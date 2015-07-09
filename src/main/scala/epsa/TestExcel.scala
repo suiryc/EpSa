@@ -78,6 +78,21 @@ class TestExcel extends Application {
   import TestExcel._
 
   var previousXPos: Option[String] = None
+  var xZoomPos1: Option[String] = None
+  var xZoomPos2: Option[String] = None
+
+  val verticalLine = new Line(0, 0, 0, 0)
+  verticalLine.setStrokeWidth(0.5)
+  verticalLine.setVisible(false)
+  // Note: it is important to disable the line, otherwise it will somehow
+  // steal mouse pointer and trigger spurious onMouseExited/onMouseEntered
+  // events on underlying chart.
+  verticalLine.setDisable(true)
+
+  val horizontalLine = new Line(0, 0, 0, 0)
+  horizontalLine.setStrokeWidth(0.5)
+  horizontalLine.setVisible(false)
+  horizontalLine.setDisable(true)
 
   def launch() {
     Application.launch()
@@ -119,65 +134,99 @@ class TestExcel extends Application {
     chart.getData.add(series)
     val chartBackground = chart.lookup(".chart-plot-background").asInstanceOf[Region]
 
-    val verticalLine = new Line(0, 0, 0, 0)
-    verticalLine.setStrokeWidth(0.5)
-    verticalLine.setVisible(false)
-    // Note: it is important to disable the line, otherwise it will somehow
-    // steal mouse pointer and trigger spurious onMouseExited/onMouseEntered
-    // events on underlying chart.
-    verticalLine.setDisable(true)
-
-    val horizontalLine = new Line(0, 0, 0, 0)
-    horizontalLine.setStrokeWidth(0.5)
-    horizontalLine.setVisible(false)
-    horizontalLine.setDisable(true)
-
     val chartPane = new Pane()
     chartPane.getChildren.addAll(chart, verticalLine, horizontalLine)
     // Note: it is not a good idea to track mouse from chartBackground, since
     // crossing any displayed element (e.g. grid) will trigger exited/entered.
     // Better track mouse on chart, and check whether it is over the graph.
-    chart.setOnMouseEntered { (event: MouseEvent) =>
-      // Note: we need to determine the position of the chart background
-      // relatively to the vertical line parent.
-      val bounds = getBounds(chartBackground, chartPane)
-      verticalLine.setStartY(bounds.getMinY)
-      verticalLine.setEndY(bounds.getMinY + bounds.getHeight)
-    }
-    chart.setOnMouseExited { (event: MouseEvent) =>
-      verticalLine.setVisible(false)
-      horizontalLine.setVisible(false)
-    }
-    chart.setOnMouseMoved { (event: MouseEvent) =>
-      val bounds = getBounds(chartBackground, chartPane)
-
-      if (bounds.contains(event.getX, event.getY)) {
-        // Note: mouse position is relative to the chart, while xAxis works
-        // relatively to the background. So adjust.
-        Option(xAxis.getValueForDisplay(event.getX - bounds.getMinX)).foreach { xPos =>
-          if (!previousXPos.contains(xPos)) {
-            val x = bounds.getMinX + xAxis.getDisplayPosition(xPos)
-            val y = bounds.getMinY + yAxis.getDisplayPosition(valuesMap(xPos))
-            verticalLine.setStartX(x)
-            verticalLine.setEndX(x)
-            verticalLine.setVisible(true)
-            horizontalLine.setStartX(bounds.getMinX)
-            horizontalLine.setEndX(x)
-            horizontalLine.setStartY(y)
-            horizontalLine.setEndY(y)
-            horizontalLine.setVisible(true)
-          }
-          previousXPos = Some(xPos)
-        }
-      } else {
-        verticalLine.setVisible(false)
-        horizontalLine.setVisible(false)
-      }
-    }
+    chart.setOnMouseEntered(onMouseEntered(chartPane, chartBackground) _)
+    chart.setOnMouseExited(onMouseExited _)
+    chart.setOnMouseMoved(onMouseMoved(chartPane, chartBackground, xAxis, yAxis, valuesMap) _)
+    chart.setOnMousePressed(onMousePressed(chartPane, chartBackground, xAxis) _)
+    chart.setOnMouseReleased(onMouseReleased _)
+    chart.setOnMouseDragged(onMouseDragged(chartPane, chartBackground, xAxis, yAxis, valuesMap) _)
 
     val scene = new Scene(chartPane)
     stage.setScene(scene)
     stage.show()
+  }
+
+  private def onMouseEntered(chartPane: Pane, chartBackground: Region)(event: MouseEvent): Unit = {
+    // Note: we need to determine the position of the chart background
+    // relatively to the vertical line parent.
+    val bounds = getBounds(chartBackground, chartPane)
+    verticalLine.setStartY(bounds.getMinY)
+    verticalLine.setEndY(bounds.getMinY + bounds.getHeight)
+  }
+
+  private def onMouseExited(event: MouseEvent): Unit = {
+    verticalLine.setVisible(false)
+    horizontalLine.setVisible(false)
+  }
+
+  private def onMouseMoved(chartPane: Pane, chartBackground: Region, xAxis: CategoryAxis, yAxis: NumberAxis, valuesMap: Map[String, Double])(event: MouseEvent): Unit = {
+    val bounds = getBounds(chartBackground, chartPane)
+
+    if (bounds.contains(event.getX, event.getY)) {
+      // Note: mouse position is relative to the chart, while xAxis works
+      // relatively to the background. So adjust.
+      Option(xAxis.getValueForDisplay(event.getX - bounds.getMinX)).foreach { xPos =>
+        if (!previousXPos.contains(xPos)) {
+          val x = bounds.getMinX + xAxis.getDisplayPosition(xPos)
+          val y = bounds.getMinY + yAxis.getDisplayPosition(valuesMap(xPos))
+          verticalLine.setStartX(x)
+          verticalLine.setEndX(x)
+          verticalLine.setVisible(true)
+          horizontalLine.setStartX(bounds.getMinX)
+          horizontalLine.setEndX(x)
+          horizontalLine.setStartY(y)
+          horizontalLine.setEndY(y)
+          horizontalLine.setVisible(true)
+        }
+        previousXPos = Some(xPos)
+      }
+    } else {
+      verticalLine.setVisible(false)
+      horizontalLine.setVisible(false)
+    }
+  }
+
+  private def onMousePressed(chartPane: Pane, chartBackground: Region, xAxis: CategoryAxis)(event: MouseEvent): Unit = {
+    val bounds = getBounds(chartBackground, chartPane)
+
+    if (bounds.contains(event.getX, event.getY)) {
+      // Note: mouse position is relative to the chart, while xAxis works
+      // relatively to the background. So adjust.
+      Option(xAxis.getValueForDisplay(event.getX - bounds.getMinX)).foreach { xPos =>
+        xZoomPos1 = Some(xPos)
+      }
+    }
+  }
+
+  private def onMouseReleased(event: MouseEvent): Unit = {
+    for {
+      pos1 <- xZoomPos1
+      pos2 <- xZoomPos2
+    } {
+      println(s"xZoomPos1: $pos1; xZoomPos2: $pos2")
+    }
+
+    xZoomPos1 = None
+    xZoomPos2 = None
+  }
+
+  private def onMouseDragged(chartPane: Pane, chartBackground: Region, xAxis: CategoryAxis, yAxis: NumberAxis, valuesMap: Map[String, Double])(event: MouseEvent): Unit = {
+    val bounds = getBounds(chartBackground, chartPane)
+
+    if (bounds.contains(event.getX, event.getY)) {
+      // Note: mouse position is relative to the chart, while xAxis works
+      // relatively to the background. So adjust.
+      Option(xAxis.getValueForDisplay(event.getX - bounds.getMinX)).foreach { xPos =>
+        xZoomPos2 = Some(xPos)
+      }
+    }
+
+    onMouseMoved(chartPane, chartBackground, xAxis, yAxis, valuesMap)(event)
   }
 
   private def getBounds(node: Node, root: Node): Bounds = {
