@@ -7,7 +7,7 @@ import javafx.application.Application
 import javafx.geometry.Bounds
 import javafx.scene.{Node, Scene}
 import javafx.scene.chart.{XYChart, LineChart, NumberAxis, CategoryAxis}
-import javafx.scene.input.MouseEvent
+import javafx.scene.input.{MouseEvent, ScrollEvent}
 import javafx.scene.layout.{Pane, Region}
 import javafx.scene.shape.Line
 import javafx.stage.Stage
@@ -75,11 +75,30 @@ object TestExcel {
 
 class TestExcel extends Application {
 
-  import TestExcel._
+  def launch() {
+    Application.launch()
+  }
+
+  override def start(stage: Stage) {
+    val chartHandler = new ChartHandler(TestExcel.support)
+
+    val scene = new Scene(chartHandler.chartPane)
+    stage.setScene(scene)
+    stage.show()
+  }
+
+}
+
+case class AssetValue(date: Date, value: Double)
+case class Support(name: String, values: List[AssetValue] = Nil)
+
+class ChartHandler(support: Support) {
 
   var previousXPos: Option[String] = None
   var xZoomPos1: Option[String] = None
   var xZoomPos2: Option[String] = None
+  var xDropLeft = 0
+  var xDropRight = 0
 
   val verticalLine = new Line(0, 0, 0, 0)
   verticalLine.setStrokeWidth(0.5)
@@ -94,64 +113,84 @@ class TestExcel extends Application {
   horizontalLine.setVisible(false)
   horizontalLine.setDisable(true)
 
-  def launch() {
-    Application.launch()
+  val xAxis = new CategoryAxis()
+  xAxis.setLabel("Date")
+
+  val dateFormat = new SimpleDateFormat("yyyy-MM-dd")
+
+  val yAxis = new NumberAxis()
+  yAxis.setLabel("VL")
+  yAxis.setTickLabelFormatter(new NumberAxis.DefaultFormatter(yAxis, null, "€"))
+  yAxis.setForceZeroInRange(false)
+  yAxis.setAutoRanging(true)
+
+  val series = new XYChart.Series[String, Number]()
+  series.setName(support.name)
+  val valuesList = support.values.takeRight(100).map { v =>
+    (dateFormat.format(v.date), v.value)
+  }
+  val valuesCount = valuesList.length
+  val valuesMap = valuesList.toMap
+
+  val chart = new LineChart[String, Number](xAxis, yAxis)
+  // We don't really need animation
+  chart.setAnimated(false)
+  chart.getStylesheets.add("test.css")
+  chart.getStyleClass.add("custom-chart")
+  chart.setTitle("Valeurs liquidatives")
+  chart.setCreateSymbols(false)
+  chart.setPrefSize(640, 480)
+  chart.getData.add(series)
+  val chartBackground = chart.lookup(".chart-plot-background").asInstanceOf[Region]
+
+  setData()
+
+  val chartPane = new Pane()
+  chartPane.getChildren.addAll(chart, verticalLine, horizontalLine)
+  // Note: it is not a good idea to track mouse from chartBackground, since
+  // crossing any displayed element (e.g. grid) will trigger exited/entered.
+  // Better track mouse on chart, and check whether it is over the graph.
+  chart.setOnMouseEntered(onMouseEntered _)
+  chart.setOnMouseExited(onMouseExited _)
+  chart.setOnMouseMoved(onMouseMoved _)
+  chart.setOnMousePressed(onMousePressed _)
+  chart.setOnMouseReleased(onMouseReleased _)
+  chart.setOnMouseDragged(onMouseDragged _)
+  chart.setOnScroll(onScroll _)
+
+  private def getValueIndex(x: String): Int = {
+    @scala.annotation.tailrec
+    def loop(values: List[(String, Double)], idx: Int): Int = values.headOption match {
+      case Some((valueX, _)) =>
+        if (valueX == x) {
+          idx
+        } else {
+          loop(values.tail, idx + 1)
+        }
+
+      case None =>
+        -1
+    }
+
+    loop(valuesList, 0)
   }
 
-  override def start(stage: Stage) {
-    val xAxis = new CategoryAxis()
-    xAxis.setLabel("Date")
-
-    val dateFormat = new SimpleDateFormat("yyyy-MM-dd")
-
-    val yAxis = new NumberAxis()
-    yAxis.setLabel("VL")
-    yAxis.setTickLabelFormatter(new NumberAxis.DefaultFormatter(yAxis, null, "€"))
-    yAxis.setForceZeroInRange(false)
-    yAxis.setAutoRanging(true)
-
-    val series = new XYChart.Series[String, Number]()
-    series.setName(support.name)
-    val valuesList = support.values.takeRight(100).map { v =>
-      (dateFormat.format(v.date), v.value)
-    }
-    val valuesMap = valuesList.toMap
-    for (value <- valuesList) {
-      series.getData.add(
-        new XYChart.Data[String, Number](
-          value._1,
-          value._2
-        )
-      )
+  private def setData(): Unit = {
+    val data = valuesList.drop(xDropLeft).dropRight(xDropRight).map { case (valueX, valueY) =>
+      new XYChart.Data[String, Number](valueX, valueY)
     }
 
-    val chart = new LineChart[String, Number](xAxis, yAxis)
-    chart.getStylesheets.add("test.css")
-    chart.getStyleClass.add("custom-chart")
-    chart.setTitle("Valeurs liquidatives")
-    chart.setCreateSymbols(false)
-    chart.setPrefSize(640, 480)
-    chart.getData.add(series)
-    val chartBackground = chart.lookup(".chart-plot-background").asInstanceOf[Region]
+    // Since we are about to change the chart data, hide lines
+    verticalLine.setVisible(false)
+    horizontalLine.setVisible(false)
 
-    val chartPane = new Pane()
-    chartPane.getChildren.addAll(chart, verticalLine, horizontalLine)
-    // Note: it is not a good idea to track mouse from chartBackground, since
-    // crossing any displayed element (e.g. grid) will trigger exited/entered.
-    // Better track mouse on chart, and check whether it is over the graph.
-    chart.setOnMouseEntered(onMouseEntered(chartPane, chartBackground) _)
-    chart.setOnMouseExited(onMouseExited _)
-    chart.setOnMouseMoved(onMouseMoved(chartPane, chartBackground, xAxis, yAxis, valuesMap) _)
-    chart.setOnMousePressed(onMousePressed(chartPane, chartBackground, xAxis) _)
-    chart.setOnMouseReleased(onMouseReleased _)
-    chart.setOnMouseDragged(onMouseDragged(chartPane, chartBackground, xAxis, yAxis, valuesMap) _)
-
-    val scene = new Scene(chartPane)
-    stage.setScene(scene)
-    stage.show()
+    // Note: clearing series data while chart is animated triggers an Exception
+    // See: http://stackoverflow.com/a/30396889
+    series.getData.clear()
+    series.getData.setAll(data : _*)
   }
 
-  private def onMouseEntered(chartPane: Pane, chartBackground: Region)(event: MouseEvent): Unit = {
+  private def onMouseEntered(event: MouseEvent): Unit = {
     // Note: we need to determine the position of the chart background
     // relatively to the vertical line parent.
     val bounds = getBounds(chartBackground, chartPane)
@@ -164,7 +203,7 @@ class TestExcel extends Application {
     horizontalLine.setVisible(false)
   }
 
-  private def onMouseMoved(chartPane: Pane, chartBackground: Region, xAxis: CategoryAxis, yAxis: NumberAxis, valuesMap: Map[String, Double])(event: MouseEvent): Unit = {
+  private def onMouseMoved(event: MouseEvent): Unit = {
     val bounds = getBounds(chartBackground, chartPane)
 
     if (bounds.contains(event.getX, event.getY)) {
@@ -191,7 +230,7 @@ class TestExcel extends Application {
     }
   }
 
-  private def onMousePressed(chartPane: Pane, chartBackground: Region, xAxis: CategoryAxis)(event: MouseEvent): Unit = {
+  private def onMousePressed(event: MouseEvent): Unit = {
     val bounds = getBounds(chartBackground, chartPane)
 
     if (bounds.contains(event.getX, event.getY)) {
@@ -204,18 +243,87 @@ class TestExcel extends Application {
   }
 
   private def onMouseReleased(event: MouseEvent): Unit = {
+    def getDrops(xZoomPos1: String, xZoomPos2: String): Option[(Int, Int)] = {
+      val (xZoomFrom, xZoomTo) = if (xZoomPos1 < xZoomPos2) {
+        (xZoomPos1, xZoomPos2)
+      } else {
+        (xZoomPos2, xZoomPos1)
+      }
+
+      @scala.annotation.tailrec
+      def loop(values: List[(String, Double)], idx: Int, xDropLeft: Option[Int]): Option[(Int, Int)] = {
+        values.headOption match {
+          case Some((valueX, _)) =>
+            xDropLeft match {
+              case None =>
+                if (xZoomFrom == valueX) {
+                  loop(values.tail, idx + 1, Some(idx))
+                } else {
+                  loop(values.tail, idx + 1, None)
+                }
+
+              case Some(left) =>
+                if (xZoomTo == valueX) {
+                  Some(left, values.tail.length - 1)
+                } else {
+                  loop(values.tail, idx + 1, xDropLeft)
+                }
+            }
+
+          case None =>
+            xDropLeft.map(left => (left, 0))
+        }
+      }
+
+      loop(valuesList, 0, None)
+    }
+
     for {
       pos1 <- xZoomPos1
       pos2 <- xZoomPos2
     } {
-      println(s"xZoomPos1: $pos1; xZoomPos2: $pos2")
+      if (pos1 != pos2) {
+        getDrops(pos1, pos2).foreach { case (dropLeft, dropRight) =>
+          if ((dropLeft != xDropLeft) || (dropRight != xDropRight)) {
+            xDropLeft = dropLeft
+            xDropRight = dropRight
+            setData()
+          }
+        }
+      }
     }
 
     xZoomPos1 = None
     xZoomPos2 = None
   }
 
-  private def onMouseDragged(chartPane: Pane, chartBackground: Region, xAxis: CategoryAxis, yAxis: NumberAxis, valuesMap: Map[String, Double])(event: MouseEvent): Unit = {
+  private def onScroll(event: ScrollEvent): Unit = {
+    val bounds = getBounds(chartBackground, chartPane)
+    val deltaY = (event.getDeltaY / event.getMultiplierY).toInt
+
+    if ((deltaY != 0) && bounds.contains(event.getX, event.getY)) {
+      // Note: mouse position is relative to the chart, while xAxis works
+      // relatively to the background. So adjust.
+      Option(xAxis.getValueForDisplay(event.getX - bounds.getMinX)).foreach { xPos =>
+        val zoomCenterIdx = getValueIndex(xPos)
+        if (deltaY > 0) {
+          // Zoom in
+          xDropLeft = math.min(zoomCenterIdx - 2, zoomCenterIdx - (zoomCenterIdx - xDropLeft) / (2 * deltaY))
+          xDropRight = valuesCount - math.max(zoomCenterIdx + 2, zoomCenterIdx + (valuesCount - xDropRight - zoomCenterIdx) / (2 * deltaY))
+        } else {
+          // Zoom out
+          xDropLeft = math.max(0, zoomCenterIdx - (zoomCenterIdx - xDropLeft) * (-3 * deltaY) / 2)
+          xDropRight = valuesCount - math.min(valuesCount, zoomCenterIdx + (valuesCount - xDropRight - zoomCenterIdx) * (-3 * deltaY) / 2)
+        }
+
+        setData()
+        // XXX - recompute vertical line height
+        // XXX - prevent zoom in to scroll left/right once maximum zoom level has been reached
+      }
+    }
+  }
+
+  private def onMouseDragged(event: MouseEvent): Unit = {
     val bounds = getBounds(chartBackground, chartPane)
 
     if (bounds.contains(event.getX, event.getY)) {
@@ -224,9 +332,11 @@ class TestExcel extends Application {
       Option(xAxis.getValueForDisplay(event.getX - bounds.getMinX)).foreach { xPos =>
         xZoomPos2 = Some(xPos)
       }
+
+      // XXX - grey out zoom zone
     }
 
-    onMouseMoved(chartPane, chartBackground, xAxis, yAxis, valuesMap)(event)
+    onMouseMoved(event)
   }
 
   private def getBounds(node: Node, root: Node): Bounds = {
@@ -243,6 +353,3 @@ class TestExcel extends Application {
   }
 
 }
-
-case class AssetValue(date: Date, value: Double)
-case class Support(name: String, values: List[AssetValue] = Nil)
