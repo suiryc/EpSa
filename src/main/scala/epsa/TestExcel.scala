@@ -99,6 +99,7 @@ class ChartHandler(support: Support) {
   var xZoomPos2: Option[String] = None
   var xDropLeft = 0
   var xDropRight = 0
+  val minValues = 20
 
   val verticalLine = new Line(0, 0, 0, 0)
   verticalLine.setStrokeWidth(0.5)
@@ -183,6 +184,8 @@ class ChartHandler(support: Support) {
     // Since we are about to change the chart data, hide lines
     verticalLine.setVisible(false)
     horizontalLine.setVisible(false)
+    // and reset previous position
+    previousXPos = None
 
     // Note: clearing series data while chart is animated triggers an Exception
     // See: http://stackoverflow.com/a/30396889
@@ -190,17 +193,38 @@ class ChartHandler(support: Support) {
     series.getData.setAll(data : _*)
   }
 
+  private def drawLines(event: MouseEvent, obounds: Option[Bounds] = None, xPos: Option[String] = None): Unit = {
+    val bounds = obounds.getOrElse(getBounds(chartBackground, chartPane))
+
+    xPos.orElse(Option(xAxis.getValueForDisplay(event.getX - bounds.getMinX))).foreach { xPos =>
+      val x = bounds.getMinX + xAxis.getDisplayPosition(xPos)
+      val y = bounds.getMinY + yAxis.getDisplayPosition(valuesMap(xPos))
+      if (!verticalLine.isVisible) {
+        // Note: we need to determine the position of the chart background
+        // relatively to the vertical line parent.
+        verticalLine.setStartY(bounds.getMinY)
+        verticalLine.setEndY(bounds.getMinY + bounds.getHeight)
+      }
+      verticalLine.setStartX(x)
+      verticalLine.setEndX(x)
+      verticalLine.setVisible(true)
+      horizontalLine.setStartX(bounds.getMinX)
+      horizontalLine.setEndX(x)
+      horizontalLine.setStartY(y)
+      horizontalLine.setEndY(y)
+      horizontalLine.setVisible(true)
+    }
+  }
+
   private def onMouseEntered(event: MouseEvent): Unit = {
-    // Note: we need to determine the position of the chart background
-    // relatively to the vertical line parent.
-    val bounds = getBounds(chartBackground, chartPane)
-    verticalLine.setStartY(bounds.getMinY)
-    verticalLine.setEndY(bounds.getMinY + bounds.getHeight)
+    drawLines(event)
   }
 
   private def onMouseExited(event: MouseEvent): Unit = {
     verticalLine.setVisible(false)
     horizontalLine.setVisible(false)
+    // Reset previous position, so that it can be redrawn if we re-enter
+    previousXPos = None
   }
 
   private def onMouseMoved(event: MouseEvent): Unit = {
@@ -211,18 +235,9 @@ class ChartHandler(support: Support) {
       // relatively to the background. So adjust.
       Option(xAxis.getValueForDisplay(event.getX - bounds.getMinX)).foreach { xPos =>
         if (!previousXPos.contains(xPos)) {
-          val x = bounds.getMinX + xAxis.getDisplayPosition(xPos)
-          val y = bounds.getMinY + yAxis.getDisplayPosition(valuesMap(xPos))
-          verticalLine.setStartX(x)
-          verticalLine.setEndX(x)
-          verticalLine.setVisible(true)
-          horizontalLine.setStartX(bounds.getMinX)
-          horizontalLine.setEndX(x)
-          horizontalLine.setStartY(y)
-          horizontalLine.setEndY(y)
-          horizontalLine.setVisible(true)
+          previousXPos = Some(xPos)
+          drawLines(event, Some(bounds), previousXPos)
         }
-        previousXPos = Some(xPos)
       }
     } else {
       verticalLine.setVisible(false)
@@ -306,19 +321,45 @@ class ChartHandler(support: Support) {
       // relatively to the background. So adjust.
       Option(xAxis.getValueForDisplay(event.getX - bounds.getMinX)).foreach { xPos =>
         val zoomCenterIdx = getValueIndex(xPos)
-        if (deltaY > 0) {
+        val redraw = if (deltaY > 0) {
           // Zoom in
-          xDropLeft = math.min(zoomCenterIdx - 2, zoomCenterIdx - (zoomCenterIdx - xDropLeft) / (2 * deltaY))
-          xDropRight = valuesCount - math.max(zoomCenterIdx + 2, zoomCenterIdx + (valuesCount - xDropRight - zoomCenterIdx) / (2 * deltaY))
+          // Note: keep at least minValues values on screen
+          if (valuesCount - xDropLeft - xDropRight > minValues) {
+            xDropLeft = math.min(math.max(0, zoomCenterIdx - minValues / 2), zoomCenterIdx - (zoomCenterIdx - xDropLeft) / (2 * deltaY))
+            xDropRight = valuesCount - math.max(math.min(valuesCount, zoomCenterIdx + minValues / 2), zoomCenterIdx + (valuesCount - xDropRight - zoomCenterIdx) / (2 * deltaY))
+
+            @scala.annotation.tailrec
+            def loop(left: Boolean) {
+              if (valuesCount - xDropLeft - xDropRight < minValues) {
+                if ((left || (xDropRight == 0)) && (xDropLeft > 0)) {
+                  xDropLeft -= 1
+                  loop(left = false)
+                } else if (xDropRight > 0) {
+                  xDropRight -= 1
+                  loop(left = true)
+                }
+              }
+            }
+            loop(left = true)
+
+            true
+          } else {
+            false
+          }
         } else {
           // Zoom out
-          xDropLeft = math.max(0, zoomCenterIdx - (zoomCenterIdx - xDropLeft) * (-3 * deltaY) / 2)
-          xDropRight = valuesCount - math.min(valuesCount, zoomCenterIdx + (valuesCount - xDropRight - zoomCenterIdx) * (-3 * deltaY) / 2)
+          if ((xDropLeft > 0) || (xDropRight > 0)) {
+            xDropLeft = math.max(0, zoomCenterIdx - (zoomCenterIdx - xDropLeft) * (-3 * deltaY) / 2)
+            xDropRight = valuesCount - math.min(valuesCount, zoomCenterIdx + (valuesCount - xDropRight - zoomCenterIdx) * (-3 * deltaY) / 2)
+            true
+          } else {
+            false
+          }
         }
 
-        setData()
-        // XXX - recompute vertical line height
-        // XXX - prevent zoom in to scroll left/right once maximum zoom level has been reached
+        if (redraw) {
+          setData()
+        }
       }
     }
   }
