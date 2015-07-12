@@ -257,6 +257,22 @@ class ChartHandler(support: Support) {
     }
   }
 
+  private def ensureMinValues(): Unit = {
+    @scala.annotation.tailrec
+    def loop(left: Boolean) {
+      if (valuesCount - xDropLeft - xDropRight < minValues) {
+        if ((left || (xDropRight == 0)) && (xDropLeft > 0)) {
+          xDropLeft -= 1
+          loop(left = false)
+        } else if (xDropRight > 0) {
+          xDropRight -= 1
+          loop(left = true)
+        }
+      }
+    }
+    loop(left = true)
+  }
+
   private def onMouseReleased(event: MouseEvent): Unit = {
     def getDrops(xZoomPos1: String, xZoomPos2: String): Option[(Int, Int)] = {
       val (xZoomFrom, xZoomTo) = if (xZoomPos1 < xZoomPos2) {
@@ -302,6 +318,7 @@ class ChartHandler(support: Support) {
           if ((dropLeft != xDropLeft) || (dropRight != xDropRight)) {
             xDropLeft = dropLeft
             xDropRight = dropRight
+            ensureMinValues()
             setData()
           }
         }
@@ -328,19 +345,7 @@ class ChartHandler(support: Support) {
             xDropLeft = math.min(math.max(0, zoomCenterIdx - minValues / 2), zoomCenterIdx - (zoomCenterIdx - xDropLeft) / (2 * deltaY))
             xDropRight = valuesCount - math.max(math.min(valuesCount, zoomCenterIdx + minValues / 2), zoomCenterIdx + (valuesCount - xDropRight - zoomCenterIdx) / (2 * deltaY))
 
-            @scala.annotation.tailrec
-            def loop(left: Boolean) {
-              if (valuesCount - xDropLeft - xDropRight < minValues) {
-                if ((left || (xDropRight == 0)) && (xDropLeft > 0)) {
-                  xDropLeft -= 1
-                  loop(left = false)
-                } else if (xDropRight > 0) {
-                  xDropRight -= 1
-                  loop(left = true)
-                }
-              }
-            }
-            loop(left = true)
+            ensureMinValues()
 
             true
           } else {
