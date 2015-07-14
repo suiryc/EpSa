@@ -10,7 +10,8 @@ import javafx.scene.chart.{XYChart, LineChart, NumberAxis, CategoryAxis}
 import javafx.scene.control.Label
 import javafx.scene.input.{MouseEvent, ScrollEvent}
 import javafx.scene.layout.{Pane, Region}
-import javafx.scene.shape.Line
+import javafx.scene.paint.Color
+import javafx.scene.shape.{Line, Rectangle}
 import javafx.stage.Stage
 import org.apache.poi.ss.usermodel.WorkbookFactory
 import suiryc.scala.concurrent.Cancellable
@@ -115,6 +116,12 @@ class ChartHandler(support: Support) {
   horizontalLine.setVisible(false)
   horizontalLine.setDisable(true)
 
+  val zoomZone = new Rectangle()
+  zoomZone.setFill(Color.BLACK)
+  zoomZone.setStyle("-fx-opacity: 0.2;")
+  zoomZone.setVisible(false)
+  zoomZone.setDisable(true)
+
   val labelVL = new Label("")
   labelVL.getStyleClass.addAll("default-color0", "chart-line-symbol", "chart-series-line")
   labelVL.setStyle("-fx-font-size: 14; -fx-opacity: 0.6;")
@@ -156,7 +163,7 @@ class ChartHandler(support: Support) {
   setData()
 
   val chartPane = new Pane()
-  chartPane.getChildren.addAll(chart, verticalLine, horizontalLine, labelVL)
+  chartPane.getChildren.addAll(chart, zoomZone, verticalLine, horizontalLine, labelVL)
   // Note: it is not a good idea to track mouse from chartBackground, since
   // crossing any displayed element (e.g. grid) will trigger exited/entered.
   // Better track mouse on chart, and check whether it is over the graph.
@@ -199,7 +206,16 @@ class ChartHandler(support: Support) {
     series.getData.setAll(data : _*)
   }
 
+  private def hideZoomArea(): Unit = {
+    if (zoomZone.isVisible) {
+      zoomZone.setVisible(false)
+      zoomZone.setWidth(0)
+      zoomZone.setHeight(0)
+    }
+  }
+
   private def hideLines(): Unit = {
+    hideZoomArea()
     labelVLCancellable.foreach(_.cancel())
     labelVLCancellable = None
     labelVL.setVisible(false)
@@ -210,11 +226,14 @@ class ChartHandler(support: Support) {
     previousXPos = None
   }
 
+  def getX(bounds: Bounds, xPos: String): Double =
+    bounds.getMinX + xAxis.getDisplayPosition(xPos)
+
   private def drawLines(event: MouseEvent, obounds: Option[Bounds] = None, xPos: Option[String] = None): Unit = {
     val bounds = obounds.getOrElse(getBounds(chartBackground, chartPane))
 
     def getXY(xPos: String): (Double, Double) = {
-      val x = bounds.getMinX + xAxis.getDisplayPosition(xPos)
+      val x = getX(bounds, xPos)
       val y = bounds.getMinY + yAxis.getDisplayPosition(valuesMap(xPos))
       (x, y)
     }
@@ -223,6 +242,18 @@ class ChartHandler(support: Support) {
     // relatively to the background. So adjust.
     xPos.orElse(Option(xAxis.getValueForDisplay(event.getX - bounds.getMinX))).foreach { xPos =>
       val (x, y) = getXY(xPos)
+
+      xZoomPos1.foreach { xPos1 =>
+        val x1 = getX(bounds, xPos1)
+        if (xPos >= xPos1) {
+          zoomZone.setWidth(x - x1)
+        } else {
+          // going left: needs to change x position
+          zoomZone.setX(x)
+          zoomZone.setWidth(x1 - x)
+        }
+      }
+
       verticalLine.setStartX(x)
       verticalLine.setEndX(x)
       verticalLine.setStartY(y)
@@ -330,6 +361,10 @@ class ChartHandler(support: Support) {
       // relatively to the background. So adjust.
       Option(xAxis.getValueForDisplay(event.getX - bounds.getMinX)).foreach { xPos =>
         xZoomPos1 = Some(xPos)
+        zoomZone.setX(getX(bounds, xPos))
+        zoomZone.setY(bounds.getMinY)
+        zoomZone.setHeight(bounds.getMaxY - bounds.getMinY)
+        zoomZone.setVisible(true)
       }
     }
   }
@@ -402,6 +437,7 @@ class ChartHandler(support: Support) {
       }
     }
 
+    hideZoomArea()
     xZoomPos1 = None
     xZoomPos2 = None
   }
@@ -455,8 +491,6 @@ class ChartHandler(support: Support) {
       Option(xAxis.getValueForDisplay(event.getX - bounds.getMinX)).foreach { xPos =>
         xZoomPos2 = Some(xPos)
       }
-
-      // XXX - grey out zoom zone
     }
 
     onMouseMoved(event)
