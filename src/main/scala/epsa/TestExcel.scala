@@ -143,7 +143,7 @@ class ChartHandler(support: Support) {
 
   val series = new XYChart.Series[String, Number]()
   series.setName(support.name)
-  val valuesList = support.values.takeRight(100).map { v =>
+  val valuesList = support.values.takeRight(200).map { v =>
     (dateFormat.format(v.date), v.value)
   }
   val valuesCount = valuesList.length
@@ -246,6 +246,7 @@ class ChartHandler(support: Support) {
       xZoomPos1.foreach { xPos1 =>
         val x1 = getX(bounds, xPos1)
         if (xPos >= xPos1) {
+          zoomZone.setX(x1)
           zoomZone.setWidth(x - x1)
         } else {
           // going left: needs to change x position
@@ -334,6 +335,8 @@ class ChartHandler(support: Support) {
 
   private def onMouseExited(event: MouseEvent): Unit = {
     hideLines()
+    xZoomPos1 = None
+    xZoomPos2 = None
   }
 
   private def onMouseMoved(event: MouseEvent): Unit = {
@@ -362,6 +365,7 @@ class ChartHandler(support: Support) {
       Option(xAxis.getValueForDisplay(event.getX - bounds.getMinX)).foreach { xPos =>
         xZoomPos1 = Some(xPos)
         zoomZone.setX(getX(bounds, xPos))
+        zoomZone.setWidth(0)
         zoomZone.setY(bounds.getMinY)
         zoomZone.setHeight(bounds.getMaxY - bounds.getMinY)
         zoomZone.setVisible(true)
@@ -427,12 +431,15 @@ class ChartHandler(support: Support) {
     } {
       if (pos1 != pos2) {
         getDrops(pos1, pos2).foreach { case (dropLeft, dropRight) =>
-          if ((dropLeft != xDropLeft) || (dropRight != xDropRight)) {
+          if (((dropLeft != xDropLeft) || (dropRight != xDropRight)) &&
+            (valuesCount - xDropLeft - xDropRight > minValues))
+          {
             xDropLeft = dropLeft
             xDropRight = dropRight
             ensureMinValues()
             setData()
           }
+          // else: either we selected the same zone, or we cannot zoom anymore
         }
       }
     }
