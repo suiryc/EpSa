@@ -266,6 +266,11 @@ class ChartHandler(support: Support) {
       horizontalLine.setEndY(y)
       horizontalLine.setVisible(true)
 
+      // Note: in general it is considered bad practice to modify a value from
+      // within its listener.
+      // Would require to delay all actions on label ? (to prevent concurrency
+      // issues between immediate ones - mouse being moved - and delayed ones)
+
       def setLabelX() = if (labelVL.isVisible) {
         labelVL.setTranslateX(x - labelVL.getWidth / 2)
       }
