@@ -15,7 +15,7 @@ import javafx.scene.shape.{Line, Rectangle}
 import javafx.stage.Stage
 import org.apache.poi.ss.usermodel.WorkbookFactory
 import suiryc.scala.concurrent.Cancellable
-import suiryc.scala.javafx.beans.property.RichReadOnlyProperty
+import suiryc.scala.javafx.beans.property.RichReadOnlyProperty._
 import suiryc.scala.javafx.event.EventHandler._
 
 object TestExcel {
@@ -96,7 +96,8 @@ case class Support(name: String, values: List[AssetValue] = Nil)
 
 class ChartHandler(support: Support) {
 
-  var previousXPos: Option[String] = None
+  var currentXPos: Option[String] = None
+  var xReference: Option[String] = None
   var xZoomPos1: Option[String] = None
   var xZoomPos2: Option[String] = None
   var xDropLeft = 0
@@ -130,6 +131,18 @@ class ChartHandler(support: Support) {
   labelVL.setDisable(true)
   var labelVLCancellable: Option[Cancellable] = None
 
+  val verticalLineRef = new Line(0, 0, 0, 0)
+  verticalLineRef.setStroke(Color.GREY)
+  verticalLineRef.setStrokeWidth(0.5)
+  verticalLineRef.setVisible(false)
+  verticalLineRef.setDisable(true)
+
+  val horizontalLineRef = new Line(0, 0, 0, 0)
+  horizontalLineRef.setStroke(Color.GREY)
+  horizontalLineRef.setStrokeWidth(0.5)
+  horizontalLineRef.setVisible(false)
+  horizontalLineRef.setDisable(true)
+
   val xAxis = new CategoryAxis()
   xAxis.setLabel("Date")
 
@@ -158,13 +171,18 @@ class ChartHandler(support: Support) {
   chart.setCreateSymbols(false)
   chart.setPrefSize(640, 480)
   chart.getData.add(series)
-  val chartBackground = chart.lookup(".chart-plot-background").asInstanceOf[Region]
+
+  val chartBg = chart.lookup(".chart-plot-background").asInstanceOf[Region]
+  var chartBgBounds: Option[Bounds] = None
+  chartBg.boundsInParentProperty.listen {
+    chartBgBounds = None
+  }
 
   setData()
 
   val chartPane = new Pane()
-  chartPane.getChildren.addAll(chart, zoomZone, verticalLine, horizontalLine, labelVL)
-  // Note: it is not a good idea to track mouse from chartBackground, since
+  chartPane.getChildren.addAll(chart, zoomZone, verticalLineRef, horizontalLineRef, verticalLine, horizontalLine, labelVL)
+  // Note: it is not a good idea to track mouse from chartBg, since
   // crossing any displayed element (e.g. grid) will trigger exited/entered.
   // Better track mouse on chart, and check whether it is over the graph.
   chart.setOnMouseEntered(onMouseEntered _)
@@ -174,6 +192,30 @@ class ChartHandler(support: Support) {
   chart.setOnMouseReleased(onMouseReleased _)
   chart.setOnMouseDragged(onMouseDragged _)
   chart.setOnScroll(onScroll _)
+
+  private def getChartBackgroundBounds: Bounds = {
+    if (chartBgBounds.isEmpty) {
+      chartBgBounds = Some(getBounds(chartBg, chartPane))
+    }
+
+    chartBgBounds.get
+  }
+
+  private def withMouseInChartBackground[A](x: Double, y: Double)(f: Bounds => A): Option[A] = {
+    val bounds = getChartBackgroundBounds
+
+    if (bounds.contains(x, y)) {
+      Some(f(bounds))
+    } else {
+      None
+    }
+  }
+
+  private def withMouseInChartBackground[A](event: MouseEvent)(f: Bounds => A): Option[A] =
+    withMouseInChartBackground(event.getX, event.getY)(f)
+
+  private def withMouseInChartBackground[A](event: ScrollEvent)(f: Bounds => A): Option[A] =
+    withMouseInChartBackground(event.getX, event.getY)(f)
 
   private def getValueIndex(x: String): Int = {
     @scala.annotation.tailrec
@@ -212,6 +254,8 @@ class ChartHandler(support: Support) {
       zoomZone.setWidth(0)
       zoomZone.setHeight(0)
     }
+    xZoomPos1 = None
+    xZoomPos2 = None
   }
 
   private def hideLines(): Unit = {
@@ -220,28 +264,101 @@ class ChartHandler(support: Support) {
     labelVLCancellable = None
     labelVL.setVisible(false)
     labelVL.setText("")
-    verticalLine.setVisible(false)
     horizontalLine.setVisible(false)
+    verticalLine.setVisible(false)
+    horizontalLineRef.setVisible(false)
+    verticalLineRef.setVisible(false)
     // Reset previous position, so that it can be redrawn if we re-enter
-    previousXPos = None
+    currentXPos = None
+    xReference = None
   }
 
-  def getX(bounds: Bounds, xPos: String): Double =
+  private def getX(bounds: Bounds, x: Double): Option[String] =
+    // Note: x is relative to the chart, while xAxis works
+    // relatively to the background. So adjust.
+    Option(xAxis.getValueForDisplay(x - bounds.getMinX))
+
+  private def getX(bounds: Bounds, xPos: String): Double =
+    // Note: x is relative to the chart, while xAxis works
+    // relatively to the background. So adjust.
     bounds.getMinX + xAxis.getDisplayPosition(xPos)
 
-  private def drawLines(event: MouseEvent, obounds: Option[Bounds] = None, xPos: Option[String] = None): Unit = {
-    val bounds = obounds.getOrElse(getBounds(chartBackground, chartPane))
+  def getXY(bounds: Bounds, xPos: String): (Double, Double) = {
+    val x = getX(bounds, xPos)
+    val y = bounds.getMinY + yAxis.getDisplayPosition(valuesMap(xPos))
+    (x, y)
+  }
 
-    def getXY(xPos: String): (Double, Double) = {
-      val x = getX(bounds, xPos)
-      val y = bounds.getMinY + yAxis.getDisplayPosition(valuesMap(xPos))
-      (x, y)
+  // Note: in general it is considered bad practice to modify a value from
+  // within its listener.
+  // Would require to delay all actions on label ? (to prevent concurrency
+  // issues between immediate ones - mouse being moved - and delayed ones)
+
+  def setLabelX() = if (labelVL.isVisible) {
+    val bounds = getChartBackgroundBounds
+
+    currentXPos.map(getXY(bounds, _)) match {
+      case Some((x, _)) =>
+        labelVL.setTranslateX(x - labelVL.getWidth / 2)
+
+      case None =>
+        // No current position to set label on
     }
+  }
 
-    // Note: mouse position is relative to the chart, while xAxis works
-    // relatively to the background. So adjust.
-    xPos.orElse(Option(xAxis.getValueForDisplay(event.getX - bounds.getMinX))).foreach { xPos =>
-      val (x, y) = getXY(xPos)
+  def setLabelY() = if (labelVL.isVisible) {
+    val bounds = getChartBackgroundBounds
+
+    currentXPos.map(getXY(bounds, _)) match {
+      case Some((_, y)) =>
+        labelVL.setTranslateY(y - labelVL.getHeight - 10)
+
+      case None =>
+        // No current position to set label on
+    }
+  }
+
+  def checkLabelPosition() = if (labelVL.isVisible) {
+    val bounds = getChartBackgroundBounds
+
+    if (labelVL.getLayoutX + labelVL.getTranslateX + labelVL.getWidth > bounds.getMaxX) {
+      // right end of label is going beyond chart
+      labelVL.setTranslateX(bounds.getMaxX - labelVL.getLayoutX - labelVL.getWidth)
+    } else if (labelVL.getLayoutX + labelVL.getTranslateX < bounds.getMinX) {
+      // left end of label is going beyond chart
+      labelVL.setTranslateX(bounds.getMinX - labelVL.getLayoutX)
+    }
+    if (labelVL.getLayoutY + labelVL.getTranslateY + labelVL.getHeight > bounds.getMaxY) {
+      // bottom end of label is going beyond chart
+      labelVL.setTranslateY(bounds.getMaxY - labelVL.getLayoutY - labelVL.getHeight)
+    } else if (labelVL.getLayoutY + labelVL.getTranslateY < bounds.getMinY) {
+      // top end of label is going beyond chart
+      currentXPos.map(getXY(bounds, _)) match {
+        case Some((_, currentY)) =>
+          // We don't want to go above the chart top, but would like not to
+          // display the label in front of the chart point, unless that make
+          // it go beyond the chart bottom.
+          if ((bounds.getMinY + labelVL.getHeight < currentY) || (currentY + 10 + labelVL.getHeight > bounds.getMaxY)) {
+            // We still remain above the displayed chart point, or would go
+            // beyond the chart bottom by displaying the label underneath it.
+            // So just go at the top of the chart.
+            labelVL.setTranslateY(bounds.getMinY - labelVL.getLayoutY)
+          } else {
+            // chart point will be under the label, move it underneath
+            labelVL.setTranslateY(currentY + 10)
+          }
+
+        case None =>
+          labelVL.setTranslateY(bounds.getMinY - labelVL.getLayoutY)
+      }
+    }
+  }
+
+  private def drawLines(event: MouseEvent, obounds: Option[Bounds] = None, xPos: Option[String] = None): Unit = {
+    val bounds = obounds.getOrElse(getChartBackgroundBounds)
+
+    xPos.orElse(getX(bounds, event.getX)).foreach { xPos =>
+      val (x, y) = getXY(bounds, xPos)
 
       xZoomPos1.foreach { xPos1 =>
         val x1 = getX(bounds, xPos1)
@@ -266,57 +383,7 @@ class ChartHandler(support: Support) {
       horizontalLine.setEndY(y)
       horizontalLine.setVisible(true)
 
-      // Note: in general it is considered bad practice to modify a value from
-      // within its listener.
-      // Would require to delay all actions on label ? (to prevent concurrency
-      // issues between immediate ones - mouse being moved - and delayed ones)
-
-      def setLabelX() = if (labelVL.isVisible) {
-        labelVL.setTranslateX(x - labelVL.getWidth / 2)
-      }
-
-      def setLabelY() = if (labelVL.isVisible) {
-        labelVL.setTranslateY(y - labelVL.getHeight - 10)
-      }
-
-      def checkLabelPosition() = if (labelVL.isVisible) {
-        val xy = previousXPos.map(getXY)
-        if (labelVL.getLayoutX + labelVL.getTranslateX + labelVL.getWidth > bounds.getMaxX) {
-          // right end of label is going beyond chart
-          labelVL.setTranslateX(bounds.getMaxX - labelVL.getLayoutX - labelVL.getWidth)
-        } else if (labelVL.getLayoutX + labelVL.getTranslateX < bounds.getMinX) {
-          // left end of label is going beyond chart
-          labelVL.setTranslateX(bounds.getMinX - labelVL.getLayoutX)
-        }
-        if (labelVL.getLayoutY + labelVL.getTranslateY + labelVL.getHeight > bounds.getMaxY) {
-          // bottom end of label is going beyond chart
-          labelVL.setTranslateY(bounds.getMaxY - labelVL.getLayoutY - labelVL.getHeight)
-        } else if (labelVL.getLayoutY + labelVL.getTranslateY < bounds.getMinY) {
-          // top end of label is going beyond chart
-          xy match {
-            case Some((_, currentY)) =>
-              // We don't want to go above the chart top, but would like not to
-              // display the label in front of the chart point, unless that make
-              // it go beyond the chart bottom.
-              if ((bounds.getMinY + labelVL.getHeight < currentY) || (currentY + 10 + labelVL.getHeight > bounds.getMaxY)) {
-                // We still remain above the displayed chart point, or would go
-                // beyond the chart bottom by displaying the label underneath it.
-                // So just go at the top of the chart.
-                labelVL.setTranslateY(bounds.getMinY - labelVL.getLayoutY)
-              } else {
-                // chart point will be under the label, move it underneath
-                labelVL.setTranslateY(currentY + 10)
-              }
-
-            case None =>
-              labelVL.setTranslateY(bounds.getMinY - labelVL.getLayoutY)
-          }
-        }
-      }
-
       if (labelVLCancellable.isEmpty) {
-        import RichReadOnlyProperty._
-
         // Listen for position and dimension changes to check the label remains inside the chart
         val s1 = labelVL.boundsInParentProperty.listen(checkLabelPosition())
         // Listen to width and height changes to place the label at the right position
@@ -328,7 +395,18 @@ class ChartHandler(support: Support) {
       if (!labelVL.isVisible) {
         labelVL.setVisible(true)
       }
-      labelVL.setText(s"Date: $xPos\nVL: ${valuesMap(xPos)}€")
+
+      val yPos = valuesMap(xPos)
+      val delta = xReference.map { xRef =>
+        val delta = if (yPos != 0) {
+          val yRef = valuesMap(xRef)
+          (yPos - yRef) * 100 / yRef
+        } else {
+          0
+        }
+        f"\nVar.: $delta%+.2f%% ($xRef)"
+      }.getOrElse("")
+      labelVL.setText(s"Date: $xPos\nVL: ${yPos}€$delta")
       setLabelX()
       setLabelY()
     }
@@ -340,20 +418,16 @@ class ChartHandler(support: Support) {
 
   private def onMouseExited(event: MouseEvent): Unit = {
     hideLines()
-    xZoomPos1 = None
-    xZoomPos2 = None
   }
 
   private def onMouseMoved(event: MouseEvent): Unit = {
-    val bounds = getBounds(chartBackground, chartPane)
+    val bounds = getChartBackgroundBounds
 
     if (bounds.contains(event.getX, event.getY)) {
-      // Note: mouse position is relative to the chart, while xAxis works
-      // relatively to the background. So adjust.
-      Option(xAxis.getValueForDisplay(event.getX - bounds.getMinX)).foreach { xPos =>
-        if (!previousXPos.contains(xPos)) {
-          previousXPos = Some(xPos)
-          drawLines(event, Some(bounds), previousXPos)
+      getX(bounds, event.getX).foreach { xPos =>
+        if (!currentXPos.contains(xPos)) {
+          currentXPos = Some(xPos)
+          drawLines(event, Some(bounds), currentXPos)
         }
       }
     } else {
@@ -362,13 +436,24 @@ class ChartHandler(support: Support) {
   }
 
   private def onMousePressed(event: MouseEvent): Unit = {
-    val bounds = getBounds(chartBackground, chartPane)
+    withMouseInChartBackground(event) { bounds =>
+      getX(bounds, event.getX).foreach { xPos =>
+        val (x, y) = getXY(bounds, xPos)
 
-    if (bounds.contains(event.getX, event.getY)) {
-      // Note: mouse position is relative to the chart, while xAxis works
-      // relatively to the background. So adjust.
-      Option(xAxis.getValueForDisplay(event.getX - bounds.getMinX)).foreach { xPos =>
-        xZoomPos1 = Some(xPos)
+        xReference = Some(xPos)
+        xZoomPos1 = xReference
+
+        verticalLineRef.setStartX(x)
+        verticalLineRef.setEndX(x)
+        verticalLineRef.setStartY(y)
+        verticalLineRef.setEndY(bounds.getMaxY)
+        verticalLineRef.setVisible(true)
+        horizontalLineRef.setStartX(bounds.getMinX)
+        horizontalLineRef.setEndX(x)
+        horizontalLineRef.setStartY(y)
+        horizontalLineRef.setEndY(y)
+        horizontalLineRef.setVisible(true)
+
         zoomZone.setX(getX(bounds, xPos))
         zoomZone.setWidth(0)
         zoomZone.setY(bounds.getMinY)
@@ -450,18 +535,12 @@ class ChartHandler(support: Support) {
     }
 
     hideZoomArea()
-    xZoomPos1 = None
-    xZoomPos2 = None
   }
 
   private def onScroll(event: ScrollEvent): Unit = {
-    val bounds = getBounds(chartBackground, chartPane)
     val deltaY = (event.getDeltaY / event.getMultiplierY).toInt
-
-    if ((deltaY != 0) && bounds.contains(event.getX, event.getY)) {
-      // Note: mouse position is relative to the chart, while xAxis works
-      // relatively to the background. So adjust.
-      Option(xAxis.getValueForDisplay(event.getX - bounds.getMinX)).foreach { xPos =>
+    if (deltaY != 0) withMouseInChartBackground(event) { bounds =>
+      getX(bounds, event.getX).foreach { xPos =>
         val zoomCenterIdx = getValueIndex(xPos)
         val redraw = if (deltaY > 0) {
           // Zoom in
@@ -495,12 +574,8 @@ class ChartHandler(support: Support) {
   }
 
   private def onMouseDragged(event: MouseEvent): Unit = {
-    val bounds = getBounds(chartBackground, chartPane)
-
-    if (bounds.contains(event.getX, event.getY)) {
-      // Note: mouse position is relative to the chart, while xAxis works
-      // relatively to the background. So adjust.
-      Option(xAxis.getValueForDisplay(event.getX - bounds.getMinX)).foreach { xPos =>
+    withMouseInChartBackground(event) { bounds =>
+      getX(bounds, event.getX).foreach { xPos =>
         xZoomPos2 = Some(xPos)
       }
     }
