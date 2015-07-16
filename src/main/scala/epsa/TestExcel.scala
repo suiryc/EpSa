@@ -240,7 +240,7 @@ class ChartHandler(support: Support) {
     }
 
     // Since we are about to change the chart data, hide lines
-    hideLines()
+    hideLines(clearRef = true)
 
     // Note: clearing series data while chart is animated triggers an Exception
     // See: http://stackoverflow.com/a/30396889
@@ -258,7 +258,7 @@ class ChartHandler(support: Support) {
     xZoomPos2 = None
   }
 
-  private def hideLines(): Unit = {
+  private def hideLines(clearRef: Boolean): Unit = {
     hideZoomArea()
     labelVLCancellable.foreach(_.cancel())
     labelVLCancellable = None
@@ -266,11 +266,14 @@ class ChartHandler(support: Support) {
     labelVL.setText("")
     horizontalLine.setVisible(false)
     verticalLine.setVisible(false)
-    horizontalLineRef.setVisible(false)
-    verticalLineRef.setVisible(false)
+    // Sometimes (exiting/leaving chart) we don't want to reset the reference value
+    if (clearRef) {
+      horizontalLineRef.setVisible(false)
+      verticalLineRef.setVisible(false)
+      xReference = None
+    }
     // Reset previous position, so that it can be redrawn if we re-enter
     currentXPos = None
-    xReference = None
   }
 
   private def getX(bounds: Bounds, x: Double): Option[String] =
@@ -417,7 +420,7 @@ class ChartHandler(support: Support) {
   }
 
   private def onMouseExited(event: MouseEvent): Unit = {
-    hideLines()
+    hideLines(clearRef = false)
   }
 
   private def onMouseMoved(event: MouseEvent): Unit = {
@@ -431,7 +434,7 @@ class ChartHandler(support: Support) {
         }
       }
     } else {
-      hideLines()
+      hideLines(clearRef = false)
     }
   }
 
