@@ -5,11 +5,11 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import javafx.application.Application
 import javafx.geometry.Bounds
+import javafx.scene.text.{Text, TextFlow}
 import javafx.scene.{Node, Scene}
-import javafx.scene.chart.{XYChart, LineChart, NumberAxis, CategoryAxis}
-import javafx.scene.control.Label
+import javafx.scene.chart.{CategoryAxis, LineChart, NumberAxis, XYChart}
 import javafx.scene.input.{MouseEvent, ScrollEvent}
-import javafx.scene.layout.{Pane, Region}
+import javafx.scene.layout.{Pane, VBox, Region}
 import javafx.scene.paint.Color
 import javafx.scene.shape.{Line, Rectangle}
 import javafx.stage.Stage
@@ -97,7 +97,6 @@ case class Support(name: String, values: List[AssetValue] = Nil)
 class ChartHandler(support: Support) {
 
   var currentXPos: Option[String] = None
-  var xReference: Option[String] = None
   var xZoomPos1: Option[String] = None
   var xZoomPos2: Option[String] = None
   var xDropLeft = 0
@@ -123,7 +122,7 @@ class ChartHandler(support: Support) {
   zoomZone.setVisible(false)
   zoomZone.setDisable(true)
 
-  val labelVL = new Label("")
+  val labelVL = new ChartDataLabel()
   labelVL.getStyleClass.addAll("default-color0", "chart-line-symbol", "chart-series-line")
   labelVL.setStyle("-fx-font-size: 14; -fx-opacity: 0.6;")
   labelVL.setMinSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE)
@@ -263,14 +262,13 @@ class ChartHandler(support: Support) {
     labelVLCancellable.foreach(_.cancel())
     labelVLCancellable = None
     labelVL.setVisible(false)
-    labelVL.setText("")
     horizontalLine.setVisible(false)
     verticalLine.setVisible(false)
     // Sometimes (exiting/leaving chart) we don't want to reset the reference value
     if (clearRef) {
       horizontalLineRef.setVisible(false)
       verticalLineRef.setVisible(false)
-      xReference = None
+      labelVL.setDataRef(None)
     }
     // Reset previous position, so that it can be redrawn if we re-enter
     currentXPos = None
@@ -399,17 +397,7 @@ class ChartHandler(support: Support) {
         labelVL.setVisible(true)
       }
 
-      val yPos = valuesMap(xPos)
-      val delta = xReference.map { xRef =>
-        val delta = if (yPos != 0) {
-          val yRef = valuesMap(xRef)
-          (yPos - yRef) * 100 / yRef
-        } else {
-          0
-        }
-        f"\nVar.: $delta%+.2f%% ($xRef)"
-      }.getOrElse("")
-      labelVL.setText(s"Date: $xPos\nVL: ${yPos}€$delta")
+      labelVL.setData(ChartData(xPos, valuesMap(xPos)))
       setLabelX()
       setLabelY()
     }
@@ -443,8 +431,8 @@ class ChartHandler(support: Support) {
       getX(bounds, event.getX).foreach { xPos =>
         val (x, y) = getXY(bounds, xPos)
 
-        xReference = Some(xPos)
-        xZoomPos1 = xReference
+        xZoomPos1 = Some(xPos)
+        labelVL.setDataRef(Some(ChartData(xPos, valuesMap(xPos))))
 
         verticalLineRef.setStartX(x)
         verticalLineRef.setEndX(x)
@@ -597,6 +585,81 @@ class ChartHandler(support: Support) {
     }
 
     loop(None, node)
+  }
+
+}
+
+/** Chart data. */
+case class ChartData(x: String, y: Double)
+
+/**
+ * Chart data 'label'.
+ *
+ * Simply assembles vertically a text for the current visible data, and an
+ * optional text flow (to apply different styles) for an optional reference
+ * data.
+ */
+class ChartDataLabel extends VBox {
+
+  /** Reference data. */
+  private var refData: Option[ChartData] = None
+
+  /** Text of current data. */
+  private val dataText = new Text()
+  /** Text (optional) for reference data. */
+  private val refText = new TextFlow()
+  /** Reference data label. */
+  private val refTextLabel = new Text("Var.: ")
+  /** Reference data variation value. */
+  private val refTextValue = new Text()
+  /** Reference data data. */
+  private val refTextDate = new Text()
+
+  // First populate the reference data text flow
+  refText.getChildren.addAll(refTextLabel, refTextValue, refTextDate)
+  // And add the data text to our children
+  getChildren.addAll(dataText)
+
+  /**
+   * Changes reference data.
+   *
+   * Takes care of adding/removing the reference data text flow when necessary.
+   */
+  def setDataRef(data: Option[ChartData]): Unit = {
+    if (refData.isDefined && data.isEmpty) {
+      getChildren.setAll(dataText)
+    } else if (refData.isEmpty && data.isDefined) {
+      getChildren.setAll(dataText, refText)
+    }
+    refData = data
+    refData.foreach(setData)
+  }
+
+  /**
+   * Changes current data.
+   *
+   * Updates data text, and reference one if necessary.
+   * If reference is present, variation value is colored accordingly: red if
+   * current data is lower, green if greater, black if equal.
+   */
+  def setData(data: ChartData): Unit = {
+    dataText.setText(s"Date: ${data.x}\nVL: ${data.y}€")
+    refData.foreach { refData =>
+      val delta = if (refData.y != 0) {
+        (data.y - refData.y) * 100 / refData.y
+      } else {
+        0
+      }
+      refTextValue.setText(f"$delta%+.2f%%")
+      refTextDate.setText(s" (${refData.x})")
+      if (delta > 0) {
+        refTextValue.setFill(Color.GREEN)
+      } else if (delta < 0) {
+        refTextValue.setFill(Color.RED)
+      } else {
+        refTextValue.setFill(Color.BLACK)
+      }
+    }
   }
 
 }
