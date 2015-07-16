@@ -9,7 +9,7 @@ import javafx.scene.text.{Text, TextFlow}
 import javafx.scene.{Node, Scene}
 import javafx.scene.chart.{CategoryAxis, LineChart, NumberAxis, XYChart}
 import javafx.scene.input.{MouseEvent, ScrollEvent}
-import javafx.scene.layout.{Pane, VBox, Region}
+import javafx.scene.layout.{AnchorPane, VBox, Region}
 import javafx.scene.paint.Color
 import javafx.scene.shape.{Line, Rectangle}
 import javafx.stage.Stage
@@ -83,8 +83,9 @@ class TestExcel extends Application {
 
   override def start(stage: Stage) {
     val chartHandler = new ChartHandler(TestExcel.support)
-
-    val scene = new Scene(chartHandler.chartPane)
+    val chartPane = chartHandler.chartPane
+    chartPane.setPrefSize(640, 480)
+    val scene = new Scene(chartPane)
     stage.setScene(scene)
     stage.show()
   }
@@ -168,18 +169,28 @@ class ChartHandler(support: Support) {
   chart.getStyleClass.add("custom-chart")
   chart.setTitle("Valeurs liquidatives")
   chart.setCreateSymbols(false)
-  chart.setPrefSize(640, 480)
   chart.getData.add(series)
 
   val chartBg = chart.lookup(".chart-plot-background").asInstanceOf[Region]
   var chartBgBounds: Option[Bounds] = None
   chartBg.boundsInParentProperty.listen {
     chartBgBounds = None
+    // Note: since bounds are changing (which is why we reset chartBgBounds)
+    // is is important to make sure we are redrawing the reference lines after
+    // recomputing it.
+    // e.g. listening to the chart (or its parent) resizing does not work as
+    // expected, probably due to relying on the bounds value known right
+    // before resizing.
+    drawReferenceLines()
   }
 
   setData()
 
-  val chartPane = new Pane()
+  val chartPane = new AnchorPane()
+  AnchorPane.setTopAnchor(chart, 0.0)
+  AnchorPane.setRightAnchor(chart, 0.0)
+  AnchorPane.setBottomAnchor(chart, 0.0)
+  AnchorPane.setLeftAnchor(chart, 0.0)
   chartPane.getChildren.addAll(chart, zoomZone, verticalLineRef, horizontalLineRef, verticalLine, horizontalLine, labelVL)
   // Note: it is not a good idea to track mouse from chartBg, since
   // crossing any displayed element (e.g. grid) will trigger exited/entered.
@@ -355,8 +366,26 @@ class ChartHandler(support: Support) {
     }
   }
 
-  private def drawLines(event: MouseEvent, obounds: Option[Bounds] = None, xPos: Option[String] = None): Unit = {
-    val bounds = obounds.getOrElse(getChartBackgroundBounds)
+  private def drawReferenceLines(xPos: Option[String] = None): Unit = {
+    xPos.orElse(labelVL.getDataRef.map(_.x)).foreach { xPos =>
+      val bounds = getChartBackgroundBounds
+      val (x, y) = getXY(bounds, xPos)
+
+      verticalLineRef.setStartX(x)
+      verticalLineRef.setEndX(x)
+      verticalLineRef.setStartY(y)
+      verticalLineRef.setEndY(bounds.getMaxY)
+      verticalLineRef.setVisible(true)
+      horizontalLineRef.setStartX(bounds.getMinX)
+      horizontalLineRef.setEndX(x)
+      horizontalLineRef.setStartY(y)
+      horizontalLineRef.setEndY(y)
+      horizontalLineRef.setVisible(true)
+    }
+  }
+
+  private def drawLines(event: MouseEvent, xPos: Option[String] = None): Unit = {
+    val bounds = getChartBackgroundBounds
 
     xPos.orElse(getX(bounds, event.getX)).foreach { xPos =>
       val (x, y) = getXY(bounds, xPos)
@@ -418,7 +447,7 @@ class ChartHandler(support: Support) {
       getX(bounds, event.getX).foreach { xPos =>
         if (!currentXPos.contains(xPos)) {
           currentXPos = Some(xPos)
-          drawLines(event, Some(bounds), currentXPos)
+          drawLines(event, currentXPos)
         }
       }
     } else {
@@ -433,17 +462,7 @@ class ChartHandler(support: Support) {
 
         xZoomPos1 = Some(xPos)
         labelVL.setDataRef(Some(ChartData(xPos, valuesMap(xPos))))
-
-        verticalLineRef.setStartX(x)
-        verticalLineRef.setEndX(x)
-        verticalLineRef.setStartY(y)
-        verticalLineRef.setEndY(bounds.getMaxY)
-        verticalLineRef.setVisible(true)
-        horizontalLineRef.setStartX(bounds.getMinX)
-        horizontalLineRef.setEndX(x)
-        horizontalLineRef.setStartY(y)
-        horizontalLineRef.setEndY(y)
-        horizontalLineRef.setVisible(true)
+        drawReferenceLines(xZoomPos1)
 
         zoomZone.setX(getX(bounds, xPos))
         zoomZone.setWidth(0)
@@ -619,6 +638,9 @@ class ChartDataLabel extends VBox {
   refText.getChildren.addAll(refTextLabel, refTextValue, refTextDate)
   // And add the data text to our children
   getChildren.addAll(dataText)
+
+  def getDataRef: Option[ChartData] =
+    refData
 
   /**
    * Changes reference data.
