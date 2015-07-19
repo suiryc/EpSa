@@ -66,7 +66,7 @@ class ChartHandler(support: Support) {
   private val chart = new LineChart[String, Number](xAxis, yAxis)
   // We don't really need animation
   chart.setAnimated(false)
-  chart.getStylesheets.add("test.css")
+  chart.getStylesheets.add(getClass.getResource("chart-support.css").toExternalForm)
   chart.getStyleClass.add("custom-chart")
   chart.setTitle("Valeurs liquidatives")
   chart.setCreateSymbols(false)
