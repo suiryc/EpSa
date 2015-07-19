@@ -14,7 +14,15 @@ import org.apache.poi.ss.usermodel.WorkbookFactory
 object EsaliaSupportProber {
 
   def probe(path: Path): Option[Support] = {
-    Option(WorkbookFactory.create(path.toFile)).filter { book =>
+    val wb = try {
+      Some(WorkbookFactory.create(path.toFile))
+    } catch {
+      case ex: Exception =>
+        ex.printStackTrace()
+        None
+    }
+
+    wb.filter { book =>
       // There should only be one sheet
       book.getNumberOfSheets == 1
     }.map { book =>
