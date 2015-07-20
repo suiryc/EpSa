@@ -26,31 +26,29 @@ class TestExcel extends Application {
   }
 
   override def start(stage: Stage) {
-    val supportPathFolder = Preference.forString("support.path.folder", null)
-    val supportPathFile = Preference.forString("support.path.file", null)
-    println(supportPathFolder())
-    println(supportPathFile())
+    val fundPathFolder = Preference.forString("fund.path.folder", null)
+    val fundPathFile = Preference.forString("fund.path.file", null)
 
     val fileChooser = new FileChooser()
-    fileChooser.setTitle("Open Support File")
+    fileChooser.setTitle("Open Investment Fund File")
     fileChooser.getExtensionFilters.addAll(
       new ExtensionFilter("Excel Files", "*.xls", "*.xlsx"),
       new ExtensionFilter("All Files", "*.*")
     )
-    supportPathFolder.option.foreach { folder =>
+    fundPathFolder.option.foreach { folder =>
       fileChooser.setInitialDirectory(new File(folder))
-      supportPathFile.option.foreach(fileChooser.setInitialFileName)
+      fundPathFile.option.foreach(fileChooser.setInitialFileName)
     }
     val selectedFile = fileChooser.showOpenDialog(stage)
     Option(selectedFile).flatMap { file =>
-      EsaliaSupportProber.probe(file.toPath)
+      EsaliaInvestmentFundProber.probe(file.toPath)
     } match {
-      case Some(support) =>
+      case Some(fund) =>
         // Save path in preferences
-        supportPathFolder() = selectedFile.getParent
-        supportPathFile() = selectedFile.getName
+        fundPathFolder() = selectedFile.getParent
+        fundPathFile() = selectedFile.getName
         // Then build and display chart
-        val chartHandler = new ChartHandler(support)
+        val chartHandler = new ChartHandler(fund)
         val chartPane = chartHandler.chartPane
         chartPane.setPrefSize(640, 480)
         val scene = new Scene(chartPane)

@@ -14,14 +14,14 @@ import suiryc.scala.javafx.beans.property.RichReadOnlyProperty._
 import suiryc.scala.javafx.event.EventHandler._
 
 /**
- * Handles chart for a given support.
+ * Handles chart for a given investment fund.
  *
  * Creates said chart, and manages associated resources:
  *   - zooming with mouse selection (dragging or scrolling)
  *   - displaying chart data value in label
  *   - draw visible lines to spot chart data value
  */
-class ChartHandler(support: Support) {
+class ChartHandler(fund: InvestmentFund) {
 
   /** Chart 'x' axis. */
   private val xAxis = new CategoryAxis()
@@ -39,15 +39,15 @@ class ChartHandler(support: Support) {
 
   /** Chart series. */
   private val series = new XYChart.Series[String, Number]()
-  series.setName(support.name)
-  /** Support assert values to display in chart. */
+  series.setName(fund.name)
+  /** Investment fund asset values to display in chart. */
   // XXX - limited to a given number of values for testing
-  private val valuesList = support.values.takeRight(200).map { v =>
+  private val valuesList = fund.values.takeRight(200).map { v =>
     (dateFormat.format(v.date), v.value)
   }
-  /** Number of support asset values. */
+  /** Number of investment fund asset values. */
   private val valuesCount = valuesList.length
-  /** Support assert values map. */
+  /** Investment fund asset values map. */
   private val valuesMap = valuesList.toMap
   /** How many values to drop on the left side to populate chart. */
   private var xDropLeft = 0
@@ -66,7 +66,7 @@ class ChartHandler(support: Support) {
   private val chart = new LineChart[String, Number](xAxis, yAxis)
   // We don't really need animation
   chart.setAnimated(false)
-  chart.getStylesheets.add(getClass.getResource("chart-support.css").toExternalForm)
+  chart.getStylesheets.add(getClass.getResource("chart-investment-fund.css").toExternalForm)
   chart.getStyleClass.add("custom-chart")
   chart.setTitle("Valeurs liquidatives")
   chart.setCreateSymbols(false)

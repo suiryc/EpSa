@@ -6,14 +6,14 @@ import java.text.SimpleDateFormat
 import org.apache.poi.ss.usermodel.WorkbookFactory
 
 /**
- * Esalia support file prober.
+ * Esalia investment fund file prober.
  *
- * Probes whether a given file contains support information (name and asset
- * values) provided by Esalia site (excel file).
+ * Probes whether a given file contains investment fund information (name and
+ * asset values) provided by Esalia site (excel file).
  */
-object EsaliaSupportProber {
+object EsaliaInvestmentFundProber {
 
-  def probe(path: Path): Option[Support] = {
+  def probe(path: Path): Option[InvestmentFund] = {
     val wb = try {
       Some(WorkbookFactory.create(path.toFile))
     } catch {
@@ -33,7 +33,7 @@ object EsaliaSupportProber {
       sheet.getSheetName.startsWith("Historique des valeurs liquida") &&
         (sheet.getFirstRowNum == 0) && (sheet.getLastRowNum >= 6)
     }.flatMap { sheet =>
-      // Row 1 contains the support name
+      // Row 1 contains the investment fund name
       // Row 5 indicates which data are listed: cell 4 shall contain the date
       // and cell 5 the value at the given date
       val dateCellIdx = 4
@@ -56,7 +56,7 @@ object EsaliaSupportProber {
             value = row.getCell(valueCellIdx).getNumericCellValue
           )
         }
-        Some(Support(name, values))
+        Some(InvestmentFund(name, values))
       } else {
         None
       }
