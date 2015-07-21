@@ -11,6 +11,22 @@ import suiryc.scala.settings.Preference
 object TestExcel {
 
   def main(args: Array[String]): Unit = {
+    val savings = Savings.processActions(Savings(),
+      _.createScheme("Scheme 1"),
+      _.createScheme("Scheme 2"),
+      _.createFund("Fund 1"),
+      _.createFund("Fund 2"))
+    val scheme1 = savings.schemes.find(_.name == "Scheme 1").get
+    val scheme2 = savings.schemes.find(_.name == "Scheme 2").get
+    val events = savings.funds.flatMap { fund =>
+      List(
+        Savings.AssociateFund(scheme1.id, fund.id),
+        Savings.AssociateFund(scheme2.id, fund.id)
+      )
+    }
+    val savings2 = Savings.processEvents(savings, events:_*)
+    println(savings2)
+
     (new TestExcel).launch()
   }
 
