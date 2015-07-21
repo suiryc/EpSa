@@ -8,13 +8,15 @@ val versions = Map[String, String](
   "logback"      -> "1.1.2",
   "poi"          -> "3.12",
   "scala"        -> "2.11.7",
-  "suiryc-scala" -> "0.0.2-SNAPSHOT"
+  "suiryc-scala" -> "0.0.2-SNAPSHOT",
+  "tape"         -> "1.2.3"
 )
 
 scalaVersion := versions("scala")
 
 libraryDependencies ++= Seq(
   "ch.qos.logback"    %  "logback-classic"                   % versions("logback"),
+  "com.squareup"      %  "tape"                              % versions("tape"),
   "com.typesafe.akka" %% "akka-actor"                        % versions("akka"),
   "com.typesafe.akka" %% "akka-stream-experimental"          % versions("akka-http"),
   "com.typesafe.akka" %% "akka-http-core-experimental"       % versions("akka-http"),
