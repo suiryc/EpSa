@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.*?>
+<?import javafx.scene.control.*?>
+<?import java.lang.*?>
+<?import javafx.scene.layout.*?>
+
+
+<VBox alignment="TOP_CENTER" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="-Infinity" minWidth="-Infinity" spacing="15.0" xmlns="http://javafx.com/javafx/8" xmlns:fx="http://javafx.com/fxml/1" fx:controller="epsa.MainController">
+   <children>
+      <Button mnemonicParsing="false" onAction="#onCreateScheme" text="Create Scheme" />
+      <Button mnemonicParsing="false" onAction="#onCreateFund" text="Create Fund" />
+      <Button mnemonicParsing="false" onAction="#onEditScheme" text="Edit Scheme" />
+      <Button mnemonicParsing="false" onAction="#onEditFund" text="Edit Fund" />
+      <Button mnemonicParsing="false" onAction="#onFundGraph" text="Fund Graph" />
+   </children>
+   <padding>
+      <Insets bottom="15.0" left="15.0" right="15.0" top="15.0" />
+   </padding>
+</VBox>
