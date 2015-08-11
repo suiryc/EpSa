@@ -7,10 +7,11 @@ import java.util.{ResourceBundle, Locale}
 import javafx.application.{Platform, Application}
 import javafx.event.ActionEvent
 import javafx.fxml.{FXML, Initializable, FXMLLoader}
-import javafx.scene.control.{ListView, TextField}
+import javafx.scene.control.{ButtonType, Dialog, ListView, TextField}
 import javafx.scene.{Node, Scene, Parent}
 import javafx.stage.FileChooser.ExtensionFilter
 import javafx.stage.{Modality, FileChooser, WindowEvent, Stage}
+import suiryc.scala.javafx.beans.property.RichReadOnlyProperty._
 import suiryc.scala.javafx.event.EventHandler._
 import suiryc.scala.settings.Preference
 
@@ -68,10 +69,16 @@ class MainController extends Initializable {
 
   import Main.prefs
 
+  // XXX - an Actor should be associated with the windows/controller, handling actual events/changes
+  // XXX - the actor would have the 'world' state (updated by events, replaced with 'become')
+  private var savings = new Savings()
+
   override def initialize(fxmlFileLocation: URL, resources: ResourceBundle): Unit = {
   }
 
   def onCreateScheme(event: ActionEvent): Unit = {
+    val events = CreateSchemeController.buildDialog(savings).showAndWait().orElse(Nil)
+    savings = Savings.processEvents(savings, events:_*)
   }
 
   def onEditScheme(event: ActionEvent): Unit = {
@@ -123,7 +130,13 @@ class MainController extends Initializable {
 
 }
 
-class CreateSchemeController extends Initializable {
+class CreateSchemeController {
+
+  //@FXML
+  //protected var location: URL = _
+
+  //@FXML
+  //protected var resources: ResourceBundle = _
 
   @FXML
   protected var nameField: TextField = _
@@ -131,7 +144,53 @@ class CreateSchemeController extends Initializable {
   @FXML
   protected var fundsField: ListView[String] = _
 
-  override def initialize(fxmlFileLocation: URL, resources: ResourceBundle): Unit = {
+  protected var savings: Savings = _
+
+  protected var buttonOk: Node = _
+
+  //def initialize(): Unit = { }
+
+  def initialize(savings: Savings, dialog: Dialog[_]): Unit = {
+    this.savings = savings
+    buttonOk = dialog.getDialogPane.lookupButton(ButtonType.OK)
+    buttonOk.setDisable(true)
+    nameField.textProperty.listen {
+      // XXX - set green/red icon (with tooltip) to show which parameters are ok or not
+      val name = nameField.getText
+      val exists = savings.schemes.exists(_.name.equalsIgnoreCase(name))
+      // XXX - also check for funds (at least one selected ?) / or are funds created after schemes ?
+      buttonOk.setDisable(exists || name.isEmpty)
+    }
+  }
+
+}
+
+object CreateSchemeController {
+
+  def buildDialog(savings: Savings): Dialog[List[Savings.Event]] = {
+    val dialog = new Dialog[List[Savings.Event]]()
+    dialog.setTitle("Create Scheme")
+    dialog.getDialogPane.getButtonTypes.addAll(ButtonType.OK, ButtonType.CANCEL)
+
+    val loader = new FXMLLoader(getClass.getResource("/fxml/scheme-create.fxml"))
+    dialog.getDialogPane.setContent(loader.load())
+    val controller = loader.getController[CreateSchemeController]
+    controller.initialize(savings, dialog)
+
+    import suiryc.scala.javafx.util.Callback._
+
+    dialog.setResultConverter { (buttonType: ButtonType) =>
+      if (buttonType != ButtonType.OK) Nil
+      else {
+        List(
+          savings.createScheme(controller.nameField.getText)
+        )
+        // XXX - manage funds
+        //controller.fundsField
+      }
+    }
+
+    dialog
   }
 
 }
