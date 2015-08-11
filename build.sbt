@@ -4,7 +4,7 @@ version := "1.0"
 
 val versions = Map[String, String](
   "akka"         -> "2.3.11",
-  "akka-http"    -> "1.0-RC4",
+  "akka-http"    -> "1.0",
   "logback"      -> "1.1.2",
   "poi"          -> "3.12",
   "scala"        -> "2.11.7",
