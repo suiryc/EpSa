@@ -78,7 +78,10 @@ class MainController extends Initializable {
   }
 
   def onCreateScheme(event: ActionEvent): Unit = {
-    val events = CreateSchemeController.buildDialog(savings).showAndWait().orElse(Nil)
+    val dialog = CreateSchemeController.buildDialog(savings)
+    dialog.initModality(Modality.WINDOW_MODAL)
+    dialog.initOwner(event.getSource.asInstanceOf[Node].getScene.getWindow)
+    val events = dialog.showAndWait().orElse(Nil)
     savings = Savings.processEvents(savings, events:_*)
   }
 
