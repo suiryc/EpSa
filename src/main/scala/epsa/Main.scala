@@ -13,6 +13,7 @@ import javafx.stage.FileChooser.ExtensionFilter
 import javafx.stage.{Modality, FileChooser, WindowEvent, Stage}
 import suiryc.scala.javafx.beans.property.RichReadOnlyProperty._
 import suiryc.scala.javafx.event.EventHandler._
+import suiryc.scala.javafx.util.Callback._
 import suiryc.scala.settings.Preference
 
 object Main {
@@ -161,6 +162,7 @@ class CreateSchemeController {
       // XXX - also check for funds (at least one selected ?) / or are funds created after schemes ?
       buttonOk.setDisable(exists || name.isEmpty)
     }
+    nameField.requestFocus()
   }
 
 }
@@ -177,20 +179,20 @@ object CreateSchemeController {
     val controller = loader.getController[CreateSchemeController]
     controller.initialize(savings, dialog)
 
-    import suiryc.scala.javafx.util.Callback._
-
-    dialog.setResultConverter { (buttonType: ButtonType) =>
-      if (buttonType != ButtonType.OK) Nil
-      else {
-        List(
-          savings.createScheme(controller.nameField.getText)
-        )
-        // XXX - manage funds
-        //controller.fundsField
-      }
-    }
+    dialog.setResultConverter(resultConverter(savings, controller) _)
 
     dialog
+  }
+
+  def resultConverter(savings: Savings, controller: CreateSchemeController)(buttonType: ButtonType): List[Savings.Event] = {
+    if (buttonType != ButtonType.OK) Nil
+    else {
+      List(
+        savings.createScheme(controller.nameField.getText)
+      )
+      // XXX - manage funds
+      //controller.fundsField
+    }
   }
 
 }
