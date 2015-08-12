@@ -2,9 +2,11 @@ name := "EpSa"
 
 version := "1.0"
 
+// XXX - use something else than grizzled ?
 val versions = Map[String, String](
   "akka"         -> "2.3.11",
   "akka-http"    -> "1.0",
+  "grizzled"     -> "1.0.2",
   "logback"      -> "1.1.2",
   "poi"          -> "3.12",
   "scala"        -> "2.11.7",
@@ -25,6 +27,7 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-slf4j"                        % versions("akka"),
   "org.apache.poi"    %  "poi"                               % versions("poi"),
   "org.apache.poi"    %  "poi-ooxml"                         % versions("poi"),
+  "org.clapper"       %% "grizzled-slf4j"                    % versions("grizzled"),
   "suiryc"            %% "suiryc-scala-core"                 % versions("suiryc-scala"),
   "suiryc"            %% "suiryc-scala-log"                  % versions("suiryc-scala"),
   "suiryc"            %% "suiryc-scala-javafx"               % versions("suiryc-scala")

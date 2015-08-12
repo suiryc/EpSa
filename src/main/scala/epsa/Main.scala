@@ -1,17 +1,18 @@
 package epsa
 
+import akka.actor.{Actor, ActorRef, Props}
 import java.io.File
-import java.net.URL
 import java.util.prefs.Preferences
-import java.util.{ResourceBundle, Locale}
+import java.util.Locale
 import javafx.application.{Platform, Application}
 import javafx.event.ActionEvent
-import javafx.fxml.{FXML, Initializable, FXMLLoader}
+import javafx.fxml.{FXML, FXMLLoader}
 import javafx.scene.control.{ButtonType, Dialog, ListView, TextField}
 import javafx.scene.{Node, Scene, Parent}
 import javafx.stage.FileChooser.ExtensionFilter
-import javafx.stage.{Modality, FileChooser, WindowEvent, Stage}
+import javafx.stage.{Modality, FileChooser, Stage, Window, WindowEvent}
 import suiryc.scala.javafx.beans.property.RichReadOnlyProperty._
+import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.javafx.event.EventHandler._
 import suiryc.scala.javafx.util.Callback._
 import suiryc.scala.settings.Preference
@@ -66,23 +67,27 @@ class Main extends Application {
 
 }
 
-class MainController extends Initializable {
+class MainController {
 
   import Main.prefs
+  import MainController._
 
-  // XXX - an Actor should be associated with the windows/controller, handling actual events/changes
-  // XXX - the actor would have the 'world' state (updated by events, replaced with 'become')
-  private var savings = new Savings()
+  //@FXML
+  //protected var location: URL = _
 
-  override def initialize(fxmlFileLocation: URL, resources: ResourceBundle): Unit = {
+  //@FXML
+  //protected var resources: ResourceBundle = _
+
+  private var actor: ActorRef = _
+
+  def initialize(): Unit = {
+    // XXX - append random value
+    // XXX - terminate actor upon leaving
+    actor = JFXSystem.newJFXActor(ControllerActor.props(new Savings()), "epsa-main")
   }
 
   def onCreateScheme(event: ActionEvent): Unit = {
-    val dialog = CreateSchemeController.buildDialog(savings)
-    dialog.initModality(Modality.WINDOW_MODAL)
-    dialog.initOwner(event.getSource.asInstanceOf[Node].getScene.getWindow)
-    val events = dialog.showAndWait().orElse(Nil)
-    savings = Savings.processEvents(savings, events:_*)
+    actor ! OnCreateScheme(event.getSource.asInstanceOf[Node].getScene.getWindow)
   }
 
   def onEditScheme(event: ActionEvent): Unit = {
@@ -131,6 +136,34 @@ class MainController extends Initializable {
       case None =>
     }
   }
+
+  object ControllerActor {
+    def props(savings: Savings) = Props(new ControllerActor(savings))
+  }
+
+  class ControllerActor(_savings: Savings) extends Actor {
+
+    override def receive: Receive = receive(_savings)
+
+    def receive(savings: Savings): Receive = {
+      case OnCreateScheme(owner) => onCreateScheme(savings, owner)
+    }
+
+    def onCreateScheme(savings: Savings, owner: Window): Unit = {
+      val dialog = CreateSchemeController.buildDialog(savings)
+      dialog.initModality(Modality.WINDOW_MODAL)
+      dialog.initOwner(owner)
+      val events = dialog.showAndWait().orElse(Nil)
+      context.become(receive(Savings.processEvents(savings, events:_*)))
+    }
+
+  }
+
+}
+
+object MainController {
+
+  case class OnCreateScheme(owner: Window)
 
 }
 
