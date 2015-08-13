@@ -82,16 +82,22 @@ case class Savings(schemes: List[Savings.Scheme] = Nil, funds: List[Savings.Fund
       ???
   }
 
-  def createScheme(name: String): Event = {
+  def getFund(fundId: String): Option[Fund] =
+    funds.find(_.id == fundId)
+
+  def createScheme(name: String): CreateScheme = {
     // XXX - not good if we can remove entries
     val id = f"${schemes.length + 1}%08x"
     CreateScheme(id, name)
   }
 
-  def createFund(name: String): Event = {
+  def createFund(name: String): CreateFund = {
     // XXX - not good if we can remove entries
     val id = f"${funds.length + 1}%08x"
     CreateFund(id, name)
   }
+
+  def associateFund(schemeId: String, fundId: String): AssociateFund =
+    AssociateFund(schemeId, fundId)
 
 }
