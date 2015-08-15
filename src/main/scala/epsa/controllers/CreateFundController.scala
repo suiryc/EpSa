@@ -30,7 +30,7 @@ class CreateFundController {
 
   def initialize(savings: Savings, dialog: Dialog[_], edit: Option[Savings.Fund]): Unit = {
     this.savings = savings
-    dialog.getDialogPane.getStylesheets.add(getClass.getResource("form.css").toExternalForm)
+    dialog.getDialogPane.getStylesheets.add(getClass.getResource("/css/form.css").toExternalForm)
     buttonOk = dialog.getDialogPane.lookupButton(ButtonType.OK)
     buttonOk.setDisable(true)
     nameField.textProperty.listen(checkForm())

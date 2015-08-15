@@ -34,7 +34,7 @@ class CreateSchemeController {
   def initialize(savings: Savings, dialog: Dialog[_], edit: Option[Savings.Scheme]): Unit = {
     this.savings = savings
     this.edit = edit
-    dialog.getDialogPane.getStylesheets.add(getClass.getResource("form.css").toExternalForm)
+    dialog.getDialogPane.getStylesheets.add(getClass.getResource("/css/form.css").toExternalForm)
     buttonOk = dialog.getDialogPane.lookupButton(ButtonType.OK)
     buttonOk.setDisable(true)
     nameField.textProperty.listen(checkForm())
