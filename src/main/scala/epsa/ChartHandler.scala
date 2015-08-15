@@ -10,7 +10,7 @@ import javafx.scene.paint.Color
 import javafx.scene.shape.{Line, Rectangle}
 
 import suiryc.scala.concurrent.Cancellable
-import suiryc.scala.javafx.beans.property.RichReadOnlyProperty._
+import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.event.EventHandler._
 
 /**
