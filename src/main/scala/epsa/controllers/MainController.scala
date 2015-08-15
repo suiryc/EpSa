@@ -1,6 +1,9 @@
 package epsa.controllers
 
 import akka.actor.{Actor, ActorRef, Props}
+import epsa.charts.ChartHandler
+import epsa.model.Savings
+import epsa.tools.EsaliaInvestmentFundProber
 import java.io.File
 import javafx.collections.FXCollections
 import javafx.event.ActionEvent
@@ -9,7 +12,6 @@ import javafx.scene.{Node, Scene}
 import javafx.scene.control.{Button, ListView}
 import javafx.stage.FileChooser.ExtensionFilter
 import javafx.stage.{FileChooser, Modality, Stage, Window}
-import epsa.{ChartHandler, EsaliaInvestmentFundProber, Savings}
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.javafx.util.Callback._

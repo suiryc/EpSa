@@ -1,5 +1,8 @@
-package epsa
+package epsa.sandbox
 
+import epsa.charts.ChartHandler
+import epsa.model.Savings
+import epsa.tools.EsaliaInvestmentFundProber
 import java.io.File
 import java.util.prefs.Preferences
 import javafx.application.Application

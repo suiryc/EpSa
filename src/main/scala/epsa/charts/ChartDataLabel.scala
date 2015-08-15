@@ -1,4 +1,4 @@
-package epsa
+package epsa.charts
 
 import javafx.scene.layout.VBox
 import javafx.scene.paint.Color

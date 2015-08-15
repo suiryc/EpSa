@@ -1,5 +1,6 @@
-package epsa
+package epsa.charts
 
+import epsa.model.InvestmentFund
 import java.text.SimpleDateFormat
 import javafx.geometry.Bounds
 import javafx.scene.Node
@@ -8,7 +9,6 @@ import javafx.scene.input.{MouseEvent, ScrollEvent}
 import javafx.scene.layout.{AnchorPane, Region}
 import javafx.scene.paint.Color
 import javafx.scene.shape.{Line, Rectangle}
-
 import suiryc.scala.concurrent.Cancellable
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.event.EventHandler._

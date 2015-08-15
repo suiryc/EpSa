@@ -1,6 +1,6 @@
 package epsa.controllers
 
-import epsa.Savings
+import epsa.model.Savings
 import javafx.collections.FXCollections
 import javafx.fxml.{FXMLLoader, FXML}
 import javafx.scene.Node

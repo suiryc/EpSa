@@ -1,4 +1,4 @@
-package epsa
+package epsa.model
 
 import java.util.Date
 

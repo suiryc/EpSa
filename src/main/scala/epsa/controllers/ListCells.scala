@@ -1,6 +1,6 @@
 package epsa.controllers
 
-import epsa.Savings
+import epsa.model.Savings
 import javafx.scene.control.ListCell
 
 class FundCell
