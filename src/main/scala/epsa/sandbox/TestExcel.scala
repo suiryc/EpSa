@@ -15,10 +15,10 @@ object TestExcel {
 
   def main(args: Array[String]): Unit = {
     val savings = Savings.processActions(Savings(),
-      _.createScheme("Scheme 1"),
-      _.createScheme("Scheme 2"),
-      _.createFund("Fund 1"),
-      _.createFund("Fund 2"))
+      _.createSchemeEvent("Scheme 1"),
+      _.createSchemeEvent("Scheme 2"),
+      _.createFundEvent("Fund 1"),
+      _.createFundEvent("Fund 2"))
     val scheme1 = savings.schemes.find(_.name == "Scheme 1").get
     val scheme2 = savings.schemes.find(_.name == "Scheme 2").get
     val events = savings.funds.flatMap { fund =>

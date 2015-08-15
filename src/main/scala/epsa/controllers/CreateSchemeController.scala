@@ -96,23 +96,33 @@ object CreateSchemeController {
     val controller = loader.getController[CreateSchemeController]
     controller.initialize(savings, dialog, edit)
 
-    dialog.setResultConverter(resultConverter(savings, controller) _)
+    dialog.setResultConverter(resultConverter(savings, edit, controller) _)
 
     dialog
   }
 
-  def resultConverter(savings: Savings, controller: CreateSchemeController)(buttonType: ButtonType): List[Savings.Event] = {
+  def resultConverter(savings: Savings, edit: Option[Savings.Scheme], controller: CreateSchemeController)(buttonType: ButtonType): List[Savings.Event] = {
     import scala.collection.JavaConversions._
 
     if (buttonType != ButtonType.OK) Nil
-    else {
-      val createScheme = savings.createScheme(controller.nameField.getText)
-      List(
-        createScheme
-      ) ::: controller.fundsField.getSelectionModel.getSelectedItems.toList.flatMap { fund =>
-        val createFund = savings.createFund(fund.name)
-        val associateFund = savings.associateFund(createScheme.schemeId, createFund.fundId)
-        List(createFund, associateFund)
+    else edit.map { edit =>
+      val name = controller.nameField.getText
+      val event1 =
+        if (name == edit.name) None
+        else Some(Savings.UpdateScheme(edit.id, name))
+
+      val oldFunds = edit.funds.toSet
+      val newFunds = controller.fundsField.getSelectionModel.getSelectedItems.toList.map(_.id).toSet
+
+      event1.toList ++ (oldFunds -- newFunds).toList.map { fundId =>
+        Savings.DissociateFund(edit.id, fundId)
+      } ++ (newFunds -- oldFunds).toList.sorted.map { fundId =>
+        Savings.AssociateFund(edit.id, fundId)
+      }
+    }.getOrElse {
+      val event = savings.createSchemeEvent(controller.nameField.getText)
+      event :: controller.fundsField.getSelectionModel.getSelectedItems.toList.map { fund =>
+        Savings.AssociateFund(event.schemeId, fund.id)
       }
     }
   }

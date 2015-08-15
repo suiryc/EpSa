@@ -80,21 +80,33 @@ object CreateFundController {
     val controller = loader.getController[CreateFundController]
     controller.initialize(savings, dialog, edit)
 
-    dialog.setResultConverter(resultConverter(savings, controller) _)
+    dialog.setResultConverter(resultConverter(savings, edit, controller) _)
 
     dialog
   }
 
-  def resultConverter(savings: Savings, controller: CreateFundController)(buttonType: ButtonType): List[Savings.Event] = {
+  def resultConverter(savings: Savings, edit: Option[Savings.Fund], controller: CreateFundController)(buttonType: ButtonType): List[Savings.Event] = {
     import scala.collection.JavaConversions._
 
     if (buttonType != ButtonType.OK) Nil
-    else {
-      val createFund = savings.createFund(controller.nameField.getText)
-      List(
-        createFund
-      ) ::: controller.schemesField.getSelectionModel.getSelectedItems.toList.map { scheme =>
-        savings.associateFund(scheme.id, createFund.fundId)
+    else edit.map { edit =>
+      val name = controller.nameField.getText
+      val event1 =
+        if (name == edit.name) None
+        else Some(Savings.UpdateFund(edit.id, name))
+
+      val oldSchemes = savings.schemes.filter(_.funds.contains(edit.id)).map(_.id).toSet
+      val newSchemes = controller.schemesField.getSelectionModel.getSelectedItems.toList.map(_.id).toSet
+
+      event1.toList ++ (oldSchemes -- newSchemes).toList.map { schemeId =>
+        Savings.DissociateFund(schemeId, edit.id)
+      } ++ (newSchemes -- oldSchemes).toList.sorted.map { schemeId =>
+        Savings.AssociateFund(schemeId, edit.id)
+      }
+    }.getOrElse {
+      val event = savings.createFundEvent(controller.nameField.getText)
+      event :: controller.schemesField.getSelectionModel.getSelectedItems.toList.map { scheme =>
+        Savings.AssociateFund(scheme.id, event.fundId)
       }
     }
   }
