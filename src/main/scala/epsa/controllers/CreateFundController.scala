@@ -1,6 +1,8 @@
 package epsa.controllers
 
+import epsa.I18N
 import epsa.model.Savings
+import java.util.ResourceBundle
 import javafx.collections.FXCollections
 import javafx.fxml.{FXMLLoader, FXML}
 import javafx.scene.Node
@@ -13,8 +15,8 @@ class CreateFundController {
   //@FXML
   //protected var location: URL = _
 
-  //@FXML
-  //protected var resources: ResourceBundle = _
+  @FXML
+  protected var resources: ResourceBundle = _
 
   @FXML
   protected var nameField: TextField = _
@@ -56,9 +58,9 @@ class CreateFundController {
     val exists = savings.funds.exists(_.name.equalsIgnoreCase(name))
     val nameOk = !exists && name.nonEmpty
     if (exists) {
-      nameField.setTooltip(new Tooltip("Name already exists"))
+      nameField.setTooltip(new Tooltip(resources.getString("Name already exists")))
     } else if (name.isEmpty) {
-      nameField.setTooltip(new Tooltip("Name cannot be empty"))
+      nameField.setTooltip(new Tooltip(resources.getString("Name cannot be empty")))
     } else {
       nameField.setTooltip(null)
     }
@@ -71,11 +73,14 @@ class CreateFundController {
 object CreateFundController {
 
   def buildDialog(savings: Savings, edit: Option[Savings.Fund]): Dialog[List[Savings.Event]] = {
+    val resources = I18N.getResources
+
     val dialog = new Dialog[List[Savings.Event]]()
-    dialog.setTitle(s"${if (edit.isDefined) "Edit" else "Create"} Fund")
+    val title = resources.getString(s"${if (edit.isDefined) "Edit" else "Add"} fund")
+    dialog.setTitle(title)
     dialog.getDialogPane.getButtonTypes.addAll(ButtonType.OK, ButtonType.CANCEL)
 
-    val loader = new FXMLLoader(getClass.getResource("/fxml/fund-create.fxml"))
+    val loader = new FXMLLoader(getClass.getResource("/fxml/fund-create.fxml"), resources)
     dialog.getDialogPane.setContent(loader.load())
     val controller = loader.getController[CreateFundController]
     controller.initialize(savings, dialog, edit)

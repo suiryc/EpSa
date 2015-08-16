@@ -37,7 +37,7 @@ class Main extends Application {
 
     stage.setOnCloseRequest(onCloseRequest _)
 
-    val root = FXMLLoader.load[Parent](getClass.getResource("/fxml/main.fxml"))
+    val root = FXMLLoader.load[Parent](getClass.getResource("/fxml/main.fxml"), I18N.getResources)
 
     /*pane.getChildren.setAll(root)
     AnchorPane.setTopAnchor(root, 0)

@@ -131,10 +131,17 @@ class MainController {
     override def receive: Receive = receive(_savings)
 
     def receive(savings: Savings): Receive = {
-      case OnCreateScheme(owner) => onCreateScheme(savings, owner, None)
-      case OnEditScheme(owner, scheme) => onCreateScheme(savings, owner, Some(scheme))
-      case OnCreateFund(owner) => onCreateFund(savings, owner, None)
-      case OnEditFund(owner, fund) => onCreateFund(savings, owner, Some(fund))
+      case OnCreateScheme(owner) =>
+        onCreateScheme(savings, owner, None)
+
+      case OnEditScheme(owner, scheme) =>
+        onCreateScheme(savings, owner, Some(scheme))
+
+      case OnCreateFund(owner) =>
+        onCreateFund(savings, owner, None)
+
+      case OnEditFund(owner, fund) =>
+        onCreateFund(savings, owner, Some(fund))
     }
 
     def processEvents(savings: Savings, events: List[Savings.Event]): Unit = {

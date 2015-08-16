@@ -1,6 +1,8 @@
 package epsa.controllers
 
+import epsa.I18N
 import epsa.model.Savings
+import java.util.ResourceBundle
 import javafx.collections.FXCollections
 import javafx.fxml.{FXMLLoader, FXML}
 import javafx.scene.Node
@@ -14,8 +16,8 @@ class CreateSchemeController {
   //@FXML
   //protected var location: URL = _
 
-  //@FXML
-  //protected var resources: ResourceBundle = _
+  @FXML
+  protected var resources: ResourceBundle = _
 
   @FXML
   protected var nameField: TextField = _
@@ -72,9 +74,9 @@ class CreateSchemeController {
     val exists = savings.schemes.exists(_.name.equalsIgnoreCase(name)) && !edit.exists(_.name.equalsIgnoreCase(name))
     val nameOk = !exists && name.nonEmpty
     if (exists) {
-      nameField.setTooltip(new Tooltip("Name already exists"))
+      nameField.setTooltip(new Tooltip(resources.getString("Name already exists")))
     } else if (name.isEmpty) {
-      nameField.setTooltip(new Tooltip("Name cannot be empty"))
+      nameField.setTooltip(new Tooltip(resources.getString("Name cannot be empty")))
     } else {
       nameField.setTooltip(null)
     }
@@ -87,11 +89,14 @@ class CreateSchemeController {
 object CreateSchemeController {
 
   def buildDialog(savings: Savings, edit: Option[Savings.Scheme]): Dialog[List[Savings.Event]] = {
+    val resources = I18N.getResources
+
     val dialog = new Dialog[List[Savings.Event]]()
-    dialog.setTitle(s"${if (edit.isDefined) "Edit" else "Create"} Scheme")
+    val title = resources.getString(s"${if (edit.isDefined) "Edit" else "Add"} scheme")
+    dialog.setTitle(title)
     dialog.getDialogPane.getButtonTypes.addAll(ButtonType.OK, ButtonType.CANCEL)
 
-    val loader = new FXMLLoader(getClass.getResource("/fxml/scheme-create.fxml"))
+    val loader = new FXMLLoader(getClass.getResource("/fxml/scheme-create.fxml"), resources)
     dialog.getDialogPane.setContent(loader.load())
     val controller = loader.getController[CreateSchemeController]
     controller.initialize(savings, dialog, edit)
