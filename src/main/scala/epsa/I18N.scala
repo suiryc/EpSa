@@ -1,13 +1,109 @@
 package epsa
 
-import java.io.{InputStream, InputStreamReader, IOException}
+import java.io.{File, InputStream, InputStreamReader, IOException}
+import java.net.JarURLConnection
 import java.security.{AccessController, PrivilegedActionException, PrivilegedExceptionAction}
 import java.util.{Locale, PropertyResourceBundle, ResourceBundle}
+import java.util.zip.ZipFile
+import suiryc.scala.io.NameFilter._
+import suiryc.scala.io.PathFinder
+import suiryc.scala.io.PathFinder._
+import suiryc.scala.settings.Preference
 
 object I18N {
 
+  import epsa.Main.prefs
+
+  private val localeCodePref = Preference.forString("locale.code", "en")
+
+  /** I18N resources (relative) path. */
+  private val i18nPath = "i18n/"
+  /** I18N EpSa resource bundle name format. */
+  private val i18nEpsaFormat = "epsa_.*.properties"
+
+  /** Gets 'language' from resource name. */
+  private def getLanguage(name: String): String =
+    name.substring(5, name.length - 11)
+
+  /**
+   * Languages that we handle.
+   *
+   * We search for the I18N resources path URL, which may be a standard file
+   * directory, or a jar (zip) file entry.
+   * Then we list files/entries relatively to this URL that do match the
+   * bundle resource name format, and extract the 'language' from its name.
+   * We also add the 'en' language which is the default.
+   *
+   * Note: we could use a virtual file system framework (like common-vfs), but
+   * we only search for file/entry names.
+   */
+  private val languages: Set[String] = Option(getClass.getResource(s"/$i18nPath")).map { url =>
+    url.getProtocol match {
+      case "file" =>
+        // Standard directory
+        val file = new File(url.toURI)
+        val finder: PathFinder = file * i18nEpsaFormat.r
+        finder.get().map(file => getLanguage(file.getName))
+
+      case "jar" =>
+        // Jar (zip) file entry
+        // Find the actual jar file, and open it as a zip
+        val file = new File(url.openConnection().asInstanceOf[JarURLConnection].getJarFileURL.toURI)
+        val zipFile = new ZipFile(file)
+        try {
+          import scala.collection.JavaConversions._
+          // Search for entries
+          zipFile.entries.flatMap { entry =>
+            val entryName = entry.getName
+            if (entryName.startsWith(i18nPath)) {
+              val relativeName = entryName.substring(i18nPath.length)
+              if ((relativeName.indexOf('/') != -1) || !relativeName.matches(i18nEpsaFormat)) None
+              else Some(getLanguage(relativeName))
+            } else None
+          }.toSet
+        } finally {
+          zipFile.close()
+        }
+
+      case protocol =>
+        // XXX - log
+        println(s"Unhandled resource protocol: $protocol")
+        Set.empty[String]
+    }
+  }.getOrElse(Set.empty) + "en"
+
+  /**
+   * Locales that we handle.
+   *
+   * Java resource bundles and locales use a lenient form with underscore '_'
+   * as separator for language/country/variant instead of hyphen as specified
+   * in BCP 47 (e.g. en_US instead of en-US).
+   * Split on the separator to get each part and build the corresponding locale.
+   */
+  val locales = languages.map { lang =>
+    val split = lang.split("_", 3)
+    val locale =
+      if (split.length == 1) new Locale(split(0))
+      else if (split.length == 2) new Locale(split(0), split(1))
+      else new Locale(split(0), split(1), split(2))
+
+    I18NLocale(locale.toString, locale.getDisplayName(locale).capitalize, locale)
+  }.toList.sortBy(_.code)
+
+  def loadLocale(): Unit = {
+    val localeCode = localeCodePref()
+    locales.find(_.code == localeCode).foreach { locale =>
+      Locale.setDefault(locale.locale)
+    }
+  }
+
+  def setLocale(localeCode: String): Unit =
+    localeCodePref() = localeCode
+
   def getResources: ResourceBundle =
     ResourceBundle.getBundle("i18n.epsa", Locale.getDefault, UTF8Control)
+
+  case class I18NLocale(code: String, displayName: String, locale: Locale)
 
 }
 

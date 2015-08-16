@@ -1,6 +1,5 @@
 package epsa
 
-import java.util.Locale
 import java.util.prefs.Preferences
 import javafx.application.{Application, Platform}
 import javafx.fxml.FXMLLoader
@@ -9,9 +8,6 @@ import javafx.stage.{Stage, WindowEvent}
 import suiryc.scala.javafx.event.EventHandler._
 
 object Main {
-
-  /* Set locale to english as application is not i18n */
-  Locale.setDefault(Locale.ENGLISH)
 
   var stage: Stage = _
 
@@ -33,6 +29,9 @@ class Main extends Application {
   }
 
   override def start(primaryStage: Stage) {
+    // XXX - GUI menu/option to change language
+    I18N.loadLocale()
+
     stage = primaryStage
 
     stage.setOnCloseRequest(onCloseRequest _)
