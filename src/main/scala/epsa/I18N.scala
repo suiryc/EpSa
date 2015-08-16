@@ -29,22 +29,9 @@ object I18N {
 object UTF8Control extends ResourceBundle.Control {
 
   override def newBundle(baseName: String, locale: Locale, format: String, loader: ClassLoader, reload: Boolean): ResourceBundle = {
-    val  bundleName = toBundleName(baseName, locale)
-
-    if (format == "java.class") {
-      try {
-        val bundleClass = loader.loadClass(bundleName).asInstanceOf[Class[_ <: ResourceBundle]]
-
-        // If the class isn't a ResourceBundle subclass, throw a ClassCastException.
-        if (classOf[ResourceBundle].isAssignableFrom(bundleClass)) {
-          bundleClass.newInstance
-        } else {
-          throw new ClassCastException(s"${bundleClass.getName} cannot be cast to ResourceBundle")
-        }
-      } catch {
-        case e: ClassNotFoundException => null
-      }
-    } else if (format == "java.properties") {
+    // Note: we only have to change the behaviour for 'java.properties' format
+    if (format == "java.properties") {
+      val  bundleName = toBundleName(baseName, locale)
       // Changed: was toResourceName0
       Option(toResourceName(bundleName, "properties")).flatMap { resourceName =>
         val stream = try {
@@ -75,9 +62,7 @@ object UTF8Control extends ResourceBundle.Control {
           }
         }
       }.orNull
-    } else {
-      throw new IllegalArgumentException(s"unknown format: $format")
-    }
+    } else super.newBundle(baseName, locale, format, loader, reload)
   }
 
 }
