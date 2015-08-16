@@ -34,3 +34,5 @@ libraryDependencies ++= Seq(
 )
 
 resolvers += Resolver.mavenLocal
+
+mainClass in assembly := Some("epsa.Main")
