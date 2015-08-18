@@ -84,6 +84,10 @@ class MainController {
     }
   }
 
+  def onTest(event: ActionEvent): Unit = {
+    actor ! OnTest
+  }
+
   def onFundGraph(event: ActionEvent): Unit = {
     val stage = new Stage()
 
@@ -131,17 +135,11 @@ class MainController {
     override def receive: Receive = receive(_savings)
 
     def receive(savings: Savings): Receive = {
-      case OnCreateScheme(owner) =>
-        onCreateScheme(savings, owner, None)
-
-      case OnEditScheme(owner, scheme) =>
-        onCreateScheme(savings, owner, Some(scheme))
-
-      case OnCreateFund(owner) =>
-        onCreateFund(savings, owner, None)
-
-      case OnEditFund(owner, fund) =>
-        onCreateFund(savings, owner, Some(fund))
+      case OnCreateScheme(owner)       => onCreateScheme(savings, owner, None)
+      case OnEditScheme(owner, scheme) => onCreateScheme(savings, owner, Some(scheme))
+      case OnCreateFund(owner)         => onCreateFund(savings, owner, None)
+      case OnEditFund(owner, fund)     => onCreateFund(savings, owner, Some(fund))
+      case OnTest                      => onTest(savings)
     }
 
     def processEvents(savings: Savings, events: List[Savings.Event]): Unit = {
@@ -158,6 +156,7 @@ class MainController {
       val dialog = CreateSchemeController.buildDialog(savings, edit)
       dialog.initModality(Modality.WINDOW_MODAL)
       dialog.initOwner(owner)
+      dialog.setResizable(true)
       val events = dialog.showAndWait().orElse(Nil)
       processEvents(savings, events)
     }
@@ -166,8 +165,22 @@ class MainController {
       val dialog = CreateFundController.buildDialog(savings, edit)
       dialog.initModality(Modality.WINDOW_MODAL)
       dialog.initOwner(owner)
+      dialog.setResizable(true)
       val events = dialog.showAndWait().orElse(Nil)
       processEvents(savings, events)
+    }
+
+    def onTest(savings: Savings): Unit = {
+      val savings1 = Savings.processActions(savings,
+        _.createSchemeEvent("Atos"),
+        _.createSchemeEvent("Worldline"),
+        _.createFundEvent("ARCANCIA MONETAIRE 257 - 2007"),
+        _.createFundEvent("ARCANCIA TEMPERE 357 - 2357"),
+        _.createFundEvent("ARCANCIA HARMONIE 453 - 2453"),
+        _.createFundEvent("SPRINT DYNAMIC - 6010"),
+        _.createFundEvent("WORLDLINE STOCK PLAN PART C - 868")
+      )
+      processEvents(savings1, Nil)
     }
 
   }
@@ -183,5 +196,7 @@ object MainController {
   case class OnCreateFund(owner: Window)
 
   case class OnEditFund(owner: Window, fund: Savings.Fund)
+
+  case object OnTest
 
 }
