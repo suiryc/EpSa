@@ -22,9 +22,6 @@ object Savings {
 
   sealed trait Event
 
-  // XXX - save list of schemes
-  // XXX - save list of funds
-
   // XXX - explicit fractional value instead of Double (possible precision issues) ?
   // XXX - fundId ok even if dealing with 'frozen current account' ?
   case class AssetQuantity(schemeId: UUID, fundId: UUID, amount: Double, units: Double, unitValue: Double)
@@ -62,39 +59,12 @@ case class Savings(schemes: List[Savings.Scheme] = Nil, funds: List[Savings.Fund
   import Savings._
 
   def processEvent(event: Event): Savings = event match {
-    case CreateScheme(id, name) =>
-      copy(schemes = schemes :+ Scheme(id, name, Nil))
-
-    case UpdateScheme(id, name) =>
-      val updated = schemes.map { scheme =>
-        if (scheme.id != id) scheme
-        else scheme.copy(name = name)
-      }
-      copy(schemes = updated)
-
-    case CreateFund(id, name) =>
-      copy(funds = funds :+ Fund(id, name))
-
-    case UpdateFund(id, name) =>
-      val updated = funds.map { fund =>
-        if (fund.id != id) fund
-        else fund.copy(name = name)
-      }
-      copy(funds = updated)
-
-    case AssociateFund(schemeId, fundId) =>
-      val updated = schemes.map { scheme =>
-        if (scheme.id != schemeId) scheme
-        else scheme.copy(funds = scheme.funds :+ fundId)
-      }
-      copy(schemes = updated)
-
-    case DissociateFund(schemeId, fundId) =>
-      val updated = schemes.map { scheme =>
-        if (scheme.id != schemeId) scheme
-        else scheme.copy(funds = scheme.funds.filterNot(_ == fundId))
-      }
-      copy(schemes = updated)
+    case CreateScheme(id, name)           => createScheme(id, name)
+    case UpdateScheme(id, name)           => updateScheme(id, name)
+    case CreateFund(id, name)             => createFund(id, name)
+    case UpdateFund(id, name)             => updateFund(id, name)
+    case AssociateFund(schemeId, fundId)  => associateFund(schemeId, fundId)
+    case DissociateFund(schemeId, fundId) => dissociateFund(schemeId, fundId)
 
     case MakePayment(date, assetQuantity, availability) =>
       ???
@@ -104,6 +74,46 @@ case class Savings(schemes: List[Savings.Scheme] = Nil, funds: List[Savings.Fund
 
     case MakeRefund(date, assetQuantity) =>
       ???
+  }
+
+  protected def createScheme(id: UUID, name: String): Savings = {
+    copy(schemes = schemes :+ Scheme(id, name, Nil))
+  }
+
+  protected def updateScheme(id: UUID, name: String): Savings = {
+    val updated = schemes.map { scheme =>
+      if (scheme.id != id) scheme
+      else scheme.copy(name = name)
+    }
+    copy(schemes = updated)
+  }
+
+  protected def createFund(id: UUID, name: String): Savings = {
+    copy(funds = funds :+ Fund(id, name))
+  }
+
+  protected def updateFund(id: UUID, name: String): Savings = {
+    val updated = funds.map { fund =>
+      if (fund.id != id) fund
+      else fund.copy(name = name)
+    }
+    copy(funds = updated)
+  }
+
+  protected def associateFund(schemeId: UUID, fundId: UUID): Savings = {
+    val updated = schemes.map { scheme =>
+      if (scheme.id != schemeId) scheme
+      else scheme.copy(funds = scheme.funds :+ fundId)
+    }
+    copy(schemes = updated)
+  }
+
+  protected def dissociateFund(schemeId: UUID, fundId: UUID): Savings = {
+    val updated = schemes.map { scheme =>
+      if (scheme.id != schemeId) scheme
+      else scheme.copy(funds = scheme.funds.filterNot(_ == fundId))
+    }
+    copy(schemes = updated)
   }
 
   def getFund(fundId: UUID): Option[Fund] =
@@ -119,11 +129,15 @@ case class Savings(schemes: List[Savings.Scheme] = Nil, funds: List[Savings.Fund
     CreateFund(id, name)
   }
 
-  @scala.annotation.tailrec
-  private def newId(existing: List[UUID]): UUID = {
-    val id = UUID.randomUUID()
-    if (!existing.contains(id)) id
-    else newId(existing)
+  protected def newId(existing: List[UUID]): UUID = {
+    @scala.annotation.tailrec
+    def loop(): UUID = {
+      val id = UUID.randomUUID()
+      if (!existing.contains(id)) id
+      else loop()
+    }
+
+    loop()
   }
 
 }
