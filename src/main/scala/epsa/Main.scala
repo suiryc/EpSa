@@ -32,6 +32,8 @@ class Main extends Application {
     // XXX - GUI menu/option to change language
     I18N.loadLocale()
 
+    storage.DataStore
+
     stage = primaryStage
 
     stage.setOnCloseRequest(onCloseRequest _)
