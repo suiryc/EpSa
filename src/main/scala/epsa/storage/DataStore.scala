@@ -24,17 +24,17 @@ trait DataStore[S] {
 
   def changePath(path: Path): Future[Unit]
 
-  def doAction[A](action: Session => A): Future[A]
-
   val eventSource: EventSource
 
   trait EventSource {
 
-    def readEvents()(implicit session: Session): List[Savings.Event]
+    protected[storage] val tableName = "eventsource"
 
-    def writeEvents(events: Savings.Event*)(implicit session: Session): Unit
+    def readEvents(): Future[Seq[Savings.Event]]
 
-    def writeEvents(events: List[Savings.Event])(implicit session: Session): Unit =
+    def writeEvents(events: Savings.Event*): Future[Unit]
+
+    def writeEvents(events: List[Savings.Event]): Future[Unit] =
       writeEvents(events:_*)
 
   }

@@ -3,10 +3,10 @@ package epsa.storage
 import akka.actor.{Actor, Props}
 import epsa.model.Savings
 import java.nio.file.Path
-import org.joda.time.DateTime
+import java.sql.Timestamp
+//import org.joda.time.DateTime
 import scala.concurrent.{Future, Promise}
 import scalikejdbc._
-import spray.json._
 
 object ScalikeJDBCDataStore extends DataStore[DBSession] {
 
@@ -28,13 +28,13 @@ object ScalikeJDBCDataStore extends DataStore[DBSession] {
 
   protected lazy val dbActor = system.actorOf(DSActor.props(defaultPath))
 
-  def changePath(path: Path): Future[Unit] = {
+  override def changePath(path: Path): Future[Unit] = {
     val promise = Promise[Unit]()
     dbActor ! DBChangePath(path, promise)
     promise.future
   }
 
-  def doAction[A](action: DBSession => A): Future[A] = {
+  protected def doAction[A](action: DBSession => A): Future[A] = {
     val promise = Promise[A]()
     dbActor ! DBAction(action, promise)
     promise.future
@@ -105,9 +105,8 @@ object ScalikeJDBCDataStore extends DataStore[DBSession] {
   // implemented DataSource trait.
   object EventSource extends EventSource {
 
+    import spray.json._
     import Savings.JsonProtocol._
-
-    protected[ScalikeJDBCDataStore] val tableName = "eventsource"
 
     protected[ScalikeJDBCDataStore] val sqlCreateTable = SQL(s"""
 create table if not exists $tableName (
@@ -117,40 +116,50 @@ create table if not exists $tableName (
 )
 """)
 
-    val entry = EventEntry.syntax("entry")
-    val column = EventEntry.column
+    protected val entry = Entries.syntax("entry")
+    protected val column = Entries.column
 
-    protected case class EventEntry(id: Long, event: Savings.Event, createdAt: DateTime)
+    protected case class Entry(id: Long, event: Savings.Event, createdAt: Timestamp)
 
-    protected object EventEntry extends SQLSyntaxSupport[EventEntry] {
+    protected object Entries extends SQLSyntaxSupport[Entry] {
 
       override val tableName = EventSource.tableName
 
-      def apply(rs: WrappedResultSet): EventEntry = EventEntry(
+      def apply(rs: WrappedResultSet): Entry = Entry(
         id = rs.long("id"),
         event = rs.string("event").parseJson.convertTo[Savings.Event],
-        createdAt = rs.jodaDateTime("created_at")
+        createdAt = rs.timestamp("created_at")//rs.jodaDateTime("created_at")
       )
 
     }
 
-    def readEvents()(implicit session: DBSession): List[Savings.Event] = withSQL {
-      select.from(EventEntry as entry).orderBy(column.id)
+    protected def _readEvents()(implicit session: DBSession): Seq[Savings.Event] = withSQL {
+      select.from(Entries as entry).orderBy(column.id)
     }.map { rs =>
-      EventEntry(rs)
+      Entries(rs)
     }.list().apply().map(_.event)
     //sql"""select * from $tableName order by id""".map { rs =>
     //  EventEntry(rs)
     //}.list().apply().map(_.event)
 
-    def writeEvents(events: Savings.Event*)(implicit session: DBSession): Unit = {
+    override def readEvents(): Future[Seq[Savings.Event]] =
+      doAction { implicit session =>
+        _readEvents()
+      }
+
+    protected def _writeEvents(events: Savings.Event*)(implicit session: DBSession): Unit = {
       val batchEvents = events.map { event =>
         Seq(event.toJson.compactPrint)
       }
       withSQL {
-        insert.into(EventEntry).namedValues(column.event -> sqls.?, column.createdAt -> sqls.currentTimestamp)
+        insert.into(Entries).namedValues(column.event -> sqls.?, column.createdAt -> sqls.currentTimestamp)
       }.batch(batchEvents: _*).apply()
     }
+
+    override def writeEvents(events: Savings.Event*): Future[Unit] =
+      doAction { implicit session =>
+        _writeEvents(events:_*)
+      }
 
   }
 

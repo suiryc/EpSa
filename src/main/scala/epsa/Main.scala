@@ -41,25 +41,20 @@ class Main extends Application {
     I18N.loadLocale()
 
     val dataStore: storage.DataStore[_] = storage.ScalikeJDBCDataStore
+    //val dataStore: storage.DataStore[_] = storage.SlickDataStore
 
     {
       import Akka._
-      val f1 = dataStore.doAction { implicit session =>
-        dataStore.eventSource.readEvents()
-      }
-      f1.onComplete {
+      dataStore.eventSource.readEvents().onComplete {
         case v =>
           println(s"EventSource.readEvents => $v")
           v.toOption.map { events =>
-            println(model.Savings.processEvents(model.Savings(), events))
+            println(model.Savings.processEvents(model.Savings(), events:_*))
           }
-          val f2 = dataStore.doAction { implicit session =>
-            dataStore.eventSource.writeEvents(
-              model.Savings().createSchemeEvent("Scheme 1"),
-              model.Savings().createFundEvent("Fund 1")
-            )
-          }
-          f2.onComplete {
+          dataStore.eventSource.writeEvents(
+            model.Savings().createSchemeEvent("Scheme 1"),
+            model.Savings().createFundEvent("Fund 1")
+          ).onComplete {
             case v => println(s"EventSource.writeEvents => $v")
           }
       }
