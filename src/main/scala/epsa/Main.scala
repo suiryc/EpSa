@@ -1,5 +1,6 @@
 package epsa
 
+import akka.actor.ActorSystem
 import java.util.prefs.Preferences
 import javafx.application.{Application, Platform}
 import javafx.fxml.FXMLLoader
@@ -16,6 +17,13 @@ object Main {
 
   def main(args: Array[String]): Unit = {
     (new Main).launch()
+  }
+
+  object Akka {
+
+    implicit val system = ActorSystem("epsa")
+    implicit val dispatcher = system.dispatcher
+
   }
 
 }
@@ -53,6 +61,7 @@ class Main extends Application {
   }
 
   private def onCloseRequest(event: WindowEvent): Unit = {
+    Akka.system.shutdown()
     stage.close()
     Platform.exit()
   }
