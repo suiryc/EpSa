@@ -1,20 +1,25 @@
 package epsa.model
 
+// XXX - use joda time
 import java.util.Date
 import java.util.UUID
+import spray.json._
 
 object Savings {
 
-  def processActions(savings: Savings, action: (Savings => Savings.Event)*): Savings =
-    action.foldLeft(savings) { (savings, action) =>
+  def processActions(savings: Savings, actions: (Savings => Savings.Event)*): Savings =
+    actions.foldLeft(savings) { (savings, action) =>
       val event = action(savings)
       savings.processEvent(event)
     }
 
-  def processEvents(savings: Savings, event: Savings.Event*): Savings =
-    event.foldLeft(savings) { (savings, event) =>
+  def processEvents(savings: Savings, events: Savings.Event*): Savings =
+    events.foldLeft(savings) { (savings, event) =>
       savings.processEvent(event)
     }
+
+  def processEvents(savings: Savings, events: List[Savings.Event]): Savings =
+    processEvents(savings, events:_*)
 
   case class Scheme(id: UUID, name: String, funds: List[UUID])
 
@@ -52,6 +57,70 @@ object Savings {
 
   case class MakeRefund(date: Date, assetQuantity: AssetQuantity)
     extends Event
+
+  object JsonProtocol extends DefaultJsonProtocol {
+
+    // UUID format is not present in spray-json
+    // See: https://github.com/spray/spray-json/issues/24
+    implicit object UUIDFormat extends JsonFormat[UUID] {
+
+      def write(uuid: UUID): JsValue =
+        JsString(uuid.toString)
+
+      def read(value: JsValue): UUID = value match {
+        case JsString(uuid) =>
+          try {
+            UUID.fromString(uuid)
+          } catch {
+            case ex: Throwable => deserializationError(s"Invalid UUID format: $uuid", ex)
+          }
+
+        case _ => deserializationError(s"Expected UUID as JsString. Got $value")
+      }
+    }
+
+    implicit val createSchemeFormat = jsonFormat2(CreateScheme)
+    implicit val updateSchemeFormat = jsonFormat2(UpdateScheme)
+    implicit val createFundFormat = jsonFormat2(CreateFund)
+    implicit val updateFundFormat = jsonFormat2(UpdateFund)
+    implicit val associateFundFormat = jsonFormat2(AssociateFund)
+    implicit val dissociateFundFormat = jsonFormat2(DissociateFund)
+
+    implicit object EventJsonFormat extends RootJsonFormat[Event] with BasicFormats {
+
+      val FIELD_KIND = "kind"
+      val FIELD_CONTENT = "content"
+
+      def write(event: Event): JsObject = event match {
+        case event: CreateScheme   => JsObject(FIELD_CONTENT -> event.toJson, FIELD_KIND -> JsString("CreateScheme"))
+        case event: UpdateScheme   => JsObject(FIELD_CONTENT -> event.toJson, FIELD_KIND -> JsString("UpdateScheme"))
+        case event: CreateFund     => JsObject(FIELD_CONTENT -> event.toJson, FIELD_KIND -> JsString("CreateFund"))
+        case event: UpdateFund     => JsObject(FIELD_CONTENT -> event.toJson, FIELD_KIND -> JsString("UpdateFund"))
+        case event: AssociateFund  => JsObject(FIELD_CONTENT -> event.toJson, FIELD_KIND -> JsString("AssociateFund"))
+        case event: DissociateFund => JsObject(FIELD_CONTENT -> event.toJson, FIELD_KIND -> JsString("DissociateFund"))
+
+        case _ => serializationError(s"Unknown event kind: ${event.getClass.getName}")
+      }
+
+      def read(value: JsValue): Event = value.asJsObject.getFields(FIELD_CONTENT, FIELD_KIND) match {
+        case Seq(content: JsObject, JsString(kind)) => kind match {
+          case "CreateScheme"   => content.convertTo[CreateScheme]
+          case "UpdateScheme"   => content.convertTo[UpdateScheme]
+          case "CreateFund"     => content.convertTo[CreateFund]
+          case "UpdateFund"     => content.convertTo[UpdateFund]
+          case "AssociateFund"  => content.convertTo[AssociateFund]
+          case "DissociateFund" => content.convertTo[DissociateFund]
+
+          case _ => deserializationError(s"Unknown (JSON) event kind: $kind")
+        }
+
+        case fields => deserializationError(s"Event (JSON format) expected. Got $fields from $value")
+      }
+
+    }
+
+  }
+
 }
 
 case class Savings(schemes: List[Savings.Scheme] = Nil, funds: List[Savings.Fund] = Nil) {

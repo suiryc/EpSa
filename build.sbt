@@ -11,6 +11,7 @@ val versions = Map[String, String](
   "poi"          -> "3.12",
   "scala"        -> "2.11.7",
   "scalikejdbc"  -> "2.2.8",
+  "spray-json"   -> "1.3.2",
   "suiryc-scala" -> "0.0.2-SNAPSHOT",
   "tape"         -> "1.2.3"
 )
@@ -27,6 +28,7 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-http-experimental"            % versions("akka-http"),
   "com.typesafe.akka" %% "akka-http-spray-json-experimental" % versions("akka-http"),
   "com.typesafe.akka" %% "akka-slf4j"                        % versions("akka"),
+  "io.spray"          %% "spray-json"                        % versions("spray-json"),
   "org.apache.poi"    %  "poi"                               % versions("poi"),
   "org.apache.poi"    %  "poi-ooxml"                         % versions("poi"),
   "org.clapper"       %% "grizzled-slf4j"                    % versions("grizzled"),
