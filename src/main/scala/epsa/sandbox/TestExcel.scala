@@ -27,7 +27,7 @@ object TestExcel {
         Savings.AssociateFund(scheme2.id, fund.id)
       )
     }
-    val savings2 = Savings.processEvents(savings, events:_*)
+    val savings2 = Savings.processEvents(savings, events)
     println(savings2)
 
     (new TestExcel).launch()

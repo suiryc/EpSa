@@ -143,7 +143,7 @@ class MainController {
     }
 
     def processEvents(savings: Savings, events: List[Savings.Event]): Unit = {
-      val newSavings = Savings.processEvents(savings, events:_*)
+      val newSavings = Savings.processEvents(savings, events)
 
       import scala.collection.JavaConversions._
       fundsField.setItems(FXCollections.observableList(newSavings.funds))
