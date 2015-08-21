@@ -40,7 +40,30 @@ class Main extends Application {
     // XXX - GUI menu/option to change language
     I18N.loadLocale()
 
-    storage.DataStore
+    val dataStore: storage.DataStore[_] = storage.ScalikeJDBCDataStore
+
+    {
+      import Akka._
+      val f1 = dataStore.doAction { implicit session =>
+        dataStore.eventSource.readEvents()
+      }
+      f1.onComplete {
+        case v =>
+          println(s"EventSource.readEvents => $v")
+          v.toOption.map { events =>
+            println(model.Savings.processEvents(model.Savings(), events))
+          }
+          val f2 = dataStore.doAction { implicit session =>
+            dataStore.eventSource.writeEvents(
+              model.Savings().createSchemeEvent("Scheme 1"),
+              model.Savings().createFundEvent("Fund 1")
+            )
+          }
+          f2.onComplete {
+            case v => println(s"EventSource.writeEvents => $v")
+          }
+      }
+    }
 
     stage = primaryStage
 
