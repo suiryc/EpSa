@@ -40,11 +40,12 @@ class Main extends Application {
     // XXX - GUI menu/option to change language
     I18N.loadLocale()
 
-    val dataStore: storage.DataStore = storage.ScalikeJDBCDataStore
-    //val dataStore: storage.DataStore = storage.SlickDataStore
-
-    {
+    try {
       import Akka._
+
+      //val dataStore: storage.DataStore = storage.ScalikeJDBCDataStore
+      val dataStore: storage.DataStore = storage.SlickDataStore
+
       dataStore.eventSource.readEvents().onComplete {
         case read =>
           println(s"EventSource.readEvents => $read")
@@ -58,6 +59,10 @@ class Main extends Application {
             case write => println(s"EventSource.writeEvents => $write")
           }
       }
+    } catch {
+      case ex: Throwable =>
+        ex.printStackTrace()
+        shutdown
     }
 
     stage = primaryStage
@@ -78,9 +83,12 @@ class Main extends Application {
     stage.show()
   }
 
-  private def onCloseRequest(event: WindowEvent): Unit = {
+  private def onCloseRequest(event: WindowEvent): Unit =
+    shutdown()
+
+  private def shutdown(): Unit = {
     Akka.system.shutdown()
-    stage.close()
+    Option(stage).foreach(_.close())
     Platform.exit()
   }
 

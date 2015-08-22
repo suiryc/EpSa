@@ -26,6 +26,7 @@ object ScalikeJDBCDataStore extends DataStore {
   // Load H2 driver
   Class.forName("org.h2.Driver")
 
+  // XXX - make sure to go up caller if actor creation fails (database init actually)
   protected lazy val dbActor = system.actorOf(DSActor.props(defaultPath))
 
   override def changePath(path: Path): Future[Unit] = {
