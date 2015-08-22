@@ -1,6 +1,7 @@
 package epsa
 
 import akka.actor.ActorSystem
+import epsa.storage.DataStore
 import java.util.prefs.Preferences
 import javafx.application.{Application, Platform}
 import javafx.fxml.FXMLLoader
@@ -15,6 +16,11 @@ object Main {
   /** Settings. */
   implicit val prefs = Preferences.userRoot.node("suiryc.epsa").node("epsa")
 
+  /** Data store. */
+  val dataStore: DataStore =
+    if (true) storage.SlickDataStore
+    else storage.ScalikeJDBCDataStore
+
   def main(args: Array[String]): Unit = {
     (new Main).launch()
   }
@@ -24,6 +30,12 @@ object Main {
     implicit val system = ActorSystem("epsa")
     implicit val dispatcher = system.dispatcher
 
+  }
+
+  def shutdown(): Unit = {
+    Akka.system.shutdown()
+    Option(stage).foreach(_.close())
+    Platform.exit()
   }
 
 }
@@ -39,31 +51,6 @@ class Main extends Application {
   override def start(primaryStage: Stage) {
     // XXX - GUI menu/option to change language
     I18N.loadLocale()
-
-    try {
-      import Akka._
-
-      //val dataStore: storage.DataStore = storage.ScalikeJDBCDataStore
-      val dataStore: storage.DataStore = storage.SlickDataStore
-
-      dataStore.eventSource.readEvents().onComplete {
-        case read =>
-          println(s"EventSource.readEvents => $read")
-          read.toOption.foreach { events =>
-            println(model.Savings.processEvents(model.Savings(), events:_*))
-          }
-          dataStore.eventSource.writeEvents(
-            model.Savings().createSchemeEvent("Scheme 1"),
-            model.Savings().createFundEvent("Fund 1")
-          ).onComplete {
-            case write => println(s"EventSource.writeEvents => $write")
-          }
-      }
-    } catch {
-      case ex: Throwable =>
-        ex.printStackTrace()
-        shutdown
-    }
 
     stage = primaryStage
 
@@ -85,11 +72,5 @@ class Main extends Application {
 
   private def onCloseRequest(event: WindowEvent): Unit =
     shutdown()
-
-  private def shutdown(): Unit = {
-    Akka.system.shutdown()
-    Option(stage).foreach(_.close())
-    Platform.exit()
-  }
 
 }
