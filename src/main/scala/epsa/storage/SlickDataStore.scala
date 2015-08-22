@@ -18,6 +18,7 @@ object SlickDataStore extends DataStore {
 
   protected var db: Option[DB] = None
 
+  /** Gets the DB (opening it if not done). */
   protected def getDB(): DB =
     db match {
       case Some(v) => v
@@ -39,12 +40,14 @@ object SlickDataStore extends DataStore {
   }
 
   protected def dbOpen(path: Path): Future[DB] = {
+    // Open the new DB, and create missing tables
     val refNew = Database.forURL(s"jdbc:h2:$path", user = "user", password = "pass", driver = "org.h2.Driver")
 
     refNew.run(MTable.getTables(eventSource.tableName)).flatMap { tables =>
       if (tables.nonEmpty) Future.successful()
       else refNew.run(eventSource.entries.schema.create)
     }.map { _ =>
+      // Automatically keep in mind the new DB
       val dbNew = DB(refNew, path)
       db = Some(dbNew)
       dbNew
@@ -53,11 +56,15 @@ object SlickDataStore extends DataStore {
 
   val eventSource = EventSource
 
+  // Yes the EventSource object extends the inner EventSource trait from the
+  // implemented DataSource trait.
   object EventSource extends EventSource {
 
     import spray.json._
     import Savings.JsonProtocol._
 
+    // Note: we manipulate 'Savings.Event' objects, but store them as String
+    // so we need to define a mapping between the two.
     protected implicit val eventColumnType = MappedColumnType.base[Savings.Event, String](
       { e => e.toJson.compactPrint },
       { s => s.parseJson.convertTo[Savings.Event] }
@@ -65,11 +72,8 @@ object SlickDataStore extends DataStore {
 
     protected class Entries(tag: Tag) extends Table[(Long, Savings.Event, Timestamp)](tag, tableName) {
       def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
-
       def event = column[Savings.Event]("event")
-
       def createdAt = column[Timestamp]("created_at")
-
       def * = (id, event, createdAt)
     }
 
