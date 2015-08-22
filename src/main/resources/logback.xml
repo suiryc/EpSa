@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+  <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+    <!-- Target is System.out by default -->
+    <!-- <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+      <level>INFO</level>
+    </filter> -->
+    <!-- Encoders are assigned the type ch.qos.logback.classic.PatternLayoutEncoder by default -->
+    <encoder>
+      <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{48} - %msg%n</pattern>
+    </encoder>
+  </appender>
+
+  <!-- Slick logs a bunch of things in DEBUG level.
+       The most interesting ones to keep are executed queries and execution times
+       (slick.jdbc.JdbcBackend.statement and slick.jdbc.JdbcBackend.benchmark).
+    -->
+  <logger name="slick" level="INFO" />
+  <logger name="slick.jdbc.JdbcBackend.statement" level="DEBUG" />
+  <logger name="slick.jdbc.JdbcBackend.benchmark" level="DEBUG" />
+
+  <!-- The level of root is set to DEBUG by default -->
+  <root level="DEBUG">
+    <appender-ref ref="STDOUT" />
+  </root>
+
+</configuration>
