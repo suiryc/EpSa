@@ -8,7 +8,7 @@ import java.sql.Timestamp
 import scala.concurrent.{Future, Promise}
 import scalikejdbc._
 
-object ScalikeJDBCDataStore extends DataStore[DBSession] {
+object ScalikeJDBCDataStore extends DataStore {
 
   import epsa.Main.Akka._
 

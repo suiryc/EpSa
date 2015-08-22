@@ -10,7 +10,7 @@ import slick.driver.H2Driver.api._
 import slick.driver.H2Driver.backend.DatabaseDef
 import slick.jdbc.meta.MTable
 
-object SlickDataStore extends DataStore[Session] {
+object SlickDataStore extends DataStore {
 
   import epsa.Main.Akka._
 
@@ -20,8 +20,8 @@ object SlickDataStore extends DataStore[Session] {
 
   protected def getDB(): DB =
     db match {
-      case Some(db) => db
-      case None     => Await.result(dbOpen(defaultPath), Duration.Inf)
+      case Some(v) => v
+      case None    => Await.result(dbOpen(defaultPath), Duration.Inf)
     }
 
   def changePath(newPath: Path): Future[Unit] = {

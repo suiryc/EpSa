@@ -40,22 +40,22 @@ class Main extends Application {
     // XXX - GUI menu/option to change language
     I18N.loadLocale()
 
-    val dataStore: storage.DataStore[_] = storage.ScalikeJDBCDataStore
-    //val dataStore: storage.DataStore[_] = storage.SlickDataStore
+    val dataStore: storage.DataStore = storage.ScalikeJDBCDataStore
+    //val dataStore: storage.DataStore = storage.SlickDataStore
 
     {
       import Akka._
       dataStore.eventSource.readEvents().onComplete {
-        case v =>
-          println(s"EventSource.readEvents => $v")
-          v.toOption.map { events =>
+        case read =>
+          println(s"EventSource.readEvents => $read")
+          read.toOption.foreach { events =>
             println(model.Savings.processEvents(model.Savings(), events:_*))
           }
           dataStore.eventSource.writeEvents(
             model.Savings().createSchemeEvent("Scheme 1"),
             model.Savings().createFundEvent("Fund 1")
           ).onComplete {
-            case v => println(s"EventSource.writeEvents => $v")
+            case write => println(s"EventSource.writeEvents => $write")
           }
       }
     }
