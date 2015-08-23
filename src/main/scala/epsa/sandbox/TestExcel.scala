@@ -3,7 +3,7 @@ package epsa.sandbox
 import epsa.charts.ChartHandler
 import epsa.model.Savings
 import epsa.tools.EsaliaInvestmentFundProber
-import java.io.File
+import java.nio.file.Path
 import java.util.prefs.Preferences
 import javafx.application.Application
 import javafx.scene.Scene
@@ -45,8 +45,10 @@ class TestExcel extends Application {
   }
 
   override def start(stage: Stage) {
-    val fundPathFolder = Preference.forString("fund.path.folder", null)
-    val fundPathFile = Preference.forString("fund.path.file", null)
+    import Preference._
+
+    val fundPathFolder = Preference.from("fund.path.folder", null:Path)
+    val fundPathFile = Preference.from("fund.path.file", null:String)
 
     val fileChooser = new FileChooser()
     fileChooser.setTitle("Open Investment Fund File")
@@ -54,8 +56,8 @@ class TestExcel extends Application {
       new ExtensionFilter("Excel Files", "*.xls", "*.xlsx"),
       new ExtensionFilter("All Files", "*.*")
     )
-    fundPathFolder.option.foreach { folder =>
-      fileChooser.setInitialDirectory(new File(folder))
+    fundPathFolder.option.foreach { path =>
+      fileChooser.setInitialDirectory(path.toFile)
       fundPathFile.option.foreach(fileChooser.setInitialFileName)
     }
     val selectedFile = fileChooser.showOpenDialog(stage)
@@ -64,7 +66,7 @@ class TestExcel extends Application {
     } match {
       case Some(fund) =>
         // Save path in preferences
-        fundPathFolder() = selectedFile.getParent
+        fundPathFolder() = selectedFile.getParentFile.toPath
         fundPathFile() = selectedFile.getName
         // Then build and display chart
         val chartHandler = new ChartHandler(fund)

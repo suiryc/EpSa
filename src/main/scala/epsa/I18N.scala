@@ -12,9 +12,10 @@ import suiryc.scala.settings.Preference
 
 object I18N {
 
+  import Preference._
   import epsa.Main.prefs
 
-  private val localeCodePref = Preference.forString("locale.code", "en")
+  private val localeCodePref = Preference.from("locale.code", "en")
 
   /** I18N resources (relative) path. */
   private val i18nPath = "i18n/"

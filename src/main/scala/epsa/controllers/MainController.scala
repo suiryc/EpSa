@@ -4,7 +4,7 @@ import akka.actor.{Actor, ActorRef, Props}
 import epsa.charts.ChartHandler
 import epsa.model.Savings
 import epsa.tools.EsaliaInvestmentFundProber
-import java.io.File
+import java.nio.file.Path
 import javafx.collections.FXCollections
 import javafx.event.ActionEvent
 import javafx.fxml.FXML
@@ -89,10 +89,12 @@ class MainController {
   }
 
   def onFundGraph(event: ActionEvent): Unit = {
+    import Preference._
+
     val stage = new Stage()
 
-    val fundPathFolder = Preference.forString("fund.path.folder", null)
-    val fundPathFile = Preference.forString("fund.path.file", null)
+    val fundPathFolder = Preference.from("fund.path.folder", null:Path)
+    val fundPathFile = Preference.from("fund.path.file", null:String)
 
     val fileChooser = new FileChooser()
     fileChooser.setTitle("Open Investment Fund File")
@@ -100,8 +102,8 @@ class MainController {
       new ExtensionFilter("Excel Files", "*.xls", "*.xlsx"),
       new ExtensionFilter("All Files", "*.*")
     )
-    fundPathFolder.option.foreach { folder =>
-      fileChooser.setInitialDirectory(new File(folder))
+    fundPathFolder.option.foreach { path =>
+      fileChooser.setInitialDirectory(path.toFile)
       fundPathFile.option.foreach(fileChooser.setInitialFileName)
     }
     val selectedFile = fileChooser.showOpenDialog(stage)
@@ -110,7 +112,7 @@ class MainController {
     } match {
       case Some(fund) =>
         // Save path in preferences
-        fundPathFolder() = selectedFile.getParent
+        fundPathFolder() = selectedFile.getParentFile.toPath
         fundPathFile() = selectedFile.getName
         // Then build and display chart
         val chartHandler = new ChartHandler(fund)
