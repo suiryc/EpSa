@@ -61,20 +61,19 @@ object DataStore {
     // Open the new DB, and create missing tables
     val refNew = Database.forURL(s"jdbc:h2:$path", user = "user", password = "pass", driver = "org.h2.Driver")
 
-    val db = refNew.run(MTable.getTables(EventSource.tableName)).flatMap { tables =>
+    refNew.run(MTable.getTables(EventSource.tableName)).flatMap { tables =>
       if (tables.nonEmpty) Future.successful()
       else refNew.run(EventSource.entries.schema.create)
     }.map { _ =>
       // Automatically keep in mind the new DB
       val dbNew = DB(refNew, path)
       dbOpt = Some(dbNew)
+
+      // Success, so save path
+      dbPath() = path
+
       dbNew
     }
-
-    // Save path
-    dbPath() = path
-
-    db
   }
 
   object EventSource {
