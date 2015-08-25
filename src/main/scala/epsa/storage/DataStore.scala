@@ -12,25 +12,33 @@ import scala.concurrent.Future
 import slick.driver.H2Driver.api._
 import slick.driver.H2Driver.backend.DatabaseDef
 import slick.jdbc.meta.MTable
+import suiryc.scala.settings.Preference
 
 object DataStore {
 
   import epsa.Main.Akka._
+  import epsa.Main.prefs
+  import Preference._
 
-  protected val defaultPath = {
-    // See: http://stackoverflow.com/a/12733172
-    val path = Paths.get(getClass.getProtectionDomain.getCodeSource.getLocation.toURI)
-    if (Files.isDirectory(path)) path
-    else path.getParent
-  }.resolve("default")
+  protected val dbPath = Preference.from("datastore.path", null:Path)
+
+  protected val defaultPath = dbPath.option.getOrElse {
+    val path = {
+      // See: http://stackoverflow.com/a/12733172
+      val appPath = Paths.get(getClass.getProtectionDomain.getCodeSource.getLocation.toURI)
+      if (Files.isDirectory(appPath)) appPath
+      else appPath.getParent
+    }
+    path.resolve("default")
+  }
 
   protected case class DB(db: DatabaseDef, path: Path)
 
-  protected var db: Option[DB] = None
+  protected var dbOpt: Option[DB] = None
 
   /** Gets the DB (opening it if not done). */
   protected def getDB(): DB =
-    db match {
+    dbOpt match {
       case Some(v) => v
       case None    => Await.result(dbOpen(defaultPath), Duration.Inf)
     }
@@ -53,15 +61,20 @@ object DataStore {
     // Open the new DB, and create missing tables
     val refNew = Database.forURL(s"jdbc:h2:$path", user = "user", password = "pass", driver = "org.h2.Driver")
 
-    refNew.run(MTable.getTables(EventSource.tableName)).flatMap { tables =>
+    val db = refNew.run(MTable.getTables(EventSource.tableName)).flatMap { tables =>
       if (tables.nonEmpty) Future.successful()
       else refNew.run(EventSource.entries.schema.create)
     }.map { _ =>
       // Automatically keep in mind the new DB
       val dbNew = DB(refNew, path)
-      db = Some(dbNew)
+      dbOpt = Some(dbNew)
       dbNew
     }
+
+    // Save path
+    dbPath() = path
+
+    db
   }
 
   object EventSource {
