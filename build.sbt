@@ -10,7 +10,6 @@ val versions = Map[String, String](
   "logback"      -> "1.1.2",
   "poi"          -> "3.12",
   "scala"        -> "2.11.7",
-  "scalikejdbc"  -> "2.2.8",
   "slick"        -> "3.0.2",
   "spray-json"   -> "1.3.2",
   "suiryc-scala" -> "0.0.2-SNAPSHOT",
@@ -34,7 +33,6 @@ libraryDependencies ++= Seq(
   "org.apache.poi"     %  "poi"                               % versions("poi"),
   "org.apache.poi"     %  "poi-ooxml"                         % versions("poi"),
   "org.clapper"        %% "grizzled-slf4j"                    % versions("grizzled"),
-  "org.scalikejdbc"    %% "scalikejdbc"                       % versions("scalikejdbc"),
   "suiryc"             %% "suiryc-scala-core"                 % versions("suiryc-scala"),
   "suiryc"             %% "suiryc-scala-log"                  % versions("suiryc-scala"),
   "suiryc"             %% "suiryc-scala-javafx"               % versions("suiryc-scala")

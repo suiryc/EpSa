@@ -1,6 +1,7 @@
 package epsa.sandbox
 
-import epsa.{model, storage}
+import epsa.model.Savings
+import epsa.storage.DataStore
 import scala.concurrent.Promise
 
 object TestDataStore {
@@ -14,18 +15,15 @@ object TestDataStore {
     }
 
     try {
-      //val dataStore: storage.DataStore = storage.ScalikeJDBCDataStore
-      val dataStore: storage.DataStore = storage.SlickDataStore
-
-      dataStore.eventSource.readEvents().onComplete {
+      DataStore.EventSource.readEvents().onComplete {
         case read =>
           println(s"EventSource.readEvents => $read")
           read.toOption.foreach { events =>
-            println(model.Savings.processEvents(model.Savings(), events:_*))
+            println(Savings.processEvents(Savings(), events:_*))
           }
-          dataStore.eventSource.writeEvents(
-            model.Savings().createSchemeEvent("Scheme 1"),
-            model.Savings().createFundEvent("Fund 1")
+          DataStore.EventSource.writeEvents(
+            Savings().createSchemeEvent("Scheme 1"),
+            Savings().createFundEvent("Fund 1")
           ).onComplete {
             case write =>
               println(s"EventSource.writeEvents => $write")

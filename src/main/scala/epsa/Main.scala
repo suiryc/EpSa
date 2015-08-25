@@ -1,7 +1,6 @@
 package epsa
 
 import akka.actor.ActorSystem
-import epsa.storage.DataStore
 import java.util.prefs.Preferences
 import javafx.application.{Application, Platform}
 import javafx.fxml.FXMLLoader
@@ -15,11 +14,6 @@ object Main {
 
   /** Settings. */
   implicit val prefs = Preferences.userRoot.node("suiryc.epsa").node("epsa")
-
-  /** Data store. */
-  val dataStore: DataStore =
-    if (true) storage.SlickDataStore
-    else storage.ScalikeJDBCDataStore
 
   def main(args: Array[String]): Unit = {
     (new Main).launch()
