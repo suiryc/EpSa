@@ -1,7 +1,6 @@
 package epsa.model
 
-// XXX - use joda time
-import java.util.Date
+import java.time.LocalDate
 import java.util.UUID
 import spray.json._
 
@@ -25,11 +24,11 @@ object Savings {
 
   case class Fund(id: UUID, name: String)
 
-  sealed trait Event
-
   // XXX - explicit fractional value instead of Double (possible precision issues) ?
   // XXX - fundId ok even if dealing with 'frozen current account' ?
-  case class AssetQuantity(schemeId: UUID, fundId: UUID, amount: Double, units: Double, unitValue: Double)
+  case class Asset(schemeId: UUID, fundId: UUID, availability: Option[LocalDate], amount: Double, units: Double)
+
+  sealed trait Event
 
   case class CreateScheme(schemeId: UUID, name: String)
     extends Event
@@ -49,13 +48,13 @@ object Savings {
   case class DissociateFund(schemeId: UUID, fundId: UUID)
     extends Event
 
-  case class MakePayment(date: Date, assetQuantity: AssetQuantity, availability: Option[Date])
+  case class MakePayment(date: LocalDate, asset: Asset)
     extends Event
 
-  case class MakeTransfer(date: Date, assetQuantitySrc: AssetQuantity, assetQuantityDst: AssetQuantity, availability: Option[Date])
+  case class MakeTransfer(date: LocalDate, assetSrc: Asset, assetDst: Asset)
     extends Event
 
-  case class MakeRefund(date: Date, assetQuantity: AssetQuantity)
+  case class MakeRefund(date: LocalDate, asset: Asset)
     extends Event
 
   object JsonProtocol extends DefaultJsonProtocol {
@@ -79,12 +78,33 @@ object Savings {
       }
     }
 
+    implicit object LocalDateFormat extends JsonFormat[LocalDate] {
+
+      def write(date: LocalDate): JsValue =
+        JsString(date.toString)
+
+      def read(value: JsValue): LocalDate = value match {
+        case JsString(dateS) =>
+          try {
+            LocalDate.parse(dateS)
+          } catch {
+            case ex: Throwable => deserializationError(s"Invalid LocalData format: $dateS", ex)
+          }
+
+        case _ => deserializationError(s"Expected LocalData as JsString. Got $value")
+      }
+    }
+
     implicit val createSchemeFormat = jsonFormat2(CreateScheme)
     implicit val updateSchemeFormat = jsonFormat2(UpdateScheme)
     implicit val createFundFormat = jsonFormat2(CreateFund)
     implicit val updateFundFormat = jsonFormat2(UpdateFund)
     implicit val associateFundFormat = jsonFormat2(AssociateFund)
     implicit val dissociateFundFormat = jsonFormat2(DissociateFund)
+    implicit val assetFormat = jsonFormat5(Asset)
+    implicit val makePaymentFormat = jsonFormat2(MakePayment)
+    implicit val makeTransferFormat = jsonFormat3(MakeTransfer)
+    implicit val makeRefundFormat = jsonFormat2(MakeRefund)
 
     implicit object EventJsonFormat extends RootJsonFormat[Event] with BasicFormats {
 
@@ -98,6 +118,9 @@ object Savings {
         case event: UpdateFund     => JsObject(FIELD_CONTENT -> event.toJson, FIELD_KIND -> JsString("UpdateFund"))
         case event: AssociateFund  => JsObject(FIELD_CONTENT -> event.toJson, FIELD_KIND -> JsString("AssociateFund"))
         case event: DissociateFund => JsObject(FIELD_CONTENT -> event.toJson, FIELD_KIND -> JsString("DissociateFund"))
+        case event: MakePayment    => JsObject(FIELD_CONTENT -> event.toJson, FIELD_KIND -> JsString("MakePayment"))
+        case event: MakeTransfer   => JsObject(FIELD_CONTENT -> event.toJson, FIELD_KIND -> JsString("MakeTransfer"))
+        case event: MakeRefund     => JsObject(FIELD_CONTENT -> event.toJson, FIELD_KIND -> JsString("MakeRefund"))
 
         case _ => serializationError(s"Unknown event kind: ${event.getClass.getName}")
       }
@@ -110,6 +133,9 @@ object Savings {
           case "UpdateFund"     => content.convertTo[UpdateFund]
           case "AssociateFund"  => content.convertTo[AssociateFund]
           case "DissociateFund" => content.convertTo[DissociateFund]
+          case "MakePayment"    => content.convertTo[MakePayment]
+          case "MakeTransfer"   => content.convertTo[MakeTransfer]
+          case "MakeRefund"     => content.convertTo[MakeRefund]
 
           case _ => deserializationError(s"Unknown (JSON) event kind: $kind")
         }
@@ -123,26 +149,20 @@ object Savings {
 
 }
 
-case class Savings(schemes: List[Savings.Scheme] = Nil, funds: List[Savings.Fund] = Nil) {
+case class Savings(schemes: List[Savings.Scheme] = Nil, funds: List[Savings.Fund] = Nil, assets: List[Savings.Asset] = Nil) {
 
   import Savings._
 
   def processEvent(event: Event): Savings = event match {
-    case CreateScheme(id, name)           => createScheme(id, name)
-    case UpdateScheme(id, name)           => updateScheme(id, name)
-    case CreateFund(id, name)             => createFund(id, name)
-    case UpdateFund(id, name)             => updateFund(id, name)
-    case AssociateFund(schemeId, fundId)  => associateFund(schemeId, fundId)
-    case DissociateFund(schemeId, fundId) => dissociateFund(schemeId, fundId)
-
-    case MakePayment(date, assetQuantity, availability) =>
-      ???
-
-    case MakeTransfer(date, assetQuantitySrc, assetQuantityDst, availability) =>
-      ???
-
-    case MakeRefund(date, assetQuantity) =>
-      ???
+    case CreateScheme(id, name)              => createScheme(id, name)
+    case UpdateScheme(id, name)              => updateScheme(id, name)
+    case CreateFund(id, name)                => createFund(id, name)
+    case UpdateFund(id, name)                => updateFund(id, name)
+    case AssociateFund(schemeId, fundId)     => associateFund(schemeId, fundId)
+    case DissociateFund(schemeId, fundId)    => dissociateFund(schemeId, fundId)
+    case MakePayment(_, asset)               => makePayment(asset)
+    case MakeTransfer(_, assetSrc, assetDst) => makeTransfer(assetSrc, assetDst)
+    case MakeRefund(_, asset)                => makeRefund(asset)
   }
 
   protected def createScheme(id: UUID, name: String): Savings = {
@@ -184,6 +204,46 @@ case class Savings(schemes: List[Savings.Scheme] = Nil, funds: List[Savings.Fund
     }
     copy(schemes = updated)
   }
+
+  protected def makePayment(asset: Asset): Savings =
+    findAsset(asset) match {
+      case Some(currentAsset) =>
+        val amount = currentAsset.amount + asset.amount
+        val units = currentAsset.units + asset.units
+        updateAsset(Asset(asset.schemeId, asset.fundId, asset.availability, amount, units))
+
+      case None =>
+        copy(assets = assets :+ asset)
+    }
+
+  protected def makeTransfer(assetSrc: Asset, assetDst: Asset): Savings =
+    makeRefund(assetSrc).makePayment(assetDst)
+
+  protected def makeRefund(asset: Asset): Savings = {
+    val currentAsset = findAsset(asset).get
+    val amount = currentAsset.amount - asset.amount
+    val units = currentAsset.units - asset.units
+
+    if (units <= 0) removeAsset(asset)
+    else updateAsset(Asset(asset.schemeId, asset.fundId, asset.availability, amount, units))
+  }
+
+  protected def testAsset(currentAsset: Asset, asset: Asset): Boolean =
+    (currentAsset.schemeId == asset.schemeId) &&
+      (currentAsset.fundId == asset.fundId) &&
+      (currentAsset.availability == asset.availability)
+
+  protected def findAsset(asset: Asset): Option[Savings.Asset] =
+    assets.find(testAsset(_, asset))
+
+  protected def updateAsset(asset: Asset): Savings =
+    copy(assets = assets.map { currentAsset =>
+      if (testAsset(currentAsset, asset)) asset
+      else currentAsset
+    })
+
+  protected def removeAsset(asset: Asset): Savings =
+    copy(assets = assets.filterNot(testAsset(_, asset)))
 
   def getFund(fundId: UUID): Option[Fund] =
     funds.find(_.id == fundId)
