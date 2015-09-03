@@ -9,7 +9,7 @@ import javafx.collections.FXCollections
 import javafx.event.ActionEvent
 import javafx.fxml.FXML
 import javafx.scene.{Node, Scene}
-import javafx.scene.control.{Button, ListView}
+import javafx.scene.control.{Button, ListView, TableView}
 import javafx.stage.FileChooser.ExtensionFilter
 import javafx.stage.{FileChooser, Modality, Stage, Window}
 import suiryc.scala.javafx.beans.value.RichObservableValue._
@@ -39,6 +39,9 @@ class MainController {
 
   @FXML
   protected var fundsField: ListView[Savings.Fund] = _
+
+  @FXML
+  protected var assetsTable: TableView[Savings.Asset] = _
 
   private var actor: ActorRef = _
 
@@ -173,16 +176,22 @@ class MainController {
     }
 
     def onTest(savings: Savings): Unit = {
-      val savings1 = Savings.processActions(savings,
-        _.createSchemeEvent("Atos"),
-        _.createSchemeEvent("Worldline"),
-        _.createFundEvent("ARCANCIA MONETAIRE 257 - 2007"),
-        _.createFundEvent("ARCANCIA TEMPERE 357 - 2357"),
-        _.createFundEvent("ARCANCIA HARMONIE 453 - 2453"),
-        _.createFundEvent("SPRINT DYNAMIC - 6010"),
-        _.createFundEvent("WORLDLINE STOCK PLAN PART C - 868")
-      )
-      processEvents(savings1, Nil)
+      import java.time.LocalDate
+
+      val s1 = Savings().createSchemeEvent("Scheme 1")
+      val s2 = Savings().createSchemeEvent("Scheme 2")
+      val f1 = Savings().createFundEvent("Fund 1")
+      val f2 = Savings().createFundEvent("Fund 2")
+      processEvents(savings, List(s1, s2, f1, f2,
+        Savings.AssociateFund(s1.schemeId, f1.fundId),
+        Savings.AssociateFund(s1.schemeId, f2.fundId),
+        Savings.AssociateFund(s2.schemeId, f2.fundId),
+        Savings.MakePayment(LocalDate.now, Savings.Asset(s1.schemeId, f1.fundId, None, 10.0, 10.0)),
+        Savings.MakePayment(LocalDate.now, Savings.Asset(s1.schemeId, f1.fundId, None, 20.0, 10.0)),
+        Savings.MakePayment(LocalDate.now, Savings.Asset(s1.schemeId, f1.fundId, Some(LocalDate.now.plusMonths(12)), 20.0, 10.0)),
+        Savings.MakeRefund(LocalDate.now, Savings.Asset(s1.schemeId, f1.fundId, None, 10.0, 5.0)),
+        Savings.MakeTransfer(LocalDate.now, Savings.Asset(s1.schemeId, f1.fundId, None, 10.0, 10.0), Savings.Asset(s1.schemeId, f2.fundId, None, 10.0, 20.0))
+      ))
     }
 
   }
