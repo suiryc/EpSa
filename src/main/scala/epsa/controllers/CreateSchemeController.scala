@@ -50,7 +50,7 @@ class CreateSchemeController {
 
     edit.foreach { scheme =>
       nameField.setText(scheme.name)
-      scheme.funds.flatMap { fundId =>
+      scheme.funds.map { fundId =>
         savings.getFund(fundId)
       }.foreach(fundsField.getSelectionModel.select)
 

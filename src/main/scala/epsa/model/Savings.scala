@@ -245,8 +245,11 @@ case class Savings(schemes: List[Savings.Scheme] = Nil, funds: List[Savings.Fund
   protected def removeAsset(asset: Asset): Savings =
     copy(assets = assets.filterNot(testAsset(_, asset)))
 
-  def getFund(fundId: UUID): Option[Fund] =
-    funds.find(_.id == fundId)
+  def getScheme(schemeId: UUID): Scheme =
+    schemes.find(_.id == schemeId).get
+
+  def getFund(fundId: UUID): Fund =
+    funds.find(_.id == fundId).get
 
   def createSchemeEvent(name: String): CreateScheme = {
     val id = newId(schemes.map(_.id))

@@ -5,11 +5,14 @@ import epsa.charts.ChartHandler
 import epsa.model.Savings
 import epsa.tools.EsaliaInvestmentFundProber
 import java.nio.file.Path
+import java.util.ResourceBundle
+import javafx.beans.property.{SimpleDoubleProperty, SimpleStringProperty}
 import javafx.collections.FXCollections
+import javafx.collections.transformation.SortedList
 import javafx.event.ActionEvent
 import javafx.fxml.FXML
 import javafx.scene.{Node, Scene}
-import javafx.scene.control.{Button, ListView, TableView}
+import javafx.scene.control.{Button, ListView, TableColumn, TableView}
 import javafx.stage.FileChooser.ExtensionFilter
 import javafx.stage.{FileChooser, Modality, Stage, Window}
 import suiryc.scala.javafx.beans.value.RichObservableValue._
@@ -25,8 +28,8 @@ class MainController {
   //@FXML
   //protected var location: URL = _
 
-  //@FXML
-  //protected var resources: ResourceBundle = _
+  @FXML
+  protected var resources: ResourceBundle = _
 
   @FXML
   protected var editSchemeButton: Button = _
@@ -44,6 +47,18 @@ class MainController {
   protected var assetsTable: TableView[Savings.Asset] = _
 
   private var actor: ActorRef = _
+
+  lazy private val columnScheme =
+    new TableColumn[Savings.Asset, String](resources.getString("Scheme"))
+
+  lazy private val columnFund =
+    new TableColumn[Savings.Asset, String](resources.getString("Fund"))
+
+  lazy private val columnAmount =
+    new TableColumn[Savings.Asset, Number](resources.getString("Amount"))
+
+  lazy private val columnUnits =
+    new TableColumn[Savings.Asset, Number](resources.getString("Units"))
 
   def initialize(): Unit = {
     // XXX - append random value
@@ -65,6 +80,17 @@ class MainController {
     fundsField.getSelectionModel.selectedItemProperty.listen {
       editFundButton.setDisable(Option(fundsField.getSelectionModel.getSelectedItem).isEmpty)
     }
+
+    // Note: scheme and fund columns cell value factory relies on the current
+    // Savings instance, and are thus defined/updated in the actor
+    columnAmount.setCellValueFactory { (data: TableColumn.CellDataFeatures[Savings.Asset, Number]) =>
+      new SimpleDoubleProperty(data.getValue.amount)
+    }
+    columnUnits.setCellValueFactory { (data: TableColumn.CellDataFeatures[Savings.Asset, Number]) =>
+      new SimpleDoubleProperty(data.getValue.units)
+    }
+
+    assetsTable.getColumns.addAll(columnScheme, columnFund, columnAmount, columnUnits)
   }
 
   def onCreateScheme(event: ActionEvent): Unit = {
@@ -150,9 +176,22 @@ class MainController {
     def processEvents(savings: Savings, events: List[Savings.Event]): Unit = {
       val newSavings = Savings.processEvents(savings, events)
 
+      // We use the savings instance to get a scheme/fund name by id in the
+      // assets table
+      columnScheme.setCellValueFactory { (data: TableColumn.CellDataFeatures[Savings.Asset, String]) =>
+        new SimpleStringProperty(newSavings.getScheme(data.getValue.schemeId).name)
+      }
+      columnFund.setCellValueFactory { (data: TableColumn.CellDataFeatures[Savings.Asset, String]) =>
+        new SimpleStringProperty(newSavings.getFund(data.getValue.fundId).name)
+      }
+
       import scala.collection.JavaConversions._
       fundsField.setItems(FXCollections.observableList(newSavings.funds))
       schemesField.setItems(FXCollections.observableList(newSavings.schemes))
+
+      val sortedAssets = new SortedList(FXCollections.observableList(newSavings.assets))
+      sortedAssets.comparatorProperty.bind(assetsTable.comparatorProperty)
+      assetsTable.setItems(sortedAssets)
 
       context.become(receive(newSavings))
     }
