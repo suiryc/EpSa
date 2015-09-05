@@ -1,7 +1,9 @@
 package epsa
 
 import akka.actor.ActorSystem
+import epsa.controllers.MainController
 import java.util.prefs.Preferences
+import javafx.event.ActionEvent
 import javafx.application.{Application, Platform}
 import javafx.fxml.FXMLLoader
 import javafx.scene.{Scene, Parent}
@@ -48,11 +50,11 @@ class Main extends Application {
 
     stage = primaryStage
 
-    // XXX - share code with main controller 'exit' menu item; how to handle it in the controller ? (will need to
-    // warn if changes are not yet saved, etc.)
-    stage.setOnCloseRequest(onCloseRequest _)
+    val loader = new FXMLLoader(getClass.getResource("/fxml/main.fxml"), I18N.getResources)
+    val root = loader.load[Parent]()
+    val controller = loader.getController[MainController]
 
-    val root = FXMLLoader.load[Parent](getClass.getResource("/fxml/main.fxml"), I18N.getResources)
+    stage.setOnCloseRequest(onCloseRequest(controller) _)
 
     /*pane.getChildren.setAll(root)
     AnchorPane.setTopAnchor(root, 0)
@@ -66,7 +68,8 @@ class Main extends Application {
     stage.show()
   }
 
-  private def onCloseRequest(event: WindowEvent): Unit =
-    shutdown()
+  private def onCloseRequest(controller: MainController)(event: WindowEvent): Unit =
+    // Delegate closing request to controller
+    controller.onExit(new ActionEvent())
 
 }

@@ -94,7 +94,7 @@ class MainController {
   }
 
   def onExit(event: ActionEvent): Unit = {
-    epsa.Main.shutdown()
+    actor ! OnExit
   }
 
   def onCreateScheme(event: ActionEvent): Unit = {
@@ -170,6 +170,7 @@ class MainController {
     override def receive: Receive = receive(_savings)
 
     def receive(savings: Savings): Receive = {
+      case OnExit                      => onExit()
       case OnCreateScheme(owner)       => onCreateScheme(savings, owner, None)
       case OnEditScheme(owner, scheme) => onCreateScheme(savings, owner, Some(scheme))
       case OnCreateFund(owner)         => onCreateFund(savings, owner, None)
@@ -198,6 +199,10 @@ class MainController {
       assetsTable.setItems(sortedAssets)
 
       context.become(receive(newSavings))
+    }
+
+    def onExit(): Unit = {
+      epsa.Main.shutdown()
     }
 
     def onCreateScheme(savings: Savings, owner: Window, edit: Option[Savings.Scheme]): Unit = {
@@ -242,6 +247,8 @@ class MainController {
 }
 
 object MainController {
+
+  case object OnExit
 
   case class OnCreateScheme(owner: Window)
 
