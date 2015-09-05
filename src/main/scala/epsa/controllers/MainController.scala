@@ -93,6 +93,10 @@ class MainController {
     assetsTable.getColumns.addAll(columnScheme, columnFund, columnAmount, columnUnits)
   }
 
+  def onExit(event: ActionEvent): Unit = {
+    epsa.Main.shutdown()
+  }
+
   def onCreateScheme(event: ActionEvent): Unit = {
     actor ! OnCreateScheme(event.getSource.asInstanceOf[Node].getScene.getWindow)
   }

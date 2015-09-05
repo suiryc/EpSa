@@ -48,6 +48,8 @@ class Main extends Application {
 
     stage = primaryStage
 
+    // XXX - share code with main controller 'exit' menu item; how to handle it in the controller ? (will need to
+    // warn if changes are not yet saved, etc.)
     stage.setOnCloseRequest(onCloseRequest _)
 
     val root = FXMLLoader.load[Parent](getClass.getResource("/fxml/main.fxml"), I18N.getResources)
