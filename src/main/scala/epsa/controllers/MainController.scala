@@ -6,7 +6,7 @@ import epsa.model.Savings
 import epsa.tools.EsaliaInvestmentFundProber
 import java.nio.file.Path
 import java.util.ResourceBundle
-import javafx.beans.property.{SimpleDoubleProperty, SimpleStringProperty}
+import javafx.beans.property.{SimpleObjectProperty, SimpleStringProperty}
 import javafx.collections.FXCollections
 import javafx.collections.transformation.SortedList
 import javafx.event.ActionEvent
@@ -55,10 +55,10 @@ class MainController {
     new TableColumn[Savings.Asset, String](resources.getString("Fund"))
 
   lazy private val columnAmount =
-    new TableColumn[Savings.Asset, Number](resources.getString("Amount"))
+    new TableColumn[Savings.Asset, BigDecimal](resources.getString("Amount"))
 
   lazy private val columnUnits =
-    new TableColumn[Savings.Asset, Number](resources.getString("Units"))
+    new TableColumn[Savings.Asset, BigDecimal](resources.getString("Units"))
 
   def initialize(): Unit = {
     // XXX - append random value
@@ -83,11 +83,11 @@ class MainController {
 
     // Note: scheme and fund columns cell value factory relies on the current
     // Savings instance, and are thus defined/updated in the actor
-    columnAmount.setCellValueFactory { (data: TableColumn.CellDataFeatures[Savings.Asset, Number]) =>
-      new SimpleDoubleProperty(data.getValue.amount)
+    columnAmount.setCellValueFactory { (data: TableColumn.CellDataFeatures[Savings.Asset, BigDecimal]) =>
+      new SimpleObjectProperty(data.getValue.amount)
     }
-    columnUnits.setCellValueFactory { (data: TableColumn.CellDataFeatures[Savings.Asset, Number]) =>
-      new SimpleDoubleProperty(data.getValue.units)
+    columnUnits.setCellValueFactory { (data: TableColumn.CellDataFeatures[Savings.Asset, BigDecimal]) =>
+      new SimpleObjectProperty(data.getValue.units)
     }
 
     assetsTable.getColumns.addAll(columnScheme, columnFund, columnAmount, columnUnits)

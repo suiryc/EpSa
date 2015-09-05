@@ -24,9 +24,8 @@ object Savings {
 
   case class Fund(id: UUID, name: String)
 
-  // XXX - explicit fractional value instead of Double (possible precision issues) ?
   // XXX - fundId ok even if dealing with 'frozen current account' ?
-  case class Asset(schemeId: UUID, fundId: UUID, availability: Option[LocalDate], amount: Double, units: Double)
+  case class Asset(schemeId: UUID, fundId: UUID, availability: Option[LocalDate], amount: BigDecimal, units: BigDecimal)
 
   sealed trait Event
 
