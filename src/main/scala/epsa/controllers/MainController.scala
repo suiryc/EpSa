@@ -60,10 +60,12 @@ class MainController {
   lazy private val columnUnits =
     new TableColumn[Savings.Asset, BigDecimal](resources.getString("Units"))
 
-  def initialize(): Unit = {
+  //def initialize(): Unit = { }
+
+  def initialize(savings: Savings): Unit = {
     // XXX - append random value
     // XXX - terminate actor upon leaving
-    actor = JFXSystem.newJFXActor(ControllerActor.props(new Savings()), "epsa-main")
+    actor = JFXSystem.newJFXActor(ControllerActor.props(savings), "epsa-main")
 
     schemesField.setCellFactory { (lv: ListView[Savings.Scheme]) =>
       new SchemeCell

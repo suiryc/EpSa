@@ -2,6 +2,7 @@ package epsa
 
 import akka.actor.ActorSystem
 import epsa.controllers.MainController
+import epsa.model.Savings
 import java.util.prefs.Preferences
 import javafx.event.ActionEvent
 import javafx.application.{Application, Platform}
@@ -53,6 +54,7 @@ class Main extends Application {
     val loader = new FXMLLoader(getClass.getResource("/fxml/main.fxml"), I18N.getResources)
     val root = loader.load[Parent]()
     val controller = loader.getController[MainController]
+    controller.initialize(new Savings())
 
     stage.setOnCloseRequest(onCloseRequest(controller) _)
 
