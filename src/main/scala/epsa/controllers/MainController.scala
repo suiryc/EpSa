@@ -1,6 +1,7 @@
 package epsa.controllers
 
 import akka.actor.{Actor, ActorRef, Props}
+import epsa.I18N
 import epsa.charts.ChartHandler
 import epsa.model.Savings
 import epsa.tools.EsaliaInvestmentFundProber
@@ -10,13 +11,14 @@ import javafx.beans.property.{SimpleObjectProperty, SimpleStringProperty}
 import javafx.collections.FXCollections
 import javafx.collections.transformation.SortedList
 import javafx.event.ActionEvent
-import javafx.fxml.FXML
-import javafx.scene.{Node, Scene}
+import javafx.fxml.{FXML, FXMLLoader}
+import javafx.scene.{Parent, Scene}
 import javafx.scene.control.{Button, ListView, TableColumn, TableView}
+import javafx.stage.{FileChooser, Modality, Stage, Window, WindowEvent}
 import javafx.stage.FileChooser.ExtensionFilter
-import javafx.stage.{FileChooser, Modality, Stage, Window}
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.concurrent.JFXSystem
+import suiryc.scala.javafx.event.EventHandler._
 import suiryc.scala.javafx.util.Callback._
 import suiryc.scala.settings.Preference
 
@@ -46,6 +48,10 @@ class MainController {
   @FXML
   protected var assetsTable: TableView[Savings.Asset] = _
 
+  private var stage: Stage = _
+
+  private lazy val window = stage.getScene.getWindow
+
   private var actor: ActorRef = _
 
   lazy private val columnScheme =
@@ -62,10 +68,12 @@ class MainController {
 
   //def initialize(): Unit = { }
 
-  def initialize(savings: Savings): Unit = {
-    // XXX - append random value
-    // XXX - terminate actor upon leaving
-    actor = JFXSystem.newJFXActor(ControllerActor.props(savings), "epsa-main")
+  def initialize(stage: Stage, savings: Savings): Unit = {
+    this.stage = stage
+
+    // Note: make the actor name unique (with timestamp) so that it can be
+    // recreated later.
+    actor = JFXSystem.newJFXActor(ControllerActor.props(savings), s"epsa-main@${System.currentTimeMillis}")
 
     schemesField.setCellFactory { (lv: ListView[Savings.Scheme]) =>
       new SchemeCell
@@ -99,23 +107,27 @@ class MainController {
     actor ! OnExit
   }
 
+  def onOptions(event: ActionEvent): Unit = {
+    actor ! OnOptions(window)
+  }
+
   def onCreateScheme(event: ActionEvent): Unit = {
-    actor ! OnCreateScheme(event.getSource.asInstanceOf[Node].getScene.getWindow)
+    actor ! OnCreateScheme(window)
   }
 
   def onEditScheme(event: ActionEvent): Unit = {
     Option(schemesField.getSelectionModel.getSelectedItem).foreach { scheme =>
-      actor ! OnEditScheme(event.getSource.asInstanceOf[Node].getScene.getWindow, scheme)
+      actor ! OnEditScheme(window, scheme)
     }
   }
 
   def onCreateFund(event: ActionEvent): Unit = {
-    actor ! OnCreateFund(event.getSource.asInstanceOf[Node].getScene.getWindow)
+    actor ! OnCreateFund(window)
   }
 
   def onEditFund(event: ActionEvent): Unit = {
     Option(fundsField.getSelectionModel.getSelectedItem).foreach { fund =>
-      actor ! OnEditFund(event.getSource.asInstanceOf[Node].getScene.getWindow, fund)
+      actor ! OnEditFund(window, fund)
     }
   }
 
@@ -156,7 +168,7 @@ class MainController {
         val scene = new Scene(chartPane)
         stage.setScene(scene)
         stage.initModality(Modality.WINDOW_MODAL)
-        stage.initOwner(event.getSource.asInstanceOf[Node].getScene.getWindow)
+        stage.initOwner(window)
         stage.show()
 
       case None =>
@@ -169,10 +181,14 @@ class MainController {
 
   class ControllerActor(_savings: Savings) extends Actor {
 
+    // Cheap trick to fill fields with Savings data
+    processEvents(_savings, Nil)
+
     override def receive: Receive = receive(_savings)
 
     def receive(savings: Savings): Receive = {
       case OnExit                      => onExit()
+      case OnOptions(owner)            => onOptions(savings, owner)
       case OnCreateScheme(owner)       => onCreateScheme(savings, owner, None)
       case OnEditScheme(owner, scheme) => onCreateScheme(savings, owner, Some(scheme))
       case OnCreateFund(owner)         => onCreateFund(savings, owner, None)
@@ -204,7 +220,20 @@ class MainController {
     }
 
     def onExit(): Unit = {
+      context.stop(self)
       epsa.Main.shutdown()
+    }
+
+    def onOptions(savings: Savings, owner: Window): Unit = {
+      val dialog = OptionsController.buildDialog()
+      dialog.initModality(Modality.WINDOW_MODAL)
+      dialog.initOwner(owner)
+      dialog.setResizable(true)
+      val reload = dialog.showAndWait().orElse(false)
+      if (reload) {
+        context.stop(self)
+        MainController.build(stage, savings)
+      }
     }
 
     def onCreateScheme(savings: Savings, owner: Window, edit: Option[Savings.Scheme]): Unit = {
@@ -252,6 +281,8 @@ object MainController {
 
   case object OnExit
 
+  case class OnOptions(owner: Window)
+
   case class OnCreateScheme(owner: Window)
 
   case class OnEditScheme(owner: Window, scheme: Savings.Scheme)
@@ -261,5 +292,46 @@ object MainController {
   case class OnEditFund(owner: Window, fund: Savings.Fund)
 
   case object OnTest
+
+  def build(stage: Stage, savings: Savings): Unit = {
+    val loader = new FXMLLoader(getClass.getResource("/fxml/main.fxml"), I18N.getResources)
+    val root = loader.load[Parent]()
+    val controller = loader.getController[MainController]
+    controller.initialize(stage, savings)
+
+    stage.setOnCloseRequest(onCloseRequest(controller) _)
+
+    /*pane.getChildren.setAll(root)
+    AnchorPane.setTopAnchor(root, 0)
+    AnchorPane.setRightAnchor(root, 0)
+    AnchorPane.setBottomAnchor(root, 0)
+    AnchorPane.setLeftAnchor(root, 0)*/
+
+    // XXX - manage window reloading
+    // Changing scene: re-display window at initial (preferred) size
+    // Changing scene root: keeps window size, even if content is bigger
+
+    // Note: when re-creating the scene, we could only change its root. But that
+    // does not go well if content computed size changes (window keep the same size)
+    Option(stage.getScene).foreach { scene =>
+      println(s"${scene.getRoot.getBoundsInLocal} ${scene.getWidth}x${scene.getHeight}")
+    }
+    Option(stage.getScene) match {
+      case Some(scene) => scene.setRoot(root)
+      case None => stage.setScene(new Scene(root))
+    }
+    Option(stage.getScene).foreach { scene =>
+      println(s"${scene.getRoot.getBoundsInLocal} ${scene.getWidth}x${scene.getHeight}")
+    }
+    /*stage.setScene(new Scene(root))
+    if (stage.isMaximized) {
+      stage.setMaximized(false)
+      stage.setMaximized(true)
+    }*/
+  }
+
+  private def onCloseRequest(controller: MainController)(event: WindowEvent): Unit =
+    // Delegate closing request to controller
+    controller.onExit(new ActionEvent())
 
 }

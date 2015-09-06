@@ -6,10 +6,7 @@ import epsa.model.Savings
 import java.util.prefs.Preferences
 import javafx.event.ActionEvent
 import javafx.application.{Application, Platform}
-import javafx.fxml.FXMLLoader
-import javafx.scene.{Scene, Parent}
 import javafx.stage.{Stage, WindowEvent}
-import suiryc.scala.javafx.event.EventHandler._
 
 object Main {
 
@@ -46,25 +43,11 @@ class Main extends Application {
   }
 
   override def start(primaryStage: Stage) {
-    // XXX - GUI menu/option to change language
     I18N.loadLocale()
 
     stage = primaryStage
 
-    val loader = new FXMLLoader(getClass.getResource("/fxml/main.fxml"), I18N.getResources)
-    val root = loader.load[Parent]()
-    val controller = loader.getController[MainController]
-    controller.initialize(new Savings())
-
-    stage.setOnCloseRequest(onCloseRequest(controller) _)
-
-    /*pane.getChildren.setAll(root)
-    AnchorPane.setTopAnchor(root, 0)
-    AnchorPane.setRightAnchor(root, 0)
-    AnchorPane.setBottomAnchor(root, 0)
-    AnchorPane.setLeftAnchor(root, 0)*/
-
-    stage.setScene(new Scene(root))
+    MainController.build(primaryStage, new Savings())
 
     stage.setTitle("EpSa")
     stage.show()
