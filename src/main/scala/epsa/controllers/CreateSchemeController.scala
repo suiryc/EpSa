@@ -9,6 +9,7 @@ import javafx.scene.Node
 import javafx.scene.control._
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.collections.RichObservableList._
+import suiryc.scala.javafx.stage.Stages
 import suiryc.scala.javafx.util.Callback._
 
 class CreateSchemeController {
@@ -102,6 +103,7 @@ object CreateSchemeController {
     controller.initialize(savings, dialog, edit)
 
     dialog.setResultConverter(resultConverter(savings, edit, controller) _)
+    Stages.trackMinimumDimensions(Stages.getStage(dialog))
 
     dialog
   }

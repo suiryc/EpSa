@@ -5,6 +5,7 @@ import java.util.ResourceBundle
 import javafx.collections.FXCollections
 import javafx.fxml.{FXMLLoader, FXML}
 import javafx.scene.control.{ButtonType, ComboBox, Dialog, ListView}
+import suiryc.scala.javafx.stage.Stages
 import suiryc.scala.javafx.util.Callback._
 import suiryc.scala.settings.{SettingSnapshot, SettingsSnapshot}
 
@@ -61,6 +62,7 @@ object OptionsController {
     controller.initialize(snapshot)
 
     dialog.setResultConverter(resultConverter(snapshot, controller) _)
+    Stages.trackMinimumDimensions(Stages.getStage(dialog))
 
     dialog
   }

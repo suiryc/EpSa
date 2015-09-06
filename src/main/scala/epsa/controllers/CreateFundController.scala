@@ -8,6 +8,7 @@ import javafx.fxml.{FXMLLoader, FXML}
 import javafx.scene.Node
 import javafx.scene.control._
 import suiryc.scala.javafx.beans.value.RichObservableValue._
+import suiryc.scala.javafx.stage.Stages
 import suiryc.scala.javafx.util.Callback._
 
 class CreateFundController {
@@ -86,6 +87,7 @@ object CreateFundController {
     controller.initialize(savings, dialog, edit)
 
     dialog.setResultConverter(resultConverter(savings, edit, controller) _)
+    Stages.trackMinimumDimensions(Stages.getStage(dialog))
 
     dialog
   }

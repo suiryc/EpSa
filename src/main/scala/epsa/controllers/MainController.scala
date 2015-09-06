@@ -19,6 +19,7 @@ import javafx.stage.FileChooser.ExtensionFilter
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.javafx.event.EventHandler._
+import suiryc.scala.javafx.stage.Stages
 import suiryc.scala.javafx.util.Callback._
 import suiryc.scala.settings.Preference
 
@@ -307,27 +308,15 @@ object MainController {
     AnchorPane.setBottomAnchor(root, 0)
     AnchorPane.setLeftAnchor(root, 0)*/
 
-    // XXX - manage window reloading
-    // Changing scene: re-display window at initial (preferred) size
-    // Changing scene root: keeps window size, even if content is bigger
-
-    // Note: when re-creating the scene, we could only change its root. But that
-    // does not go well if content computed size changes (window keep the same size)
-    Option(stage.getScene).foreach { scene =>
-      println(s"${scene.getRoot.getBoundsInLocal} ${scene.getWidth}x${scene.getHeight}")
-    }
+    // If scene already exists, replace its content.
+    // Otherwise create the scene.
     Option(stage.getScene) match {
       case Some(scene) => scene.setRoot(root)
       case None => stage.setScene(new Scene(root))
     }
-    Option(stage.getScene).foreach { scene =>
-      println(s"${scene.getRoot.getBoundsInLocal} ${scene.getWidth}x${scene.getHeight}")
-    }
-    /*stage.setScene(new Scene(root))
-    if (stage.isMaximized) {
-      stage.setMaximized(false)
-      stage.setMaximized(true)
-    }*/
+
+    // Then track minimum dimensions
+    Stages.trackMinimumDimensions(stage)
   }
 
   private def onCloseRequest(controller: MainController)(event: WindowEvent): Unit =
