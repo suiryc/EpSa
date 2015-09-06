@@ -15,7 +15,7 @@ object I18N {
   import Preference._
   import epsa.Main.prefs
 
-  private val localeCodePref = Preference.from("locale.code", "en")
+  private[epsa] val localeCodePref = Preference.from("locale.code", "en")
 
   /** I18N resources (relative) path. */
   private val i18nPath = "i18n/"
@@ -98,8 +98,10 @@ object I18N {
     }
   }
 
-  def setLocale(localeCode: String): Unit =
+  def setLocale(localeCode: String): Unit = {
     localeCodePref() = localeCode
+    loadLocale()
+  }
 
   def getResources: ResourceBundle =
     ResourceBundle.getBundle("i18n.epsa", Locale.getDefault, UTF8Control)
