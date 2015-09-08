@@ -132,7 +132,7 @@ class ChartHandler(fund: InvestmentFund) {
   labelVL.setVisible(false)
   labelVL.setDisable(true)
   /** Label listerning subscription. */
-  private var labelVLCancellable: Option[Cancellable] = None
+  private var labelVLCancellable: List[Cancellable] = Nil
 
   setData()
 
@@ -253,7 +253,7 @@ class ChartHandler(fund: InvestmentFund) {
   private def hideLines(clearRef: Boolean): Unit = {
     hideZoomArea()
     labelVLCancellable.foreach(_.cancel())
-    labelVLCancellable = None
+    labelVLCancellable = Nil
     labelVL.setVisible(false)
     horizontalLine.setVisible(false)
     verticalLine.setVisible(false)
@@ -426,9 +426,9 @@ class ChartHandler(fund: InvestmentFund) {
         // Listen for position and dimension changes to check the label remains inside the chart
         val s1 = labelVL.boundsInParentProperty.listen(checkLabelPosition())
         // Listen to width and height changes to place the label at the right position
-        val s2 = labelVL.widthProperty.listen(s1, setLabelX())
-        val s3 = labelVL.heightProperty.listen(s2, setLabelY())
-        labelVLCancellable = Some(s3)
+        val s2 = labelVL.widthProperty.listen(setLabelX())
+        val s3 = labelVL.heightProperty.listen(setLabelY())
+        labelVLCancellable = List(s1, s2, s3)
       }
 
       if (!labelVL.isVisible) {
