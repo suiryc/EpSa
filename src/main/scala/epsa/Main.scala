@@ -10,8 +10,6 @@ import javafx.stage.{Stage, WindowEvent}
 
 object Main {
 
-  var stage: Stage = _
-
   /** Settings. */
   implicit val prefs = Preferences.userRoot.node("suiryc.epsa").node("epsa")
 
@@ -26,9 +24,13 @@ object Main {
 
   }
 
+  def shutdown(stage: Stage): Unit = {
+    stage.close()
+    shutdown()
+  }
+
   def shutdown(): Unit = {
     Akka.system.shutdown()
-    Option(stage).foreach(_.close())
     Platform.exit()
   }
 
@@ -36,21 +38,16 @@ object Main {
 
 class Main extends Application {
 
-  import Main._
-
   def launch(): Unit = {
     Application.launch()
   }
 
-  override def start(primaryStage: Stage) {
+  override def start(stage: Stage) {
     I18N.loadLocale()
 
-    stage = primaryStage
-
-    MainController.build(primaryStage, new Savings())
-
+    val state = MainController.State(stage, new Savings())
     stage.setTitle("EpSa")
-    stage.show()
+    MainController.build(state)
   }
 
   private def onCloseRequest(controller: MainController)(event: WindowEvent): Unit =

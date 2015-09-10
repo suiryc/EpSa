@@ -14,7 +14,7 @@ import javafx.event.ActionEvent
 import javafx.fxml.{FXML, FXMLLoader}
 import javafx.scene.{Parent, Scene}
 import javafx.scene.control.{Button, ListView, TableColumn, TableView}
-import javafx.stage.{FileChooser, Modality, Stage, Window, WindowEvent}
+import javafx.stage.{FileChooser, Modality, Stage, WindowEvent}
 import javafx.stage.FileChooser.ExtensionFilter
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.concurrent.JFXSystem
@@ -49,10 +49,6 @@ class MainController {
   @FXML
   protected var assetsTable: TableView[Savings.Asset] = _
 
-  private var stage: Stage = _
-
-  private lazy val window = stage.getScene.getWindow
-
   private var actor: ActorRef = _
 
   lazy private val columnScheme =
@@ -69,12 +65,13 @@ class MainController {
 
   //def initialize(): Unit = { }
 
-  def initialize(stage: Stage, savings: Savings): Unit = {
-    this.stage = stage
-
+  def initialize(state: State): Unit = {
     // Note: make the actor name unique (with timestamp) so that it can be
     // recreated later.
-    actor = JFXSystem.newJFXActor(ControllerActor.props(savings), s"epsa-main@${System.currentTimeMillis}")
+    actor = JFXSystem.newJFXActor(
+      ControllerActor.props(state),
+      s"epsa-main@${System.currentTimeMillis}"
+    )
 
     schemesField.setCellFactory { (lv: ListView[Savings.Scheme]) =>
       new SchemeCell
@@ -109,26 +106,26 @@ class MainController {
   }
 
   def onOptions(event: ActionEvent): Unit = {
-    actor ! OnOptions(window)
+    actor ! OnOptions
   }
 
   def onCreateScheme(event: ActionEvent): Unit = {
-    actor ! OnCreateScheme(window)
+    actor ! OnCreateScheme
   }
 
   def onEditScheme(event: ActionEvent): Unit = {
     Option(schemesField.getSelectionModel.getSelectedItem).foreach { scheme =>
-      actor ! OnEditScheme(window, scheme)
+      actor ! OnEditScheme(scheme)
     }
   }
 
   def onCreateFund(event: ActionEvent): Unit = {
-    actor ! OnCreateFund(window)
+    actor ! OnCreateFund
   }
 
   def onEditFund(event: ActionEvent): Unit = {
     Option(fundsField.getSelectionModel.getSelectedItem).foreach { fund =>
-      actor ! OnEditFund(window, fund)
+      actor ! OnEditFund(fund)
     }
   }
 
@@ -137,68 +134,33 @@ class MainController {
   }
 
   def onFundGraph(event: ActionEvent): Unit = {
-    import Preference._
-
-    val stage = new Stage()
-
-    val fundPathFolder = Preference.from("fund.path.folder", null:Path)
-    val fundPathFile = Preference.from("fund.path.file", null:String)
-
-    val fileChooser = new FileChooser()
-    fileChooser.setTitle("Open Investment Fund File")
-    fileChooser.getExtensionFilters.addAll(
-      new ExtensionFilter("Excel Files", "*.xls", "*.xlsx"),
-      new ExtensionFilter("All Files", "*.*")
-    )
-    fundPathFolder.option.foreach { path =>
-      fileChooser.setInitialDirectory(path.toFile)
-      fundPathFile.option.foreach(fileChooser.setInitialFileName)
-    }
-    val selectedFile = fileChooser.showOpenDialog(stage)
-    Option(selectedFile).flatMap { file =>
-      EsaliaInvestmentFundProber.probe(file.toPath)
-    } match {
-      case Some(fund) =>
-        // Save path in preferences
-        fundPathFolder() = selectedFile.getParentFile.toPath
-        fundPathFile() = selectedFile.getName
-        // Then build and display chart
-        val chartHandler = new ChartHandler(fund)
-        val chartPane = chartHandler.chartPane
-        chartPane.setPrefSize(640, 480)
-        val scene = new Scene(chartPane)
-        stage.setScene(scene)
-        stage.initModality(Modality.WINDOW_MODAL)
-        stage.initOwner(window)
-        stage.show()
-
-      case None =>
-    }
+    actor ! OnFundGraph
   }
 
   object ControllerActor {
-    def props(savings: Savings) = Props(new ControllerActor(savings))
+    def props(state: State) = Props(new ControllerActor(state))
   }
 
-  class ControllerActor(_savings: Savings) extends Actor {
+  class ControllerActor(state0: State) extends Actor {
 
     // Cheap trick to fill fields with Savings data
-    processEvents(_savings, Nil)
+    processEvents(state0, Nil)
 
-    override def receive: Receive = receive(_savings)
+    override def receive: Receive = receive(state0)
 
-    def receive(savings: Savings): Receive = {
-      case OnExit                      => onExit()
-      case OnOptions(owner)            => onOptions(savings, owner)
-      case OnCreateScheme(owner)       => onCreateScheme(savings, owner, None)
-      case OnEditScheme(owner, scheme) => onCreateScheme(savings, owner, Some(scheme))
-      case OnCreateFund(owner)         => onCreateFund(savings, owner, None)
-      case OnEditFund(owner, fund)     => onCreateFund(savings, owner, Some(fund))
-      case OnTest                      => onTest(savings)
+    def receive(state: State): Receive = {
+      case OnExit               => onExit(state)
+      case OnOptions            => onOptions(state)
+      case OnCreateScheme       => onCreateScheme(state, None)
+      case OnEditScheme(scheme) => onCreateScheme(state, Some(scheme))
+      case OnCreateFund         => onCreateFund(state, None)
+      case OnEditFund(fund)     => onCreateFund(state, Some(fund))
+      case OnTest               => onTest(state)
+      case OnFundGraph          => onFundGraph(state)
     }
 
-    def processEvents(savings: Savings, events: List[Savings.Event]): Unit = {
-      val newSavings = Savings.processEvents(savings, events)
+    def processEvents(state: State, events: List[Savings.Event]): Unit = {
+      val newSavings = Savings.processEvents(state.savings, events)
 
       // We use the savings instance to get a scheme/fund name by id in the
       // assets table
@@ -217,52 +179,52 @@ class MainController {
       sortedAssets.comparatorProperty.bind(assetsTable.comparatorProperty)
       assetsTable.setItems(sortedAssets)
 
-      context.become(receive(newSavings))
+      context.become(receive(state.copy(savings = newSavings)))
     }
 
-    def onExit(): Unit = {
+    def onExit(state: State): Unit = {
       context.stop(self)
-      epsa.Main.shutdown()
+      epsa.Main.shutdown(state.stage)
     }
 
-    def onOptions(savings: Savings, owner: Window): Unit = {
+    def onOptions(state: State): Unit = {
       val dialog = OptionsController.buildDialog()
       dialog.initModality(Modality.WINDOW_MODAL)
-      dialog.initOwner(owner)
+      dialog.initOwner(state.window)
       dialog.setResizable(true)
       val reload = dialog.showAndWait().orElse(false)
       if (reload) {
         context.stop(self)
-        MainController.build(stage, savings)
+        MainController.build(state)
       }
     }
 
-    def onCreateScheme(savings: Savings, owner: Window, edit: Option[Savings.Scheme]): Unit = {
-      val dialog = CreateSchemeController.buildDialog(savings, edit)
+    def onCreateScheme(state: State, edit: Option[Savings.Scheme]): Unit = {
+      val dialog = CreateSchemeController.buildDialog(state.savings, edit)
       dialog.initModality(Modality.WINDOW_MODAL)
-      dialog.initOwner(owner)
+      dialog.initOwner(state.window)
       dialog.setResizable(true)
       val events = dialog.showAndWait().orElse(Nil)
-      processEvents(savings, events)
+      processEvents(state, events)
     }
 
-    def onCreateFund(savings: Savings, owner: Window, edit: Option[Savings.Fund]): Unit = {
-      val dialog = CreateFundController.buildDialog(savings, edit)
+    def onCreateFund(state: State, edit: Option[Savings.Fund]): Unit = {
+      val dialog = CreateFundController.buildDialog(state.savings, edit)
       dialog.initModality(Modality.WINDOW_MODAL)
-      dialog.initOwner(owner)
+      dialog.initOwner(state.window)
       dialog.setResizable(true)
       val events = dialog.showAndWait().orElse(Nil)
-      processEvents(savings, events)
+      processEvents(state, events)
     }
 
-    def onTest(savings: Savings): Unit = {
+    def onTest(state: State): Unit = {
       import java.time.LocalDate
 
       val s1 = Savings().createSchemeEvent("Scheme 1")
       val s2 = Savings().createSchemeEvent("Scheme 2")
       val f1 = Savings().createFundEvent("Fund 1")
       val f2 = Savings().createFundEvent("Fund 2")
-      processEvents(savings, List(s1, s2, f1, f2,
+      processEvents(state, List(s1, s2, f1, f2,
         Savings.AssociateFund(s1.schemeId, f1.fundId),
         Savings.AssociateFund(s1.schemeId, f2.fundId),
         Savings.AssociateFund(s2.schemeId, f2.fundId),
@@ -274,33 +236,79 @@ class MainController {
       ))
     }
 
+    def onFundGraph(state: State): Unit = {
+      import Preference._
+
+      val stage = new Stage()
+
+      val fundPathFolder = Preference.from("fund.path.folder", null:Path)
+      val fundPathFile = Preference.from("fund.path.file", null:String)
+
+      val fileChooser = new FileChooser()
+      fileChooser.setTitle("Open Investment Fund File")
+      fileChooser.getExtensionFilters.addAll(
+        new ExtensionFilter("Excel Files", "*.xls", "*.xlsx"),
+        new ExtensionFilter("All Files", "*.*")
+      )
+      fundPathFolder.option.foreach { path =>
+        fileChooser.setInitialDirectory(path.toFile)
+        fundPathFile.option.foreach(fileChooser.setInitialFileName)
+      }
+      val selectedFile = fileChooser.showOpenDialog(stage)
+      Option(selectedFile).flatMap { file =>
+        EsaliaInvestmentFundProber.probe(file.toPath)
+      } match {
+        case Some(fund) =>
+          // Save path in preferences
+          fundPathFolder() = selectedFile.getParentFile.toPath
+          fundPathFile() = selectedFile.getName
+          // Then build and display chart
+          val chartHandler = new ChartHandler(fund)
+          val chartPane = chartHandler.chartPane
+          chartPane.setPrefSize(640, 480)
+          val scene = new Scene(chartPane)
+          stage.setScene(scene)
+          stage.initModality(Modality.WINDOW_MODAL)
+          stage.initOwner(state.window)
+          stage.show()
+
+        case None =>
+      }
+    }
+
   }
 
 }
 
 object MainController {
 
+  case class State(stage: Stage, savings: Savings) {
+    lazy val window = stage.getScene.getWindow
+  }
+
   case object OnExit
 
-  case class OnOptions(owner: Window)
+  case object OnOptions
 
-  case class OnCreateScheme(owner: Window)
+  case object OnCreateScheme
 
-  case class OnEditScheme(owner: Window, scheme: Savings.Scheme)
+  case class OnEditScheme(scheme: Savings.Scheme)
 
-  case class OnCreateFund(owner: Window)
+  case object OnCreateFund
 
-  case class OnEditFund(owner: Window, fund: Savings.Fund)
+  case class OnEditFund(fund: Savings.Fund)
 
   case object OnTest
 
-  def build(stage: Stage, savings: Savings): Unit = {
+  case object OnFundGraph
+
+  def build(state: State): Unit = {
+    val stage = state.stage
+
     val loader = new FXMLLoader(getClass.getResource("/fxml/main.fxml"), I18N.getResources)
     val root = loader.load[Parent]()
     val controller = loader.getController[MainController]
-    controller.initialize(stage, savings)
-
-    stage.setOnCloseRequest(onCloseRequest(controller) _)
+    controller.initialize(state)
 
     /*pane.getChildren.setAll(root)
     AnchorPane.setTopAnchor(root, 0)
@@ -308,14 +316,17 @@ object MainController {
     AnchorPane.setBottomAnchor(root, 0)
     AnchorPane.setLeftAnchor(root, 0)*/
 
-    // If scene already exists, replace its content.
-    // Otherwise create the scene.
     Option(stage.getScene) match {
-      case Some(scene) => scene.setRoot(root)
-      case None => stage.setScene(new Scene(root))
+      case Some(scene) =>
+        stage.hide()
+
+      case None =>
+        stage.setOnCloseRequest(onCloseRequest(controller) _)
     }
 
-    // Then track minimum dimensions
+    stage.setScene(new Scene(root))
+    stage.show()
+
     Stages.trackMinimumDimensions(stage)
   }
 
