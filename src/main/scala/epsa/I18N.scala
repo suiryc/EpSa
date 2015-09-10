@@ -98,6 +98,13 @@ object I18N {
     }
   }
 
+  /**
+   * Sets locale.
+   *
+   * Note: JavaFX statically loads some resources (e.g. default dialog buttons
+   * label, empty list text, etc.) which cannot be resetted. Changing locale
+   * at runtime has no effect for those already loaded.
+   */
   def setLocale(localeCode: String): Unit = {
     localeCodePref() = localeCode
     loadLocale()
