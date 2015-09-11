@@ -94,6 +94,9 @@ class MainController {
     columnAmount.setCellValueFactory { (data: TableColumn.CellDataFeatures[Savings.Asset, BigDecimal]) =>
       new SimpleObjectProperty(data.getValue.amount)
     }
+    columnAmount.setCellFactory { (column: TableColumn[Savings.Asset, BigDecimal]) =>
+      new AmountCell[Savings.Asset]
+    }
     columnUnits.setCellValueFactory { (data: TableColumn.CellDataFeatures[Savings.Asset, BigDecimal]) =>
       new SimpleObjectProperty(data.getValue.units)
     }
