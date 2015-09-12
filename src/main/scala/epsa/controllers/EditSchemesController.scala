@@ -79,6 +79,7 @@ class EditSchemesController {
     fundsField.setItems(FXCollections.observableList(savings.funds))
 
     updateEditFields()
+    edit.foreach(schemesField.getSelectionModel.select)
     fundsField.getSelectionModel.getSelectedItems.listen(checkForm())
 
     checkForm()
