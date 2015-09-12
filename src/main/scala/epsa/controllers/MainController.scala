@@ -203,7 +203,7 @@ class MainController {
     }
 
     def onCreateScheme(state: State, edit: Option[Savings.Scheme]): Unit = {
-      val dialog = CreateSchemeController.buildDialog(state.savings, edit)
+      val dialog = EditSchemesController.buildDialog(state.savings, edit)
       dialog.initModality(Modality.WINDOW_MODAL)
       dialog.initOwner(state.window)
       dialog.setResizable(true)

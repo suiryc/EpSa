@@ -2,3 +2,15 @@
   -fx-text-box-border: red;
   -fx-focus-color: red;
 }
+
+.image-button {
+  -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.6), 6, 0.0, 0, 1);
+}
+
+.image-button:hover {
+  -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,1.0), 6, 0.0, 0, 1);
+}
+
+.image-button:pressed {
+  -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,1.0), 3, 0.0, 0, 1);
+}

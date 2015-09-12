@@ -29,23 +29,37 @@ object Savings {
 
   sealed trait Event
 
+  trait SchemeEvent {
+    val schemeId: UUID
+  }
+
+  trait FundEvent {
+    val fundId: UUID
+  }
+
   case class CreateScheme(schemeId: UUID, name: String)
-    extends Event
+    extends Event with SchemeEvent
 
   case class UpdateScheme(schemeId: UUID, name: String)
-    extends Event
+    extends Event with SchemeEvent
+
+  case class DeleteScheme(schemeId: UUID)
+    extends Event with SchemeEvent
 
   case class CreateFund(fundId: UUID, name: String)
-    extends Event
+    extends Event with FundEvent
 
   case class UpdateFund(fundId: UUID, name: String)
-    extends Event
+    extends Event with FundEvent
+
+  case class DeleteFund(fundId: UUID)
+    extends Event with FundEvent
 
   case class AssociateFund(schemeId: UUID, fundId: UUID)
-    extends Event
+    extends Event with SchemeEvent with FundEvent
 
   case class DissociateFund(schemeId: UUID, fundId: UUID)
-    extends Event
+    extends Event with SchemeEvent with FundEvent
 
   case class MakePayment(date: LocalDate, asset: Asset)
     extends Event
@@ -96,8 +110,10 @@ object Savings {
 
     implicit val createSchemeFormat = jsonFormat2(CreateScheme)
     implicit val updateSchemeFormat = jsonFormat2(UpdateScheme)
+    implicit val deleteSchemeFormat = jsonFormat1(DeleteScheme)
     implicit val createFundFormat = jsonFormat2(CreateFund)
     implicit val updateFundFormat = jsonFormat2(UpdateFund)
+    implicit val deleteFundFormat = jsonFormat1(DeleteFund)
     implicit val associateFundFormat = jsonFormat2(AssociateFund)
     implicit val dissociateFundFormat = jsonFormat2(DissociateFund)
     implicit val assetFormat = jsonFormat5(Asset)
@@ -113,8 +129,10 @@ object Savings {
       def write(event: Event): JsObject = event match {
         case event: CreateScheme   => JsObject(FIELD_CONTENT -> event.toJson, FIELD_KIND -> JsString("CreateScheme"))
         case event: UpdateScheme   => JsObject(FIELD_CONTENT -> event.toJson, FIELD_KIND -> JsString("UpdateScheme"))
+        case event: DeleteScheme   => JsObject(FIELD_CONTENT -> event.toJson, FIELD_KIND -> JsString("DeleteScheme"))
         case event: CreateFund     => JsObject(FIELD_CONTENT -> event.toJson, FIELD_KIND -> JsString("CreateFund"))
         case event: UpdateFund     => JsObject(FIELD_CONTENT -> event.toJson, FIELD_KIND -> JsString("UpdateFund"))
+        case event: DeleteFund     => JsObject(FIELD_CONTENT -> event.toJson, FIELD_KIND -> JsString("DeleteFund"))
         case event: AssociateFund  => JsObject(FIELD_CONTENT -> event.toJson, FIELD_KIND -> JsString("AssociateFund"))
         case event: DissociateFund => JsObject(FIELD_CONTENT -> event.toJson, FIELD_KIND -> JsString("DissociateFund"))
         case event: MakePayment    => JsObject(FIELD_CONTENT -> event.toJson, FIELD_KIND -> JsString("MakePayment"))
@@ -128,8 +146,10 @@ object Savings {
         case Seq(content: JsObject, JsString(kind)) => kind match {
           case "CreateScheme"   => content.convertTo[CreateScheme]
           case "UpdateScheme"   => content.convertTo[UpdateScheme]
+          case "DeleteScheme"   => content.convertTo[DeleteScheme]
           case "CreateFund"     => content.convertTo[CreateFund]
           case "UpdateFund"     => content.convertTo[UpdateFund]
+          case "DeleteFund"     => content.convertTo[DeleteFund]
           case "AssociateFund"  => content.convertTo[AssociateFund]
           case "DissociateFund" => content.convertTo[DissociateFund]
           case "MakePayment"    => content.convertTo[MakePayment]
@@ -155,8 +175,10 @@ case class Savings(schemes: List[Savings.Scheme] = Nil, funds: List[Savings.Fund
   def processEvent(event: Event): Savings = event match {
     case CreateScheme(id, name)              => createScheme(id, name)
     case UpdateScheme(id, name)              => updateScheme(id, name)
+    case DeleteScheme(id)                    => deleteScheme(id)
     case CreateFund(id, name)                => createFund(id, name)
     case UpdateFund(id, name)                => updateFund(id, name)
+    case DeleteFund(id)                      => deleteFund(id)
     case AssociateFund(schemeId, fundId)     => associateFund(schemeId, fundId)
     case DissociateFund(schemeId, fundId)    => dissociateFund(schemeId, fundId)
     case MakePayment(_, asset)               => makePayment(asset)
@@ -176,6 +198,10 @@ case class Savings(schemes: List[Savings.Scheme] = Nil, funds: List[Savings.Fund
     copy(schemes = updated)
   }
 
+  protected def deleteScheme(id: UUID): Savings = {
+    copy(schemes = schemes.filterNot(_.id == id))
+  }
+
   protected def createFund(id: UUID, name: String): Savings = {
     copy(funds = funds :+ Fund(id, name))
   }
@@ -186,6 +212,10 @@ case class Savings(schemes: List[Savings.Scheme] = Nil, funds: List[Savings.Fund
       else fund.copy(name = name)
     }
     copy(funds = updated)
+  }
+
+  protected def deleteFund(id: UUID): Savings = {
+    copy(funds = funds.filterNot(_.id == id))
   }
 
   protected def associateFund(schemeId: UUID, fundId: UUID): Savings = {
