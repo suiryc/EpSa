@@ -55,38 +55,60 @@ class EditSchemesController {
   //def initialize(): Unit = { }
 
   def initialize(savings0: Savings, dialog: Dialog[_], edit0: Option[Savings.Scheme]): Unit = {
+    // Save initial state
     savings = savings0
     edit = edit0
+
+    // Load css
     dialog.getDialogPane.getStylesheets.add(getClass.getResource("/css/form.css").toExternalForm)
+
+    // Lookup OK dialog button
     buttonOk = dialog.getDialogPane.lookupButton(ButtonType.OK)
+    // Disable OK button unless there are events to take into account
     buttonOk.setDisable(true)
-    nameField.textProperty.listen(checkForm())
-
-    schemesField.setCellFactory { (lv: ListView[Savings.Scheme]) =>
-      newSchemeCell(lv)
-    }
-    updateSchemes()
-    schemesField.getSelectionModel.selectedItemProperty.listen(checkForm())
-
     events.listen { events =>
       buttonOk.setDisable(events.isEmpty)
     }
 
+    // Initialize schemes list view
+    schemesField.setCellFactory { (lv: ListView[Savings.Scheme]) =>
+      newSchemeCell(lv)
+    }
+    updateSchemes()
+    // Re-check form when selected scheme changes
+    schemesField.getSelectionModel.selectedItemProperty.listen(checkForm())
+
+    // Re-check form when scheme name is changed
+    nameField.textProperty.listen(checkForm())
+
+    // Initialize funds list view
     fundsField.setCellFactory { (lv: ListView[Savings.Fund]) =>
       new FundCell
     }
     fundsField.getSelectionModel.setSelectionMode(SelectionMode.MULTIPLE)
     fundsField.setItems(FXCollections.observableList(savings.funds))
-
-    updateEditFields()
-    edit.foreach(schemesField.getSelectionModel.select)
+    // Re-check form when selected funds are changed
     fundsField.getSelectionModel.getSelectedItems.listen(checkForm())
 
+    // Populate editing fields if a scheme is initially selected
+    updateEditFields()
+    // Select initial scheme if any
+    edit.foreach(schemesField.getSelectionModel.select)
+
+    // Initial form checking
     checkForm()
 
+    // Initial focus goes to name field
     nameField.requestFocus()
   }
 
+  /**
+   * Called when releasing mouse/touch on 'plus' image.
+   *
+   * Ensures event is on target node.
+   * Generates and applies events to create a new scheme with associated funds.
+   * If editing, adds number suffix to ensure name is unique if necessary.
+   */
   def onAdd(event: Event): Unit = {
     if (isEventOnNode(event)) {
       val name = if (edit.isDefined) {
@@ -116,6 +138,14 @@ class EditSchemesController {
     }
   }
 
+  /**
+   * Called when releasing mouse/touch on 'minus' image.
+   *
+   * Ensures event is on target node.
+   * Even though 'minus' image is not accessible in those conditions, also checks
+   * a scheme to delete is selected and has no remaining assets.
+   * Applies deletion event if conditions are met.
+   */
   def onRemove(event: Event): Unit = {
     if (isEventOnNode(event)) {
       // XXX - ask whether to also remove lone funds
@@ -128,6 +158,14 @@ class EditSchemesController {
     }
   }
 
+  /**
+   * Called when releasing mouse/touch on 'tick' image.
+   *
+   * Ensures event is on target node.
+   * Generates and applies events to update edited scheme:
+   *   - name changing if any
+   *   - funds association changes if any
+   */
   def onApply(event: Event): Unit = {
     if (isEventOnNode(event)) {
       edit.foreach { scheme =>
@@ -148,12 +186,26 @@ class EditSchemesController {
     }
   }
 
+  /**
+   * Checks (mouse) event is no target mode.
+   *
+   * Allows to not take into account events for which (mouse) releasing is not
+   * performed while still on target node.
+   * Non-mouse events (usually touch) are always considered on target.
+   */
   private def isEventOnNode(event: Event): Boolean =
     event match {
       case event: MouseEvent => event.getTarget.asInstanceOf[Node].contains(event.getX, event.getY)
       case _ => true
     }
 
+  /**
+   * Creates a new Scheme list view cell.
+   *
+   * Cell has the appropriate value displaying.
+   * An event filter is added on the generated cell to allow de-selecting a
+   * Scheme in the list view by clicking on it a second time.
+   */
   private def newSchemeCell(lv: ListView[Savings.Scheme]): ListCell[Savings.Scheme] = {
     import suiryc.scala.javafx.event.EventHandler._
 
@@ -161,24 +213,44 @@ class EditSchemesController {
     val cell = new SchemeCell
     cell.addEventFilter(MouseEvent.MOUSE_PRESSED, { (event: MouseEvent) =>
       if (schemesField.getSelectionModel.getSelectedIndices.contains(cell.getIndex)) {
+        // De-select scheme
+        // 1. We are not editing it anymore
         edit = None
+        // 2. It is removed from selection
         schemesField.getSelectionModel.clearSelection(cell.getIndex)
+        // 3. Re-check form
         checkForm()
       }
       else if (cell.getItem != null) {
+        // Select scheme
+        // 1. We are editing it now
         edit = Option(cell.getItem)
+        // 2. Select it
         schemesField.getSelectionModel.select(cell.getIndex)
-        nameField.setText(cell.getItem.name)
+        // 3. Update editing fields
         updateEditFields()
+        // 4. Re-check form
         checkForm()
       }
+      // In any case, consume the event so that ListView does not try to
+      // process it: we are overriding its behaviour.
       event.consume()
+
+      // At least re-focus on the schemes field it not done
       if (!schemesField.isFocused) schemesField.requestFocus()
     })
 
     cell
   }
 
+  /**
+   * Applies events.
+   *
+   * Resets editing fields
+   * Applies events on current Savings value, to compute new one.
+   * Updates current list of events to take into account: flattens them to
+   * filter unnecessary ones.
+   */
   private def applyEvents(newEvents: Savings.Event*): Unit = {
     resetEditFields()
     savings = Savings.processEvents(savings, newEvents:_*)
@@ -186,6 +258,12 @@ class EditSchemesController {
     updateSchemes()
   }
 
+  /**
+   * Flattens events.
+   *
+   * Filters unnecessary events, e.g. when creating then deleting a scheme or
+   * fund.
+   */
   private def flattenEvents(events: List[Savings.Event]): List[Savings.Event] = {
     case class Data(schemesCreated: Set[UUID] = Set.empty, fundsCreated: Set[UUID] = Set.empty,
         schemesNop: Set[UUID] = Set.empty, fundsNop: Set[UUID] = Set.empty)
@@ -218,14 +296,25 @@ class EditSchemesController {
     }
   }
 
+  /**
+   * Whether a scheme can be deleted.
+   *
+   * A scheme can be deleted only if it has no assets.
+   */
   private def canDeleteScheme(scheme: Savings.Scheme): Boolean =
     !savings.assets.exists(_.schemeId == scheme.id)
 
+  /** Updates the list of schemes. */
   private def updateSchemes(): Unit = {
     schemesField.getSelectionModel.clearSelection()
     schemesField.setItems(FXCollections.observableList(savings.schemes))
   }
 
+  /**
+   * Updates editing fields.
+   *
+   * Upon editing a scheme, sets its name and selects its funds.
+   */
   private def updateEditFields(): Unit =
     edit.foreach { scheme =>
       nameField.setText(scheme.name)
@@ -235,13 +324,24 @@ class EditSchemesController {
       }.foreach(fundsField.getSelectionModel.select)
     }
 
+  /**
+   * Resets editing fields.
+   *
+   * Clears name and resets funds selection.
+   */
   private def resetEditFields(): Unit = {
     nameField.clear()
     fundsField.getSelectionModel.clearSelection()
   }
 
+  /**
+   * Checks form.
+   *
+   * Checks what state to apply on many fields: name, minus, plus, tick.
+   */
   private def checkForm(): Unit = {
     val name = nameField.getText
+    // Edition is OK if either name or funds are changed.
     val editOk = edit.exists { scheme =>
       import scala.collection.JavaConversions._
 
@@ -250,16 +350,25 @@ class EditSchemesController {
         scheme.funds.toSet != newFunds
     }
     val exists = savings.schemes.exists(_.name.equalsIgnoreCase(name)) && !edit.exists(_.name.equalsIgnoreCase(name))
+    // Selected name is OK if it is not empty and does not already exists.
     val nameOk = !exists && name.nonEmpty
+
+    // Apply name field status:
+    // 1. Set issue in tooltip if any
     if (exists) {
+      // Name already exists
       nameField.setTooltip(new Tooltip(resources.getString("Name already exists")))
     } else if (name.isEmpty) {
+      // Name is empty
       nameField.setTooltip(new Tooltip(resources.getString("Name cannot be empty")))
     } else {
+      // No issue
       nameField.setTooltip(null)
     }
+    // Set error style if name is not OK
     Form.setStyleError(nameField, !nameOk)
 
+    // Minus field status: enable deletion if selected scheme can be deleted
     Option(schemesField.getSelectionModel.getSelectedItem) match {
       case None =>
         toggleImageButton(minusField, set = false)
@@ -269,14 +378,24 @@ class EditSchemesController {
         else toggleImageButton(minusField, set = false, Some(resources.getString("Scheme is not empty")))
     }
 
+    // Plus field status: enable if adding new scheme which name is OK, or
+    // copying with non-empty name.
     val addOk =
       if (schemesField.getSelectionModel.isEmpty) nameOk
       else name.nonEmpty
     toggleImageButton(plusField, addOk)
 
+    // Tick field status: enable if name and edition are OK
     toggleImageButton(tickField, nameOk && editOk)
   }
 
+  /**
+   * Toggles image status.
+   *
+   * When set, sets 'image-button' style class and have node opaque.
+   * Otherwise unsets 'image-button' style class and have node 60% transparent.
+   * Also installs/uninstalls tooltip message.
+   */
   private def toggleImageButton(node: ImageView, set: Boolean, msgOpt: Option[String] = None): Unit = {
     // Note: do not disable node otherwise tooltip won't work
     if (set) {
@@ -303,6 +422,7 @@ class EditSchemesController {
 
 object EditSchemesController {
 
+  /** Builds a dialog out of this controller. */
   def buildDialog(savings: Savings, edit: Option[Savings.Scheme]): Dialog[List[Savings.Event]] = {
     val resources = I18N.getResources
 
@@ -322,7 +442,7 @@ object EditSchemesController {
     dialog
   }
 
-  def resultConverter(savings: Savings, edit: Option[Savings.Scheme], controller: EditSchemesController)(buttonType: ButtonType): List[Savings.Event] = {
+  private def resultConverter(savings: Savings, edit: Option[Savings.Scheme], controller: EditSchemesController)(buttonType: ButtonType): List[Savings.Event] = {
     if (buttonType != ButtonType.OK) Nil
     else controller.events.getValue
   }
