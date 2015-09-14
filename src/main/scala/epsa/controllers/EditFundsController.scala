@@ -112,7 +112,7 @@ class EditFundsController {
   def onAdd(event: Event): Unit = {
     if (isEventOnNode(event)) {
       val name = if (edit.isDefined) {
-        val fundName = nameField.getText
+        val fundName = nameField.getText.trim
 
         @scala.annotation.tailrec
         def loop(n: Int): String = {
@@ -126,7 +126,7 @@ class EditFundsController {
 
         loop(1)
       }
-      else nameField.getText
+      else nameField.getText.trim
 
       val event = savings.createFundEvent(name)
       val newEvents = event ::
@@ -176,7 +176,7 @@ class EditFundsController {
   def onApply(event: Event): Unit = {
     if (isEventOnNode(event)) {
       edit.foreach { fund =>
-        val name = nameField.getText
+        val name = nameField.getText.trim
         val event1 =
           if (name == fund.name) None
           else Some(Savings.UpdateFund(fund.id, name))
@@ -364,7 +364,7 @@ class EditFundsController {
    * Checks what state to apply on many fields: name, minus, plus, tick.
    */
   def checkForm(): Unit = {
-    val name = nameField.getText
+    val name = nameField.getText.trim
     // Edition is OK if either name or schemes are changed.
     val editOk = edit.exists { fund =>
       import scala.collection.JavaConversions._
