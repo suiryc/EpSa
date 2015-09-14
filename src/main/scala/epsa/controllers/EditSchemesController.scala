@@ -2,7 +2,7 @@ package epsa.controllers
 
 import epsa.I18N
 import epsa.model.Savings
-import java.util.{ResourceBundle, UUID}
+import java.util.ResourceBundle
 import javafx.beans.property.{Property, SimpleObjectProperty}
 import javafx.collections.FXCollections
 import javafx.event.Event
@@ -14,6 +14,7 @@ import javafx.scene.input.MouseEvent
 import scala.collection.JavaConversions._
 import suiryc.scala.javafx.collections.RichObservableList._
 import suiryc.scala.javafx.beans.value.RichObservableValue._
+import suiryc.scala.javafx.event.Events
 import suiryc.scala.javafx.stage.Stages
 import suiryc.scala.javafx.util.Callback._
 
@@ -110,7 +111,7 @@ class EditSchemesController {
    * If editing, adds number suffix to ensure name is unique if necessary.
    */
   def onAdd(event: Event): Unit = {
-    if (isEventOnNode(event)) {
+    if (Events.isOnNode(event)) {
       val name = if (edit.isDefined) {
         val schemeName = nameField.getText.trim
 
@@ -147,7 +148,7 @@ class EditSchemesController {
    * Applies deletion event if conditions are met.
    */
   def onRemove(event: Event): Unit = {
-    if (isEventOnNode(event)) {
+    if (Events.isOnNode(event)) {
       // XXX - ask whether to also remove lone funds
       // Make sure there is something to delete, and that we can
       Option(schemesField.getSelectionModel.getSelectedItem).foreach { scheme =>
@@ -167,7 +168,7 @@ class EditSchemesController {
    *   - funds association changes if any
    */
   def onApply(event: Event): Unit = {
-    if (isEventOnNode(event)) {
+    if (Events.isOnNode(event)) {
       edit.foreach { scheme =>
         val name = nameField.getText.trim
         val event1 =
@@ -187,19 +188,6 @@ class EditSchemesController {
       }
     }
   }
-
-  /**
-   * Checks (mouse) event is no target mode.
-   *
-   * Allows to not take into account events for which (mouse) releasing is not
-   * performed while still on target node.
-   * Non-mouse events (usually touch) are always considered on target.
-   */
-  private def isEventOnNode(event: Event): Boolean =
-    event match {
-      case event: MouseEvent => event.getTarget.asInstanceOf[Node].contains(event.getX, event.getY)
-      case _ => true
-    }
 
   /**
    * Creates a new Scheme list view cell.
@@ -259,46 +247,8 @@ class EditSchemesController {
   private def applyEvents(newEvents: Savings.Event*): Unit = {
     resetEditFields()
     savings = Savings.processEvents(savings, newEvents:_*)
-    events.setValue(flattenEvents(events.getValue ++ newEvents))
+    events.setValue(Savings.flattenEvents(events.getValue ++ newEvents))
     updateSchemes()
-  }
-
-  /**
-   * Flattens events.
-   *
-   * Filters unnecessary events, e.g. when creating then deleting a scheme or
-   * fund.
-   */
-  private def flattenEvents(events: List[Savings.Event]): List[Savings.Event] = {
-    case class Data(schemesCreated: Set[UUID] = Set.empty, fundsCreated: Set[UUID] = Set.empty,
-      schemesNop: Set[UUID] = Set.empty, fundsNop: Set[UUID] = Set.empty)
-
-    val r = events.foldLeft(Data()) { (data, event) =>
-      event match {
-        case Savings.CreateScheme(id, _) =>
-          data.copy(schemesCreated = data.schemesCreated + id)
-
-        case Savings.DeleteScheme(id) =>
-          if (!data.schemesCreated.contains(id)) data
-          else data.copy(schemesNop = data.schemesNop + id,
-            schemesCreated = data.schemesCreated - id)
-
-        case Savings.CreateFund(id, _) =>
-          data.copy(fundsCreated = data.fundsCreated + id)
-
-        case Savings.DeleteFund(id) =>
-          if (!data.fundsCreated.contains(id)) data
-          else data.copy(fundsNop = data.fundsNop + id,
-            fundsCreated = data.fundsCreated - id)
-
-        case _ => data
-      }
-    }
-
-    events.filterNot { event =>
-      (event.isInstanceOf[Savings.SchemeEvent] && r.schemesNop.contains(event.asInstanceOf[Savings.SchemeEvent].schemeId)) ||
-        (event.isInstanceOf[Savings.FundEvent] && r.fundsNop.contains(event.asInstanceOf[Savings.FundEvent].fundId))
-    }
   }
 
   /**
@@ -376,11 +326,11 @@ class EditSchemesController {
     // Minus field status: enable deletion if selected scheme can be deleted
     Option(schemesField.getSelectionModel.getSelectedItem) match {
       case None =>
-        toggleImageButton(minusField, set = false)
+        Form.toggleImageButton(minusField, set = false)
 
       case Some(scheme) =>
-        if (canDeleteScheme(scheme)) toggleImageButton(minusField, set = true)
-        else toggleImageButton(minusField, set = false, Some(resources.getString("Scheme is not empty")))
+        if (canDeleteScheme(scheme)) Form.toggleImageButton(minusField, set = true)
+        else Form.toggleImageButton(minusField, set = false, Some(resources.getString("Scheme is not empty")))
     }
 
     // Plus field status: enable if adding new scheme which name is OK, or
@@ -388,39 +338,10 @@ class EditSchemesController {
     val addOk =
       if (schemesField.getSelectionModel.isEmpty) nameOk
       else name.nonEmpty
-    toggleImageButton(plusField, addOk)
+    Form.toggleImageButton(plusField, addOk)
 
     // Tick field status: enable if name and edition are OK
-    toggleImageButton(tickField, nameOk && editOk)
-  }
-
-  /**
-   * Toggles image status.
-   *
-   * When set, sets 'image-button' style class and have node opaque.
-   * Otherwise unsets 'image-button' style class and have node 60% transparent.
-   * Also installs/uninstalls tooltip message.
-   */
-  private def toggleImageButton(node: ImageView, set: Boolean, msgOpt: Option[String] = None): Unit = {
-    // Note: do not disable node otherwise tooltip won't work
-    if (set) {
-      Form.setStyleImageButton(node, set = true)
-      node.setOpacity(1.0)
-    }
-    else {
-      Form.setStyleImageButton(node, set = false)
-      node.setOpacity(0.4)
-    }
-
-    msgOpt match {
-      case Some(msg) =>
-        Tooltip.install(node, new Tooltip(msg))
-
-      case None =>
-        // Note: uninstall takes a Tooltip but does not use it (and we did not
-        // keep the installed tooltip if any).
-        Tooltip.uninstall(node, null)
-    }
+    Form.toggleImageButton(tickField, nameOk && editOk)
   }
 
 }

@@ -20,6 +20,46 @@ object Savings {
   def processEvents(savings: Savings, events: List[Savings.Event]): Savings =
     processEvents(savings, events:_*)
 
+  /**
+   * Flattens events.
+   *
+   * Filters unnecessary events, e.g. when creating then deleting a scheme or
+   * fund.
+   */
+  // XXX - also flatten editing
+  // XXX - also flatten association/dissociation
+  def flattenEvents(events: List[Savings.Event]): List[Savings.Event] = {
+    case class Data(schemesCreated: Set[UUID] = Set.empty, fundsCreated: Set[UUID] = Set.empty,
+                    schemesNop: Set[UUID] = Set.empty, fundsNop: Set[UUID] = Set.empty)
+
+    val r = events.foldLeft(Data()) { (data, event) =>
+      event match {
+        case Savings.CreateScheme(id, _) =>
+          data.copy(schemesCreated = data.schemesCreated + id)
+
+        case Savings.DeleteScheme(id) =>
+          if (!data.schemesCreated.contains(id)) data
+          else data.copy(schemesNop = data.schemesNop + id,
+            schemesCreated = data.schemesCreated - id)
+
+        case Savings.CreateFund(id, _) =>
+          data.copy(fundsCreated = data.fundsCreated + id)
+
+        case Savings.DeleteFund(id) =>
+          if (!data.fundsCreated.contains(id)) data
+          else data.copy(fundsNop = data.fundsNop + id,
+            fundsCreated = data.fundsCreated - id)
+
+        case _ => data
+      }
+    }
+
+    events.filterNot { event =>
+      (event.isInstanceOf[Savings.SchemeEvent] && r.schemesNop.contains(event.asInstanceOf[Savings.SchemeEvent].schemeId)) ||
+        (event.isInstanceOf[Savings.FundEvent] && r.fundsNop.contains(event.asInstanceOf[Savings.FundEvent].fundId))
+    }
+  }
+
   case class Scheme(id: UUID, name: String, funds: List[UUID])
 
   case class Fund(id: UUID, name: String)
