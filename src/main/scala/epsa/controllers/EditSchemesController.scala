@@ -12,8 +12,8 @@ import javafx.scene.control._
 import javafx.scene.image.ImageView
 import javafx.scene.input.MouseEvent
 import scala.collection.JavaConversions._
-import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.collections.RichObservableList._
+import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.stage.Stages
 import suiryc.scala.javafx.util.Callback._
 
@@ -26,10 +26,10 @@ class EditSchemesController {
   protected var resources: ResourceBundle = _
 
   @FXML
-  protected var nameField: TextField = _
+  protected var schemesField: ListView[Savings.Scheme] = _
 
   @FXML
-  protected var schemesField: ListView[Savings.Scheme] = _
+  protected var nameField: TextField = _
 
   @FXML
   protected var fundsField: ListView[Savings.Fund] = _
@@ -177,11 +177,13 @@ class EditSchemesController {
         val oldFunds = scheme.funds.toSet
         val newFunds = fundsField.getSelectionModel.getSelectedItems.toList.map(_.id).toSet
 
-        event1.toList ++ (oldFunds -- newFunds).toList.map { fundId =>
+        val newEvents = event1.toList ++ (oldFunds -- newFunds).toList.map { fundId =>
           Savings.DissociateFund(scheme.id, fundId)
         } ++ (newFunds -- oldFunds).toList.sorted.map { fundId =>
           Savings.AssociateFund(scheme.id, fundId)
         }
+
+        applyEvents(newEvents:_*)
       }
     }
   }
@@ -269,7 +271,7 @@ class EditSchemesController {
    */
   private def flattenEvents(events: List[Savings.Event]): List[Savings.Event] = {
     case class Data(schemesCreated: Set[UUID] = Set.empty, fundsCreated: Set[UUID] = Set.empty,
-        schemesNop: Set[UUID] = Set.empty, fundsNop: Set[UUID] = Set.empty)
+      schemesNop: Set[UUID] = Set.empty, fundsNop: Set[UUID] = Set.empty)
 
     val r = events.foldLeft(Data()) { (data, event) =>
       event match {
