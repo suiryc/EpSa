@@ -20,7 +20,6 @@ import suiryc.scala.javafx.event.Events
 import suiryc.scala.javafx.stage.Stages
 import suiryc.scala.javafx.util.Callback._
 
-// TODO - prevent unselecting associated scheme if it has assets for fund
 class EditFundsController {
 
   //@FXML
@@ -58,13 +57,15 @@ class EditFundsController {
 
   protected var buttonOk: Node = _
 
+  protected lazy val window =
+    nameField.getScene.getWindow
+
   //def initialize(): Unit = { }
 
   def initialize(savings0: Savings, dialog: Dialog[_], edit0: Option[Savings.Fund]): Unit = {
     // Save initial state
     this.savings0 = savings0
     savings = savings0
-    edit = edit0
 
     // Load css
     dialog.getDialogPane.getStylesheets.add(getClass.getResource("/css/form.css").toExternalForm)
@@ -94,11 +95,14 @@ class EditFundsController {
     }
     schemesField.getSelectionModel.setSelectionMode(SelectionMode.MULTIPLE)
     schemesField.setItems(FXCollections.observableList(savings.schemes))
-    // Re-check form when selected funds are changed
-    schemesField.getSelectionModel.getSelectedItems.listen(checkForm())
+    // Check selected schemes upon change, triggers form re-check if necessary
+    schemesField.getSelectionModel.getSelectedItems.listen(checkSelectedSchemes())
 
     // Populate editing fields if a fund is initially selected
-    updateEditFields()
+    edit0.foreach(updateEditFields)
+    // Note: we must first select schemes before entering edition mode (due to
+    // some checking).
+    edit = edit0
     // Select initial fund if any
     edit.foreach(fundsField.getSelectionModel.select)
 
@@ -109,8 +113,6 @@ class EditFundsController {
       // and having changed anything.
       val dirty = edit match {
         case Some(fund) =>
-          import scala.collection.JavaConversions._
-
           val oldSchemes = savings.schemes.filter(_.funds.contains(fund.id)).map(_.id).toSet
           val newSchemes = schemesField.getSelectionModel.getSelectedItems.toList.map(_.id).toSet
           (fund.name != name) ||
@@ -210,7 +212,7 @@ class EditFundsController {
 
     val events = if (schemes.nonEmpty) {
       val alert = new Alert(Alert.AlertType.CONFIRMATION)
-      alert.initOwner(nameField.getScene.getWindow)
+      alert.initOwner(window)
 
       val loader = new FXMLLoader(getClass.getResource("/fxml/select-resources.fxml"), resources)
       val root = loader.load[Node]()
@@ -287,14 +289,19 @@ class EditFundsController {
         checkForm()
       }
       else if (cell.getItem != null) {
-        // Select scheme
-        // 1. We are editing it now
-        edit = Option(cell.getItem)
+        // Select fund
+        val fund = cell.getItem
+        // 1. Leave editing mode
+        // Note: needed due to some checking when selecting schemes.
+        edit = None
         // 2. Select it
         fundsField.getSelectionModel.select(cell.getIndex)
         // 3. Update editing fields
-        updateEditFields()
-        // 4. Re-check form
+        updateEditFields(fund)
+        // 4. We are editing it now
+        // Note: need to be done after selecting schemes due to some checking.
+        edit = Option(fund)
+        // 5. Re-check form
         checkForm()
       }
       // In any case, consume the event so that ListView does not try to
@@ -357,14 +364,13 @@ class EditFundsController {
    *
    * Upon editing a fund, sets its name and selects its funds.
    */
-  private def updateEditFields(): Unit =
-    edit.foreach { fund =>
-      nameField.setText(fund.name)
-      schemesField.getSelectionModel.clearSelection()
-      savings.schemes.filter { scheme =>
-        scheme.funds.contains(fund.id)
-      }.foreach(schemesField.getSelectionModel.select)
-    }
+  private def updateEditFields(fund: Savings.Fund): Unit = {
+    nameField.setText(fund.name)
+    schemesField.getSelectionModel.clearSelection()
+    savings.schemes.filter { scheme =>
+      scheme.funds.contains(fund.id)
+    }.foreach(schemesField.getSelectionModel.select)
+  }
 
   /**
    * Resets editing fields.
@@ -377,6 +383,36 @@ class EditFundsController {
   }
 
   /**
+   * Checks selected schemes.
+   *
+   * If not editing, check form.
+   * If editing, ensure schemes with assets cannot be de-selected.
+   */
+  private def checkSelectedSchemes(): Unit =
+    edit match {
+      case Some(fund) =>
+        val selected = schemesField.getSelectionModel.getSelectedItems.toList.map(_.id).toSet
+        val unselected = savings.schemes.map(_.id).filterNot(selected.contains)
+        val reselect = unselected.filter { schemeId =>
+          savings.hasAsset(schemeId, fund.id)
+        }
+        // If selected schemes are OK, simply check form.
+        // Otherwise, re-select needed schemes, which will trigger a form checking.
+        if (reselect.isEmpty) checkForm()
+        else {
+          val alert = new Alert(Alert.AlertType.WARNING)
+          alert.initOwner(window)
+          alert.setContentText(resources.getString("warning.unselecting-nonempty-resource"))
+          alert.showAndWait()
+
+          reselect.map(savings.getScheme).foreach(schemesField.getSelectionModel.select)
+        }
+
+      case None =>
+        checkForm()
+    }
+
+  /**
    * Checks form.
    *
    * Checks what state to apply on many fields: name, minus, plus, tick.
@@ -385,8 +421,6 @@ class EditFundsController {
     val name = nameField.getText.trim
     // Edition is OK if either name or schemes are changed.
     val editOk = edit.exists { fund =>
-      import scala.collection.JavaConversions._
-
       val oldSchemes = savings.schemes.filter(_.funds.contains(fund.id)).map(_.id).toSet
       val newSchemes = schemesField.getSelectionModel.getSelectedItems.toList.map(_.id).toSet
       (fund.name != name) ||

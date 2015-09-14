@@ -369,6 +369,12 @@ case class Savings(schemes: List[Savings.Scheme] = Nil, funds: List[Savings.Fund
   def getFund(fundId: UUID): Fund =
     funds.find(_.id == fundId).get
 
+  def hasAsset(schemeId: UUID, fundId: UUID): Boolean =
+    assets.exists { asset =>
+      (asset.schemeId == schemeId) &&
+        (asset.fundId == fundId)
+    }
+
   def createSchemeEvent(name: String): CreateScheme = {
     val id = newId(schemes.map(_.id))
     CreateScheme(id, name)
