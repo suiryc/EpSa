@@ -12,6 +12,7 @@ import javafx.scene.control._
 import javafx.scene.image.ImageView
 import javafx.scene.input.MouseEvent
 import scala.collection.JavaConversions._
+import suiryc.scala.RichOption._
 import suiryc.scala.javafx.collections.RichObservableList._
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.event.EventHandler._
@@ -19,6 +20,7 @@ import suiryc.scala.javafx.event.Events
 import suiryc.scala.javafx.stage.Stages
 import suiryc.scala.javafx.util.Callback._
 
+// TODO - prevent unselecting associated scheme if it has assets for fund
 class EditFundsController {
 
   //@FXML
@@ -119,8 +121,6 @@ class EditFundsController {
       }
 
       if (dirty) {
-        import suiryc.scala.RichOption._
-
         val alert = new Alert(Alert.AlertType.CONFIRMATION)
         alert.initOwner(Stages.getStage(dialog))
         alert.setContentText(resources.getString("confirmation.pending-changes"))
@@ -171,7 +171,7 @@ class EditFundsController {
           Savings.AssociateFund(scheme.id, event.fundId)
         }
 
-      applyEvents(newEvents:_*)
+      applyEvents(newEvents)
     }
   }
 
@@ -182,24 +182,57 @@ class EditFundsController {
    * Even though 'minus' image is not accessible in those conditions, also checks
    * a fund to delete is selected and has no remaining assets.
    * Applies deletion event if conditions are met.
+   * Asks for associated schemes deletion.
    */
   def onRemove(event: Event): Unit = {
     if (Events.isOnNode(event)) {
-      // TODO - ask whether to also remove lone schemes
       // Make sure there is something to delete, and that we can
       Option(fundsField.getSelectionModel.getSelectedItem).foreach { fund =>
         if (canDeleteFund(fund)) {
+          val deleteSchemes = confirmSchemesDeletion(fund)
           // Note: don't forget to dissociate fund first
-          val newEvents = savings.schemes.filter { scheme =>
-            scheme.funds.contains(fund.id)
+          val deleteFund = savings.schemes.filter { scheme =>
+            scheme.funds.contains(fund.id) && !deleteSchemes.exists(_.schemeId == scheme.id)
           }.map(_.id).map { schemeId =>
             Savings.DissociateFund(schemeId, fund.id)
           } :+ Savings.DeleteFund(fund.id)
 
-          applyEvents(newEvents:_*)
+          applyEvents(deleteSchemes ::: deleteFund)
         }
       }
     }
+  }
+
+  private def confirmSchemesDeletion(fund: Savings.Fund): List[Savings.DeleteScheme] = {
+    val schemes = savings.schemes.filter { scheme =>
+      scheme.funds.contains(fund.id) && (scheme.funds.size == 1)
+    }
+
+    val events = if (schemes.nonEmpty) {
+      val alert = new Alert(Alert.AlertType.CONFIRMATION)
+      alert.initOwner(nameField.getScene.getWindow)
+
+      val loader = new FXMLLoader(getClass.getResource("/fxml/select-resources.fxml"), resources)
+      val root = loader.load[Node]()
+      alert.getDialogPane.setContent(root)
+      val label = root.lookup("#labelField").asInstanceOf[Label]
+      label.setText(resources.getString("confirmation.delete-associated-schemes"))
+      val resourcesField = root.lookup("#resourcesField").asInstanceOf[ListView[Savings.Scheme]]
+      resourcesField.setCellFactory { (lv: ListView[Savings.Scheme]) =>
+        new SchemeCell
+      }
+      resourcesField.getSelectionModel.setSelectionMode(SelectionMode.MULTIPLE)
+      resourcesField.setItems(FXCollections.observableList(schemes))
+      resourcesField.getSelectionModel.selectAll()
+
+      if (!alert.showAndWait().contains(ButtonType.OK)) Nil
+      else resourcesField.getSelectionModel.getSelectedItems.toList.map { scheme =>
+        Savings.DeleteScheme(scheme.id)
+      }
+    }
+    else Nil
+
+    events
   }
 
   /**
@@ -227,7 +260,7 @@ class EditFundsController {
           Savings.AssociateFund(schemeId, fund.id)
         }
 
-        applyEvents(newEvents:_*)
+        applyEvents(newEvents)
       }
     }
   }
@@ -295,6 +328,9 @@ class EditFundsController {
     updateSchemes()
     updateFunds()
   }
+
+  private def applyEvents(newEvents: List[Savings.Event]): Unit =
+    applyEvents(newEvents:_*)
 
   /**
    * Whether a fund can be deleted.

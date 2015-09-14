@@ -12,6 +12,7 @@ import javafx.scene.control._
 import javafx.scene.image.ImageView
 import javafx.scene.input.MouseEvent
 import scala.collection.JavaConversions._
+import suiryc.scala.RichOption._
 import suiryc.scala.javafx.collections.RichObservableList._
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.event.EventHandler._
@@ -19,6 +20,7 @@ import suiryc.scala.javafx.event.Events
 import suiryc.scala.javafx.stage.Stages
 import suiryc.scala.javafx.util.Callback._
 
+// TODO - prevent unselecting associated fund if it has assets for scheme
 class EditSchemesController {
 
   //@FXML
@@ -118,8 +120,6 @@ class EditSchemesController {
       }
 
       if (dirty) {
-        import suiryc.scala.RichOption._
-
         val alert = new Alert(Alert.AlertType.CONFIRMATION)
         alert.initOwner(Stages.getStage(dialog))
         alert.setContentText(resources.getString("confirmation.pending-changes"))
@@ -170,7 +170,7 @@ class EditSchemesController {
           Savings.AssociateFund(event.schemeId, fund.id)
         }
 
-      applyEvents(newEvents:_*)
+      applyEvents(newEvents)
     }
   }
 
@@ -181,17 +181,54 @@ class EditSchemesController {
    * Even though 'minus' image is not accessible in those conditions, also checks
    * a scheme to delete is selected and has no remaining assets.
    * Applies deletion event if conditions are met.
+   * Asks for associated funds deletion.
    */
   def onRemove(event: Event): Unit = {
     if (Events.isOnNode(event)) {
-      // TODO - ask whether to also remove lone funds
       // Make sure there is something to delete, and that we can
       Option(schemesField.getSelectionModel.getSelectedItem).foreach { scheme =>
         if (canDeleteScheme(scheme)) {
-          applyEvents(Savings.DeleteScheme(scheme.id))
+          applyEvents(Savings.DeleteScheme(scheme.id) :: confirmFundsDeletion(scheme))
         }
       }
     }
+  }
+
+  private def confirmFundsDeletion(scheme: Savings.Scheme): List[Savings.Event] = {
+    val lone = scheme.funds.filterNot { fundId =>
+      savings.schemes.filterNot(_.id == scheme.id).exists { otherScheme =>
+        otherScheme.funds.contains(fundId)
+      }
+    }
+    val funds = savings.funds.filter { fund =>
+      lone.contains(fund.id)
+    }
+
+    val events = if (funds.nonEmpty) {
+      val alert = new Alert(Alert.AlertType.CONFIRMATION)
+      alert.initOwner(nameField.getScene.getWindow)
+
+      val loader = new FXMLLoader(getClass.getResource("/fxml/select-resources.fxml"), resources)
+      val root = loader.load[Node]()
+      alert.getDialogPane.setContent(root)
+      val label = root.lookup("#labelField").asInstanceOf[Label]
+      label.setText(resources.getString("confirmation.delete-associated-funds"))
+      val resourcesField = root.lookup("#resourcesField").asInstanceOf[ListView[Savings.Fund]]
+      resourcesField.setCellFactory { (lv: ListView[Savings.Fund]) =>
+        new FundCell
+      }
+      resourcesField.getSelectionModel.setSelectionMode(SelectionMode.MULTIPLE)
+      resourcesField.setItems(FXCollections.observableList(funds))
+      resourcesField.getSelectionModel.selectAll()
+
+      if (!alert.showAndWait().contains(ButtonType.OK)) Nil
+      else resourcesField.getSelectionModel.getSelectedItems.toList.map { fund =>
+        Savings.DeleteFund(fund.id)
+      }
+    }
+    else Nil
+
+    events
   }
 
   /**
@@ -219,7 +256,7 @@ class EditSchemesController {
           Savings.AssociateFund(scheme.id, fundId)
         }
 
-        applyEvents(newEvents:_*)
+        applyEvents(newEvents)
       }
     }
   }
@@ -283,7 +320,12 @@ class EditSchemesController {
     savings = Savings.processEvents(savings, newEvents:_*)
     events.setValue(Savings.flattenEvents(savings0, events.getValue ++ newEvents))
     updateSchemes()
+    // Note: we may delete associated funds, so refresh the list view too.
+    updateFunds()
   }
+
+  private def applyEvents(newEvents: List[Savings.Event]): Unit =
+    applyEvents(newEvents:_*)
 
   /**
    * Whether a scheme can be deleted.
@@ -297,6 +339,12 @@ class EditSchemesController {
   private def updateSchemes(): Unit = {
     schemesField.getSelectionModel.clearSelection()
     schemesField.setItems(FXCollections.observableList(savings.schemes))
+  }
+
+  /** Updates the list of funds. */
+  private def updateFunds(): Unit = {
+    fundsField.getSelectionModel.clearSelection()
+    fundsField.setItems(FXCollections.observableList(savings.funds))
   }
 
   /**
