@@ -37,14 +37,14 @@ object DataStore {
   protected var dbOpt: Option[DB] = None
 
   /** Gets the DB (opening it if not done). */
-  protected def getDB(): DB =
+  protected def getDB: DB =
     dbOpt match {
       case Some(v) => v
       case None    => Await.result(dbOpen(defaultPath), Duration.Inf)
     }
 
   def changePath(newPath: Path): Future[Unit] = {
-    val oldDB = getDB()
+    val oldDB = getDB
     val oldPath = oldDB.path
     if (newPath.compareTo(oldPath) != 0) {
       try {
@@ -54,7 +54,7 @@ object DataStore {
       } catch {
         case ex: Throwable => Future.failed(ex)
       }
-    } else Future.successful()
+    } else Future.successful(())
   }
 
   protected def dbOpen(path: Path): Future[DB] = {
@@ -62,7 +62,7 @@ object DataStore {
     val refNew = Database.forURL(s"jdbc:h2:$path", user = "user", password = "pass", driver = "org.h2.Driver")
 
     refNew.run(MTable.getTables(EventSource.tableName)).flatMap { tables =>
-      if (tables.nonEmpty) Future.successful()
+      if (tables.nonEmpty) Future.successful(())
       else refNew.run(EventSource.entries.schema.create)
     }.map { _ =>
       // Automatically keep in mind the new DB
@@ -100,10 +100,10 @@ object DataStore {
     val entries = TableQuery[Entries]
 
     def readEvents(): Future[Seq[Savings.Event]] =
-      getDB().db.run(entries.sortBy(_.id).map(_.event).result)
+      getDB.db.run(entries.sortBy(_.id).map(_.event).result)
 
     def writeEvents(events: Savings.Event*): Future[Unit] =
-      getDB().db.run {
+      getDB.db.run {
         entries ++= events.map { event =>
           // Note: "auto increment" field value will be ignored
           (0L, event, Timestamp.from(Instant.now))

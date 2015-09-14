@@ -27,7 +27,7 @@ object TestDataStore {
           ).onComplete {
             case write =>
               println(s"EventSource.writeEvents => $write")
-              promise.success()
+              promise.success(())
           }
       }
     } catch {
