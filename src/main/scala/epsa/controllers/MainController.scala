@@ -29,6 +29,8 @@ import suiryc.scala.settings.Preference
 // TODO - remove add/edit scheme/fund buttons in main window
 // TODO - move other buttons into menu items
 // TODO - change menu for OS integration ? (e.g. Ubuntu)
+// TODO - persist main window size/position; restart at last size/position
+// TODO - persist table view columns positions/width
 class MainController {
 
   import epsa.Main.prefs
