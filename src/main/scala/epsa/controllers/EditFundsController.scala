@@ -5,7 +5,7 @@ import epsa.model.Savings
 import java.util.ResourceBundle
 import javafx.beans.property.{Property, SimpleObjectProperty}
 import javafx.collections.FXCollections
-import javafx.event.Event
+import javafx.event.{ActionEvent, Event}
 import javafx.fxml.{FXMLLoader, FXML}
 import javafx.scene.Node
 import javafx.scene.control._
@@ -14,11 +14,11 @@ import javafx.scene.input.MouseEvent
 import scala.collection.JavaConversions._
 import suiryc.scala.javafx.collections.RichObservableList._
 import suiryc.scala.javafx.beans.value.RichObservableValue._
+import suiryc.scala.javafx.event.EventHandler._
 import suiryc.scala.javafx.event.Events
 import suiryc.scala.javafx.stage.Stages
 import suiryc.scala.javafx.util.Callback._
 
-// TODO - prevent dialog closing if changes are pending
 class EditFundsController {
 
   //@FXML
@@ -99,6 +99,38 @@ class EditFundsController {
     updateEditFields()
     // Select initial fund if any
     edit.foreach(fundsField.getSelectionModel.select)
+
+    // Request confirmation if changes are pending
+    def confirmationFilter(event: ActionEvent): Unit = {
+      val name = nameField.getText.trim
+      // Changes are pending if not editing but name is not empty, or editing
+      // and having changed anything.
+      val dirty = edit match {
+        case Some(fund) =>
+          import scala.collection.JavaConversions._
+
+          val oldSchemes = savings.schemes.filter(_.funds.contains(fund.id)).map(_.id).toSet
+          val newSchemes = schemesField.getSelectionModel.getSelectedItems.toList.map(_.id).toSet
+          (fund.name != name) ||
+            oldSchemes != newSchemes
+
+        case None =>
+          name.nonEmpty
+      }
+
+      if (dirty) {
+        import suiryc.scala.RichOption._
+
+        val alert = new Alert(Alert.AlertType.CONFIRMATION)
+        alert.initOwner(Stages.getStage(dialog))
+        alert.setContentText(resources.getString("confirmation.pending-changes"))
+
+        if (!alert.showAndWait().contains(ButtonType.OK)) {
+          event.consume()
+        }
+      }
+    }
+    buttonOk.addEventFilter(ActionEvent.ACTION, confirmationFilter _)
 
     // Initial form checking
     checkForm()
@@ -208,8 +240,6 @@ class EditFundsController {
    * Fund in the list view by clicking on it a second time.
    */
   private def newFundCell(lv: ListView[Savings.Fund]): ListCell[Savings.Fund] = {
-    import suiryc.scala.javafx.event.EventHandler._
-
     // See: http://stackoverflow.com/questions/23622703/deselect-an-item-on-an-javafx-listview-on-click
     val cell = new FundCell
 
@@ -250,12 +280,13 @@ class EditFundsController {
   /**
    * Applies events.
    *
-   * Resets editing fields
+   * Resets editing fields and edited scheme.
    * Applies events on current Savings value, to compute new one.
    * Updates current list of events to take into account: flattens them to
    * filter unnecessary ones.
    */
   private def applyEvents(newEvents: Savings.Event*): Unit = {
+    edit = None
     resetEditFields()
     savings = Savings.processEvents(savings, newEvents:_*)
     events.setValue(Savings.flattenEvents(savings0, events.getValue ++ newEvents))
@@ -357,7 +388,7 @@ class EditFundsController {
     // Plus field status: enable if adding new fund which name is OK, or
     // copying with non-empty name.
     val addOk =
-      if (fundsField.getSelectionModel.isEmpty) nameOk
+      if (edit.isEmpty) nameOk
       else name.nonEmpty
     Form.toggleImageButton(plusField, addOk)
 
