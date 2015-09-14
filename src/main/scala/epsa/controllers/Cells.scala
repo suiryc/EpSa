@@ -46,7 +46,7 @@ class AmountCell[A]
 
   override protected def updateItem(item: BigDecimal, empty: Boolean) {
     super.updateItem(item, empty)
-    // XXX - currency as setting ?
+    // TODO - currency as setting ?
     if (empty) setText(null)
     else setText(s"$item €")
   }

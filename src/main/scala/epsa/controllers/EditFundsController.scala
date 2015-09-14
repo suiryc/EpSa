@@ -149,7 +149,7 @@ class EditFundsController {
    */
   def onRemove(event: Event): Unit = {
     if (Events.isOnNode(event)) {
-      // XXX - ask whether to also remove lone schemes
+      // TODO - ask whether to also remove lone schemes
       // Make sure there is something to delete, and that we can
       Option(fundsField.getSelectionModel.getSelectedItem).foreach { fund =>
         if (canDeleteFund(fund)) {

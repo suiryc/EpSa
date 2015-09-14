@@ -26,8 +26,8 @@ object Savings {
    * Filters unnecessary events, e.g. when creating then deleting a scheme or
    * fund.
    */
-  // XXX - also flatten editing
-  // XXX - also flatten association/dissociation
+  // TODO - also flatten editing
+  // TODO - also flatten association/dissociation
   def flattenEvents(events: List[Savings.Event]): List[Savings.Event] = {
     case class Data(schemesCreated: Set[UUID] = Set.empty, fundsCreated: Set[UUID] = Set.empty,
                     schemesNop: Set[UUID] = Set.empty, fundsNop: Set[UUID] = Set.empty)
@@ -64,7 +64,7 @@ object Savings {
 
   case class Fund(id: UUID, name: String)
 
-  // XXX - fundId ok even if dealing with 'frozen current account' ?
+  // TODO - fundId ok even if dealing with 'frozen current account' ?
   case class Asset(schemeId: UUID, fundId: UUID, availability: Option[LocalDate], amount: BigDecimal, units: BigDecimal)
 
   sealed trait Event

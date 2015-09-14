@@ -41,7 +41,7 @@ class ChartHandler(fund: InvestmentFund) {
   private val series = new XYChart.Series[String, Number]()
   series.setName(fund.name)
   /** Investment fund asset values to display in chart. */
-  // XXX - limited to a given number of values for testing
+  // TODO - limited to a given number of values for testing
   private val valuesList = fund.values.takeRight(200).map { v =>
     (dateFormat.format(v.date), v.value)
   }

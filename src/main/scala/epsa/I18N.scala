@@ -67,7 +67,7 @@ object I18N {
         }
 
       case protocol =>
-        // XXX - log
+        // TODO - log
         println(s"Unhandled resource protocol: $protocol")
         Set.empty[String]
     }

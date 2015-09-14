@@ -23,6 +23,12 @@ import suiryc.scala.javafx.stage.Stages
 import suiryc.scala.javafx.util.Callback._
 import suiryc.scala.settings.Preference
 
+// TODO - add "Edit schemes"/"Edit funds" menu items
+// TODO - add mouse context menu over scheme/fund cell in assets table to edit the scheme/fund
+// TODO - remove schemes/funds list view in main window
+// TODO - remove add/edit scheme/fund buttons in main window
+// TODO - move other buttons into menu items
+// TODO - change menu for OS integration ? (e.g. Ubuntu)
 class MainController {
 
   import epsa.Main.prefs
