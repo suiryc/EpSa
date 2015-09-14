@@ -211,7 +211,8 @@ class EditSchemesController {
 
     // See: http://stackoverflow.com/questions/23622703/deselect-an-item-on-an-javafx-listview-on-click
     val cell = new SchemeCell
-    cell.addEventFilter(MouseEvent.MOUSE_PRESSED, { (event: MouseEvent) =>
+
+    def eventFilter(event: MouseEvent): Unit = {
       if (schemesField.getSelectionModel.getSelectedIndices.contains(cell.getIndex)) {
         // De-select scheme
         // 1. We are not editing it anymore
@@ -238,7 +239,9 @@ class EditSchemesController {
 
       // At least re-focus on the schemes field it not done
       if (!schemesField.isFocused) schemesField.requestFocus()
-    })
+    }
+
+    cell.addEventFilter(MouseEvent.MOUSE_PRESSED, eventFilter _)
 
     cell
   }
