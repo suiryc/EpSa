@@ -212,7 +212,7 @@ class MainController {
     }
 
     def onCreateFund(state: State, edit: Option[Savings.Fund]): Unit = {
-      val dialog = CreateFundController.buildDialog(state.savings, edit)
+      val dialog = EditFundsController.buildDialog(state.savings, edit)
       dialog.initModality(Modality.WINDOW_MODAL)
       dialog.initOwner(state.window)
       dialog.setResizable(true)

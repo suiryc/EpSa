@@ -11,7 +11,7 @@ import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.stage.Stages
 import suiryc.scala.javafx.util.Callback._
 
-class CreateFundController {
+class EditFundsController {
 
   //@FXML
   //protected var location: URL = _
@@ -71,7 +71,7 @@ class CreateFundController {
 
 }
 
-object CreateFundController {
+object EditFundsController {
 
   def buildDialog(savings: Savings, edit: Option[Savings.Fund]): Dialog[List[Savings.Event]] = {
     val resources = I18N.getResources
@@ -81,9 +81,9 @@ object CreateFundController {
     dialog.setTitle(title)
     dialog.getDialogPane.getButtonTypes.addAll(ButtonType.OK, ButtonType.CANCEL)
 
-    val loader = new FXMLLoader(getClass.getResource("/fxml/fund-create.fxml"), resources)
+    val loader = new FXMLLoader(getClass.getResource("/fxml/edit-funds.fxml"), resources)
     dialog.getDialogPane.setContent(loader.load())
-    val controller = loader.getController[CreateFundController]
+    val controller = loader.getController[EditFundsController]
     controller.initialize(savings, dialog, edit)
 
     dialog.setResultConverter(resultConverter(savings, edit, controller) _)
@@ -92,7 +92,7 @@ object CreateFundController {
     dialog
   }
 
-  def resultConverter(savings: Savings, edit: Option[Savings.Fund], controller: CreateFundController)(buttonType: ButtonType): List[Savings.Event] = {
+  def resultConverter(savings: Savings, edit: Option[Savings.Fund], controller: EditFundsController)(buttonType: ButtonType): List[Savings.Event] = {
     import scala.collection.JavaConversions._
 
     if (buttonType != ButtonType.OK) Nil
