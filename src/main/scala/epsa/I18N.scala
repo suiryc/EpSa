@@ -1,5 +1,6 @@
 package epsa
 
+import grizzled.slf4j.Logging
 import java.io.{File, InputStream, InputStreamReader, IOException}
 import java.net.JarURLConnection
 import java.security.{AccessController, PrivilegedActionException, PrivilegedExceptionAction}
@@ -10,7 +11,7 @@ import suiryc.scala.io.PathFinder
 import suiryc.scala.io.PathFinder._
 import suiryc.scala.settings.Preference
 
-object I18N {
+object I18N extends Logging {
 
   import Preference._
   import epsa.Main.prefs
@@ -67,8 +68,7 @@ object I18N {
         }
 
       case protocol =>
-        // TODO - log
-        println(s"Unhandled resource protocol: $protocol")
+        warn(s"Unhandled resource protocol: $protocol")
         Set.empty[String]
     }
   }.getOrElse(Set.empty) + "en"
