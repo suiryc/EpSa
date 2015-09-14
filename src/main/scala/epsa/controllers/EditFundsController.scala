@@ -18,6 +18,7 @@ import suiryc.scala.javafx.event.Events
 import suiryc.scala.javafx.stage.Stages
 import suiryc.scala.javafx.util.Callback._
 
+// TODO - prevent dialog closing if changes are pending
 class EditFundsController {
 
   //@FXML
