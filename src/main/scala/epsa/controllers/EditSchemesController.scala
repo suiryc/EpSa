@@ -45,6 +45,8 @@ class EditSchemesController {
   @FXML
   protected var tickField: ImageView = _
 
+  protected var savings0: Savings = _
+
   protected var savings: Savings = _
 
   protected var events: Property[List[Savings.Event]] =
@@ -58,6 +60,7 @@ class EditSchemesController {
 
   def initialize(savings0: Savings, dialog: Dialog[_], edit0: Option[Savings.Scheme]): Unit = {
     // Save initial state
+    this.savings0 = savings0
     savings = savings0
     edit = edit0
 
@@ -248,7 +251,7 @@ class EditSchemesController {
   private def applyEvents(newEvents: Savings.Event*): Unit = {
     resetEditFields()
     savings = Savings.processEvents(savings, newEvents:_*)
-    events.setValue(Savings.flattenEvents(events.getValue ++ newEvents))
+    events.setValue(Savings.flattenEvents(savings0, events.getValue ++ newEvents))
     updateSchemes()
   }
 

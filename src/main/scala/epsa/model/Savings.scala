@@ -23,40 +23,97 @@ object Savings {
   /**
    * Flattens events.
    *
-   * Filters unnecessary events, e.g. when creating then deleting a scheme or
-   * fund.
+   * Applies events to initial savings, and determines actual diff with
+   * computed new savings.
+   * Effectively filters unnecessary events, e.g. when creating then deleting a
+   * scheme or fund.
+   *
+   * WARNING: Does not take care of assets modifications.
    */
-  // TODO - also flatten editing
-  // TODO - also flatten association/dissociation
-  def flattenEvents(events: List[Savings.Event]): List[Savings.Event] = {
-    case class Data(schemesCreated: Set[UUID] = Set.empty, fundsCreated: Set[UUID] = Set.empty,
-                    schemesNop: Set[UUID] = Set.empty, fundsNop: Set[UUID] = Set.empty)
+  def flattenEvents(savings: Savings, events: List[Savings.Event]): List[Savings.Event] = {
+    val oldSchemes = savings.schemes.map(_.id).toSet
+    val oldFunds = savings.funds.map(_.id).toSet
+    val newSavings = processEvents(savings, events)
+    val newSchemes = newSavings.schemes.map(_.id).toSet
+    val newFunds = newSavings.funds.map(_.id).toSet
 
-    val r = events.foldLeft(Data()) { (data, event) =>
-      event match {
-        case Savings.CreateScheme(id, _) =>
-          data.copy(schemesCreated = data.schemesCreated + id)
-
-        case Savings.DeleteScheme(id) =>
-          if (!data.schemesCreated.contains(id)) data
-          else data.copy(schemesNop = data.schemesNop + id,
-            schemesCreated = data.schemesCreated - id)
-
-        case Savings.CreateFund(id, _) =>
-          data.copy(fundsCreated = data.fundsCreated + id)
-
-        case Savings.DeleteFund(id) =>
-          if (!data.fundsCreated.contains(id)) data
-          else data.copy(fundsNop = data.fundsNop + id,
-            fundsCreated = data.fundsCreated - id)
-
-        case _ => data
+    def orderSchemes(uuids: Set[UUID]): List[Savings.Scheme] =
+      newSavings.schemes.filter { scheme =>
+        uuids.contains(scheme.id)
       }
-    }
 
-    events.filterNot { event =>
-      (event.isInstanceOf[Savings.SchemeEvent] && r.schemesNop.contains(event.asInstanceOf[Savings.SchemeEvent].schemeId)) ||
-        (event.isInstanceOf[Savings.FundEvent] && r.fundsNop.contains(event.asInstanceOf[Savings.FundEvent].fundId))
+    def orderFunds(uuids: Set[UUID]): List[Savings.Fund] =
+      newSavings.funds.filter { fund =>
+        uuids.contains(fund.id)
+      }
+
+    val schemesCreated = newSchemes -- oldSchemes
+    val schemesCreatedOrdered = orderSchemes(schemesCreated)
+    val schemesDeleted = oldSchemes -- newSchemes
+    val schemesRemaining = newSchemes.intersect(oldSchemes)
+    val schemesRemainingOrdered = orderSchemes(schemesRemaining)
+    val fundsCreated = newFunds -- oldFunds
+    val fundsCreatedOrdered = orderFunds(fundsCreated)
+    val fundsDeleted = oldFunds -- newFunds
+    val fundsRemaining = newFunds.intersect(oldFunds)
+    val fundsRemainingOrdered = orderFunds(fundsRemaining)
+
+    // In order, we have:
+    // 1. deleted schemes (with funds dissociation)
+    // 2. deleted funds (with remaining dissociations)
+    // 3. created schemes
+    // 4. created funds
+    // 5. funds associated to created schemes
+    // 6. created funds remaining associations
+    // 7. remaining schemes updates
+    // 8. remaining funds updates
+    schemesDeleted.toList.flatMap { schemeId =>
+      savings.getScheme(schemeId).funds.map { fundId =>
+        Savings.DissociateFund(schemeId, fundId)
+      } :+ Savings.DeleteScheme(schemeId)
+    } ::: fundsDeleted.toList.flatMap { fundId =>
+      savings.schemes.filter { scheme =>
+        scheme.funds.contains(fundId) && !schemesDeleted.contains(scheme.id)
+      }.map { scheme =>
+        Savings.DissociateFund(scheme.id, fundId)
+      } :+ Savings.DeleteFund(fundId)
+    } ::: schemesCreatedOrdered.map { scheme =>
+      Savings.CreateScheme(scheme.id, scheme.name)
+    } ::: fundsCreatedOrdered.map { fund =>
+      Savings.CreateFund(fund.id, fund.name)
+    } ::: schemesCreatedOrdered.flatMap { scheme =>
+      scheme.funds.map { fundId =>
+        Savings.AssociateFund(scheme.id, fundId)
+      }
+    } ::: fundsCreatedOrdered.flatMap { fund =>
+      newSavings.schemes.filter { scheme =>
+        scheme.funds.contains(fund.id) && !schemesCreated.contains(scheme.id)
+      }.map { scheme =>
+        Savings.AssociateFund(scheme.id, fund.id)
+      }
+    } ::: schemesRemainingOrdered.flatMap { newScheme =>
+      val oldScheme = savings.getScheme(newScheme.id)
+      val event1 =
+        if (newScheme.name == oldScheme.name) None
+        else Some(Savings.UpdateScheme(newScheme.id, newScheme.name))
+
+      val oldFunds = oldScheme.funds.toSet
+      val newFunds = newScheme.funds.toSet
+      val fundsAssociated = newFunds -- oldFunds
+      val fundsAssociatedOrdered = newScheme.funds.filter(fundsAssociated.contains)
+      val fundsDissociated = oldFunds -- newFunds
+
+      event1.toList ++ fundsDissociated.toList.map { fundId =>
+        Savings.DissociateFund(oldScheme.id, fundId)
+      } ++ fundsAssociatedOrdered.map { fundId =>
+        Savings.AssociateFund(oldScheme.id, fundId)
+      } ::: fundsRemainingOrdered.flatMap { newFund =>
+        val oldFund = savings.getFund(newFund.id)
+        if (newFund.name == oldFund.name) None
+        else Some(Savings.UpdateFund(newFund.id, newFund.name))
+        // Note: association/dissociation to old, new or remaining schemes have
+        // been taken care of already.
+      }
     }
   }
 
@@ -69,37 +126,29 @@ object Savings {
 
   sealed trait Event
 
-  trait SchemeEvent {
-    val schemeId: UUID
-  }
-
-  trait FundEvent {
-    val fundId: UUID
-  }
-
   case class CreateScheme(schemeId: UUID, name: String)
-    extends Event with SchemeEvent
+    extends Event
 
   case class UpdateScheme(schemeId: UUID, name: String)
-    extends Event with SchemeEvent
+    extends Event
 
   case class DeleteScheme(schemeId: UUID)
-    extends Event with SchemeEvent
+    extends Event
 
   case class CreateFund(fundId: UUID, name: String)
-    extends Event with FundEvent
+    extends Event
 
   case class UpdateFund(fundId: UUID, name: String)
-    extends Event with FundEvent
+    extends Event
 
   case class DeleteFund(fundId: UUID)
-    extends Event with FundEvent
+    extends Event
 
   case class AssociateFund(schemeId: UUID, fundId: UUID)
-    extends Event with SchemeEvent with FundEvent
+    extends Event
 
   case class DissociateFund(schemeId: UUID, fundId: UUID)
-    extends Event with SchemeEvent with FundEvent
+    extends Event
 
   case class MakePayment(date: LocalDate, asset: Asset)
     extends Event
