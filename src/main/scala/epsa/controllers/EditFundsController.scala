@@ -387,7 +387,9 @@ class EditFundsController {
   private def checkSelectedSchemes(): Unit =
     edit match {
       case Some(fund) =>
-        val selected = schemesField.getSelectionModel.getSelectedItems.toList.map(_.id).toSet
+        // Note: on Linux selectedItems may contain a 'null' value the first
+        // time it is called ...
+        val selected = schemesField.getSelectionModel.getSelectedItems.toList.flatMap(Option(_)).map(_.id).toSet
         val unselected = savings.schemes.map(_.id).filterNot(selected.contains)
         val reselect = unselected.filter { schemeId =>
           savings.hasAsset(schemeId, fund.id)
