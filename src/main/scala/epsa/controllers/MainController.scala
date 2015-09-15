@@ -20,20 +20,23 @@ import javafx.stage.FileChooser.ExtensionFilter
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.javafx.event.EventHandler._
+import suiryc.scala.javafx.scene.control.TableViews
 import suiryc.scala.javafx.stage.Stages
 import suiryc.scala.javafx.util.Callback._
 import suiryc.scala.settings.Preference
 
 // TODO - menu key shortcuts ?
 // TODO - change menu for OS integration ? (e.g. Ubuntu)
-// TODO - persist table view columns positions/width
 class MainController {
 
   import epsa.Main.prefs
   import MainController._
+  import Preference._
   import Stages.StageLocation
 
-  private val stageLocation = Preference.from("stage.location", null:StageLocation)
+  private val stageLocation = Preference.from("stage.main.location", null:StageLocation)
+
+  private val assetsColumnsPref = Preference.from("stage.main.assets.columns", null:String)
 
   //@FXML
   //protected var location: URL = _
@@ -58,6 +61,13 @@ class MainController {
   lazy private val columnUnits =
     new TableColumn[Savings.Asset, BigDecimal](resources.getString("Units"))
 
+  lazy private val assetsColumns = List(
+    "scheme" -> columnScheme,
+    "fund" -> columnFund,
+    "amount" -> columnAmount,
+    "units" -> columnUnits
+  )
+
   //def initialize(): Unit = { }
 
   def initialize(state: State): Unit = {
@@ -80,7 +90,8 @@ class MainController {
       new SimpleObjectProperty(data.getValue.units)
     }
 
-    assetsTable.getColumns.addAll(columnScheme, columnFund, columnAmount, columnUnits)
+    // Restore assets columns order and width
+    TableViews.setColumnsView(assetsTable, assetsColumns, Option(assetsColumnsPref()))
     // Note: Asset gives scheme/fund UUID. Since State is immutable (and is
     // changed when applying events in controller) we must delegate scheme/fund
     // lookup to the controller.
@@ -193,6 +204,9 @@ class MainController {
       // Note: if iconified, resets it
       val stage = state.stage
       stageLocation() = Stages.getLocation(stage).orNull
+
+      // Persist assets table columns order and width
+      assetsColumnsPref() = TableViews.getColumnsView(assetsTable, assetsColumns)
 
       // Then shutdown
       context.stop(self)
