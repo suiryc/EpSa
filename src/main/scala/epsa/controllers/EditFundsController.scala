@@ -125,7 +125,7 @@ class EditFundsController {
       if (dirty) {
         val alert = new Alert(Alert.AlertType.CONFIRMATION)
         alert.initOwner(Stages.getStage(dialog))
-        alert.setContentText(resources.getString("confirmation.pending-changes"))
+        alert.setHeaderText(resources.getString("confirmation.pending-changes"))
 
         if (!alert.showAndWait().contains(ButtonType.OK)) {
           event.consume()
@@ -402,7 +402,7 @@ class EditFundsController {
         else {
           val alert = new Alert(Alert.AlertType.WARNING)
           alert.initOwner(window)
-          alert.setContentText(resources.getString("warning.unselecting-nonempty-resource"))
+          alert.setHeaderText(resources.getString("warning.unselecting-nonempty-resource"))
           alert.showAndWait()
 
           reselect.map(savings.getScheme).foreach(schemesField.getSelectionModel.select)
