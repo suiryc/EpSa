@@ -27,6 +27,17 @@ import suiryc.scala.settings.Preference
 
 // TODO - menu key shortcuts ?
 // TODO - change menu for OS integration ? (e.g. Ubuntu)
+// TODO - save fund value history in datastore
+// TODO - display base and current (to date) amounts in assets table
+// TODO - display asset gain/loss (amount/percentage) in assets table
+// TODO - display details next to assets table when selecting entry; display values history graph (or button for new window)
+// TODO - keep events to persist in datastore until saved
+// TODO - menu entry to save pending events to datastore
+// TODO - load (and replay) events upon starting application
+// TODO - menu entry to select datastore location
+// TODO - menu entries with latest datastore locations ?
+// TODO - prevent leaving application if events are not yet saved
+// TODO - notify datastore saving issues
 class MainController {
 
   import epsa.Main.prefs
