@@ -24,7 +24,7 @@ import suiryc.scala.javafx.stage.Stages
 import suiryc.scala.javafx.util.Callback._
 import suiryc.scala.settings.Preference
 
-// TODO - initially edit selected scheme/fund if any
+// TODO - menu key shortcuts ?
 // TODO - change menu for OS integration ? (e.g. Ubuntu)
 // TODO - persist main window size/position; restart at last size/position
 // TODO - persist table view columns positions/width
@@ -191,7 +191,10 @@ class MainController {
       epsa.Main.shutdown(state.stage)
     }
 
-    def onEditSchemes(state: State, edit: Option[Savings.Scheme]): Unit = {
+    def onEditSchemes(state: State, edit0: Option[Savings.Scheme]): Unit = {
+      val edit = edit0.orElse(Option(assetsTable.getSelectionModel.getSelectedItem).map { asset =>
+        state.savings.getScheme(asset.schemeId)
+      })
       val dialog = EditSchemesController.buildDialog(state.savings, edit)
       dialog.initModality(Modality.WINDOW_MODAL)
       dialog.initOwner(state.window)
@@ -200,7 +203,10 @@ class MainController {
       processEvents(state, events)
     }
 
-    def onEditFunds(state: State, edit: Option[Savings.Fund]): Unit = {
+    def onEditFunds(state: State, edit0: Option[Savings.Fund]): Unit = {
+      val edit = edit0.orElse(Option(assetsTable.getSelectionModel.getSelectedItem).map { asset =>
+        state.savings.getFund(asset.fundId)
+      })
       val dialog = EditFundsController.buildDialog(state.savings, edit)
       dialog.initModality(Modality.WINDOW_MODAL)
       dialog.initOwner(state.window)
