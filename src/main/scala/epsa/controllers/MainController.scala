@@ -23,11 +23,9 @@ import suiryc.scala.javafx.stage.Stages
 import suiryc.scala.javafx.util.Callback._
 import suiryc.scala.settings.Preference
 
-// TODO - add "Edit schemes"/"Edit funds" menu items
 // TODO - add mouse context menu over scheme/fund cell in assets table to edit the scheme/fund
 // TODO - remove schemes/funds list view in main window
-// TODO - remove add/edit scheme/fund buttons in main window
-// TODO - move other buttons into menu items
+// TODO - remove edit scheme/fund buttons in main window
 // TODO - change menu for OS integration ? (e.g. Ubuntu)
 // TODO - persist main window size/position; restart at last size/position
 // TODO - persist table view columns positions/width
@@ -116,22 +114,22 @@ class MainController {
     actor ! OnExit
   }
 
-  def onOptions(event: ActionEvent): Unit = {
-    actor ! OnOptions
+  def onEditSchemes(event: ActionEvent): Unit = {
+    actor ! OnEditSchemes
   }
 
-  def onCreateScheme(event: ActionEvent): Unit = {
-    actor ! OnCreateScheme
+  def onEditFunds(event: ActionEvent): Unit = {
+    actor ! OnEditFunds
+  }
+
+  def onOptions(event: ActionEvent): Unit = {
+    actor ! OnOptions
   }
 
   def onEditScheme(event: ActionEvent): Unit = {
     Option(schemesField.getSelectionModel.getSelectedItem).foreach { scheme =>
       actor ! OnEditScheme(scheme)
     }
-  }
-
-  def onCreateFund(event: ActionEvent): Unit = {
-    actor ! OnCreateFund
   }
 
   def onEditFund(event: ActionEvent): Unit = {
@@ -161,11 +159,11 @@ class MainController {
 
     def receive(state: State): Receive = {
       case OnExit               => onExit(state)
+      case OnEditSchemes        => onEditSchemes(state, None)
+      case OnEditFunds          => onEditFunds(state, None)
       case OnOptions            => onOptions(state)
-      case OnCreateScheme       => onCreateScheme(state, None)
-      case OnEditScheme(scheme) => onCreateScheme(state, Some(scheme))
-      case OnCreateFund         => onCreateFund(state, None)
-      case OnEditFund(fund)     => onCreateFund(state, Some(fund))
+      case OnEditScheme(scheme) => onEditSchemes(state, Some(scheme))
+      case OnEditFund(fund)     => onEditFunds(state, Some(fund))
       case OnTest               => onTest(state)
       case OnFundGraph          => onFundGraph(state)
     }
@@ -198,6 +196,24 @@ class MainController {
       epsa.Main.shutdown(state.stage)
     }
 
+    def onEditSchemes(state: State, edit: Option[Savings.Scheme]): Unit = {
+      val dialog = EditSchemesController.buildDialog(state.savings, edit)
+      dialog.initModality(Modality.WINDOW_MODAL)
+      dialog.initOwner(state.window)
+      dialog.setResizable(true)
+      val events = dialog.showAndWait().orElse(Nil)
+      processEvents(state, events)
+    }
+
+    def onEditFunds(state: State, edit: Option[Savings.Fund]): Unit = {
+      val dialog = EditFundsController.buildDialog(state.savings, edit)
+      dialog.initModality(Modality.WINDOW_MODAL)
+      dialog.initOwner(state.window)
+      dialog.setResizable(true)
+      val events = dialog.showAndWait().orElse(Nil)
+      processEvents(state, events)
+    }
+
     def onOptions(state: State): Unit = {
       val dialog = OptionsController.buildDialog()
       dialog.initModality(Modality.WINDOW_MODAL)
@@ -208,24 +224,6 @@ class MainController {
         context.stop(self)
         MainController.build(state)
       }
-    }
-
-    def onCreateScheme(state: State, edit: Option[Savings.Scheme]): Unit = {
-      val dialog = EditSchemesController.buildDialog(state.savings, edit)
-      dialog.initModality(Modality.WINDOW_MODAL)
-      dialog.initOwner(state.window)
-      dialog.setResizable(true)
-      val events = dialog.showAndWait().orElse(Nil)
-      processEvents(state, events)
-    }
-
-    def onCreateFund(state: State, edit: Option[Savings.Fund]): Unit = {
-      val dialog = EditFundsController.buildDialog(state.savings, edit)
-      dialog.initModality(Modality.WINDOW_MODAL)
-      dialog.initOwner(state.window)
-      dialog.setResizable(true)
-      val events = dialog.showAndWait().orElse(Nil)
-      processEvents(state, events)
     }
 
     def onTest(state: State): Unit = {
@@ -299,13 +297,13 @@ object MainController {
 
   case object OnExit
 
+  case object OnEditSchemes
+
+  case object OnEditFunds
+
   case object OnOptions
 
-  case object OnCreateScheme
-
   case class OnEditScheme(scheme: Savings.Scheme)
-
-  case object OnCreateFund
 
   case class OnEditFund(fund: Savings.Fund)
 

@@ -16,6 +16,12 @@
           </Menu>
           <Menu mnemonicParsing="false" text="%Edit">
                <items>
+                  <MenuItem mnemonicParsing="false" onAction="#onEditSchemes" text="%Edit schemes" />
+                  <MenuItem mnemonicParsing="false" onAction="#onEditFunds" text="%Edit funds" />
+                  <SeparatorMenuItem mnemonicParsing="false" />
+                  <MenuItem mnemonicParsing="false" onAction="#onTest" text="Test" />
+                  <MenuItem mnemonicParsing="false" onAction="#onFundGraph" text="%Fund graph" />
+                  <SeparatorMenuItem mnemonicParsing="false" />
                   <MenuItem mnemonicParsing="false" onAction="#onOptions" text="%Options" />
                </items></Menu>
         </menus>
@@ -24,12 +30,8 @@
          <children>
             <VBox alignment="CENTER" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="-Infinity" minWidth="-Infinity" spacing="15.0" HBox.hgrow="NEVER">
                <children>
-                  <Button mnemonicParsing="false" onAction="#onCreateScheme" text="%Add scheme" />
-                  <Button mnemonicParsing="false" onAction="#onCreateFund" text="%Add fund" />
                   <Button fx:id="editSchemeButton" mnemonicParsing="false" onAction="#onEditScheme" text="%Edit scheme" />
                   <Button fx:id="editFundButton" mnemonicParsing="false" onAction="#onEditFund" text="%Edit fund" />
-                  <Button mnemonicParsing="false" onAction="#onTest" text="Test" />
-                  <Button mnemonicParsing="false" onAction="#onFundGraph" text="%Fund graph" />
                </children>
                <padding>
                   <Insets bottom="15.0" left="15.0" right="15.0" top="15.0" />
