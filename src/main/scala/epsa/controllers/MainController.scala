@@ -15,7 +15,7 @@ import javafx.event.ActionEvent
 import javafx.fxml.{FXML, FXMLLoader}
 import javafx.scene.{Parent, Scene}
 import javafx.scene.control._
-import javafx.stage.{FileChooser, Modality, Stage, WindowEvent}
+import javafx.stage._
 import javafx.stage.FileChooser.ExtensionFilter
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.concurrent.JFXSystem
@@ -26,12 +26,14 @@ import suiryc.scala.settings.Preference
 
 // TODO - menu key shortcuts ?
 // TODO - change menu for OS integration ? (e.g. Ubuntu)
-// TODO - persist main window size/position; restart at last size/position
 // TODO - persist table view columns positions/width
 class MainController {
 
   import epsa.Main.prefs
   import MainController._
+  import Stages.StageLocation
+
+  private val stageLocation = Preference.from("stage.location", null:StageLocation)
 
   //@FXML
   //protected var location: URL = _
@@ -187,8 +189,14 @@ class MainController {
     }
 
     def onExit(state: State): Unit = {
+      // Persist stage location
+      // Note: if iconified, resets it
+      val stage = state.stage
+      stageLocation() = Stages.getLocation(stage).orNull
+
+      // Then shutdown
       context.stop(self)
-      epsa.Main.shutdown(state.stage)
+      epsa.Main.shutdown(stage)
     }
 
     def onEditSchemes(state: State, edit0: Option[Savings.Scheme]): Unit = {
@@ -338,6 +346,10 @@ object MainController {
     stage.setScene(new Scene(root))
     stage.show()
 
+    // Restore stage location
+    Option(controller.stageLocation()).foreach { loc =>
+      Stages.setLocation(stage, loc, setSize = true)
+    }
     Stages.trackMinimumDimensions(stage)
 
     if (needRestart) {
