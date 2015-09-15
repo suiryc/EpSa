@@ -6,7 +6,8 @@ import epsa.charts.ChartHandler
 import epsa.model.Savings
 import epsa.tools.EsaliaInvestmentFundProber
 import java.nio.file.Path
-import java.util.ResourceBundle
+import java.util.{ResourceBundle, UUID}
+import javafx.beans.binding.Bindings
 import javafx.beans.property.{SimpleObjectProperty, SimpleStringProperty}
 import javafx.collections.FXCollections
 import javafx.collections.transformation.SortedList
@@ -23,9 +24,7 @@ import suiryc.scala.javafx.stage.Stages
 import suiryc.scala.javafx.util.Callback._
 import suiryc.scala.settings.Preference
 
-// TODO - add mouse context menu over scheme/fund cell in assets table to edit the scheme/fund
-// TODO - remove schemes/funds list view in main window
-// TODO - remove edit scheme/fund buttons in main window
+// TODO - initially edit selected scheme/fund if any
 // TODO - change menu for OS integration ? (e.g. Ubuntu)
 // TODO - persist main window size/position; restart at last size/position
 // TODO - persist table view columns positions/width
@@ -39,18 +38,6 @@ class MainController {
 
   @FXML
   protected var resources: ResourceBundle = _
-
-  @FXML
-  protected var editSchemeButton: Button = _
-
-  @FXML
-  protected var schemesField: ListView[Savings.Scheme] = _
-
-  @FXML
-  protected var editFundButton: Button = _
-
-  @FXML
-  protected var fundsField: ListView[Savings.Fund] = _
 
   @FXML
   protected var assetsTable: TableView[Savings.Asset] = _
@@ -79,22 +66,6 @@ class MainController {
       s"epsa-main@${System.currentTimeMillis}"
     )
 
-    schemesField.setCellFactory { (lv: ListView[Savings.Scheme]) =>
-      new SchemeCell
-    }
-    editSchemeButton.setDisable(true)
-    schemesField.getSelectionModel.selectedItemProperty.listen {
-      editSchemeButton.setDisable(Option(schemesField.getSelectionModel.getSelectedItem).isEmpty)
-    }
-
-    fundsField.setCellFactory { (lv: ListView[Savings.Fund]) =>
-      new FundCell
-    }
-    editFundButton.setDisable(true)
-    fundsField.getSelectionModel.selectedItemProperty.listen {
-      editFundButton.setDisable(Option(fundsField.getSelectionModel.getSelectedItem).isEmpty)
-    }
-
     // Note: scheme and fund columns cell value factory relies on the current
     // Savings instance, and are thus defined/updated in the actor
     columnAmount.setCellValueFactory { (data: TableColumn.CellDataFeatures[Savings.Asset, BigDecimal]) =>
@@ -108,6 +79,12 @@ class MainController {
     }
 
     assetsTable.getColumns.addAll(columnScheme, columnFund, columnAmount, columnUnits)
+    // Note: Asset gives scheme/fund UUID. Since State is immutable (and is
+    // changed when applying events in controller) we must delegate scheme/fund
+    // lookup to the controller.
+    assetsTable.setRowFactory { (tv: TableView[Savings.Asset]) =>
+      newAssetRow()
+    }
   }
 
   def onExit(event: ActionEvent): Unit = {
@@ -126,24 +103,45 @@ class MainController {
     actor ! OnOptions
   }
 
-  def onEditScheme(event: ActionEvent): Unit = {
-    Option(schemesField.getSelectionModel.getSelectedItem).foreach { scheme =>
-      actor ! OnEditScheme(scheme)
-    }
-  }
-
-  def onEditFund(event: ActionEvent): Unit = {
-    Option(fundsField.getSelectionModel.getSelectedItem).foreach { fund =>
-      actor ! OnEditFund(fund)
-    }
-  }
-
   def onTest(event: ActionEvent): Unit = {
     actor ! OnTest
   }
 
   def onFundGraph(event: ActionEvent): Unit = {
     actor ! OnFundGraph
+  }
+
+  /**
+   * Creates a new Asset table view row.
+   *
+   * Binds menu context to edit asset scheme/fund.
+   */
+  private def newAssetRow(): TableRow[Savings.Asset] = {
+    val row = new TableRow[Savings.Asset]()
+
+    // See: https://www.marshall.edu/genomicjava/2013/12/30/javafx-tableviews-with-contextmenus/
+    val menu = new ContextMenu()
+    val editScheme = new MenuItem(resources.getString("Edit scheme"))
+    editScheme.setOnAction { (event: ActionEvent) =>
+      Option(row.getItem).foreach { asset =>
+        actor ! OnEditScheme(asset.schemeId)
+      }
+    }
+    val editFund = new MenuItem(resources.getString("Edit fund"))
+    editFund.setOnAction { (event: ActionEvent) =>
+      Option(row.getItem).foreach { asset =>
+        actor ! OnEditFund(asset.fundId)
+      }
+    }
+    menu.getItems.addAll(editScheme, editFund)
+
+    row.contextMenuProperty().bind {
+      Bindings.when(Bindings.isNotNull(row.itemProperty))
+        .`then`(menu)
+        .otherwise(null:ContextMenu)
+    }
+
+    row
   }
 
   object ControllerActor {
@@ -158,14 +156,14 @@ class MainController {
     override def receive: Receive = receive(state0)
 
     def receive(state: State): Receive = {
-      case OnExit               => onExit(state)
-      case OnEditSchemes        => onEditSchemes(state, None)
-      case OnEditFunds          => onEditFunds(state, None)
-      case OnOptions            => onOptions(state)
-      case OnEditScheme(scheme) => onEditSchemes(state, Some(scheme))
-      case OnEditFund(fund)     => onEditFunds(state, Some(fund))
-      case OnTest               => onTest(state)
-      case OnFundGraph          => onFundGraph(state)
+      case OnExit           => onExit(state)
+      case OnEditSchemes    => onEditSchemes(state, None)
+      case OnEditScheme(id) => onEditSchemes(state, Some(state.savings.getScheme(id)))
+      case OnEditFunds      => onEditFunds(state, None)
+      case OnEditFund(id)   => onEditFunds(state, Some(state.savings.getFund(id)))
+      case OnOptions        => onOptions(state)
+      case OnTest           => onTest(state)
+      case OnFundGraph      => onFundGraph(state)
     }
 
     def processEvents(state: State, events: List[Savings.Event]): Unit = {
@@ -181,9 +179,6 @@ class MainController {
       }
 
       import scala.collection.JavaConversions._
-      fundsField.setItems(FXCollections.observableList(newSavings.funds))
-      schemesField.setItems(FXCollections.observableList(newSavings.schemes))
-
       val sortedAssets = new SortedList(FXCollections.observableList(newSavings.assets))
       sortedAssets.comparatorProperty.bind(assetsTable.comparatorProperty)
       assetsTable.setItems(sortedAssets)
@@ -303,9 +298,9 @@ object MainController {
 
   case object OnOptions
 
-  case class OnEditScheme(scheme: Savings.Scheme)
+  case class OnEditScheme(schemeId: UUID)
 
-  case class OnEditFund(fund: Savings.Fund)
+  case class OnEditFund(fundId: UUID)
 
   case object OnTest
 
