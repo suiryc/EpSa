@@ -3,7 +3,6 @@ package epsa.controllers
 import epsa.I18N
 import epsa.model.Savings
 import java.util.ResourceBundle
-import javafx.beans.property.{Property, SimpleObjectProperty}
 import javafx.collections.FXCollections
 import javafx.event.{ActionEvent, Event}
 import javafx.fxml.{FXMLLoader, FXML}
@@ -50,8 +49,7 @@ class EditSchemesController {
 
   protected var savings: Savings = _
 
-  protected var events: Property[List[Savings.Event]] =
-    new SimpleObjectProperty(Nil)
+  protected var events: List[Savings.Event] = Nil
 
   protected var edit: Option[Savings.Scheme] = None
 
@@ -74,9 +72,6 @@ class EditSchemesController {
     buttonOk = dialog.getDialogPane.lookupButton(ButtonType.OK)
     // Disable OK button unless there are events to take into account
     buttonOk.setDisable(true)
-    events.listen { events =>
-      buttonOk.setDisable(events.isEmpty)
-    }
 
     // Initialize schemes list view
     schemesField.setCellFactory { (lv: ListView[Savings.Scheme]) =>
@@ -325,7 +320,8 @@ class EditSchemesController {
     edit = None
     resetEditFields()
     savings = Savings.processEvents(savings, newEvents:_*)
-    events.setValue(Savings.flattenEvents(savings0, events.getValue ++ newEvents))
+    events = Savings.flattenEvents(savings0, events ++ newEvents)
+    buttonOk.setDisable(events.isEmpty)
     updateSchemes()
     // Note: we may delete associated funds, so refresh the list view too.
     updateFunds()
@@ -486,7 +482,7 @@ object EditSchemesController {
 
   private def resultConverter(savings: Savings, edit: Option[Savings.Scheme], controller: EditSchemesController)(buttonType: ButtonType): List[Savings.Event] = {
     if (buttonType != ButtonType.OK) Nil
-    else controller.events.getValue
+    else controller.events
   }
 
 }
