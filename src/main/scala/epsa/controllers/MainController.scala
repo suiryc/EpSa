@@ -13,7 +13,7 @@ import javafx.collections.transformation.SortedList
 import javafx.event.ActionEvent
 import javafx.fxml.{FXML, FXMLLoader}
 import javafx.scene.{Parent, Scene}
-import javafx.scene.control.{Button, ListView, TableColumn, TableView}
+import javafx.scene.control._
 import javafx.stage.{FileChooser, Modality, Stage, WindowEvent}
 import javafx.stage.FileChooser.ExtensionFilter
 import suiryc.scala.javafx.beans.value.RichObservableValue._
@@ -222,7 +222,7 @@ class MainController {
       val reload = dialog.showAndWait().orElse(false)
       if (reload) {
         context.stop(self)
-        MainController.build(state)
+        MainController.build(state, needRestart = true)
       }
     }
 
@@ -311,10 +311,11 @@ object MainController {
 
   case object OnFundGraph
 
-  def build(state: State): Unit = {
+  def build(state: State, needRestart: Boolean = false): Unit = {
     val stage = state.stage
 
-    val loader = new FXMLLoader(getClass.getResource("/fxml/main.fxml"), I18N.getResources)
+    val resources = I18N.getResources
+    val loader = new FXMLLoader(getClass.getResource("/fxml/main.fxml"), resources)
     val root = loader.load[Parent]()
     val controller = loader.getController[MainController]
     controller.initialize(state)
@@ -337,6 +338,13 @@ object MainController {
     stage.show()
 
     Stages.trackMinimumDimensions(stage)
+
+    if (needRestart) {
+      val alert = new Alert(Alert.AlertType.INFORMATION)
+      alert.initOwner(state.window)
+      alert.setHeaderText(resources.getString("information.need-restart"))
+      alert.showAndWait()
+    }
   }
 
   private def onCloseRequest(controller: MainController)(event: WindowEvent): Unit =
