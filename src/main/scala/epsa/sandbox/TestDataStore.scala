@@ -2,11 +2,26 @@ package epsa.sandbox
 
 import epsa.model.Savings
 import epsa.storage.DataStore
-import scala.concurrent.Promise
+import javafx.application.Application
+import javafx.stage.Stage
+import scala.concurrent.{Await, Promise}
+import scala.concurrent.duration.Duration
 
 object TestDataStore {
 
   def main(args: Array[String]): Unit = {
+    (new TestDataStore).launch()
+  }
+
+}
+
+class TestDataStore extends Application {
+
+  def launch(): Unit = {
+    Application.launch()
+  }
+
+  override def start(stage: Stage) {
     import epsa.Main.Akka._
 
     val promise = Promise[Unit]()
@@ -15,6 +30,11 @@ object TestDataStore {
     }
 
     try {
+      if (DataStore.open(None, change = false).isEmpty) {
+        DataStore.open(None, change = true).foreach { r =>
+          Await.ready(r, Duration.Inf)
+        }
+      }
       DataStore.EventSource.readEvents().onComplete {
         case read =>
           println(s"EventSource.readEvents => $read")
