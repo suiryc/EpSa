@@ -24,7 +24,7 @@ import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.javafx.event.EventHandler._
 import suiryc.scala.javafx.scene.control.TableViews
 import suiryc.scala.javafx.stage.Stages
-import suiryc.scala.javafx.util.Callback._
+import suiryc.scala.javafx.util.Callback
 import suiryc.scala.settings.Preference
 
 // TODO - menu key shortcuts ?
@@ -104,36 +104,32 @@ class MainController {
     // updated after savings).
     val savingsProperty = new SimpleObjectProperty[Savings](state.savingsUpd)
     assetsTable.setUserData(savingsProperty)
-    columnScheme.setCellValueFactory { (data: TableColumn.CellDataFeatures[Savings.Asset, String]) =>
+    columnScheme.setCellValueFactory(Callback { data =>
       Bindings.createStringBinding(
         Callable(savingsProperty.get().findScheme(data.getValue.schemeId).map(_.name).orNull),
         savingsProperty
       )
-    }
-    columnFund.setCellValueFactory { (data: TableColumn.CellDataFeatures[Savings.Asset, String]) =>
+    })
+    columnFund.setCellValueFactory(Callback { data =>
       Bindings.createStringBinding(
         Callable(savingsProperty.get().findFund(data.getValue.fundId).map(_.name).orNull),
         savingsProperty
       )
-    }
-    columnAmount.setCellValueFactory { (data: TableColumn.CellDataFeatures[Savings.Asset, BigDecimal]) =>
+    })
+    columnAmount.setCellValueFactory(Callback { data =>
       new SimpleObjectProperty(data.getValue.amount)
-    }
-    columnAmount.setCellFactory { (column: TableColumn[Savings.Asset, BigDecimal]) =>
-      new AmountCell[Savings.Asset]
-    }
-    columnUnits.setCellValueFactory { (data: TableColumn.CellDataFeatures[Savings.Asset, BigDecimal]) =>
+    })
+    columnAmount.setCellFactory(Callback { new AmountCell[Savings.Asset] })
+    columnUnits.setCellValueFactory(Callback { data =>
       new SimpleObjectProperty(data.getValue.units)
-    }
+    })
 
     // Restore assets columns order and width
     TableViews.setColumnsView(assetsTable, assetsColumns, Option(assetsColumnsPref()))
     // Note: Asset gives scheme/fund UUID. Since State is immutable (and is
     // changed when applying events in controller) we must delegate scheme/fund
     // lookup to the controller.
-    assetsTable.setRowFactory { (tv: TableView[Savings.Asset]) =>
-      newAssetRow()
-    }
+    assetsTable.setRowFactory(Callback { newAssetRow() })
   }
 
   def onCloseRequest(event: WindowEvent): Unit = {

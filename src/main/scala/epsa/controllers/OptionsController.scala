@@ -6,7 +6,7 @@ import javafx.collections.FXCollections
 import javafx.fxml.{FXMLLoader, FXML}
 import javafx.scene.control.{ButtonType, ComboBox, Dialog, ListView}
 import suiryc.scala.javafx.stage.Stages
-import suiryc.scala.javafx.util.Callback._
+import suiryc.scala.javafx.util.Callback
 import suiryc.scala.settings.{SettingSnapshot, SettingsSnapshot}
 
 class OptionsController {
@@ -28,9 +28,7 @@ class OptionsController {
     // Note: we need to tell the combobox how to display both the 'button' area
     // (what is shown as selected) and the content (list of choices).
     languageChoice.setButtonCell(new I18NLocaleCell)
-    languageChoice.setCellFactory { (lv: ListView[I18N.I18NLocale]) =>
-      new I18NLocaleCell
-    }
+    languageChoice.setCellFactory(Callback { new I18NLocaleCell })
 
     import scala.collection.JavaConversions._
     val locales = I18N.locales.sortBy(_.displayName)
@@ -61,7 +59,7 @@ object OptionsController {
     val controller = loader.getController[OptionsController]
     controller.initialize(snapshot)
 
-    dialog.setResultConverter(resultConverter(snapshot, controller) _)
+    dialog.setResultConverter(Callback(resultConverter(snapshot, controller)))
     Stages.trackMinimumDimensions(Stages.getStage(dialog))
 
     dialog

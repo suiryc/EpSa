@@ -17,7 +17,7 @@ import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.event.EventHandler._
 import suiryc.scala.javafx.event.Events
 import suiryc.scala.javafx.stage.Stages
-import suiryc.scala.javafx.util.Callback._
+import suiryc.scala.javafx.util.Callback
 
 class EditFundsController {
 
@@ -74,9 +74,7 @@ class EditFundsController {
     buttonOk.setDisable(true)
 
     // Initialize funds list view
-    fundsField.setCellFactory { (lv: ListView[Savings.Fund]) =>
-      newFundCell(lv)
-    }
+    fundsField.setCellFactory(Callback { newFundCell _ })
     updateFunds()
     // Re-check form when selected scheme changes
     fundsField.getSelectionModel.selectedItemProperty.listen(checkForm())
@@ -85,9 +83,7 @@ class EditFundsController {
     nameField.textProperty.listen(checkForm())
 
     // Initialize schemes list view
-    schemesField.setCellFactory { (lv: ListView[Savings.Scheme]) =>
-      new SchemeCell
-    }
+    schemesField.setCellFactory(Callback { new SchemeCell })
     schemesField.getSelectionModel.setSelectionMode(SelectionMode.MULTIPLE)
     schemesField.setItems(FXCollections.observableList(savings.schemes))
     // Check selected schemes upon change, triggers form re-check if necessary
@@ -215,9 +211,7 @@ class EditFundsController {
       val label = root.lookup("#labelField").asInstanceOf[Label]
       label.setText(resources.getString("confirmation.delete-associated-schemes"))
       val resourcesField = root.lookup("#resourcesField").asInstanceOf[ListView[Savings.Scheme]]
-      resourcesField.setCellFactory { (lv: ListView[Savings.Scheme]) =>
-        new SchemeCell
-      }
+      resourcesField.setCellFactory(Callback { new SchemeCell })
       resourcesField.getSelectionModel.setSelectionMode(SelectionMode.MULTIPLE)
       resourcesField.setItems(FXCollections.observableList(schemes))
       resourcesField.getSelectionModel.selectAll()
@@ -482,7 +476,7 @@ object EditFundsController {
     val controller = loader.getController[EditFundsController]
     controller.initialize(savings, dialog, edit)
 
-    dialog.setResultConverter(resultConverter(savings, edit, controller) _)
+    dialog.setResultConverter(Callback(resultConverter(savings, edit, controller)))
     Stages.trackMinimumDimensions(Stages.getStage(dialog))
 
     dialog
