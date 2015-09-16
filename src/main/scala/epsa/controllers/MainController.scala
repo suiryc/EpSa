@@ -17,6 +17,7 @@ import javafx.scene.{Parent, Scene}
 import javafx.scene.control._
 import javafx.stage._
 import javafx.stage.FileChooser.ExtensionFilter
+import suiryc.scala.RichOption._
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.javafx.event.EventHandler._
@@ -35,7 +36,6 @@ import suiryc.scala.settings.Preference
 // TODO - load (and replay) events upon starting application
 // TODO - menu entry to select datastore location
 // TODO - menu entries with latest datastore locations ?
-// TODO - prevent leaving application if events are not yet saved
 // TODO - notify datastore saving issues
 class MainController {
 
@@ -218,17 +218,28 @@ class MainController {
     }
 
     def onExit(state: State): Unit = {
-      // Persist stage location
-      // Note: if iconified, resets it
-      val stage = state.stage
-      stageLocation() = Stages.getLocation(stage).orNull
+      val shutdown = if (state.eventsUpd.nonEmpty) {
+        // TODO - also propose saving before leaving ?
+        val alert = new Alert(Alert.AlertType.CONFIRMATION)
+        alert.initOwner(state.window)
+        alert.setHeaderText(resources.getString("confirmation.pending-changes"))
+        alert.showAndWait().contains(ButtonType.OK)
+      }
+      else true
 
-      // Persist assets table columns order and width
-      assetsColumnsPref() = TableViews.getColumnsView(assetsTable, assetsColumns)
+      if (shutdown) {
+        // Persist stage location
+        // Note: if iconified, resets it
+        val stage = state.stage
+        stageLocation() = Stages.getLocation(stage).orNull
 
-      // Then shutdown
-      context.stop(self)
-      epsa.Main.shutdown(stage)
+        // Persist assets table columns order and width
+        assetsColumnsPref() = TableViews.getColumnsView(assetsTable, assetsColumns)
+
+        // Then shutdown
+        context.stop(self)
+        epsa.Main.shutdown(stage)
+      }
     }
 
     def onEditSchemes(state: State, edit0: Option[Savings.Scheme]): Unit = {
