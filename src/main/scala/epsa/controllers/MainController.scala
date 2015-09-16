@@ -34,7 +34,6 @@ import suiryc.scala.settings.Preference
 // TODO - display asset gain/loss (amount/percentage) in assets table
 // TODO - display details next to assets table when selecting entry; display values history graph (or button for new window)
 // TODO - menu entry to save pending events to datastore
-// TODO - load (and replay) events upon starting application
 // TODO - menu entry to select datastore location
 // TODO - menu entries with latest datastore locations ?
 // TODO - notify datastore saving issues
