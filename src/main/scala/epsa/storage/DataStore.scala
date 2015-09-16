@@ -91,7 +91,7 @@ object DataStore {
    */
   protected def changePath(owner: Option[Window], newPath: Path): Future[Unit] =
     changePath(newPath).transform(identity, { ex =>
-      val msg = I18N.getResources.getString("Could not select data store") +
+      val msg = I18N.getResources.getString("Could not read data store") +
         s"\n$newPath"
       Dialogs.error(owner, None, Some(msg), ex)
       ex
