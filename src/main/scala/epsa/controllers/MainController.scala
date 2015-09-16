@@ -230,17 +230,10 @@ class MainController {
       else true
 
       if (shutdown) {
-        // Persist stage location
-        // Note: if iconified, resets it
-        val stage = state.stage
-        stageLocation() = Stages.getLocation(stage).orNull
+        persistView(state)
 
-        // Persist assets table columns order and width
-        assetsColumnsPref() = TableViews.getColumnsView(assetsTable, assetsColumns)
-
-        // Then shutdown
         context.stop(self)
-        epsa.Main.shutdown(stage)
+        epsa.Main.shutdown(state.stage)
       }
     }
 
@@ -275,6 +268,8 @@ class MainController {
       dialog.setResizable(true)
       val reload = dialog.showAndWait().orElse(false)
       if (reload) {
+        // Persist now to restore it when rebuilding the stage
+        persistView(state)
         context.stop(self)
         MainController.build(state, needRestart = true)
       }
@@ -337,6 +332,16 @@ class MainController {
 
         case None =>
       }
+    }
+
+    /** Persists view (stage location, ...). */
+    private def persistView(state: State): Unit = {
+      // Persist stage location
+      // Note: if iconified, resets it
+      stageLocation() = Stages.getLocation(state.stage).orNull
+
+      // Persist assets table columns order and width
+      assetsColumnsPref() = TableViews.getColumnsView(assetsTable, assetsColumns)
     }
 
   }
