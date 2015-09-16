@@ -182,16 +182,18 @@ class MainController {
     def receive(state: State): Receive = {
       case OnExit           => onExit(state)
       case OnEditSchemes    => onEditSchemes(state, None)
-      case OnEditScheme(id) => onEditSchemes(state, Some(state.savings.getScheme(id)))
+      case OnEditScheme(id) => onEditSchemes(state, Some(state.savingsUpd.getScheme(id)))
       case OnEditFunds      => onEditFunds(state, None)
-      case OnEditFund(id)   => onEditFunds(state, Some(state.savings.getFund(id)))
+      case OnEditFund(id)   => onEditFunds(state, Some(state.savingsUpd.getFund(id)))
       case OnOptions        => onOptions(state)
       case OnTest           => onTest(state)
       case OnFundGraph      => onFundGraph(state)
     }
 
     def processEvents(state: State, events: List[Savings.Event]): Unit = {
-      val newSavings = Savings.processEvents(state.savings, events)
+      val newEvents = state.eventsUpd ::: events
+      val newSavings = Savings.processEvents(state.savingsUpd, events)
+      val newState = state.copy(eventsUpd = newEvents, savingsUpd = newSavings)
 
       // We use the savings instance to get a scheme/fund name by id in the
       // assets table
@@ -207,7 +209,7 @@ class MainController {
       sortedAssets.comparatorProperty.bind(assetsTable.comparatorProperty)
       assetsTable.setItems(sortedAssets)
 
-      context.become(receive(state.copy(savings = newSavings)))
+      context.become(receive(newState))
     }
 
     def onExit(state: State): Unit = {
@@ -226,9 +228,9 @@ class MainController {
 
     def onEditSchemes(state: State, edit0: Option[Savings.Scheme]): Unit = {
       val edit = edit0.orElse(Option(assetsTable.getSelectionModel.getSelectedItem).map { asset =>
-        state.savings.getScheme(asset.schemeId)
+        state.savingsUpd.getScheme(asset.schemeId)
       })
-      val dialog = EditSchemesController.buildDialog(state.savings, edit)
+      val dialog = EditSchemesController.buildDialog(state.savingsUpd, edit)
       dialog.initModality(Modality.WINDOW_MODAL)
       dialog.initOwner(state.window)
       dialog.setResizable(true)
@@ -238,9 +240,9 @@ class MainController {
 
     def onEditFunds(state: State, edit0: Option[Savings.Fund]): Unit = {
       val edit = edit0.orElse(Option(assetsTable.getSelectionModel.getSelectedItem).map { asset =>
-        state.savings.getFund(asset.fundId)
+        state.savingsUpd.getFund(asset.fundId)
       })
-      val dialog = EditFundsController.buildDialog(state.savings, edit)
+      val dialog = EditFundsController.buildDialog(state.savingsUpd, edit)
       dialog.initModality(Modality.WINDOW_MODAL)
       dialog.initOwner(state.window)
       dialog.setResizable(true)
@@ -325,7 +327,7 @@ class MainController {
 
 object MainController {
 
-  case class State(stage: Stage, savings: Savings) {
+  case class State(stage: Stage, savingsInit: Savings, eventsUpd: List[Savings.Event], savingsUpd: Savings) {
     lazy val window = stage.getScene.getWindow
   }
 

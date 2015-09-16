@@ -45,7 +45,13 @@ class Main extends Application {
   override def start(stage: Stage) {
     I18N.loadLocale()
 
-    val state = MainController.State(stage, new Savings())
+    val savingsInit = new Savings()
+    val state = MainController.State(
+      stage = stage,
+      savingsInit = savingsInit,
+      eventsUpd = Nil,
+      savingsUpd = savingsInit
+    )
     stage.setTitle("EpSa")
     MainController.build(state)
   }
