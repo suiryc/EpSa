@@ -12,6 +12,7 @@ import scala.concurrent.Future
 import slick.driver.H2Driver.api._
 import slick.driver.H2Driver.backend.DatabaseDef
 import slick.jdbc.meta.MTable
+import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.javafx.scene.control.Dialogs
 import suiryc.scala.settings.Preference
 
@@ -64,7 +65,9 @@ object DataStore {
       fileChooser.setInitialFileName(defaultPath.toFile.getName)
 
       // TODO - prevent "Overwrite existing file" confirmation if file exists ?
-      val selectedFile = fileChooser.showSaveDialog(owner.orNull)
+      // Note: file chooser must operate within JavaFX thread
+      val selectedFile =
+        JFXSystem.await(fileChooser.showSaveDialog(owner.orNull), logReentrant = false)
       Option(selectedFile).map { file =>
         changePath(owner, file.toPath)
       }
