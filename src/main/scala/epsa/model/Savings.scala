@@ -98,23 +98,24 @@ object Savings extends Logging {
         if (newScheme.name == oldScheme.name) None
         else Some(Savings.UpdateScheme(newScheme.id, newScheme.name))
 
+      // Note: don't forget to ignore created/deleted funds (already taken care of)
       val oldFunds = oldScheme.funds.toSet
       val newFunds = newScheme.funds.toSet
-      val fundsAssociated = newFunds -- oldFunds
+      val fundsAssociated = (newFunds -- oldFunds) -- fundsCreated
       val fundsAssociatedOrdered = newScheme.funds.filter(fundsAssociated.contains)
-      val fundsDissociated = oldFunds -- newFunds
+      val fundsDissociated = (oldFunds -- newFunds) -- fundsDeleted
 
       event1.toList ++ fundsDissociated.toList.map { fundId =>
         Savings.DissociateFund(oldScheme.id, fundId)
       } ++ fundsAssociatedOrdered.map { fundId =>
         Savings.AssociateFund(oldScheme.id, fundId)
-      } ::: fundsRemainingOrdered.flatMap { newFund =>
-        val oldFund = savings.getFund(newFund.id)
-        if (newFund.name == oldFund.name) None
-        else Some(Savings.UpdateFund(newFund.id, newFund.name))
-        // Note: association/dissociation to old, new or remaining schemes have
-        // been taken care of already.
       }
+    } ::: fundsRemainingOrdered.flatMap { newFund =>
+      val oldFund = savings.getFund(newFund.id)
+      if (newFund.name == oldFund.name) None
+      else Some(Savings.UpdateFund(newFund.id, newFund.name))
+      // Note: association/dissociation to old, new or remaining schemes have
+      // been taken care of already.
     }
 
     // Ensure flattening is OK
