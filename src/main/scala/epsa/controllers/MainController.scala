@@ -37,6 +37,8 @@ import suiryc.scala.settings.Preference
 // TODO - menu entry to select datastore location
 // TODO - menu entries with latest datastore locations ?
 // TODO - notify datastore saving issues
+// TODO - menu entry and dialog to create a payment/transfer/refund event
+// TODO - menu entry and dialog to display/edit events history ?
 class MainController {
 
   import epsa.Main.prefs
