@@ -214,6 +214,7 @@ class MainController {
       import scala.collection.JavaConversions._
       val sortedAssets = new SortedList(FXCollections.observableList(newSavings.assets))
       sortedAssets.comparatorProperty.bind(assetsTable.comparatorProperty)
+      // TODO - how to make sure scheme/fund edits (e.g. name changed) are applied in table assets ?
       assetsTable.setItems(sortedAssets)
 
       context.become(receive(newState))
