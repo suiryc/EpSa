@@ -476,7 +476,7 @@ object EditFundsController {
     val controller = loader.getController[EditFundsController]
     controller.initialize(savings, dialog, edit)
 
-    dialog.setResultConverter(Callback(resultConverter(savings, edit, controller)))
+    dialog.setResultConverter(Callback { resultConverter(savings, edit, controller) _ })
     Stages.trackMinimumDimensions(Stages.getStage(dialog))
 
     dialog

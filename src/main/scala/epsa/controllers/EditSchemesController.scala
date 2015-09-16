@@ -470,7 +470,7 @@ object EditSchemesController {
     val controller = loader.getController[EditSchemesController]
     controller.initialize(savings, dialog, edit)
 
-    dialog.setResultConverter(Callback(resultConverter(savings, edit, controller)))
+    dialog.setResultConverter(Callback { resultConverter(savings, edit, controller) _ })
     Stages.trackMinimumDimensions(Stages.getStage(dialog))
 
     dialog

@@ -59,7 +59,7 @@ object OptionsController {
     val controller = loader.getController[OptionsController]
     controller.initialize(snapshot)
 
-    dialog.setResultConverter(Callback(resultConverter(snapshot, controller)))
+    dialog.setResultConverter(Callback { resultConverter(snapshot, controller) _ })
     Stages.trackMinimumDimensions(Stages.getStage(dialog))
 
     dialog
