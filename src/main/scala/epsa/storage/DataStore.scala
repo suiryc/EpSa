@@ -12,6 +12,7 @@ import scala.concurrent.Future
 import slick.driver.H2Driver.api._
 import slick.driver.H2Driver.backend.DatabaseDef
 import slick.jdbc.meta.MTable
+import suiryc.scala.javafx.scene.control.Dialogs
 import suiryc.scala.settings.Preference
 
 object DataStore {
@@ -50,7 +51,7 @@ object DataStore {
       case None    => throw new Exception(I18N.getResources.getString("No data store selected"))
     }
 
-  def open(owner: Window, change: Boolean): Option[Future[Unit]] = {
+  def open(owner: Option[Window], change: Boolean): Option[Future[Unit]] = {
     val resources = I18N.getResources
 
     if (change) {
@@ -63,13 +64,13 @@ object DataStore {
       fileChooser.setInitialFileName(defaultPath.toFile.getName)
 
       // TODO - prevent "Overwrite existing file" confirmation if file exists ?
-      val selectedFile = fileChooser.showSaveDialog(owner)
+      val selectedFile = fileChooser.showSaveDialog(owner.orNull)
       Option(selectedFile).map { file =>
-        changePath(file.toPath).map(_ => ())
+        changePath(owner, file.toPath)
       }
     }
     else if (Files.exists(defaultPath)) {
-      Some(changePath(defaultPath).map(_ => ()))
+      Some(changePath(owner, defaultPath))
     } else {
       None
     }
@@ -80,11 +81,29 @@ object DataStore {
     dbOpt = None
   }
 
-  protected def changePath(newPath: Path): Future[DB] = {
+  /**
+   * Changes db path.
+   *
+   * Upon failure, notifies user before returning result.
+   */
+  protected def changePath(owner: Option[Window], newPath: Path): Future[Unit] =
+    changePath(newPath).transform(identity, { ex =>
+      val msg = I18N.getResources.getString("Could not select data store") +
+        s"\n$newPath"
+      Dialogs.error(owner, None, Some(msg), ex)
+      ex
+    })
+
+  /**
+   * Changes db path.
+   *
+   * If not equal to previous path, closes db and opens new path.
+   */
+  protected def changePath(newPath: Path): Future[Unit] = {
     if (!dbOpt.map(_.path).exists(_.compareTo(newPath) == 0)) {
       try {
         close()
-        dbOpen(newPath)
+        dbOpen(newPath).map(_ => ())
       } catch {
         case ex: Throwable => Future.failed(ex)
       }
