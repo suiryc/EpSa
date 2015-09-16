@@ -31,7 +31,6 @@ import suiryc.scala.settings.Preference
 // TODO - display base and current (to date) amounts in assets table
 // TODO - display asset gain/loss (amount/percentage) in assets table
 // TODO - display details next to assets table when selecting entry; display values history graph (or button for new window)
-// TODO - keep events to persist in datastore until saved
 // TODO - menu entry to save pending events to datastore
 // TODO - load (and replay) events upon starting application
 // TODO - menu entry to select datastore location
@@ -109,6 +108,12 @@ class MainController {
     assetsTable.setRowFactory { (tv: TableView[Savings.Asset]) =>
       newAssetRow()
     }
+  }
+
+  def onCloseRequest(event: WindowEvent): Unit = {
+    actor ! OnExit
+    // Note: consume the event, the actor is responsible for shutting down
+    event.consume()
   }
 
   def onExit(event: ActionEvent): Unit = {
@@ -362,14 +367,9 @@ object MainController {
     AnchorPane.setBottomAnchor(root, 0)
     AnchorPane.setLeftAnchor(root, 0)*/
 
-    Option(stage.getScene) match {
-      case Some(scene) =>
-        stage.hide()
-
-      case None =>
-        stage.setOnCloseRequest(onCloseRequest(controller) _)
-    }
-
+    if (Option(stage.getScene).isDefined) stage.hide()
+    // Delegate closing request to controller
+    stage.setOnCloseRequest(controller.onCloseRequest _)
     stage.setScene(new Scene(root))
     stage.show()
 
@@ -386,9 +386,5 @@ object MainController {
       alert.showAndWait()
     }
   }
-
-  private def onCloseRequest(controller: MainController)(event: WindowEvent): Unit =
-    // Delegate closing request to controller
-    controller.onExit(new ActionEvent())
 
 }

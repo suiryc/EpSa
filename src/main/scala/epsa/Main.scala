@@ -4,9 +4,8 @@ import akka.actor.ActorSystem
 import epsa.controllers.MainController
 import epsa.model.Savings
 import java.util.prefs.Preferences
-import javafx.event.ActionEvent
 import javafx.application.{Application, Platform}
-import javafx.stage.{Stage, WindowEvent}
+import javafx.stage.Stage
 
 object Main {
 
@@ -55,9 +54,5 @@ class Main extends Application {
     stage.setTitle("EpSa")
     MainController.build(state)
   }
-
-  private def onCloseRequest(controller: MainController)(event: WindowEvent): Unit =
-    // Delegate closing request to controller
-    controller.onExit(new ActionEvent())
 
 }
