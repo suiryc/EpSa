@@ -1,10 +1,11 @@
 package epsa.model
 
+import grizzled.slf4j.Logging
 import java.time.LocalDate
 import java.util.UUID
 import spray.json._
 
-object Savings {
+object Savings extends Logging {
 
   def processActions(savings: Savings, actions: (Savings => Savings.Event)*): Savings =
     actions.foldLeft(savings) { (savings, action) =>
@@ -67,7 +68,7 @@ object Savings {
     // 6. created funds remaining associations
     // 7. remaining schemes updates
     // 8. remaining funds updates
-    schemesDeleted.toList.flatMap { schemeId =>
+    val flattenedEvents = schemesDeleted.toList.flatMap { schemeId =>
       savings.getScheme(schemeId).funds.map { fundId =>
         Savings.DissociateFund(schemeId, fundId)
       } :+ Savings.DeleteScheme(schemeId)
@@ -115,6 +116,14 @@ object Savings {
         // been taken care of already.
       }
     }
+
+    // Ensure flattening is OK
+    val flattenedSavings = processEvents(savings, flattenedEvents)
+    if (flattenedSavings != newSavings) {
+      warn(s"Events flattening failed: savings[$savings] events[$events] flattened[$flattenedEvents]")
+      events
+    }
+    else flattenedEvents
   }
 
   case class Scheme(id: UUID, name: String, funds: List[UUID])
