@@ -373,11 +373,17 @@ case class Savings(schemes: List[Savings.Scheme] = Nil, funds: List[Savings.Fund
   protected def removeAsset(asset: Asset): Savings =
     copy(assets = assets.filterNot(testAsset(_, asset)))
 
+  def findScheme(schemeId: UUID): Option[Scheme] =
+    schemes.find(_.id == schemeId)
+
   def getScheme(schemeId: UUID): Scheme =
-    schemes.find(_.id == schemeId).get
+    findScheme(schemeId).get
+
+  def findFund(fundId: UUID): Option[Fund] =
+    funds.find(_.id == fundId)
 
   def getFund(fundId: UUID): Fund =
-    funds.find(_.id == fundId).get
+    findFund(fundId).get
 
   def hasAsset(schemeId: UUID, fundId: UUID): Boolean =
     assets.exists { asset =>

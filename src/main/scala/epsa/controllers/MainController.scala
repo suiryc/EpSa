@@ -8,7 +8,7 @@ import epsa.tools.EsaliaInvestmentFundProber
 import java.nio.file.Path
 import java.util.{ResourceBundle, UUID}
 import javafx.beans.binding.Bindings
-import javafx.beans.property.{SimpleObjectProperty, SimpleStringProperty}
+import javafx.beans.property.SimpleObjectProperty
 import javafx.collections.FXCollections
 import javafx.collections.transformation.SortedList
 import javafx.event.ActionEvent
@@ -18,6 +18,7 @@ import javafx.scene.control._
 import javafx.stage._
 import javafx.stage.FileChooser.ExtensionFilter
 import suiryc.scala.RichOption._
+import suiryc.scala.concurrent.Callable
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.javafx.event.EventHandler._
@@ -91,7 +92,30 @@ class MainController {
     )
 
     // Note: scheme and fund columns cell value factory relies on the current
-    // Savings instance, and are thus defined/updated in the actor
+    // Savings instance. We could try to define those in the actor, but table
+    // view handling makes it difficult or impossible to ensure all updated
+    // values (e.g. changed scheme/fund name) are applied.
+    // Instead, have the savings a Property that triggers cell content updating
+    // when changed. Store it as the table user data since we don't use it for
+    // anything else while it needs to be shared between the controller and its
+    // actor.
+    // Note: handle unknown scheme/fund in updated Savings. It if happens,
+    // corresponding assets will disappear from the table right away (items
+    // updated after savings).
+    val savingsProperty = new SimpleObjectProperty[Savings](state.savingsUpd)
+    assetsTable.setUserData(savingsProperty)
+    columnScheme.setCellValueFactory { (data: TableColumn.CellDataFeatures[Savings.Asset, String]) =>
+      Bindings.createStringBinding(
+        Callable(savingsProperty.get().findScheme(data.getValue.schemeId).map(_.name).orNull),
+        savingsProperty
+      )
+    }
+    columnFund.setCellValueFactory { (data: TableColumn.CellDataFeatures[Savings.Asset, String]) =>
+      Bindings.createStringBinding(
+        Callable(savingsProperty.get().findFund(data.getValue.fundId).map(_.name).orNull),
+        savingsProperty
+      )
+    }
     columnAmount.setCellValueFactory { (data: TableColumn.CellDataFeatures[Savings.Asset, BigDecimal]) =>
       new SimpleObjectProperty(data.getValue.amount)
     }
@@ -202,19 +226,13 @@ class MainController {
       val newSavings = Savings.processEvents(state.savingsUpd, events)
       val newState = state.copy(eventsUpd = newEvents, savingsUpd = newSavings)
 
-      // We use the savings instance to get a scheme/fund name by id in the
-      // assets table
-      columnScheme.setCellValueFactory { (data: TableColumn.CellDataFeatures[Savings.Asset, String]) =>
-        new SimpleStringProperty(newSavings.getScheme(data.getValue.schemeId).name)
-      }
-      columnFund.setCellValueFactory { (data: TableColumn.CellDataFeatures[Savings.Asset, String]) =>
-        new SimpleStringProperty(newSavings.getFund(data.getValue.fundId).name)
-      }
-
+      // First update savings associated to assets table: takes care of
+      // schemes/funds updated names if any.
+      assetsTable.getUserData.asInstanceOf[SimpleObjectProperty[Savings]].set(newSavings)
+      // Then update table content: takes care of added/removed entries
       import scala.collection.JavaConversions._
       val sortedAssets = new SortedList(FXCollections.observableList(newSavings.assets))
       sortedAssets.comparatorProperty.bind(assetsTable.comparatorProperty)
-      // TODO - how to make sure scheme/fund edits (e.g. name changed) are applied in table assets ?
       assetsTable.setItems(sortedAssets)
 
       context.become(receive(newState))
