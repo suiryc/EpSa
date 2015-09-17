@@ -13,7 +13,6 @@ import slick.driver.H2Driver.api._
 import slick.driver.H2Driver.backend.DatabaseDef
 import slick.jdbc.meta.MTable
 import suiryc.scala.javafx.concurrent.JFXSystem
-import suiryc.scala.javafx.scene.control.Dialogs
 import suiryc.scala.settings.Preference
 
 object DataStore {
@@ -26,7 +25,7 @@ object DataStore {
 
   protected val dbPathPref = Preference.from("datastore.path", null:Path)
 
-  protected val defaultPath = dbPathPref.option.getOrElse {
+  protected[epsa] val defaultPath = dbPathPref.option.getOrElse {
     val path = {
       // See: http://stackoverflow.com/a/12733172
       val appPath = Paths.get(getClass.getProtectionDomain.getCodeSource.getLocation.toURI)
@@ -69,11 +68,11 @@ object DataStore {
       val selectedFile =
         JFXSystem.await(fileChooser.showSaveDialog(owner.orNull), logReentrant = false)
       Option(selectedFile).map { file =>
-        changePath(owner, file.toPath)
+        changePath(file.toPath)
       }
     }
     else if (Files.exists(defaultPath)) {
-      Some(changePath(owner, defaultPath))
+      Some(changePath(defaultPath))
     } else {
       None
     }
@@ -83,19 +82,6 @@ object DataStore {
     dbOpt.foreach(_.db.close())
     dbOpt = None
   }
-
-  /**
-   * Changes db path.
-   *
-   * Upon failure, notifies user before returning result.
-   */
-  protected def changePath(owner: Option[Window], newPath: Path): Future[Unit] =
-    changePath(newPath).transform(identity, { ex =>
-      val msg = I18N.getResources.getString("Could not read data store") +
-        s"\n$newPath"
-      Dialogs.error(owner, None, Some(msg), ex)
-      ex
-    })
 
   /**
    * Changes db path.

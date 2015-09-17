@@ -5,6 +5,7 @@ import epsa.I18N
 import epsa.charts.ChartHandler
 import epsa.model.Savings
 import epsa.tools.EsaliaInvestmentFundProber
+import epsa.util.Awaits
 import java.nio.file.Path
 import java.util.{ResourceBundle, UUID}
 import javafx.beans.binding.Bindings
@@ -16,6 +17,7 @@ import javafx.fxml.{FXML, FXMLLoader}
 import javafx.scene.{Parent, Scene}
 import javafx.scene.control._
 import javafx.stage._
+import scala.util.Success
 import suiryc.scala.RichOption._
 import suiryc.scala.concurrent.Callable
 import suiryc.scala.javafx.beans.value.RichObservableValue._
@@ -32,10 +34,8 @@ import suiryc.scala.settings.Preference
 // TODO - display base and current (to date) amounts in assets table
 // TODO - display asset gain/loss (amount/percentage) in assets table
 // TODO - display details next to assets table when selecting entry; display values history graph (or button for new window)
-// TODO - menu entry to save pending events to datastore
 // TODO - menu entry to select datastore location
 // TODO - menu entries with latest datastore locations ?
-// TODO - notify datastore saving issues
 // TODO - menu entry and dialog to create a payment/transfer/refund event
 // TODO - menu entry and dialog to display/edit events history ?
 class MainController {
@@ -54,6 +54,9 @@ class MainController {
 
   @FXML
   protected var resources: ResourceBundle = _
+
+  @FXML
+  protected var fileSaveMenu: MenuItem = _
 
   @FXML
   protected var assetsTable: TableView[Savings.Asset] = _
@@ -136,6 +139,10 @@ class MainController {
     event.consume()
   }
 
+  def onFileSave(event: ActionEvent): Unit = {
+    actor ! OnFileSave
+  }
+
   def onExit(event: ActionEvent): Unit = {
     actor ! OnExit
   }
@@ -205,6 +212,7 @@ class MainController {
     override def receive: Receive = receive(state0)
 
     def receive(state: State): Receive = {
+      case OnFileSave       => onFileSave(state)
       case OnExit           => onExit(state)
       case OnEditSchemes    => onEditSchemes(state, None)
       case OnEditScheme(id) => onEditSchemes(state, Some(state.savingsUpd.getScheme(id)))
@@ -229,7 +237,38 @@ class MainController {
       sortedAssets.comparatorProperty.bind(assetsTable.comparatorProperty)
       assetsTable.setItems(sortedAssets)
 
+      fileSaveMenu.setDisable(newState.eventsUpd.isEmpty)
+
       context.become(receive(newState))
+    }
+
+    def onFileSave(state: State): Unit = {
+      // Note: make sure to not both lock JavaFX (e.g. waiting for a Future) and
+      // try to use it (e.g. Dialog to show upon issue).
+      // For simplicity, we waits for result and display issue after receiving
+      // it.
+
+      def save() =
+        Awaits.writeDataStoreEvents(Some(state.window), state.eventsUpd).isSuccess
+
+      val saved = if (!state.dbOpened) {
+        // Data store not opened yet: open then save
+        Awaits.openDataStore(Some(state.window), change = true) match {
+          case Some(Success(_)) => save()
+          case _                => false
+        }
+      } else save()
+
+      if (saved) {
+        // Update state
+        val newState = state.copy(savingsInit = state.savingsUpd, eventsUpd = Nil, dbOpened = true)
+
+        fileSaveMenu.setDisable(true)
+
+        context.become(receive(newState))
+      }
+      // else: either it was cancelled by user, or it failed (and user was
+      // notified).
     }
 
     def onExit(state: State): Unit = {
@@ -361,9 +400,17 @@ class MainController {
 
 object MainController {
 
-  case class State(stage: Stage, savingsInit: Savings, eventsUpd: List[Savings.Event], savingsUpd: Savings) {
+  case class State(
+    stage: Stage,
+    savingsInit: Savings = Savings(),
+    eventsUpd: List[Savings.Event] = Nil,
+    savingsUpd: Savings = Savings(),
+    dbOpened: Boolean = false
+  ) {
     lazy val window = stage.getScene.getWindow
   }
+
+  case object OnFileSave
 
   case object OnExit
 

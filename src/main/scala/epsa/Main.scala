@@ -3,14 +3,11 @@ package epsa
 import akka.actor.ActorSystem
 import epsa.controllers.MainController
 import epsa.model.Savings
-import epsa.storage.DataStore
+import epsa.util.Awaits
 import java.util.prefs.Preferences
 import javafx.application.{Application, Platform}
 import javafx.stage.Stage
-import scala.util.Failure
 import scala.util.Success
-import suiryc.scala.javafx.concurrent.JFXExecutor
-import suiryc.scala.javafx.scene.control.Dialogs
 
 object Main {
 
@@ -49,13 +46,13 @@ class Main extends Application {
   override def start(stage: Stage) {
     I18N.loadLocale()
 
-    def startController(events: Seq[Savings.Event] = Nil): Unit = {
+    def startController(dbOpened: Boolean, events: Seq[Savings.Event] = Nil): Unit = {
       val savingsInit = Savings.processEvents(new Savings(), events:_*)
       val state = MainController.State(
         stage = stage,
         savingsInit = savingsInit,
-        eventsUpd = Nil,
-        savingsUpd = savingsInit
+        savingsUpd = savingsInit,
+        dbOpened = dbOpened
       )
       stage.setTitle("EpSa")
       MainController.build(state)
@@ -63,33 +60,22 @@ class Main extends Application {
 
     // Note: if stage has no Scene, have it owns a Dialog fails.
     // In any case, we have yet to build and show the stage.
-    DataStore.open(None, change = false) match {
-      case Some(r) =>
-        // Note: startController must be executed within JavaFX thread
-        import JFXExecutor.executor
+    Awaits.openDataStore(None, change = false) match {
+      case Some(Success(_)) =>
+        // Data store opening succeeded: read events to replay
+        Awaits.readDataStoreEvents(None) match  {
+          case Success(events) =>
+            // Apply read events for initial savings
+            startController(dbOpened = true, events)
 
-        r.onComplete {
-          case Success(_) =>
-            // Data store opening succeeded: read events to replay
-            DataStore.EventSource.readEvents().onComplete {
-              case Success(events) =>
-                // Apply read events for initial savings
-                startController(events)
-
-              case Failure(ex) =>
-                // Failed to read events: warn user
-                Dialogs.error(None, None, Some(I18N.getResources.getString("Could not read data store")), ex)
-                startController()
-            }
-
-          case Failure(ex) =>
-            // Failed to open data store. User was warned. Start anew.
-            startController()
+          case _ =>
+            // Failed to read events. User was warned.
+            startController(dbOpened = true)
         }
 
-      case None =>
-        // No default data store
-        startController()
+      case _ =>
+        // Either there was an issue (notified to user) or no default data store
+        startController(dbOpened = false)
     }
   }
 
