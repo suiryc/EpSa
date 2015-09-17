@@ -110,6 +110,8 @@ object I18N extends Logging {
     loadLocale()
   }
 
+  // Note: if key is missing in bundle, it is searched in parent (if any).
+  // Exception is thrown if it is missing in whole chain.
   def getResources: ResourceBundle =
     ResourceBundle.getBundle("i18n.epsa", Locale.getDefault, UTF8Control)
 

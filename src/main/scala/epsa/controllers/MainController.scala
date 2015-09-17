@@ -26,7 +26,6 @@ import suiryc.scala.javafx.stage.Stages
 import suiryc.scala.javafx.util.Callback
 import suiryc.scala.settings.Preference
 
-// TODO - have I18N resource fall back to default language value, or key (log issue)
 // TODO - menu key shortcuts ?
 // TODO - change menu for OS integration ? (e.g. Ubuntu)
 // TODO - save fund value history in datastore
