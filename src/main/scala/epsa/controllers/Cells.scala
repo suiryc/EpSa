@@ -1,8 +1,8 @@
 package epsa.controllers
 
-import epsa.I18N
 import epsa.model.Savings
 import javafx.scene.control.{ListCell, TableCell}
+import suiryc.scala.util.I18NLocale
 
 class FundCell
   extends ListCell[Savings.Fund]
@@ -29,10 +29,10 @@ class SchemeCell
 }
 
 class I18NLocaleCell
-  extends ListCell[I18N.I18NLocale]
+  extends ListCell[I18NLocale]
 {
 
-  override protected def updateItem(item: I18N.I18NLocale, empty: Boolean) {
+  override protected def updateItem(item: I18NLocale, empty: Boolean) {
     super.updateItem(item, empty)
     if (empty) setText(null)
     else setText(item.displayName)

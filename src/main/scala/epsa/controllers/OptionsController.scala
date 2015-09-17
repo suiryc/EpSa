@@ -4,10 +4,11 @@ import epsa.I18N
 import java.util.ResourceBundle
 import javafx.collections.FXCollections
 import javafx.fxml.{FXMLLoader, FXML}
-import javafx.scene.control.{ButtonType, ComboBox, Dialog, ListView}
+import javafx.scene.control.{ButtonType, ComboBox, Dialog}
 import suiryc.scala.javafx.stage.Stages
 import suiryc.scala.javafx.util.Callback
 import suiryc.scala.settings.{SettingSnapshot, SettingsSnapshot}
+import suiryc.scala.util.I18NLocale
 
 class OptionsController {
 
@@ -18,12 +19,12 @@ class OptionsController {
   protected var resources: ResourceBundle = _
 
   @FXML
-  protected var languageChoice: ComboBox[I18N.I18NLocale] = _
+  protected var languageChoice: ComboBox[I18NLocale] = _
 
   //def initialize(): Unit = { }
 
   def initialize(snapshot: SettingsSnapshot): Unit = {
-    snapshot.add(SettingSnapshot(I18N.localeCodePref))
+    snapshot.add(SettingSnapshot(I18N.pref))
 
     // Note: we need to tell the combobox how to display both the 'button' area
     // (what is shown as selected) and the content (list of choices).
@@ -33,7 +34,7 @@ class OptionsController {
     import scala.collection.JavaConversions._
     val locales = I18N.locales.sortBy(_.displayName)
     languageChoice.setItems(FXCollections.observableList(locales))
-    locales.find(_.code == I18N.localeCodePref()).foreach { locale =>
+    locales.find(_.code == I18N.pref()).foreach { locale =>
       languageChoice.getSelectionModel.select(locale)
     }
   }
@@ -72,7 +73,7 @@ object OptionsController {
     }
     else {
       Option(controller.languageChoice.getValue) match {
-        case Some(locale) if locale.code != I18N.localeCodePref() =>
+        case Some(locale) if locale.code != I18N.pref() =>
           I18N.setLocale(locale.code)
           true
 
