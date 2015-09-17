@@ -1,15 +1,17 @@
 package epsa
 
+import java.nio.file.Paths
+
 import grizzled.slf4j.Logging
-import java.io.{File, InputStream, InputStreamReader, IOException}
+import java.io.File
 import java.net.JarURLConnection
-import java.security.{AccessController, PrivilegedActionException, PrivilegedExceptionAction}
-import java.util.{Locale, PropertyResourceBundle, ResourceBundle}
+import java.util.{Locale, ResourceBundle}
 import java.util.zip.ZipFile
 import suiryc.scala.io.NameFilter._
 import suiryc.scala.io.PathFinder
 import suiryc.scala.io.PathFinder._
 import suiryc.scala.settings.Preference
+import suiryc.scala.util.UTF8Control
 
 object I18N extends Logging {
 
@@ -18,10 +20,22 @@ object I18N extends Logging {
 
   private[epsa] val localeCodePref = Preference.from("locale.code", "en")
 
-  /** I18N resources (relative) path. */
-  private val i18nPath = "i18n/"
-  /** I18N EpSa resource bundle name format. */
-  private val i18nEpsaFormat = "epsa_.*.properties"
+  private val baseName = "i18n.epsa"
+
+  private val resourceNameSuffix = "properties"
+
+  /** Resource bundle path and name prefix. */
+  val (resourcePath, resourceNamePrefix) = {
+    // Use resource 'Control' to translate base name into resource name
+    val fullName = UTF8Control.toResourceName(baseName, resourceNameSuffix)
+    // Then get base path and filename from it
+    val path = Paths.get(fullName)
+    val name = path.getFileName.toString
+    (s"${path.getParent}/", name.substring(0, name.length - (resourceNameSuffix.length + 1)))
+  }
+
+  /** Resource bundle name format (non-ROOT). */
+  private val resourceNameFormat = s"${resourceNamePrefix}_.*\\.$resourceNameSuffix"
 
   /** Gets 'language' from resource name. */
   private def getLanguage(name: String): String =
@@ -39,12 +53,12 @@ object I18N extends Logging {
    * Note: we could use a virtual file system framework (like common-vfs), but
    * we only search for file/entry names.
    */
-  private val languages: Set[String] = Option(getClass.getResource(s"/$i18nPath")).map { url =>
+  private val languages: Set[String] = Option(getClass.getResource(s"/$resourcePath")).map { url =>
     url.getProtocol match {
       case "file" =>
         // Standard directory
         val file = new File(url.toURI)
-        val finder: PathFinder = file * i18nEpsaFormat.r
+        val finder: PathFinder = file * resourceNameFormat.r
         finder.get().map(file => getLanguage(file.getName))
 
       case "jar" =>
@@ -57,9 +71,9 @@ object I18N extends Logging {
           // Search for entries
           zipFile.entries.flatMap { entry =>
             val entryName = entry.getName
-            if (entryName.startsWith(i18nPath)) {
-              val relativeName = entryName.substring(i18nPath.length)
-              if ((relativeName.indexOf('/') != -1) || !relativeName.matches(i18nEpsaFormat)) None
+            if (entryName.startsWith(resourcePath)) {
+              val relativeName = entryName.substring(resourcePath.length)
+              if ((relativeName.indexOf('/') != -1) || !relativeName.matches(resourceNameFormat)) None
               else Some(getLanguage(relativeName))
             } else None
           }.toSet
@@ -113,65 +127,8 @@ object I18N extends Logging {
   // Note: if key is missing in bundle, it is searched in parent (if any).
   // Exception is thrown if it is missing in whole chain.
   def getResources: ResourceBundle =
-    ResourceBundle.getBundle("i18n.epsa", Locale.getDefault, UTF8Control)
+    ResourceBundle.getBundle(baseName, Locale.getDefault, UTF8Control)
 
   case class I18NLocale(code: String, displayName: String, locale: Locale)
-
-}
-
-/**
- * UTF-8 resource bundle control.
- *
- * Resource bundle load files assuming ISO-8859-1 content.
- * To override this behaviour, one solution is to redefine the 'Control' class
- * used, for example by overriding the 'newBundle' function in order to use an
- * UTF-8 input stream reader.
- *
- * This is what this UTF8Control does, as seen in online answers. The code was
- * adapted with latest ResourceBundle.Control.newBundle code and translated to
- * scala.
- *
- * See: http://stackoverflow.com/a/4660195 (which refers to
- * http://jdevelopment.nl/internationalization-jsf-utf8-encoded-properties-files/)
- */
-object UTF8Control extends ResourceBundle.Control {
-
-  override def newBundle(baseName: String, locale: Locale, format: String, loader: ClassLoader, reload: Boolean): ResourceBundle = {
-    // Note: we only have to change the behaviour for 'java.properties' format
-    if (format == "java.properties") {
-      val  bundleName = toBundleName(baseName, locale)
-      // Changed: was toResourceName0 (private access)
-      Option(toResourceName(bundleName, "properties")).flatMap { resourceName =>
-        val stream = try {
-          AccessController.doPrivileged(new PrivilegedExceptionAction[InputStream]() {
-            def run: InputStream = {
-              if (reload) {
-                Option(loader.getResource(resourceName)).flatMap { url =>
-                  Option(url.openConnection).map { connection =>
-                    // Disable caches to get fresh data for reloading.
-                    connection.setUseCaches(false)
-                    connection.getInputStream
-                  }
-                }.orNull
-              } else {
-                loader.getResourceAsStream(resourceName)
-              }
-            }
-          })
-        } catch {
-          case e: PrivilegedActionException => throw e.getException.asInstanceOf[IOException]
-        }
-        Option(stream).map {stream =>
-          try {
-            // Changed: was new PropertyResourceBundle(stream)
-            // This is where we handle UTF-8 input
-            new PropertyResourceBundle(new InputStreamReader(stream, "UTF-8"))
-          } finally {
-            stream.close()
-          }
-        }
-      }.orNull
-    } else super.newBundle(baseName, locale, format, loader, reload)
-  }
 
 }
