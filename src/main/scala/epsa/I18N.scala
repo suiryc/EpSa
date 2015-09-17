@@ -140,7 +140,7 @@ object UTF8Control extends ResourceBundle.Control {
     // Note: we only have to change the behaviour for 'java.properties' format
     if (format == "java.properties") {
       val  bundleName = toBundleName(baseName, locale)
-      // Changed: was toResourceName0
+      // Changed: was toResourceName0 (private access)
       Option(toResourceName(bundleName, "properties")).flatMap { resourceName =>
         val stream = try {
           AccessController.doPrivileged(new PrivilegedExceptionAction[InputStream]() {
@@ -164,6 +164,7 @@ object UTF8Control extends ResourceBundle.Control {
         Option(stream).map {stream =>
           try {
             // Changed: was new PropertyResourceBundle(stream)
+            // This is where we handle UTF-8 input
             new PropertyResourceBundle(new InputStreamReader(stream, "UTF-8"))
           } finally {
             stream.close()
