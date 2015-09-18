@@ -20,8 +20,8 @@ object Awaits {
     r
   }
 
-  def openDataStore(owner: Option[Window], change: Boolean): Option[Try[Unit]] =
-    DataStore.open(owner, change).map { future =>
+  def openDataStore(owner: Option[Window], change: Boolean, save: Boolean): Option[Try[Unit]] =
+    DataStore.open(owner, change, save).map { future =>
       Awaits.orError(future, owner, {
         // Note: if changing, we don't know what path we tried to open, but
         // the user shall know. Otherwise remind the default path.

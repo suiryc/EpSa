@@ -60,7 +60,7 @@ class Main extends Application {
 
     // Note: if stage has no Scene, have it owns a Dialog fails.
     // In any case, we have yet to build and show the stage.
-    Awaits.openDataStore(None, change = false) match {
+    Awaits.openDataStore(None, change = false, save = false) match {
       case Some(Success(_)) =>
         // Data store opening succeeded: read events to replay
         Awaits.readDataStoreEvents(None) match  {

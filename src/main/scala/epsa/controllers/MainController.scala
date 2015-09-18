@@ -4,6 +4,7 @@ import akka.actor.{Actor, ActorRef, Props}
 import epsa.I18N
 import epsa.charts.ChartHandler
 import epsa.model.Savings
+import epsa.storage.DataStore
 import epsa.tools.EsaliaInvestmentFundProber
 import epsa.util.Awaits
 import java.nio.file.Path
@@ -31,10 +32,11 @@ import suiryc.scala.settings.Preference
 // TODO - menu key shortcuts ?
 // TODO - change menu for OS integration ? (e.g. Ubuntu)
 // TODO - save fund value history in datastore
+// TODO - display selected data store ? (name without extension in title bar ?)
+// TODO - visual hint for pending changes ? ('*' in title bar)
 // TODO - display base and current (to date) amounts in assets table
 // TODO - display asset gain/loss (amount/percentage) in assets table
 // TODO - display details next to assets table when selecting entry; display values history graph (or button for new window)
-// TODO - menu entry to select datastore location
 // TODO - menu entries with latest datastore locations ?
 // TODO - menu entry and dialog to create a payment/transfer/refund event
 // TODO - menu entry and dialog to display/edit events history ?
@@ -54,6 +56,9 @@ class MainController {
 
   @FXML
   protected var resources: ResourceBundle = _
+
+  @FXML
+  protected var fileCloseMenu: MenuItem = _
 
   @FXML
   protected var fileSaveMenu: MenuItem = _
@@ -139,6 +144,14 @@ class MainController {
     event.consume()
   }
 
+  def onFileOpen(event: ActionEvent): Unit = {
+    actor ! OnFileOpen
+  }
+
+  def onFileClose(event: ActionEvent): Unit = {
+    actor ! OnFileClose
+  }
+
   def onFileSave(event: ActionEvent): Unit = {
     actor ! OnFileSave
   }
@@ -206,12 +219,13 @@ class MainController {
 
   class ControllerActor(state0: State) extends Actor {
 
-    // Cheap trick to fill fields with Savings data
-    processEvents(state0, Nil)
+    applyState(state0)
 
     override def receive: Receive = receive(state0)
 
     def receive(state: State): Receive = {
+      case OnFileOpen       => onFileOpen(state)
+      case OnFileClose      => onFileClose(state)
       case OnFileSave       => onFileSave(state)
       case OnExit           => onExit(state)
       case OnEditSchemes    => onEditSchemes(state, None)
@@ -237,9 +251,22 @@ class MainController {
       sortedAssets.comparatorProperty.bind(assetsTable.comparatorProperty)
       assetsTable.setItems(sortedAssets)
 
+      fileCloseMenu.setDisable(!newState.dbOpened)
       fileSaveMenu.setDisable(newState.eventsUpd.isEmpty)
 
       context.become(receive(newState))
+    }
+
+    def onFileOpen(state: State): Unit = {
+      if (checkPendingChanges(state)) open(state)
+    }
+
+    def onFileClose(state: State): Unit = {
+      if (checkPendingChanges(state)) {
+        DataStore.close()
+        val newState = State(stage = state.stage)
+        applyState(newState)
+      }
     }
 
     def onFileSave(state: State): Unit = {
@@ -256,29 +283,7 @@ class MainController {
     }
 
     def onExit(state: State): Unit = {
-      val shutdown = if (state.eventsUpd.nonEmpty) {
-        // There are pending changes. Ask user for confirmation, allowing
-        // to save before leaving.
-        val buttonSaveType = new ButtonType(fileSaveMenu.getText, ButtonBar.ButtonData.OK_DONE)
-        val alert = new Alert(Alert.AlertType.CONFIRMATION, "",
-          ButtonType.OK, ButtonType.CANCEL, buttonSaveType)
-        alert.initOwner(state.window)
-        alert.setHeaderText(resources.getString("confirmation.pending-changes"))
-
-        // Filter action on "Save" button to trigger saving and check result:
-        // If saving failed (user was notified), consume event to get back to
-        // confirmation dialog.
-        val buttonSave = alert.getDialogPane.lookupButton(buttonSaveType)
-        buttonSave.addEventFilter(ActionEvent.ACTION, { (event: ActionEvent) =>
-          if (!save(state, Some(Stages.getStage(alert)))) event.consume()
-        })
-
-        val r = alert.showAndWait()
-        r.contains(ButtonType.OK) || r.contains(buttonSaveType)
-      }
-      else true
-
-      if (shutdown) {
+      if (checkPendingChanges(state)) {
         persistView(state)
 
         context.stop(self)
@@ -381,6 +386,11 @@ class MainController {
       }
     }
 
+    private def applyState(state: State): Unit = {
+      // Cheap trick to fill fields with Savings data
+      processEvents(state, Nil)
+    }
+
     /** Persists view (stage location, ...). */
     private def persistView(state: State): Unit = {
       // Persist stage location
@@ -389,6 +399,60 @@ class MainController {
 
       // Persist assets table columns order and width
       assetsColumnsPref() = TableViews.getColumnsView(assetsTable, assetsColumns)
+    }
+
+    /**
+     * Checks pending changes (before losing them).
+     *
+     * If changes are pending, ask for user confirmation, allowing to save them
+     * before continuing.
+     *
+     * @return whether we can continue (changes saved or can be lost)
+     */
+    private def checkPendingChanges(state: State): Boolean =
+      if (state.eventsUpd.nonEmpty) {
+        // There are pending changes. Ask user for confirmation, allowing
+        // to save before continuing.
+        val buttonSaveType = new ButtonType(fileSaveMenu.getText, ButtonBar.ButtonData.OK_DONE)
+        val alert = new Alert(Alert.AlertType.CONFIRMATION, "",
+          ButtonType.OK, ButtonType.CANCEL, buttonSaveType)
+        alert.initOwner(state.window)
+        alert.setHeaderText(resources.getString("confirmation.pending-changes"))
+
+        // Filter action on "Save" button to trigger saving and check result:
+        // If saving failed (user was notified), consume event to get back to
+        // confirmation dialog.
+        val buttonSave = alert.getDialogPane.lookupButton(buttonSaveType)
+        buttonSave.addEventFilter(ActionEvent.ACTION, { (event: ActionEvent) =>
+          if (!save(state, Some(Stages.getStage(alert)))) event.consume()
+        })
+
+        val r = alert.showAndWait()
+        r.contains(ButtonType.OK) || r.contains(buttonSaveType)
+      }
+      else true
+
+    private def open(state: State): Unit = {
+      val owner = Some(state.stage)
+
+      def read() = Awaits.readDataStoreEvents(owner) match {
+        case Success(events) =>
+          val savingsInit = Savings.processEvents(new Savings(), events:_*)
+          val newState = State(
+            stage = state.stage,
+            savingsInit = savingsInit,
+            savingsUpd = savingsInit,
+            dbOpened = true
+          )
+          applyState(newState)
+
+        case _ =>
+      }
+
+      Awaits.openDataStore(owner, change = true, save = false) match {
+        case Some(Success(_)) => read()
+        case _                =>
+      }
     }
 
     private def save(state: State, owner0: Option[Window] = None): Boolean = {
@@ -404,7 +468,7 @@ class MainController {
 
       if (!state.dbOpened) {
         // Data store not opened yet: open then save
-        Awaits.openDataStore(owner, change = true) match {
+        Awaits.openDataStore(owner, change = true, save = true) match {
           case Some(Success(_)) => save()
           case _                => false
         }
@@ -426,6 +490,10 @@ object MainController {
   ) {
     lazy val window = stage.getScene.getWindow
   }
+
+  case object OnFileOpen
+
+  case object OnFileClose
 
   case object OnFileSave
 

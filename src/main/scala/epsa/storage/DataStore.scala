@@ -51,7 +51,7 @@ object DataStore {
       case None    => throw new Exception(I18N.getResources.getString("No data store selected"))
     }
 
-  def open(owner: Option[Window], change: Boolean): Option[Future[Unit]] = {
+  def open(owner: Option[Window], change: Boolean, save: Boolean): Option[Future[Unit]] = {
     val resources = I18N.getResources
 
     if (change) {
@@ -63,10 +63,13 @@ object DataStore {
       fileChooser.setInitialDirectory(defaultPath.getParent.toFile)
       fileChooser.setInitialFileName(defaultPath.toFile.getName)
 
-      // TODO - prevent "Overwrite existing file" confirmation if file exists ?
       // Note: file chooser must operate within JavaFX thread
-      val selectedFile =
+      val selectedFile = if (save) {
+        // TODO - prevent "Overwrite existing file" confirmation if file exists ?
         JFXSystem.await(fileChooser.showSaveDialog(owner.orNull), logReentrant = false)
+      } else {
+        JFXSystem.await(fileChooser.showOpenDialog(owner.orNull), logReentrant = false)
+      }
       Option(selectedFile).map { file =>
         changePath(file.toPath)
       }

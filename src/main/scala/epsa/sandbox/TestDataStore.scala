@@ -30,8 +30,8 @@ class TestDataStore extends Application {
     }
 
     try {
-      if (DataStore.open(None, change = false).isEmpty) {
-        DataStore.open(None, change = true).foreach { r =>
+      if (DataStore.open(None, change = false, save = false).isEmpty) {
+        DataStore.open(None, change = true, save = true).foreach { r =>
           Await.ready(r, Duration.Inf)
         }
       }
