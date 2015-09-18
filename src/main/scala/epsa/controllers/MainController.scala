@@ -584,12 +584,6 @@ object MainController {
     val controller = loader.getController[MainController]
     controller.initialize(state)
 
-    /*pane.getChildren.setAll(root)
-    AnchorPane.setTopAnchor(root, 0)
-    AnchorPane.setRightAnchor(root, 0)
-    AnchorPane.setBottomAnchor(root, 0)
-    AnchorPane.setLeftAnchor(root, 0)*/
-
     if (Option(stage.getScene).isDefined) stage.hide()
     // Delegate closing request to controller
     stage.setOnCloseRequest(controller.onCloseRequest _)
