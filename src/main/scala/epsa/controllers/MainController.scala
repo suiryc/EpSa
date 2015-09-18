@@ -7,6 +7,7 @@ import epsa.model.Savings
 import epsa.storage.DataStore
 import epsa.tools.EsaliaInvestmentFundProber
 import epsa.util.Awaits
+import grizzled.slf4j.Logging
 import java.nio.file.Path
 import java.time.LocalDate
 import java.util.{ResourceBundle, UUID}
@@ -36,11 +37,10 @@ import suiryc.scala.settings.Preference
 // TODO - display base and current (to date) amounts in assets table
 // TODO - display asset gain/loss (amount/percentage) in assets table
 // TODO - display more details for selected asset (values history graph, ...)
-// TODO - use SplitPane to separate details and assets table; persist details width ?
 // TODO - menu entries with latest datastore locations ?
 // TODO - menu entry and dialog to create a payment/transfer/refund event
 // TODO - menu entry and dialog to display/edit events history ?
-class MainController {
+class MainController extends Logging {
 
   import epsa.Main.prefs
   import MainController._
@@ -48,6 +48,8 @@ class MainController {
   import Stages.StageLocation
 
   private val stageLocation = Preference.from("stage.main.location", null:StageLocation)
+
+  private val splitPaneDividerPosition = Preference.from("stage.main.splitPane.dividerPositions", null:String)
 
   private val assetsColumnsPref = Preference.from("stage.main.assets.columns", null:String)
 
@@ -62,6 +64,9 @@ class MainController {
 
   @FXML
   protected var fileSaveMenu: MenuItem = _
+
+  @FXML
+  protected var splitPane: SplitPane = _
 
   @FXML
   protected var schemeField: Label = _
@@ -179,6 +184,16 @@ class MainController {
       unitsField.setText(assetOpt.map { asset =>
         asset.units.toString()
       }.orNull)
+    }
+
+    // Restore SplitPane divider positions
+    Option(splitPaneDividerPosition()).foreach { dividerPositions =>
+      try {
+        val positions = dividerPositions.split(';').map(_.toDouble)
+        splitPane.setDividerPositions(positions: _*)
+      } catch {
+        case ex: Throwable => warn(s"Could not restore SplitPane divider positions[$dividerPositions]: ${ex.getMessage}")
+      }
     }
   }
 
@@ -451,6 +466,9 @@ class MainController {
 
       // Persist assets table columns order and width
       assetsColumnsPref() = TableViews.getColumnsView(assetsTable, assetsColumns)
+
+      // Persist SplitPane divider positions
+      splitPaneDividerPosition() = splitPane.getDividerPositions.mkString(";")
     }
 
     /**
