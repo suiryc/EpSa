@@ -1,5 +1,7 @@
 package epsa.controllers
 
+import epsa.I18N
+import java.time.LocalDate
 import javafx.css.PseudoClass
 import javafx.scene.Node
 import javafx.scene.control.Tooltip
@@ -50,6 +52,15 @@ object Form {
         // keep the installed tooltip if any).
         Tooltip.uninstall(node, null)
     }
+  }
+
+  def formatAvailability(availability: Option[LocalDate]): String = {
+    availability.map(_.toString).getOrElse(I18N.getResources.getString("available"))
+  }
+
+  def formatAmount(amount: BigDecimal): String = {
+    // TODO - currency as setting ?
+    s"$amount €"
   }
 
 }

@@ -1,5 +1,6 @@
 package epsa.controllers
 
+import epsa.I18N
 import epsa.model.Savings
 import java.time.LocalDate
 import javafx.scene.control.{ListCell, TableCell}
@@ -36,7 +37,7 @@ class AvailabilityCell[A]
   override protected def updateItem(item: Option[LocalDate], empty: Boolean) {
     super.updateItem(item, empty)
     if (empty) setText(null)
-    else setText(item.map(_.toString).getOrElse(""))
+    else setText(Form.formatAvailability(item))
   }
 
 }
@@ -47,9 +48,8 @@ class AmountCell[A]
 
   override protected def updateItem(item: BigDecimal, empty: Boolean) {
     super.updateItem(item, empty)
-    // TODO - currency as setting ?
     if (empty) setText(null)
-    else setText(s"$item €")
+    else setText(Form.formatAmount(item))
   }
 
 }

@@ -35,7 +35,8 @@ import suiryc.scala.settings.Preference
 // TODO - save fund value history in datastore
 // TODO - display base and current (to date) amounts in assets table
 // TODO - display asset gain/loss (amount/percentage) in assets table
-// TODO - display details next to assets table when selecting entry; display values history graph (or button for new window)
+// TODO - display more details for selected asset (values history graph, ...)
+// TODO - use SplitPane to separate details and assets table; persist details width ?
 // TODO - menu entries with latest datastore locations ?
 // TODO - menu entry and dialog to create a payment/transfer/refund event
 // TODO - menu entry and dialog to display/edit events history ?
@@ -61,6 +62,21 @@ class MainController {
 
   @FXML
   protected var fileSaveMenu: MenuItem = _
+
+  @FXML
+  protected var schemeField: Label = _
+
+  @FXML
+  protected var fundField: Label = _
+
+  @FXML
+  protected var availabilityField: Label = _
+
+  @FXML
+  protected var amountField: Label = _
+
+  @FXML
+  protected var unitsField: Label = _
 
   @FXML
   protected var assetsTable: TableView[Savings.Asset] = _
@@ -143,6 +159,27 @@ class MainController {
     // changed when applying events in controller) we must delegate scheme/fund
     // lookup to the controller.
     assetsTable.setRowFactory(Callback { newAssetRow() })
+
+    // Show details of selected asset
+    assetsTable.getSelectionModel.selectedItemProperty.listen { asset0 =>
+      val savings = getAssetsSavings.get()
+      val assetOpt = Option(asset0)
+      schemeField.setText(assetOpt.map { asset =>
+        savings.getScheme(asset.schemeId).name
+      }.orNull)
+      fundField.setText(assetOpt.map { asset =>
+        savings.getFund(asset.fundId).name
+      }.orNull)
+      availabilityField.setText(assetOpt.map { asset =>
+        Form.formatAvailability(asset.availability)
+      }.orNull)
+      amountField.setText(assetOpt.map { asset =>
+        Form.formatAmount(asset.amount)
+      }.orNull)
+      unitsField.setText(assetOpt.map { asset =>
+        asset.units.toString()
+      }.orNull)
+    }
   }
 
   def onCloseRequest(event: WindowEvent): Unit = {
@@ -185,6 +222,10 @@ class MainController {
 
   def onFundGraph(event: ActionEvent): Unit = {
     actor ! OnFundGraph
+  }
+
+  private def getAssetsSavings: SimpleObjectProperty[Savings] = {
+    assetsTable.getUserData.asInstanceOf[SimpleObjectProperty[Savings]]
   }
 
   /**
@@ -252,7 +293,7 @@ class MainController {
 
       // First update savings associated to assets table: takes care of
       // schemes/funds updated names if any.
-      assetsTable.getUserData.asInstanceOf[SimpleObjectProperty[Savings]].set(newSavings)
+      getAssetsSavings.set(newSavings)
       // Then update table content: takes care of added/removed entries
       import scala.collection.JavaConversions._
       val sortedAssets = new SortedList(FXCollections.observableList(newSavings.assets))
