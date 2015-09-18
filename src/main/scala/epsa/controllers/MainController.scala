@@ -8,6 +8,7 @@ import epsa.storage.DataStore
 import epsa.tools.EsaliaInvestmentFundProber
 import epsa.util.Awaits
 import java.nio.file.Path
+import java.time.LocalDate
 import java.util.{ResourceBundle, UUID}
 import javafx.beans.binding.Bindings
 import javafx.beans.property.SimpleObjectProperty
@@ -72,6 +73,9 @@ class MainController {
   lazy private val columnFund =
     new TableColumn[Savings.Asset, String](resources.getString("Fund"))
 
+  lazy private val columnAvailability =
+    new TableColumn[Savings.Asset, Option[LocalDate]](resources.getString("Availability"))
+
   lazy private val columnAmount =
     new TableColumn[Savings.Asset, BigDecimal](resources.getString("Amount"))
 
@@ -79,10 +83,11 @@ class MainController {
     new TableColumn[Savings.Asset, BigDecimal](resources.getString("Units"))
 
   lazy private val assetsColumns = List(
-    "scheme" -> columnScheme,
-    "fund" -> columnFund,
-    "amount" -> columnAmount,
-    "units" -> columnUnits
+    "scheme"       -> columnScheme,
+    "fund"         -> columnFund,
+    "availability" -> columnAvailability,
+    "amount"       -> columnAmount,
+    "units"        -> columnUnits
   )
 
   //def initialize(): Unit = { }
@@ -120,6 +125,10 @@ class MainController {
         savingsProperty
       )
     })
+    columnAvailability.setCellValueFactory(Callback { data =>
+      new SimpleObjectProperty(data.getValue.availability)
+    })
+    columnAvailability.setCellFactory(Callback { new AvailabilityCell[Savings.Asset] })
     columnAmount.setCellValueFactory(Callback { data =>
       new SimpleObjectProperty(data.getValue.amount)
     })
