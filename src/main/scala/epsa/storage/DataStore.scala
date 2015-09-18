@@ -35,9 +35,9 @@ object DataStore {
     path.resolve(s"default$dbExtension")
   }
 
-  protected case class DB(db: DatabaseDef, path: Path)
+  protected case class DBInfo(db: DatabaseDef, path: Path)
 
-  protected var dbOpt: Option[DB] = None
+  protected var dbInfoOpt: Option[DBInfo] = None
 
   /**
    * Gets the DB.
@@ -45,13 +45,13 @@ object DataStore {
    * Throws an exception if DB is not opened.
    * Caller is responsible to ensure DB has been opened beforehand.
    */
-  protected def getDB: DB =
-    dbOpt match {
+  protected def getDBInfo: DBInfo =
+    dbInfoOpt match {
       case Some(v) => v
       case None    => throw new Exception(I18N.getResources.getString("No data store selected"))
     }
 
-  def open(owner: Option[Window], change: Boolean, save: Boolean): Option[Future[Unit]] = {
+  def open(owner: Option[Window], change: Boolean, save: Boolean): Option[Future[String]] = {
     val resources = I18N.getResources
 
     if (change) {
@@ -82,8 +82,13 @@ object DataStore {
   }
 
   def close(): Unit = {
-    dbOpt.foreach(_.db.close())
-    dbOpt = None
+    dbInfoOpt.foreach(_.db.close())
+    dbInfoOpt = None
+  }
+
+  protected def getName(path: Path): String = {
+    val name0 = path.toFile.getName
+    name0.substring(0, name0.length - dbExtension.length)
   }
 
   /**
@@ -91,21 +96,19 @@ object DataStore {
    *
    * If not equal to previous path, closes db and opens new path.
    */
-  protected def changePath(newPath: Path): Future[Unit] = {
-    if (!dbOpt.map(_.path).exists(_.compareTo(newPath) == 0)) {
+  protected def changePath(newPath: Path): Future[String] =
+    if (!dbInfoOpt.map(_.path).exists(_.compareTo(newPath) == 0)) {
       try {
         close()
-        dbOpen(newPath).map(_ => ())
+        dbOpen(newPath).map(_ => getName(newPath))
       } catch {
         case ex: Throwable => Future.failed(ex)
       }
-    } else Future.successful(dbOpt.get)
-  }
+    } else Future.successful(getName(dbInfoOpt.get.path))
 
-  protected def dbOpen(path: Path): Future[DB] = {
+  protected def dbOpen(path: Path): Future[DBInfo] = {
     // Note: path contains extension, which is added by driver.
-    val name0 = path.toFile.getName
-    val name = name0.substring(0, name0.length - dbExtension.length)
+    val name = getName(path)
     val dbPath = path.getParent.resolve(name)
 
     // Open the new DB, and create missing tables
@@ -116,13 +119,13 @@ object DataStore {
       else refNew.run(EventSource.entries.schema.create)
     }.map { _ =>
       // Automatically keep in mind the new DB
-      val dbNew = DB(refNew, path)
-      dbOpt = Some(dbNew)
+      val dbInfoNew = DBInfo(refNew, path)
+      dbInfoOpt = Some(dbInfoNew)
 
       // Success, so save path
       dbPathPref() = path
 
-      dbNew
+      dbInfoNew
     }
   }
 
@@ -150,10 +153,10 @@ object DataStore {
     val entries = TableQuery[Entries]
 
     def readEvents(): Future[Seq[Savings.Event]] =
-      getDB.db.run(entries.sortBy(_.id).map(_.event).result)
+      getDBInfo.db.run(entries.sortBy(_.id).map(_.event).result)
 
     def writeEvents(events: Savings.Event*): Future[Unit] =
-      getDB.db.run {
+      getDBInfo.db.run {
         entries ++= events.map { event =>
           // Note: "auto increment" field value will be ignored
           (0L, event, Timestamp.from(Instant.now))

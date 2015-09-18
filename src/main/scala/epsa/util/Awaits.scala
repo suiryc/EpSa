@@ -20,7 +20,7 @@ object Awaits {
     r
   }
 
-  def openDataStore(owner: Option[Window], change: Boolean, save: Boolean): Option[Try[Unit]] =
+  def openDataStore(owner: Option[Window], change: Boolean, save: Boolean): Option[Try[String]] =
     DataStore.open(owner, change, save).map { future =>
       Awaits.orError(future, owner, {
         // Note: if changing, we don't know what path we tried to open, but

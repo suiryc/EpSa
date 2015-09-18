@@ -11,6 +11,8 @@ import scala.util.Success
 
 object Main {
 
+  val name = "EpSa"
+
   /** Settings. */
   implicit val prefs = Preferences.userRoot.node("suiryc.epsa").node("epsa")
 
@@ -46,7 +48,7 @@ class Main extends Application {
   override def start(stage: Stage) {
     I18N.loadLocale()
 
-    def startController(dbOpened: Boolean, events: Seq[Savings.Event] = Nil): Unit = {
+    def startController(dbOpened: Option[String], events: Seq[Savings.Event] = Nil): Unit = {
       val savingsInit = Savings.processEvents(new Savings(), events:_*)
       val state = MainController.State(
         stage = stage,
@@ -54,28 +56,28 @@ class Main extends Application {
         savingsUpd = savingsInit,
         dbOpened = dbOpened
       )
-      stage.setTitle("EpSa")
       MainController.build(state)
     }
 
     // Note: if stage has no Scene, have it owns a Dialog fails.
     // In any case, we have yet to build and show the stage.
     Awaits.openDataStore(None, change = false, save = false) match {
-      case Some(Success(_)) =>
+      case Some(Success(name)) =>
+        val dbOpened = Some(name)
         // Data store opening succeeded: read events to replay
         Awaits.readDataStoreEvents(None) match  {
           case Success(events) =>
             // Apply read events for initial savings
-            startController(dbOpened = true, events)
+            startController(dbOpened = dbOpened, events)
 
           case _ =>
             // Failed to read events. User was warned.
-            startController(dbOpened = true)
+            startController(dbOpened = dbOpened)
         }
 
       case _ =>
         // Either there was an issue (notified to user) or no default data store
-        startController(dbOpened = false)
+        startController(dbOpened = None)
     }
   }
 
