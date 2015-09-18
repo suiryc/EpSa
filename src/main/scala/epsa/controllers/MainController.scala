@@ -243,23 +243,7 @@ class MainController {
     }
 
     def onFileSave(state: State): Unit = {
-      // Note: make sure to not both lock JavaFX (e.g. waiting for a Future) and
-      // try to use it (e.g. Dialog to show upon issue).
-      // For simplicity, we waits for result and display issue after receiving
-      // it.
-
-      def save() =
-        Awaits.writeDataStoreEvents(Some(state.window), state.eventsUpd).isSuccess
-
-      val saved = if (!state.dbOpened) {
-        // Data store not opened yet: open then save
-        Awaits.openDataStore(Some(state.window), change = true) match {
-          case Some(Success(_)) => save()
-          case _                => false
-        }
-      } else save()
-
-      if (saved) {
+      if (save(state)) {
         // Update state
         val newState = state.copy(savingsInit = state.savingsUpd, eventsUpd = Nil, dbOpened = true)
 
@@ -273,11 +257,24 @@ class MainController {
 
     def onExit(state: State): Unit = {
       val shutdown = if (state.eventsUpd.nonEmpty) {
-        // TODO - also propose saving before leaving ?
-        val alert = new Alert(Alert.AlertType.CONFIRMATION)
+        // There are pending changes. Ask user for confirmation, allowing
+        // to save before leaving.
+        val buttonSaveType = new ButtonType(fileSaveMenu.getText, ButtonBar.ButtonData.OK_DONE)
+        val alert = new Alert(Alert.AlertType.CONFIRMATION, "",
+          ButtonType.OK, ButtonType.CANCEL, buttonSaveType)
         alert.initOwner(state.window)
         alert.setHeaderText(resources.getString("confirmation.pending-changes"))
-        alert.showAndWait().contains(ButtonType.OK)
+
+        // Filter action on "Save" button to trigger saving and check result:
+        // If saving failed (user was notified), consume event to get back to
+        // confirmation dialog.
+        val buttonSave = alert.getDialogPane.lookupButton(buttonSaveType)
+        buttonSave.addEventFilter(ActionEvent.ACTION, { (event: ActionEvent) =>
+          if (!save(state, Some(Stages.getStage(alert)))) event.consume()
+        })
+
+        val r = alert.showAndWait()
+        r.contains(ButtonType.OK) || r.contains(buttonSaveType)
       }
       else true
 
@@ -392,6 +389,26 @@ class MainController {
 
       // Persist assets table columns order and width
       assetsColumnsPref() = TableViews.getColumnsView(assetsTable, assetsColumns)
+    }
+
+    private def save(state: State, owner0: Option[Window] = None): Boolean = {
+      // Note: make sure to not both lock JavaFX (e.g. waiting for a Future) and
+      // try to use it (e.g. Dialog to show upon issue).
+      // For simplicity, we waits for result and display issue after receiving
+      // it.
+
+      val owner = owner0.orElse(Some(state.window))
+
+      def save() =
+        Awaits.writeDataStoreEvents(owner, state.eventsUpd).isSuccess
+
+      if (!state.dbOpened) {
+        // Data store not opened yet: open then save
+        Awaits.openDataStore(owner, change = true) match {
+          case Some(Success(_)) => save()
+          case _                => false
+        }
+      } else save()
     }
 
   }
