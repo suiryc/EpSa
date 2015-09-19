@@ -378,10 +378,7 @@ class MainController extends Logging {
       }
     }
 
-    def onEditSchemes(state: State, edit0: Option[Savings.Scheme]): Unit = {
-      val edit = edit0.orElse(Option(assetsTable.getSelectionModel.getSelectedItem).map { asset =>
-        state.savingsUpd.getScheme(asset.schemeId)
-      })
+    def onEditSchemes(state: State, edit: Option[Savings.Scheme]): Unit = {
       val dialog = EditSchemesController.buildDialog(state.savingsUpd, edit)
       dialog.initModality(Modality.WINDOW_MODAL)
       dialog.initOwner(state.window)
@@ -390,10 +387,7 @@ class MainController extends Logging {
       processEvents(state, events)
     }
 
-    def onEditFunds(state: State, edit0: Option[Savings.Fund]): Unit = {
-      val edit = edit0.orElse(Option(assetsTable.getSelectionModel.getSelectedItem).map { asset =>
-        state.savingsUpd.getFund(asset.fundId)
-      })
+    def onEditFunds(state: State, edit: Option[Savings.Fund]): Unit = {
       val dialog = EditFundsController.buildDialog(state.savingsUpd, edit)
       dialog.initModality(Modality.WINDOW_MODAL)
       dialog.initOwner(state.window)
