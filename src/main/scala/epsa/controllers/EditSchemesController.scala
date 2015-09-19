@@ -9,7 +9,7 @@ import javafx.fxml.{FXMLLoader, FXML}
 import javafx.scene.Node
 import javafx.scene.control._
 import javafx.scene.image.ImageView
-import javafx.scene.input.MouseEvent
+import javafx.scene.input.{KeyCode, KeyEvent, MouseEvent}
 import scala.collection.JavaConversions._
 import suiryc.scala.RichOption._
 import suiryc.scala.javafx.collections.RichObservableList._
@@ -19,6 +19,7 @@ import suiryc.scala.javafx.event.Events
 import suiryc.scala.javafx.stage.Stages
 import suiryc.scala.javafx.util.Callback
 
+// TODO - using keyboard arrows in schemes does not trigger selection
 class EditSchemesController {
 
   //@FXML
@@ -57,6 +58,10 @@ class EditSchemesController {
 
   protected lazy val window =
     nameField.getScene.getWindow
+
+  private var applyReady = false
+
+  private var deletionReady = false
 
   //def initialize(): Unit = { }
 
@@ -123,6 +128,21 @@ class EditSchemesController {
       }
     }
     buttonOk.addEventFilter(ActionEvent.ACTION, confirmationFilter _)
+
+    // 'Enter' applies pending scheme changes if any
+    dialog.getDialogPane.addEventFilter(KeyEvent.KEY_PRESSED, { (event: KeyEvent) =>
+      if ((event.getCode == KeyCode.ENTER) && applyReady) {
+        onApply(event)
+        event.consume()
+      }
+    })
+    // 'Delete' applies selected scheme deletion if possible
+    dialog.getDialogPane.addEventFilter(KeyEvent.KEY_PRESSED, { (event: KeyEvent) =>
+      if ((event.getCode == KeyCode.DELETE) && deletionReady) {
+        onRemove(event)
+        event.consume()
+      }
+    })
 
     // Initial form checking
     checkForm()
@@ -434,11 +454,13 @@ class EditSchemesController {
     // Minus field status: enable deletion if selected scheme can be deleted
     Option(schemesField.getSelectionModel.getSelectedItem) match {
       case None =>
-        Form.toggleImageButton(minusField, set = false)
+        deletionReady = false
+        Form.toggleImageButton(minusField, set = deletionReady)
 
       case Some(scheme) =>
-        if (canDeleteScheme(scheme)) Form.toggleImageButton(minusField, set = true)
-        else Form.toggleImageButton(minusField, set = false, Some(resources.getString("Scheme is not empty")))
+        deletionReady = canDeleteScheme(scheme)
+        if (deletionReady) Form.toggleImageButton(minusField, set = deletionReady)
+        else Form.toggleImageButton(minusField, set = deletionReady, Some(resources.getString("Scheme is not empty")))
     }
 
     // Plus field status: enable if adding new scheme which name is OK, or
@@ -449,7 +471,8 @@ class EditSchemesController {
     Form.toggleImageButton(plusField, addOk)
 
     // Tick field status: enable if name and edition are OK
-    Form.toggleImageButton(tickField, nameOk && editOk)
+    applyReady = nameOk && editOk
+    Form.toggleImageButton(tickField, applyReady)
   }
 
 }
