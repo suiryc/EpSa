@@ -242,11 +242,11 @@ class MainController extends Logging {
   }
 
   def onEditSchemes(event: ActionEvent): Unit = {
-    actor ! OnEditSchemes
+    actor ! OnEditSchemes(Option(assetsTable.getSelectionModel.getSelectedItem).map(_.schemeId))
   }
 
   def onEditFunds(event: ActionEvent): Unit = {
-    actor ! OnEditFunds
+    actor ! OnEditFunds(Option(assetsTable.getSelectionModel.getSelectedItem).map(_.fundId))
   }
 
   def onOptions(event: ActionEvent): Unit = {
@@ -278,13 +278,13 @@ class MainController extends Logging {
     val editScheme = new MenuItem(resources.getString("Edit scheme"))
     editScheme.setOnAction { (event: ActionEvent) =>
       Option(row.getItem).foreach { asset =>
-        actor ! OnEditScheme(asset.schemeId)
+        actor ! OnEditSchemes(Some(asset.schemeId))
       }
     }
     val editFund = new MenuItem(resources.getString("Edit fund"))
     editFund.setOnAction { (event: ActionEvent) =>
       Option(row.getItem).foreach { asset =>
-        actor ! OnEditFund(asset.fundId)
+        actor ! OnEditFunds(Some(asset.fundId))
       }
     }
     menu.getItems.addAll(editScheme, editFund)
@@ -309,17 +309,15 @@ class MainController extends Logging {
     override def receive: Receive = receive(state0)
 
     def receive(state: State): Receive = {
-      case OnFileOpen       => onFileOpen(state)
-      case OnFileClose      => onFileClose(state)
-      case OnFileSave       => onFileSave(state)
-      case OnExit           => onExit(state)
-      case OnEditSchemes    => onEditSchemes(state, None)
-      case OnEditScheme(id) => onEditSchemes(state, Some(state.savingsUpd.getScheme(id)))
-      case OnEditFunds      => onEditFunds(state, None)
-      case OnEditFund(id)   => onEditFunds(state, Some(state.savingsUpd.getFund(id)))
-      case OnOptions        => onOptions(state)
-      case OnTest           => onTest(state)
-      case OnFundGraph      => onFundGraph(state)
+      case OnFileOpen        => onFileOpen(state)
+      case OnFileClose       => onFileClose(state)
+      case OnFileSave        => onFileSave(state)
+      case OnExit            => onExit(state)
+      case OnEditSchemes(id) => onEditSchemes(state, id.map(state.savingsUpd.getScheme))
+      case OnEditFunds(id)   => onEditFunds(state, id.map(state.savingsUpd.getFund))
+      case OnOptions         => onOptions(state)
+      case OnTest            => onTest(state)
+      case OnFundGraph       => onFundGraph(state)
     }
 
     def processEvents(state: State, events: List[Savings.Event]): Unit = {
@@ -588,15 +586,11 @@ object MainController {
 
   case object OnExit
 
-  case object OnEditSchemes
+  case class OnEditSchemes(schemeId: Option[UUID])
 
-  case object OnEditFunds
+  case class OnEditFunds(fundId: Option[UUID])
 
   case object OnOptions
-
-  case class OnEditScheme(schemeId: UUID)
-
-  case class OnEditFund(fundId: UUID)
 
   case object OnTest
 
