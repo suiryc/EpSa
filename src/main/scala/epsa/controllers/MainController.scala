@@ -49,7 +49,7 @@ class MainController extends Logging {
 
   private val stageLocation = Preference.from("stage.main.location", null:StageLocation)
 
-  private val splitPaneDividerPosition = Preference.from("stage.main.splitPane.dividerPositions", null:String)
+  private val splitPaneDividerPositions = Preference.from("stage.main.splitPane.dividerPositions", null:String)
 
   private val assetsColumnsPref = Preference.from("stage.main.assets.columns", null:String)
 
@@ -158,8 +158,6 @@ class MainController extends Logging {
       new SimpleObjectProperty(data.getValue.units)
     })
 
-    // Restore assets columns order and width
-    TableViews.setColumnsView(assetsTable, assetsColumns, Option(assetsColumnsPref()))
     // Note: Asset gives scheme/fund UUID. Since State is immutable (and is
     // changed when applying events in controller) we must delegate scheme/fund
     // lookup to the controller.
@@ -185,9 +183,20 @@ class MainController extends Logging {
         asset.units.toString()
       }.orNull)
     }
+  }
+
+  /** Restores (persisted) view. */
+  private def restoreView(stage: Stage): Unit = {
+    // Restore stage location
+    Option(stageLocation()).foreach { loc =>
+      Stages.setLocation(stage, loc, setSize = true)
+    }
+
+    // Restore assets columns order and width
+    TableViews.setColumnsView(assetsTable, assetsColumns, Option(assetsColumnsPref()))
 
     // Restore SplitPane divider positions
-    Option(splitPaneDividerPosition()).foreach { dividerPositions =>
+    Option(splitPaneDividerPositions()).foreach { dividerPositions =>
       try {
         val positions = dividerPositions.split(';').map(_.toDouble)
         splitPane.setDividerPositions(positions: _*)
@@ -195,6 +204,19 @@ class MainController extends Logging {
         case ex: Throwable => warn(s"Could not restore SplitPane divider positions[$dividerPositions]: ${ex.getMessage}")
       }
     }
+  }
+
+  /** Persists view (stage location, ...). */
+  private def persistView(state: State): Unit = {
+    // Persist stage location
+    // Note: if iconified, resets it
+    stageLocation() = Stages.getLocation(state.stage).orNull
+
+    // Persist assets table columns order and width
+    assetsColumnsPref() = TableViews.getColumnsView(assetsTable, assetsColumns)
+
+    // Persist SplitPane divider positions
+    splitPaneDividerPositions() = splitPane.getDividerPositions.mkString(";")
   }
 
   def onCloseRequest(event: WindowEvent): Unit = {
@@ -458,19 +480,6 @@ class MainController extends Logging {
       processEvents(state, Nil)
     }
 
-    /** Persists view (stage location, ...). */
-    private def persistView(state: State): Unit = {
-      // Persist stage location
-      // Note: if iconified, resets it
-      stageLocation() = Stages.getLocation(state.stage).orNull
-
-      // Persist assets table columns order and width
-      assetsColumnsPref() = TableViews.getColumnsView(assetsTable, assetsColumns)
-
-      // Persist SplitPane divider positions
-      splitPaneDividerPosition() = splitPane.getDividerPositions.mkString(";")
-    }
-
     /**
      * Checks pending changes (before losing them).
      *
@@ -608,10 +617,12 @@ object MainController {
     stage.setScene(new Scene(root))
     stage.show()
 
-    // Restore stage location
-    Option(controller.stageLocation()).foreach { loc =>
-      Stages.setLocation(stage, loc, setSize = true)
-    }
+    // It is important to restore view after showing the stage, at least for
+    // some settings (which may slightly change or not be fully applied):
+    //   - stage position/size
+    //   - SplitPane dividers position
+    controller.restoreView(stage)
+
     Stages.trackMinimumDimensions(stage)
 
     if (needRestart) {
