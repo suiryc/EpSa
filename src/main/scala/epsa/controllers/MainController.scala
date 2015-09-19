@@ -40,6 +40,10 @@ import suiryc.scala.settings.Preference
 // TODO - menu entries with latest datastore locations ?
 // TODO - menu entry and dialog to create a payment/transfer/refund event
 // TODO - menu entry and dialog to display/edit events history ?
+// TODO - how to handle past availability dates ?
+//        -> when making transfer (or payment with immediate availability) on it, empty date for result ?
+//        -> update search/find/test functions to take into account asset action date ?
+//        -> must work when adding history events
 class MainController extends Logging {
 
   import epsa.Main.prefs
@@ -174,7 +178,7 @@ class MainController extends Logging {
         savings.getFund(asset.fundId).name
       }.orNull)
       availabilityField.setText(assetOpt.map { asset =>
-        Form.formatAvailability(asset.availability)
+        Form.formatAvailability(asset.availability, long = true)
       }.orNull)
       amountField.setText(assetOpt.map { asset =>
         Form.formatAmount(asset.amount)
@@ -249,6 +253,18 @@ class MainController extends Logging {
     actor ! OnEditFunds(Option(assetsTable.getSelectionModel.getSelectedItem).map(_.fundId))
   }
 
+  def onNewPayment(event: ActionEvent): Unit = {
+    actor ! OnNewAssetAction(AssetActionKind.Payment, Option(assetsTable.getSelectionModel.getSelectedItem))
+  }
+
+  def onNewTransfer(event: ActionEvent): Unit = {
+    actor ! OnNewAssetAction(AssetActionKind.Transfer, Option(assetsTable.getSelectionModel.getSelectedItem))
+  }
+
+  def onNewRefund(event: ActionEvent): Unit = {
+    actor ! OnNewAssetAction(AssetActionKind.Refund, Option(assetsTable.getSelectionModel.getSelectedItem))
+  }
+
   def onOptions(event: ActionEvent): Unit = {
     actor ! OnOptions
   }
@@ -287,7 +303,26 @@ class MainController extends Logging {
         actor ! OnEditFunds(Some(asset.fundId))
       }
     }
-    menu.getItems.addAll(editScheme, editFund)
+    val newPayment = new MenuItem(resources.getString("New payment"))
+    newPayment.setOnAction { (event: ActionEvent) =>
+      Option(row.getItem).foreach { asset =>
+        actor ! OnNewAssetAction(AssetActionKind.Payment, Some(asset))
+      }
+    }
+    val newArbitrage = new MenuItem(resources.getString("New transfer"))
+    newArbitrage.setOnAction { (event: ActionEvent) =>
+      Option(row.getItem).foreach { asset =>
+        actor ! OnNewAssetAction(AssetActionKind.Transfer, Some(asset))
+      }
+    }
+    val newRefund = new MenuItem(resources.getString("New refund"))
+    newRefund.setOnAction { (event: ActionEvent) =>
+      Option(row.getItem).foreach { asset =>
+        actor ! OnNewAssetAction(AssetActionKind.Refund, Some(asset))
+      }
+    }
+    menu.getItems.addAll(editScheme, editFund, new SeparatorMenuItem(),
+      newPayment, newArbitrage, newRefund)
 
     row.contextMenuProperty().bind {
       Bindings.when(Bindings.isNotNull(row.itemProperty))
@@ -315,6 +350,7 @@ class MainController extends Logging {
       case OnExit            => onExit(state)
       case OnEditSchemes(id) => onEditSchemes(state, id.map(state.savingsUpd.getScheme))
       case OnEditFunds(id)   => onEditFunds(state, id.map(state.savingsUpd.getFund))
+      case OnNewAssetAction(kind, asset) => onNewAssetAction(state, kind, asset)
       case OnOptions         => onOptions(state)
       case OnTest            => onTest(state)
       case OnFundGraph       => onFundGraph(state)
@@ -394,6 +430,15 @@ class MainController extends Logging {
       dialog.setResizable(true)
       val events = dialog.showAndWait().orElse(Nil)
       processEvents(state, events)
+    }
+
+    def onNewAssetAction(state: State, kind: AssetActionKind.Value, asset: Option[Savings.Asset]): Unit = {
+      val dialog = NewAssetActionController.buildDialog(state.savingsUpd, kind, asset)
+      dialog.initModality(Modality.WINDOW_MODAL)
+      dialog.initOwner(state.window)
+      dialog.setResizable(true)
+      val event = dialog.showAndWait().orElse(None)
+      processEvents(state, event.toList)
     }
 
     def onOptions(state: State): Unit = {
@@ -583,6 +628,8 @@ object MainController {
   case class OnEditSchemes(schemeId: Option[UUID])
 
   case class OnEditFunds(fundId: Option[UUID])
+
+  case class OnNewAssetAction(kind: AssetActionKind.Value, asset: Option[Savings.Asset])
 
   case object OnOptions
 

@@ -54,8 +54,16 @@ object Form {
     }
   }
 
-  def formatAvailability(availability: Option[LocalDate]): String = {
-    availability.map(_.toString).getOrElse(I18N.getResources.getString("available"))
+  def formatAvailability(availability: Option[LocalDate], long: Boolean): String = {
+    LocalDate.now.isAfter(LocalDate.now)
+    availability.map { avail =>
+      val now = LocalDate.now
+      if (avail.compareTo(now) <= 0) {
+        // Actually available
+        I18N.getResources.getString("available") +
+          (if (long) s" ($avail)" else "")
+      } else avail.toString
+    }.getOrElse(I18N.getResources.getString("available"))
   }
 
   def formatAmount(amount: BigDecimal): String = {
@@ -63,4 +71,10 @@ object Form {
     s"$amount €"
   }
 
+}
+
+object AssetActionKind extends Enumeration {
+  val Payment = Value
+  val Transfer = Value
+  val Refund = Value
 }

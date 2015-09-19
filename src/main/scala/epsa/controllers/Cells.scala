@@ -37,7 +37,7 @@ class AvailabilityCell[A]
   override protected def updateItem(item: Option[LocalDate], empty: Boolean) {
     super.updateItem(item, empty)
     if (empty) setText(null)
-    else setText(Form.formatAvailability(item))
+    else setText(Form.formatAvailability(item, long = false))
   }
 
 }

@@ -24,6 +24,10 @@
                   <MenuItem mnemonicParsing="false" onAction="#onEditSchemes" text="%Edit schemes" />
                   <MenuItem mnemonicParsing="false" onAction="#onEditFunds" text="%Edit funds" />
                   <SeparatorMenuItem mnemonicParsing="false" />
+                  <MenuItem mnemonicParsing="false" onAction="#onNewPayment" text="%New payment" />
+                  <MenuItem mnemonicParsing="false" onAction="#onNewTransfer" text="%New transfer" />
+                  <MenuItem mnemonicParsing="false" onAction="#onNewRefund" text="%New refund" />
+                  <SeparatorMenuItem mnemonicParsing="false" />
                   <MenuItem mnemonicParsing="false" onAction="#onTest" text="Test" />
                   <MenuItem mnemonicParsing="false" onAction="#onFundGraph" text="%Fund graph" />
                   <SeparatorMenuItem mnemonicParsing="false" />
