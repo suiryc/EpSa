@@ -497,13 +497,13 @@ object EditSchemesController {
     val controller = loader.getController[EditSchemesController]
     controller.initialize(savings, dialog, edit)
 
-    dialog.setResultConverter(Callback { resultConverter(savings, edit, controller) _ })
+    dialog.setResultConverter(Callback { resultConverter(controller) _ })
     Stages.trackMinimumDimensions(Stages.getStage(dialog))
 
     dialog
   }
 
-  private def resultConverter(savings: Savings, edit: Option[Savings.Scheme], controller: EditSchemesController)(buttonType: ButtonType): List[Savings.Event] = {
+  private def resultConverter(controller: EditSchemesController)(buttonType: ButtonType): List[Savings.Event] = {
     if (buttonType != ButtonType.OK) Nil
     else controller.events
   }
