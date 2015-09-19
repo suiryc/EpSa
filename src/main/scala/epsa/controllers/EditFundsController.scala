@@ -19,7 +19,6 @@ import suiryc.scala.javafx.event.Events
 import suiryc.scala.javafx.stage.Stages
 import suiryc.scala.javafx.util.Callback
 
-// TODO - using keyboard arrows in funds does not trigger selection
 class EditFundsController {
 
   //@FXML
@@ -83,10 +82,10 @@ class EditFundsController {
     // Initialize funds list view
     fundsField.setCellFactory(Callback { newFundCell _ })
     updateFunds()
-    // Re-check form when selected scheme changes
-    fundsField.getSelectionModel.selectedItemProperty.listen(checkForm())
+    // Handle fund selection changes
+    fundsField.getSelectionModel.selectedItemProperty.listen(onSelectedFund())
 
-    // Re-check form when scheme name is changed
+    // Re-check form when fund name is changed
     nameField.textProperty.listen(checkForm())
 
     // Initialize schemes list view
@@ -96,13 +95,8 @@ class EditFundsController {
     // Check selected schemes upon change, triggers form re-check if necessary
     schemesField.getSelectionModel.getSelectedItems.listen(checkSelectedSchemes())
 
-    // Populate editing fields if a fund is initially selected
-    edit0.foreach(updateEditFields)
-    // Note: we must first select schemes before entering edition mode (due to
-    // some checking).
-    edit = edit0
     // Select initial fund if any
-    edit.foreach(fundsField.getSelectionModel.select)
+    edit0.foreach(fundsField.getSelectionModel.select)
 
     // Request confirmation if changes are pending
     def confirmationFilter(event: ActionEvent): Unit = {
@@ -286,6 +280,23 @@ class EditFundsController {
     }
   }
 
+  /** Handles fund selection changes. */
+  private def onSelectedFund(): Unit = {
+    val newEdit = Option(fundsField.getSelectionModel.getSelectedItem)
+
+    // Update editing fields if we are selecting a new fund
+    newEdit.filterNot(edit.contains).foreach { fund =>
+      // Note: we need to temporarily disable editing before updating selected
+      // schemes due to some checking.
+      edit = None
+      updateEditFields(fund)
+    }
+    edit = newEdit
+
+    // Finally, re-check form
+    checkForm()
+  }
+
   /**
    * Creates a new Fund list view cell.
    *
@@ -300,28 +311,11 @@ class EditFundsController {
     def eventFilter(event: MouseEvent): Unit = {
       if (fundsField.getSelectionModel.getSelectedIndices.contains(cell.getIndex)) {
         // De-select fund
-        // 1. We are not editing it anymore
-        edit = None
-        // 2. It is removed from selection
         fundsField.getSelectionModel.clearSelection(cell.getIndex)
-        // 3. Re-check form
-        checkForm()
       }
       else if (cell.getItem != null) {
         // Select fund
-        val fund = cell.getItem
-        // 1. Leave editing mode
-        // Note: needed due to some checking when selecting schemes.
-        edit = None
-        // 2. Select it
         fundsField.getSelectionModel.select(cell.getIndex)
-        // 3. Update editing fields
-        updateEditFields(fund)
-        // 4. We are editing it now
-        // Note: need to be done after selecting schemes due to some checking.
-        edit = Option(fund)
-        // 5. Re-check form
-        checkForm()
       }
       // In any case, consume the event so that ListView does not try to
       // process it: we are overriding its behaviour.
