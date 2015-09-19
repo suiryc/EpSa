@@ -61,7 +61,9 @@ class EditFundsController {
 
   private var applyReady = false
 
-  private var deletionReady = false
+  private var addReady = false
+
+  private var deleteReady = false
 
   //def initialize(): Unit = { }
 
@@ -130,20 +132,28 @@ class EditFundsController {
     }
     buttonOk.addEventFilter(ActionEvent.ACTION, confirmationFilter _)
 
-    // 'Enter' applies pending fund changes if any
-    dialog.getDialogPane.addEventFilter(KeyEvent.KEY_PRESSED, { (event: KeyEvent) =>
-      if ((event.getCode == KeyCode.ENTER) && applyReady) {
+    // Filter keys pressed to trigger some actions if possible:
+    //   ENTER applies pending fund changes if any
+    //   DELETE/'-' applies selected fund deletion
+    //   '+' applies selected fund adding/copy
+    def keyFilter(event: KeyEvent): Unit = {
+      if (applyReady && (event.getCode == KeyCode.ENTER)) {
         onApply(event)
         event.consume()
       }
-    })
-    // 'Delete' applies selected fund deletion if possible
-    dialog.getDialogPane.addEventFilter(KeyEvent.KEY_PRESSED, { (event: KeyEvent) =>
-      if ((event.getCode == KeyCode.DELETE) && deletionReady) {
+      else if (deleteReady && schemesField.isFocused &&
+        ((event.getCode == KeyCode.DELETE) || (event.getCharacter == "-")))
+      {
         onRemove(event)
         event.consume()
       }
-    })
+      else if (addReady && (event.getCharacter == "+") && !nameField.isFocused) {
+        onAdd(event)
+        event.consume()
+      }
+    }
+    dialog.getDialogPane.addEventFilter(KeyEvent.KEY_PRESSED, keyFilter _)
+    dialog.getDialogPane.addEventFilter(KeyEvent.KEY_TYPED, keyFilter _)
 
     // Initial form checking
     checkForm()
@@ -460,21 +470,21 @@ class EditFundsController {
     // Minus field status: enable deletion if selected fund can be deleted
     Option(fundsField.getSelectionModel.getSelectedItem) match {
       case None =>
-        deletionReady = false
-        Form.toggleImageButton(minusField, set = deletionReady)
+        deleteReady = false
+        Form.toggleImageButton(minusField, set = deleteReady)
 
       case Some(fund) =>
-        deletionReady = canDeleteFund(fund)
-        if (deletionReady) Form.toggleImageButton(minusField, set = deletionReady)
-        else Form.toggleImageButton(minusField, set = deletionReady, Some(resources.getString("Fund is not empty")))
+        deleteReady = canDeleteFund(fund)
+        if (deleteReady) Form.toggleImageButton(minusField, set = deleteReady)
+        else Form.toggleImageButton(minusField, set = deleteReady, Some(resources.getString("Fund is not empty")))
     }
 
     // Plus field status: enable if adding new fund which name is OK, or
     // copying with non-empty name.
-    val addOk =
+    addReady =
       if (edit.isEmpty) nameOk
       else name.nonEmpty
-    Form.toggleImageButton(plusField, addOk)
+    Form.toggleImageButton(plusField, addReady)
 
     // Tick field status: enable if name and edition are OK
     applyReady = nameOk && editOk
