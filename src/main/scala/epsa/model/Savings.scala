@@ -232,6 +232,9 @@ case class Savings(schemes: List[Savings.Scheme] = Nil, funds: List[Savings.Fund
       case Some(currentAsset) =>
         val amount = currentAsset.amount + asset.amount
         val units = currentAsset.units + asset.units
+        // Note: keeping the given (and not existing) asset availability date
+        // has the nice side effect of reseting it if the existing asset is
+        // actually available for the given date.
         updateAsset(date, Asset(asset.schemeId, asset.fundId, asset.availability, amount, units))
 
       case None =>
@@ -246,8 +249,11 @@ case class Savings(schemes: List[Savings.Scheme] = Nil, funds: List[Savings.Fund
     val amount = currentAsset.amount - asset.amount
     val units = currentAsset.units - asset.units
 
+    // Note: keep existing asset availability date if any, instead of using
+    // given one (which may be empty if asset is actually available for the
+    // given date).
     if (units <= 0) removeAsset(date, asset)
-    else updateAsset(date, Asset(asset.schemeId, asset.fundId, asset.availability, amount, units))
+    else updateAsset(date, Asset(asset.schemeId, asset.fundId, currentAsset.availability, amount, units))
   }
 
   protected def testAsset(date: LocalDate, currentAsset: Asset, asset: Asset): Boolean = {
