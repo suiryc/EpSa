@@ -14,7 +14,7 @@ import suiryc.scala.settings.Preference
 object TestExcel {
 
   def main(args: Array[String]): Unit = {
-    val savings = Savings.processActions(Savings(),
+    val savings = Savings().processActions(
       _.createSchemeEvent("Scheme 1"),
       _.createSchemeEvent("Scheme 2"),
       _.createFundEvent("Fund 1"),
@@ -27,7 +27,7 @@ object TestExcel {
         Savings.AssociateFund(scheme2.id, fund.id)
       )
     }
-    val savings2 = Savings.processEvents(savings, events)
+    val savings2 = savings.processEvents(events)
     println(savings2)
 
     (new TestExcel).launch()

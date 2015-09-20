@@ -337,8 +337,8 @@ class EditSchemesController {
   private def applyEvents(newEvents: Savings.Event*): Unit = {
     edit = None
     resetEditFields()
-    savings = Savings.processEvents(savings, newEvents:_*)
-    events = Savings.flattenEvents(savings0, events ++ newEvents)
+    savings = savings.processEvents(newEvents:_*)
+    events = savings0.flattenEvents(events ++ newEvents)
     buttonOk.setDisable(events.isEmpty)
     updateSchemes()
     // Note: we may delete associated funds, so refresh the list view too.

@@ -44,6 +44,9 @@ import suiryc.scala.settings.Preference
 //        -> when making transfer (or payment with immediate availability) on it, empty date for result ?
 //        -> update search/find/test functions to take into account asset action date ?
 //        -> must work when adding history events
+//        -> function to 'flatten' assets for a given date
+//          -> when processing new action, flatten at the given date to match correct asset
+//          -> main view shows flattened (to date) assets, unless option is enabled/disabled (only available in menu, no persistence)
 class MainController extends Logging {
 
   import epsa.Main.prefs
@@ -358,7 +361,7 @@ class MainController extends Logging {
 
     def processEvents(state: State, events: List[Savings.Event]): Unit = {
       val newEvents = state.eventsUpd ::: events
-      val newSavings = Savings.processEvents(state.savingsUpd, events)
+      val newSavings = state.savingsUpd.processEvents(events)
       val newState = state.copy(eventsUpd = newEvents, savingsUpd = newSavings)
       val dirty = newState.eventsUpd.nonEmpty
 
@@ -553,7 +556,7 @@ class MainController extends Logging {
 
       def read(name: String) = Awaits.readDataStoreEvents(owner) match {
         case Success(events) =>
-          val savingsInit = Savings.processEvents(new Savings(), events:_*)
+          val savingsInit = Savings().processEvents(events:_*)
           val newState = State(
             stage = state.stage,
             savingsInit = savingsInit,

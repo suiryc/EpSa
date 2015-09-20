@@ -341,8 +341,8 @@ class EditFundsController {
   private def applyEvents(newEvents: Savings.Event*): Unit = {
     edit = None
     resetEditFields()
-    savings = Savings.processEvents(savings, newEvents:_*)
-    events = Savings.flattenEvents(savings0, events ++ newEvents)
+    savings = savings.processEvents(newEvents:_*)
+    events = savings0.flattenEvents(events ++ newEvents)
     buttonOk.setDisable(events.isEmpty)
     // Note: since we may change Scheme objects (fund association), it is
     // necessary to update the list view to be able to select them by instance.

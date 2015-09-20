@@ -5,127 +5,7 @@ import java.time.LocalDate
 import java.util.UUID
 import spray.json._
 
-object Savings extends Logging {
-
-  def processActions(savings: Savings, actions: (Savings => Savings.Event)*): Savings =
-    actions.foldLeft(savings) { (savings, action) =>
-      val event = action(savings)
-      savings.processEvent(event)
-    }
-
-  def processEvents(savings: Savings, events: Savings.Event*): Savings =
-    events.foldLeft(savings) { (savings, event) =>
-      savings.processEvent(event)
-    }
-
-  def processEvents(savings: Savings, events: List[Savings.Event]): Savings =
-    processEvents(savings, events:_*)
-
-  /**
-   * Flattens events.
-   *
-   * Applies events to initial savings, and determines actual diff with
-   * computed new savings.
-   * Effectively filters unnecessary events, e.g. when creating then deleting a
-   * scheme or fund.
-   *
-   * WARNING: Does not take care of assets modifications.
-   */
-  def flattenEvents(savings: Savings, events: List[Savings.Event]): List[Savings.Event] = {
-    val oldSchemes = savings.schemes.map(_.id).toSet
-    val oldFunds = savings.funds.map(_.id).toSet
-    val newSavings = processEvents(savings, events)
-    val newSchemes = newSavings.schemes.map(_.id).toSet
-    val newFunds = newSavings.funds.map(_.id).toSet
-
-    def orderSchemes(uuids: Set[UUID]): List[Savings.Scheme] =
-      newSavings.schemes.filter { scheme =>
-        uuids.contains(scheme.id)
-      }
-
-    def orderFunds(uuids: Set[UUID]): List[Savings.Fund] =
-      newSavings.funds.filter { fund =>
-        uuids.contains(fund.id)
-      }
-
-    val schemesCreated = newSchemes -- oldSchemes
-    val schemesCreatedOrdered = orderSchemes(schemesCreated)
-    val schemesDeleted = oldSchemes -- newSchemes
-    val schemesRemaining = newSchemes.intersect(oldSchemes)
-    val schemesRemainingOrdered = orderSchemes(schemesRemaining)
-    val fundsCreated = newFunds -- oldFunds
-    val fundsCreatedOrdered = orderFunds(fundsCreated)
-    val fundsDeleted = oldFunds -- newFunds
-    val fundsRemaining = newFunds.intersect(oldFunds)
-    val fundsRemainingOrdered = orderFunds(fundsRemaining)
-
-    // In order, we have:
-    // 1. deleted schemes (with funds dissociation)
-    // 2. deleted funds (with remaining dissociations)
-    // 3. created schemes
-    // 4. created funds
-    // 5. funds associated to created schemes
-    // 6. created funds remaining associations
-    // 7. remaining schemes updates
-    // 8. remaining funds updates
-    val flattenedEvents = schemesDeleted.toList.flatMap { schemeId =>
-      savings.getScheme(schemeId).funds.map { fundId =>
-        Savings.DissociateFund(schemeId, fundId)
-      } :+ Savings.DeleteScheme(schemeId)
-    } ::: fundsDeleted.toList.flatMap { fundId =>
-      savings.schemes.filter { scheme =>
-        scheme.funds.contains(fundId) && !schemesDeleted.contains(scheme.id)
-      }.map { scheme =>
-        Savings.DissociateFund(scheme.id, fundId)
-      } :+ Savings.DeleteFund(fundId)
-    } ::: schemesCreatedOrdered.map { scheme =>
-      Savings.CreateScheme(scheme.id, scheme.name)
-    } ::: fundsCreatedOrdered.map { fund =>
-      Savings.CreateFund(fund.id, fund.name)
-    } ::: schemesCreatedOrdered.flatMap { scheme =>
-      scheme.funds.map { fundId =>
-        Savings.AssociateFund(scheme.id, fundId)
-      }
-    } ::: fundsCreatedOrdered.flatMap { fund =>
-      newSavings.schemes.filter { scheme =>
-        scheme.funds.contains(fund.id) && !schemesCreated.contains(scheme.id)
-      }.map { scheme =>
-        Savings.AssociateFund(scheme.id, fund.id)
-      }
-    } ::: schemesRemainingOrdered.flatMap { newScheme =>
-      val oldScheme = savings.getScheme(newScheme.id)
-      val event1 =
-        if (newScheme.name == oldScheme.name) None
-        else Some(Savings.UpdateScheme(newScheme.id, newScheme.name))
-
-      // Note: don't forget to ignore created/deleted funds (already taken care of)
-      val oldFunds = oldScheme.funds.toSet
-      val newFunds = newScheme.funds.toSet
-      val fundsAssociated = (newFunds -- oldFunds) -- fundsCreated
-      val fundsAssociatedOrdered = newScheme.funds.filter(fundsAssociated.contains)
-      val fundsDissociated = (oldFunds -- newFunds) -- fundsDeleted
-
-      event1.toList ++ fundsDissociated.toList.map { fundId =>
-        Savings.DissociateFund(oldScheme.id, fundId)
-      } ++ fundsAssociatedOrdered.map { fundId =>
-        Savings.AssociateFund(oldScheme.id, fundId)
-      }
-    } ::: fundsRemainingOrdered.flatMap { newFund =>
-      val oldFund = savings.getFund(newFund.id)
-      if (newFund.name == oldFund.name) None
-      else Some(Savings.UpdateFund(newFund.id, newFund.name))
-      // Note: association/dissociation to old, new or remaining schemes have
-      // been taken care of already.
-    }
-
-    // Ensure flattening is OK
-    val flattenedSavings = processEvents(savings, flattenedEvents)
-    if (flattenedSavings != newSavings) {
-      warn(s"Events flattening failed: savings[$savings] events[$events] flattened[$flattenedEvents]")
-      events
-    }
-    else flattenedEvents
-  }
+object Savings {
 
   case class Scheme(id: UUID, name: String, funds: List[UUID])
 
@@ -267,9 +147,23 @@ object Savings extends Logging {
 
 }
 
-case class Savings(schemes: List[Savings.Scheme] = Nil, funds: List[Savings.Fund] = Nil, assets: List[Savings.Asset] = Nil) {
+case class Savings(schemes: List[Savings.Scheme] = Nil, funds: List[Savings.Fund] = Nil, assets: List[Savings.Asset] = Nil) extends Logging {
 
   import Savings._
+
+  def processActions(actions: (Savings => Savings.Event)*): Savings =
+    actions.foldLeft(this) { (savings, action) =>
+      val event = action(savings)
+      savings.processEvent(event)
+    }
+
+  def processEvents(events: Savings.Event*): Savings =
+    events.foldLeft(this) { (savings, event) =>
+      savings.processEvent(event)
+    }
+
+  def processEvents(events: List[Savings.Event]): Savings =
+    processEvents(events:_*)
 
   def processEvent(event: Event): Savings = event match {
     case CreateScheme(id, name)              => createScheme(id, name)
@@ -410,6 +304,111 @@ case class Savings(schemes: List[Savings.Scheme] = Nil, funds: List[Savings.Fund
     }
 
     loop()
+  }
+
+  /**
+   * Flattens events.
+   *
+   * Applies events and determines actual diff with computed savings.
+   * Effectively filters unnecessary events, e.g. when creating then deleting a
+   * scheme or fund.
+   *
+   * WARNING: Does not take care of assets modifications.
+   */
+  def flattenEvents(events: List[Savings.Event]): List[Savings.Event] = {
+    val oldSchemes = schemes.map(_.id).toSet
+    val oldFunds = funds.map(_.id).toSet
+    val newSavings = processEvents(events)
+    val newSchemes = newSavings.schemes.map(_.id).toSet
+    val newFunds = newSavings.funds.map(_.id).toSet
+
+    def orderSchemes(uuids: Set[UUID]): List[Savings.Scheme] =
+      newSavings.schemes.filter { scheme =>
+        uuids.contains(scheme.id)
+      }
+
+    def orderFunds(uuids: Set[UUID]): List[Savings.Fund] =
+      newSavings.funds.filter { fund =>
+        uuids.contains(fund.id)
+      }
+
+    val schemesCreated = newSchemes -- oldSchemes
+    val schemesCreatedOrdered = orderSchemes(schemesCreated)
+    val schemesDeleted = oldSchemes -- newSchemes
+    val schemesRemaining = newSchemes.intersect(oldSchemes)
+    val schemesRemainingOrdered = orderSchemes(schemesRemaining)
+    val fundsCreated = newFunds -- oldFunds
+    val fundsCreatedOrdered = orderFunds(fundsCreated)
+    val fundsDeleted = oldFunds -- newFunds
+    val fundsRemaining = newFunds.intersect(oldFunds)
+    val fundsRemainingOrdered = orderFunds(fundsRemaining)
+
+    // In order, we have:
+    // 1. deleted schemes (with funds dissociation)
+    // 2. deleted funds (with remaining dissociations)
+    // 3. created schemes
+    // 4. created funds
+    // 5. funds associated to created schemes
+    // 6. created funds remaining associations
+    // 7. remaining schemes updates
+    // 8. remaining funds updates
+    val flattenedEvents = schemesDeleted.toList.flatMap { schemeId =>
+      getScheme(schemeId).funds.map { fundId =>
+        Savings.DissociateFund(schemeId, fundId)
+      } :+ Savings.DeleteScheme(schemeId)
+    } ::: fundsDeleted.toList.flatMap { fundId =>
+      schemes.filter { scheme =>
+        scheme.funds.contains(fundId) && !schemesDeleted.contains(scheme.id)
+      }.map { scheme =>
+        Savings.DissociateFund(scheme.id, fundId)
+      } :+ Savings.DeleteFund(fundId)
+    } ::: schemesCreatedOrdered.map { scheme =>
+      Savings.CreateScheme(scheme.id, scheme.name)
+    } ::: fundsCreatedOrdered.map { fund =>
+      Savings.CreateFund(fund.id, fund.name)
+    } ::: schemesCreatedOrdered.flatMap { scheme =>
+      scheme.funds.map { fundId =>
+        Savings.AssociateFund(scheme.id, fundId)
+      }
+    } ::: fundsCreatedOrdered.flatMap { fund =>
+      newSavings.schemes.filter { scheme =>
+        scheme.funds.contains(fund.id) && !schemesCreated.contains(scheme.id)
+      }.map { scheme =>
+        Savings.AssociateFund(scheme.id, fund.id)
+      }
+    } ::: schemesRemainingOrdered.flatMap { newScheme =>
+      val oldScheme = getScheme(newScheme.id)
+      val event1 =
+        if (newScheme.name == oldScheme.name) None
+        else Some(Savings.UpdateScheme(newScheme.id, newScheme.name))
+
+      // Note: don't forget to ignore created/deleted funds (already taken care of)
+      val oldFunds = oldScheme.funds.toSet
+      val newFunds = newScheme.funds.toSet
+      val fundsAssociated = (newFunds -- oldFunds) -- fundsCreated
+      val fundsAssociatedOrdered = newScheme.funds.filter(fundsAssociated.contains)
+      val fundsDissociated = (oldFunds -- newFunds) -- fundsDeleted
+
+      event1.toList ++ fundsDissociated.toList.map { fundId =>
+        Savings.DissociateFund(oldScheme.id, fundId)
+      } ++ fundsAssociatedOrdered.map { fundId =>
+        Savings.AssociateFund(oldScheme.id, fundId)
+      }
+    } ::: fundsRemainingOrdered.flatMap { newFund =>
+      val oldFund = getFund(newFund.id)
+      if (newFund.name == oldFund.name) None
+      else Some(Savings.UpdateFund(newFund.id, newFund.name))
+      // Note: association/dissociation to old, new or remaining schemes have
+      // been taken care of already.
+    }
+
+    // Ensure flattening is OK
+    val flattenedSavings = processEvents(flattenedEvents)
+    if (flattenedSavings != newSavings) {
+      warn(s"Events flattening failed: savings[$this] events[$events] flattened[$flattenedEvents]")
+      events
+    }
+    else flattenedEvents
   }
 
 }
