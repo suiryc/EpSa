@@ -65,13 +65,22 @@ object DataStore {
 
       // Note: file chooser must operate within JavaFX thread
       val selectedFile = if (save) {
-        // TODO - prevent "Overwrite existing file" confirmation if file exists ?
         JFXSystem.await(fileChooser.showSaveDialog(owner.orNull), logReentrant = false)
       } else {
         JFXSystem.await(fileChooser.showOpenDialog(owner.orNull), logReentrant = false)
       }
-      Option(selectedFile).map { file =>
-        changePath(file.toPath)
+      Option(selectedFile).flatMap { file =>
+        // First delete existing file if saving
+        val r0: Option[Future[String]] = if (save && file.exists) {
+          try {
+            if (file.delete()) None
+            else Some(Future.failed(new Exception("Could not delete pre-existing data store")))
+          } catch {
+            case ex: Throwable => Some(Future.failed(ex))
+          }
+        } else None
+        // If OK, do change db path
+        r0.orElse(Some(changePath(file.toPath)))
       }
     }
     else if (Files.exists(defaultPath)) {

@@ -25,7 +25,9 @@ object Awaits {
       Awaits.orError(future, owner, {
         // Note: if changing, we don't know what path we tried to open, but
         // the user shall know. Otherwise remind the default path.
-        val msg = I18N.getResources.getString("Could not read data store")
+        val msg =
+          if (change && save) I18N.getResources.getString("Could not write data store")
+          else I18N.getResources.getString("Could not read data store")
         if (change) msg
         else s"$msg\n${DataStore.defaultPath}"
       })

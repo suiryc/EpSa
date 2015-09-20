@@ -39,9 +39,7 @@ import suiryc.scala.settings.Preference
 // TODO - display asset gain/loss (amount/percentage) in assets table
 // TODO - display more details for selected asset (values history graph, ...)
 // TODO - menu entries with latest datastore locations ?
-// TODO - menu entry and dialog to create a payment/transfer/refund event
 // TODO - menu entry and dialog to display/edit events history ?
-// TODO - when saving non-opened datastore, remove selected path if exists
 // TODO - when computing assets, order by scheme/fund/availability ?
 // TODO - add menu icons ?
 class MainController extends Logging {
