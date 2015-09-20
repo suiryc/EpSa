@@ -135,7 +135,7 @@ class EditFundsController {
         onApply(event)
         event.consume()
       }
-      else if (deleteReady && schemesField.isFocused &&
+      else if (deleteReady && fundsField.isFocused &&
         ((event.getCode == KeyCode.DELETE) || (event.getCharacter == "-")))
       {
         onRemove(event)
