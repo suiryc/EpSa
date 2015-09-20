@@ -23,6 +23,7 @@ import javafx.stage._
 import scala.util.Success
 import suiryc.scala.RichOption._
 import suiryc.scala.concurrent.Callable
+import suiryc.scala.javafx
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.javafx.event.EventHandler._
@@ -204,15 +205,24 @@ class MainController extends Logging {
     // Restore assets columns order and width
     TableViews.setColumnsView(assetsTable, assetsColumns, Option(assetsColumnsPref()))
 
-    // Restore SplitPane divider positions
-    Option(splitPaneDividerPositions()).foreach { dividerPositions =>
-      try {
-        val positions = dividerPositions.split(';').map(_.toDouble)
-        splitPane.setDividerPositions(positions: _*)
-      } catch {
-        case ex: Throwable => warn(s"Could not restore SplitPane divider positions[$dividerPositions]: ${ex.getMessage}")
+    def restoreDividerPositions(): Unit = {
+      // Restore SplitPane divider positions
+      Option(splitPaneDividerPositions()).foreach { dividerPositions =>
+        try {
+          val positions = dividerPositions.split(';').map(_.toDouble)
+          splitPane.setDividerPositions(positions: _*)
+        } catch {
+          case ex: Throwable => warn(s"Could not restore SplitPane divider positions[$dividerPositions]: ${ex.getMessage}")
+        }
       }
     }
+
+    // On Linux, we must wait a bit after changing stage size before setting
+    // divider positions, otherwise the value gets altered a bit by stage
+    // resizing ...
+    import scala.concurrent.duration._
+    if (!javafx.isLinux) restoreDividerPositions()
+    else JFXSystem.scheduleOnce(200.millis)(restoreDividerPositions())
   }
 
   /** Persists view (stage location, ...). */
