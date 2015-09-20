@@ -28,11 +28,18 @@
                   <MenuItem mnemonicParsing="false" onAction="#onNewTransfer" text="%New transfer" />
                   <MenuItem mnemonicParsing="false" onAction="#onNewRefund" text="%New refund" />
                   <SeparatorMenuItem mnemonicParsing="false" />
-                  <MenuItem mnemonicParsing="false" onAction="#onTest" text="Test" />
+                  <MenuItem mnemonicParsing="false" onAction="#onTest" text="Test 1" />
+                  <MenuItem mnemonicParsing="false" onAction="#onTest" text="Test 2" />
+                  <MenuItem mnemonicParsing="false" onAction="#onTest" text="Test 3" />
                   <MenuItem mnemonicParsing="false" onAction="#onFundGraph" text="%Fund graph" />
                   <SeparatorMenuItem mnemonicParsing="false" />
                   <MenuItem mnemonicParsing="false" onAction="#onOptions" text="%Options" />
                </items></Menu>
+            <Menu mnemonicParsing="false" text="%View">
+              <items>
+                  <CheckMenuItem mnemonicParsing="false" onAction="#onUpToDateAssets" selected="true" text="%Up to date assets" />
+              </items>
+            </Menu>
         </menus>
       </MenuBar>
       <SplitPane fx:id="splitPane" dividerPositions="0.4" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" VBox.vgrow="ALWAYS">
