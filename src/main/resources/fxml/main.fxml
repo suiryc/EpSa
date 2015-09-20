@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
+<?import javafx.scene.image.*?>
 <?import javafx.geometry.*?>
 <?import javafx.scene.control.*?>
 <?import java.lang.*?>
@@ -11,30 +12,108 @@
         <menus>
           <Menu mnemonicParsing="false" text="%File">
             <items>
-                  <MenuItem mnemonicParsing="false" onAction="#onFileNew" text="%New" />
-                  <MenuItem mnemonicParsing="false" onAction="#onFileOpen" text="%Open" />
-                  <MenuItem fx:id="fileCloseMenu" mnemonicParsing="false" onAction="#onFileClose" text="%Close" />
+                  <MenuItem mnemonicParsing="false" onAction="#onFileNew" text="%New">
+                     <graphic>
+                        <ImageView pickOnBounds="true" preserveRatio="true">
+                           <image>
+                              <Image url="@../images/fugue-icons/document.png" />
+                           </image>
+                        </ImageView>
+                     </graphic>
+                  </MenuItem>
+                  <MenuItem mnemonicParsing="false" onAction="#onFileOpen" text="%Open">
+                     <graphic>
+                        <ImageView pickOnBounds="true" preserveRatio="true">
+                           <image>
+                              <Image url="@../images/fugue-icons/folder-open-document.png" />
+                           </image>
+                        </ImageView>
+                     </graphic></MenuItem>
+                  <MenuItem fx:id="fileCloseMenu" mnemonicParsing="false" onAction="#onFileClose" text="%Close">
+                     <graphic>
+                        <ImageView pickOnBounds="true" preserveRatio="true">
+                           <image>
+                              <Image url="@../images/fugue-icons/document--arrow.png" />
+                           </image>
+                        </ImageView>
+                     </graphic></MenuItem>
                   <SeparatorMenuItem mnemonicParsing="false" />
-                  <MenuItem fx:id="fileSaveMenu" mnemonicParsing="false" onAction="#onFileSave" text="%Save" />
+                  <MenuItem fx:id="fileSaveMenu" mnemonicParsing="false" onAction="#onFileSave" text="%Save">
+                     <graphic>
+                        <ImageView pickOnBounds="true" preserveRatio="true">
+                           <image>
+                              <Image url="@../images/fugue-icons/disk.png" />
+                           </image>
+                        </ImageView>
+                     </graphic></MenuItem>
                   <SeparatorMenuItem mnemonicParsing="false" />
-              <MenuItem mnemonicParsing="false" onAction="#onExit" text="%Exit" />
+              <MenuItem mnemonicParsing="false" onAction="#onExit" text="%Exit">
+                     <graphic>
+                        <ImageView pickOnBounds="true" preserveRatio="true">
+                           <image>
+                              <Image url="@../images/fugue-icons/application--arrow.png" />
+                           </image>
+                        </ImageView>
+                     </graphic></MenuItem>
             </items>
           </Menu>
           <Menu mnemonicParsing="false" text="%Edit">
                <items>
-                  <MenuItem mnemonicParsing="false" onAction="#onEditSchemes" text="%Edit schemes" />
-                  <MenuItem mnemonicParsing="false" onAction="#onEditFunds" text="%Edit funds" />
+                  <MenuItem mnemonicParsing="false" onAction="#onEditSchemes" text="%Edit schemes">
+                     <graphic>
+                        <ImageView pickOnBounds="true" preserveRatio="true">
+                           <image>
+                              <Image url="@../images/fugue-icons/tables.png" />
+                           </image>
+                        </ImageView>
+                     </graphic></MenuItem>
+                  <MenuItem mnemonicParsing="false" onAction="#onEditFunds" text="%Edit funds">
+                     <graphic>
+                        <ImageView pickOnBounds="true" preserveRatio="true">
+                           <image>
+                              <Image url="@../images/fugue-icons/table.png" />
+                           </image>
+                        </ImageView>
+                     </graphic></MenuItem>
                   <SeparatorMenuItem mnemonicParsing="false" />
-                  <MenuItem mnemonicParsing="false" onAction="#onNewPayment" text="%New payment" />
-                  <MenuItem mnemonicParsing="false" onAction="#onNewTransfer" text="%New transfer" />
-                  <MenuItem mnemonicParsing="false" onAction="#onNewRefund" text="%New refund" />
+                  <MenuItem mnemonicParsing="false" onAction="#onNewPayment" text="%New payment">
+                     <graphic>
+                        <ImageView pickOnBounds="true" preserveRatio="true">
+                           <image>
+                              <Image url="@../images/fugue-icons/table-import.png" />
+                           </image>
+                        </ImageView>
+                     </graphic></MenuItem>
+                  <MenuItem mnemonicParsing="false" onAction="#onNewTransfer" text="%New transfer">
+                     <graphic>
+                        <ImageView pickOnBounds="true" preserveRatio="true">
+                           <image>
+                              <Image url="@../images/fugue-icons/tables-relation.png" />
+                           </image>
+                        </ImageView>
+                     </graphic></MenuItem>
+                  <MenuItem mnemonicParsing="false" onAction="#onNewRefund" text="%New refund">
+                     <graphic>
+                        <ImageView pickOnBounds="true" preserveRatio="true">
+                           <image>
+                              <Image url="@../images/fugue-icons/table-export.png" />
+                           </image>
+                        </ImageView>
+                     </graphic></MenuItem>
                   <SeparatorMenuItem mnemonicParsing="false" />
                   <MenuItem mnemonicParsing="false" onAction="#onTest" text="Test 1" />
                   <MenuItem mnemonicParsing="false" onAction="#onTest" text="Test 2" />
                   <MenuItem mnemonicParsing="false" onAction="#onTest" text="Test 3" />
                   <MenuItem mnemonicParsing="false" onAction="#onFundGraph" text="%Fund graph" />
                   <SeparatorMenuItem mnemonicParsing="false" />
-                  <MenuItem mnemonicParsing="false" onAction="#onOptions" text="%Options" />
+                  <MenuItem mnemonicParsing="false" onAction="#onOptions" text="%Options">
+                     <graphic>
+                        <ImageView pickOnBounds="true" preserveRatio="true">
+                           <image>
+                              <Image url="@../images/fugue-icons/gear.png" />
+                           </image>
+                        </ImageView>
+                     </graphic></MenuItem>
                </items></Menu>
             <Menu mnemonicParsing="false" text="%View">
               <items>

@@ -19,6 +19,7 @@ import javafx.event.ActionEvent
 import javafx.fxml.{FXML, FXMLLoader}
 import javafx.scene.{Parent, Scene}
 import javafx.scene.control._
+import javafx.scene.image.{Image, ImageView}
 import javafx.stage._
 import scala.util.Success
 import suiryc.scala.RichOption._
@@ -41,7 +42,6 @@ import suiryc.scala.settings.Preference
 // TODO - menu entries with latest datastore locations ?
 // TODO - menu entry and dialog to display/edit events history ?
 // TODO - when computing assets, order by scheme/fund/availability ?
-// TODO - add menu icons ?
 class MainController extends Logging {
 
   import epsa.Main.prefs
@@ -619,6 +619,9 @@ class MainController extends Logging {
         // If saving failed (user was notified), consume event to get back to
         // confirmation dialog.
         val buttonSave = alert.getDialogPane.lookupButton(buttonSaveType)
+        // Note: Image(url, requestedWidth, requestedHeight, preserveRatio, smooth, backgroundLoading)
+        val image = new Image("/images/fugue-icons/disk.png", 0.0, 0.0, true, false, false)
+        buttonSave.asInstanceOf[Button].setGraphic(new ImageView(image))
         buttonSave.addEventFilter(ActionEvent.ACTION, { (event: ActionEvent) =>
           if (save(state, Some(Stages.getStage(alert))).isEmpty) event.consume()
         })
