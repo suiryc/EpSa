@@ -236,6 +236,10 @@ class MainController extends Logging {
     event.consume()
   }
 
+  def onFileNew(event: ActionEvent): Unit = {
+    actor ! OnFileNew
+  }
+
   def onFileOpen(event: ActionEvent): Unit = {
     actor ! OnFileOpen
   }
@@ -355,6 +359,7 @@ class MainController extends Logging {
     override def receive: Receive = receive(state0)
 
     def receive(state: State): Receive = {
+      case OnFileNew         => onFileNew(state)
       case OnFileOpen        => onFileOpen(state)
       case OnFileClose       => onFileClose(state)
       case OnFileSave        => onFileSave(state)
@@ -395,6 +400,13 @@ class MainController extends Logging {
       newState.stage.setTitle(title)
 
       context.become(receive(newState))
+    }
+
+    def onFileNew(state: State): Unit = {
+      // We actually do the same than when closing current file.
+      // Code works even if no current file is opened (with or without pending
+      // changes).
+      onFileClose(state)
     }
 
     def onFileOpen(state: State): Unit = {
@@ -685,6 +697,8 @@ object MainController {
   ) {
     lazy val window = stage.getScene.getWindow
   }
+
+  case object OnFileNew
 
   case object OnFileOpen
 
