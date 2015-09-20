@@ -47,6 +47,8 @@ import suiryc.scala.settings.Preference
 //        -> function to 'flatten' assets for a given date
 //          -> when processing new action, flatten at the given date to match correct asset
 //          -> main view shows flattened (to date) assets, unless option is enabled/disabled (only available in menu, no persistence)
+// TODO - when saving non-opened datastore, remove selected path if exists
+// TODO - when computing assets, order by scheme/fund/availability ?
 class MainController extends Logging {
 
   import epsa.Main.prefs
@@ -465,15 +467,27 @@ class MainController extends Logging {
       val s2 = Savings().createSchemeEvent("Scheme 2")
       val f1 = Savings().createFundEvent("Fund 1")
       val f2 = Savings().createFundEvent("Fund 2")
+      // Mixe many actions that ultimately gives:
+      //   s1f1: 5 now
+      //   s1f2: 10 now
+      //   s1f2: 15 (+1 month)
+      //   s2f2: 20 now
+      // Purposely performs 2 last payments: last action leaves 2 assets which
+      // shall be merged when computed now.
       processEvents(state, List(s1, s2, f1, f2,
         Savings.AssociateFund(s1.schemeId, f1.fundId),
         Savings.AssociateFund(s1.schemeId, f2.fundId),
         Savings.AssociateFund(s2.schemeId, f2.fundId),
-        Savings.MakePayment(LocalDate.now, Savings.Asset(s1.schemeId, f1.fundId, None, 10.0, 10.0)),
-        Savings.MakePayment(LocalDate.now, Savings.Asset(s1.schemeId, f1.fundId, None, 20.0, 10.0)),
-        Savings.MakePayment(LocalDate.now, Savings.Asset(s1.schemeId, f1.fundId, Some(LocalDate.now.plusMonths(12)), 20.0, 10.0)),
-        Savings.MakeRefund(LocalDate.now, Savings.Asset(s1.schemeId, f1.fundId, None, 10.0, 5.0)),
-        Savings.MakeTransfer(LocalDate.now, Savings.Asset(s1.schemeId, f1.fundId, None, 10.0, 10.0), Savings.Asset(s1.schemeId, f2.fundId, None, 10.0, 20.0))
+        Savings.MakePayment(LocalDate.now.minusMonths(24), Savings.Asset(s1.schemeId, f1.fundId, Some(LocalDate.now.minusMonths(12)), 10.0, 10.0)),
+        Savings.MakePayment(LocalDate.now.minusMonths(24), Savings.Asset(s1.schemeId, f1.fundId, Some(LocalDate.now.minusMonths(12)), 20.0, 10.0)),
+        Savings.MakePayment(LocalDate.now.minusMonths(24), Savings.Asset(s1.schemeId, f2.fundId, Some(LocalDate.now.minusMonths(12)), 5.0, 5.0)),
+        Savings.MakePayment(LocalDate.now.minusMonths(24), Savings.Asset(s1.schemeId, f1.fundId, Some(LocalDate.now.minusMonths(1)), 25.0, 15.0)),
+        Savings.MakePayment(LocalDate.now.minusMonths(24), Savings.Asset(s1.schemeId, f2.fundId, Some(LocalDate.now.plusMonths(12)), 15.0, 15.0)),
+        Savings.MakeRefund(LocalDate.now.minusMonths(12), Savings.Asset(s1.schemeId, f1.fundId, Some(LocalDate.now.minusMonths(1)), 20.0, 10.0)),
+        Savings.MakeRefund(LocalDate.now.minusMonths(1), Savings.Asset(s1.schemeId, f1.fundId, None, 25.0, 10.0)),
+        Savings.MakeTransfer(LocalDate.now.minusMonths(1), Savings.Asset(s1.schemeId, f1.fundId, None, 5.0, 10.0), Savings.Asset(s1.schemeId, f2.fundId, None, 5.0, 5.0)),
+        Savings.MakePayment(LocalDate.now.minusMonths(1), Savings.Asset(s2.schemeId, f2.fundId, Some(LocalDate.now.minusMonths(1)), 10.0, 10.0)),
+        Savings.MakePayment(LocalDate.now.minusMonths(1), Savings.Asset(s2.schemeId, f2.fundId, Some(LocalDate.now), 10.0, 10.0))
       ))
     }
 

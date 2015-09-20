@@ -166,17 +166,17 @@ case class Savings(schemes: List[Savings.Scheme] = Nil, funds: List[Savings.Fund
     processEvents(events:_*)
 
   def processEvent(event: Event): Savings = event match {
-    case CreateScheme(id, name)              => createScheme(id, name)
-    case UpdateScheme(id, name)              => updateScheme(id, name)
-    case DeleteScheme(id)                    => deleteScheme(id)
-    case CreateFund(id, name)                => createFund(id, name)
-    case UpdateFund(id, name)                => updateFund(id, name)
-    case DeleteFund(id)                      => deleteFund(id)
-    case AssociateFund(schemeId, fundId)     => associateFund(schemeId, fundId)
-    case DissociateFund(schemeId, fundId)    => dissociateFund(schemeId, fundId)
-    case MakePayment(_, asset)               => makePayment(asset)
-    case MakeTransfer(_, assetSrc, assetDst) => makeTransfer(assetSrc, assetDst)
-    case MakeRefund(_, asset)                => makeRefund(asset)
+    case CreateScheme(id, name)                 => createScheme(id, name)
+    case UpdateScheme(id, name)                 => updateScheme(id, name)
+    case DeleteScheme(id)                       => deleteScheme(id)
+    case CreateFund(id, name)                   => createFund(id, name)
+    case UpdateFund(id, name)                   => updateFund(id, name)
+    case DeleteFund(id)                         => deleteFund(id)
+    case AssociateFund(schemeId, fundId)        => associateFund(schemeId, fundId)
+    case DissociateFund(schemeId, fundId)       => dissociateFund(schemeId, fundId)
+    case MakePayment(date, asset)               => computeAssets(date).makePayment(date, asset)
+    case MakeTransfer(date, assetSrc, assetDst) => computeAssets(date).makeTransfer(date, assetSrc, assetDst)
+    case MakeRefund(date, asset)                => computeAssets(date).makeRefund(date, asset)
   }
 
   protected def createScheme(id: UUID, name: String): Savings = {
@@ -227,45 +227,49 @@ case class Savings(schemes: List[Savings.Scheme] = Nil, funds: List[Savings.Fund
     copy(schemes = updated)
   }
 
-  protected def makePayment(asset: Asset): Savings =
-    findAsset(asset) match {
+  protected def makePayment(date: LocalDate, asset: Asset): Savings =
+    findAsset(date, asset) match {
       case Some(currentAsset) =>
         val amount = currentAsset.amount + asset.amount
         val units = currentAsset.units + asset.units
-        updateAsset(Asset(asset.schemeId, asset.fundId, asset.availability, amount, units))
+        updateAsset(date, Asset(asset.schemeId, asset.fundId, asset.availability, amount, units))
 
       case None =>
         copy(assets = assets :+ asset)
     }
 
-  protected def makeTransfer(assetSrc: Asset, assetDst: Asset): Savings =
-    makeRefund(assetSrc).makePayment(assetDst)
+  protected def makeTransfer(date: LocalDate, assetSrc: Asset, assetDst: Asset): Savings =
+    makeRefund(date, assetSrc).makePayment(date, assetDst)
 
-  protected def makeRefund(asset: Asset): Savings = {
-    val currentAsset = findAsset(asset).get
+  protected def makeRefund(date: LocalDate, asset: Asset): Savings = {
+    val currentAsset = findAsset(date, asset).get
     val amount = currentAsset.amount - asset.amount
     val units = currentAsset.units - asset.units
 
-    if (units <= 0) removeAsset(asset)
-    else updateAsset(Asset(asset.schemeId, asset.fundId, asset.availability, amount, units))
+    if (units <= 0) removeAsset(date, asset)
+    else updateAsset(date, Asset(asset.schemeId, asset.fundId, asset.availability, amount, units))
   }
 
-  protected def testAsset(currentAsset: Asset, asset: Asset): Boolean =
+  protected def testAsset(date: LocalDate, currentAsset: Asset, asset: Asset): Boolean = {
+    lazy val checkDate =
+      if (asset.availability.nonEmpty) currentAsset.availability == asset.availability
+      else currentAsset.availability.map(date.compareTo).getOrElse(1) >= 0
     (currentAsset.schemeId == asset.schemeId) &&
       (currentAsset.fundId == asset.fundId) &&
-      (currentAsset.availability == asset.availability)
+      checkDate
+  }
 
-  protected def findAsset(asset: Asset): Option[Savings.Asset] =
-    assets.find(testAsset(_, asset))
+  protected def findAsset(date: LocalDate, asset: Asset): Option[Savings.Asset] =
+    assets.find(testAsset(date, _, asset))
 
-  protected def updateAsset(asset: Asset): Savings =
+  protected def updateAsset(date: LocalDate, asset: Asset): Savings =
     copy(assets = assets.map { currentAsset =>
-      if (testAsset(currentAsset, asset)) asset
+      if (testAsset(date, currentAsset, asset)) asset
       else currentAsset
     })
 
-  protected def removeAsset(asset: Asset): Savings =
-    copy(assets = assets.filterNot(testAsset(_, asset)))
+  protected def removeAsset(date: LocalDate, asset: Asset): Savings =
+    copy(assets = assets.filterNot(testAsset(date, _, asset)))
 
   def findScheme(schemeId: UUID): Option[Scheme] =
     schemes.find(_.id == schemeId)
@@ -409,6 +413,47 @@ case class Savings(schemes: List[Savings.Scheme] = Nil, funds: List[Savings.Fund
       events
     }
     else flattenedEvents
+  }
+
+  /**
+   * Computes assets at given date.
+   *
+   * Merges assets for the same scheme, fund, and availability (compared to
+   * given date).
+   */
+  def computeAssets(date: LocalDate): Savings = {
+    case class AssetKey(schemeId: UUID, fundId: UUID, availability: Option[LocalDate])
+    case class AssetComputation(computed: List[Savings.Asset] = Nil, keys: Set[AssetKey] = Set.empty)
+
+    def getKey(asset: Savings.Asset): AssetKey = {
+      val availability = asset.availability.filter(_.compareTo(date) > 0)
+      AssetKey(asset.schemeId, asset.fundId, availability)
+    }
+
+    def process(computation: AssetComputation, asset: Savings.Asset): AssetComputation = {
+      val key = getKey(asset)
+      if (computation.keys.contains(key)) {
+        // Merge assets
+        val (previous, filtered) = computation.computed.partition(getKey(_) == key)
+        val asset0 = Savings.Asset(
+          schemeId = key.schemeId,
+          fundId = key.fundId,
+          availability = key.availability,
+          amount = 0.0,
+          units = 0.0
+        )
+        val computedAsset = (previous :+ asset).foldLeft(asset0) { (computed, asset) =>
+          val amount = computed.amount + asset.amount
+          val units = computed.units + asset.units
+          computed.copy(amount = amount, units = units)
+        }
+        computation.copy(computed = filtered :+ computedAsset)
+      }
+      else computation.copy(computed = computation.computed :+ asset, keys = computation.keys + key)
+    }
+
+    val computedAssets = assets.foldLeft(AssetComputation())(process).computed
+    copy(assets = computedAssets)
   }
 
 }
