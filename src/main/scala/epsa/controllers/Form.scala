@@ -23,7 +23,7 @@ object Form {
 
   def toggleError(node: Control, set: Boolean, msgOpt: Option[String] = None): Unit = {
     setStyleError(node, set)
-    node.setTooltip(new Tooltip(msgOpt.orNull))
+    node.setTooltip(msgOpt.map(new Tooltip(_)).orNull)
   }
 
   def setStyleImageButton(node: Node, set: Boolean): Unit = {
