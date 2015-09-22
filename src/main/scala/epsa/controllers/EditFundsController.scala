@@ -446,20 +446,12 @@ class EditFundsController {
     // Selected name is OK if it is not empty and does not already exists.
     val nameOk = !exists && name.nonEmpty
 
-    // Apply name field status:
-    // 1. Set issue in tooltip if any
-    if (exists) {
-      // Name already exists
-      nameField.setTooltip(new Tooltip(resources.getString("Name already exists")))
-    } else if (name.isEmpty) {
-      // Name is empty
-      nameField.setTooltip(new Tooltip(resources.getString("Name cannot be empty")))
-    } else {
-      // No issue
-      nameField.setTooltip(null)
-    }
-    // Set error style if name is not OK
-    Form.setStyleError(nameField, !nameOk)
+    // Apply name field status: set error style if name is not OK
+    Form.toggleError(nameField, !nameOk,
+      if (exists) Some(resources.getString("Name already exists"))
+      else if (name.isEmpty) Some(resources.getString("Name cannot be empty"))
+      else None
+    )
 
     // Minus field status: enable deletion if selected fund can be deleted
     Option(fundsField.getSelectionModel.getSelectedItem) match {

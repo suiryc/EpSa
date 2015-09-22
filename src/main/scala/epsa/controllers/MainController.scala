@@ -42,6 +42,7 @@ import suiryc.scala.settings.Preference
 // TODO - menu entries with latest datastore locations ?
 // TODO - menu entry and dialog to display/edit events history ?
 // TODO - when computing assets, order by scheme/fund/availability ?
+// TODO - manage encryption of datastore ?
 class MainController extends Logging {
 
   import epsa.Main.prefs
@@ -151,7 +152,7 @@ class MainController extends Logging {
     columnAvailability.setCellValueFactory(Callback { data =>
       new SimpleObjectProperty(data.getValue.availability)
     })
-    columnAvailability.setCellFactory(Callback { new AvailabilityCell[Savings.Asset] })
+    columnAvailability.setCellFactory(Callback { new AvailabilityTableCell[Savings.Asset] })
     columnAmount.setCellValueFactory(Callback { data =>
       new SimpleObjectProperty(data.getValue.amount)
     })
@@ -176,7 +177,7 @@ class MainController extends Logging {
         savings.getFund(asset.fundId).name
       }.orNull)
       availabilityField.setText(assetOpt.map { asset =>
-        Form.formatAvailability(asset.availability, long = true)
+        Form.formatAvailability(asset.availability, baseOpt = None, long = true)
       }.orNull)
       amountField.setText(assetOpt.map { asset =>
         Form.formatAmount(asset.amount)

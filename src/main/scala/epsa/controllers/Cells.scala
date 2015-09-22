@@ -1,6 +1,5 @@
 package epsa.controllers
 
-import epsa.I18N
 import epsa.model.Savings
 import java.time.LocalDate
 import javafx.scene.control.{ListCell, TableCell}
@@ -30,14 +29,38 @@ class FundCell
 
 }
 
-class AvailabilityCell[A]
+class SchemeAndFundCell
+  extends ListCell[SchemeAndFund]
+{
+
+  override protected def updateItem(item: SchemeAndFund, empty: Boolean) {
+    super.updateItem(item, empty)
+    if (empty) setText(null)
+    else setText(s"${item.scheme.name} / ${item.fund.name}")
+  }
+
+}
+
+class AvailabilityListCell(baseOpt: Option[LocalDate])
+  extends ListCell[Option[LocalDate]]
+{
+
+  override protected def updateItem(item: Option[LocalDate], empty: Boolean) {
+    super.updateItem(item, empty)
+    if (empty) setText(null)
+    else setText(Form.formatAvailability(item, baseOpt, long = false))
+  }
+
+}
+
+class AvailabilityTableCell[A]
   extends TableCell[A, Option[LocalDate]]
 {
 
   override protected def updateItem(item: Option[LocalDate], empty: Boolean) {
     super.updateItem(item, empty)
     if (empty) setText(null)
-    else setText(Form.formatAvailability(item, long = false))
+    else setText(Form.formatAvailability(item, baseOpt = None, long = false))
   }
 
 }
