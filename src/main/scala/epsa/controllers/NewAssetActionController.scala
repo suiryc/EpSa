@@ -2,20 +2,29 @@ package epsa.controllers
 
 import epsa.I18N
 import epsa.model.Savings
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import java.util.ResourceBundle
-import javafx.fxml.{FXMLLoader, FXML}
-import javafx.scene.control.{RadioButton, ToggleGroup, ButtonType, Dialog}
+import javafx.event.ActionEvent
+import javafx.collections.FXCollections
+import javafx.fxml.{FXML, FXMLLoader}
+import javafx.scene.Node
+import javafx.scene.control._
+import javafx.util.converter.LocalDateStringConverter
+import scala.collection.JavaConversions._
+import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.stage.Stages
 import suiryc.scala.javafx.util.Callback
 
-// TODO - fields for date (of action and value), scheme&fund, availability, amount and units
-// TODO - in case of transfer, enable fields to select destination
 // TODO - button to select (existing) scheme&fund+availability
 // TODO - handle some event (action ?) on amount/units to update counterpart (and also destination data if any)
-// TODO - changing availability updates destination' one
+// TODO - changing availability updates destination' one ?
 // TODO - use value date to handle amount/units conversion on destination
-// TODO - hint (form) error if amount/units exceeds asset for transfer/fund
 // TODO - give info on limits for selected asset (and button to use all)
+// TODO - option of default day/month and number of years for frozen assets ?
+// TODO - prevent validation if transferring to same asset
+// TODO - hint (tooltips/combobox) existing availability dates when applicable ?
+// TODO - select first (if any) value of ComboBoxes by default ?
 class NewAssetActionController {
 
   //@FXML
@@ -25,7 +34,7 @@ class NewAssetActionController {
   protected var resources: ResourceBundle = _
 
   @FXML
-  protected var actionKind: ToggleGroup = _
+  protected var actionKindGroup: ToggleGroup = _
 
   @FXML
   protected var paymentButton: RadioButton = _
@@ -36,16 +45,272 @@ class NewAssetActionController {
   @FXML
   protected var refundButton: RadioButton = _
 
+  @FXML
+  protected var operationDateField: DatePicker = _
+
+  @FXML
+  protected var srcFundField: ComboBox[SchemeAndFund] = _
+
+  @FXML
+  protected var srcAvailabilityField: DatePicker = _
+
+  @FXML
+  protected var srcAvailabilityField2: ComboBox[Option[LocalDate]] = _
+
+  @FXML
+  protected var srcAmountField: TextField = _
+
+  @FXML
+  protected var srcUnitsField: TextField = _
+
+  @FXML
+  protected var dstFundField: ComboBox[SchemeAndFund] = _
+
+  @FXML
+  protected var dstAvailabilityField: DatePicker = _
+
+  @FXML
+  protected var dstAmountField: TextField = _
+
+  @FXML
+  protected var dstUnitsField: TextField = _
+
+  protected var buttonOk: Node = _
+
+  private lazy val toggleButtons = List(paymentButton, transferButton, refundButton)
+
+  private lazy val mandatoryMsg = resources.getString("Mandatory field")
+
+  private var savings: Savings = _
+
+  private var actionKind: AssetActionKind.Value = _
+
   //def initialize(): Unit = { }
 
-  def initialize(savings0: Savings, dialog: Dialog[_], kind: AssetActionKind.Value, asset: Option[Savings.Asset]): Unit = {
-    val toggle = kind match {
-      case AssetActionKind.Payment  => paymentButton
-      case AssetActionKind.Transfer => transferButton
-      case AssetActionKind.Refund   => refundButton
+  def initialize(savings0: Savings, dialog: Dialog[_], actionKind0: AssetActionKind.Value, asset: Option[Savings.Asset]): Unit = {
+    // Save initial state
+    savings = savings0
+    actionKind = actionKind0
+
+    // Load css
+    dialog.getDialogPane.getStylesheets.add(getClass.getResource("/css/form.css").toExternalForm)
+
+    // Lookup OK dialog button
+    buttonOk = dialog.getDialogPane.lookupButton(ButtonType.OK)
+    // Disable OK button unless there are events to take into account
+    buttonOk.setDisable(true)
+
+    // Associate action kind to related toggle button
+    paymentButton.setUserData(AssetActionKind.Payment)
+    transferButton.setUserData(AssetActionKind.Transfer)
+    refundButton.setUserData(AssetActionKind.Refund)
+
+    // Listen to action kind change
+    actionKindGroup.selectedToggleProperty.listen(onToggleKind())
+    // Select initial toggle button
+    toggleButtons.find(getToggleKind(_) == actionKind).foreach(actionKindGroup.selectToggle)
+
+    // Note: we need to tell the combobox how to display both the 'button' area
+    // (what is shown as selected) and the content (list of choices).
+    for (field <- List(srcFundField, dstFundField)) {
+      field.setButtonCell(new SchemeAndFundCell)
+      field.setCellFactory(Callback { new SchemeAndFundCell })
     }
-    actionKind.selectToggle(toggle)
+
+    // Note: we set the availability combobox format now and change it later
+    // if operation date if changed.
+    srcAvailabilityField2.setButtonCell(new AvailabilityListCell(None))
+    srcAvailabilityField2.setCellFactory(Callback { new AvailabilityListCell(None) })
+
+    // Force date format (to match the one of LocalDate in other views) in date picker fields
+    val dateFormat = "yyyy-MM-dd"
+    val dateConverter = new LocalDateStringConverter(DateTimeFormatter.ofPattern(dateFormat), null)
+    for (field <- List(operationDateField, srcAvailabilityField, dstAvailabilityField)) {
+      field.setPromptText(dateFormat)
+      field.setConverter(dateConverter)
+    }
   }
+
+  def onToggleKind(): Unit = {
+    actionKind = getToggleKind(actionKindGroup.getSelectedToggle)
+
+    val disableDst = actionKind != AssetActionKind.Transfer
+    dstFundField.setDisable(disableDst)
+    dstAvailabilityField.setDisable(disableDst)
+    dstAmountField.setDisable(disableDst)
+    dstUnitsField.setDisable(disableDst)
+
+    val srcAvailabilityExact = actionKind != AssetActionKind.Payment
+    srcAvailabilityField.setVisible(!srcAvailabilityExact)
+    srcAvailabilityField2.setVisible(srcAvailabilityExact)
+
+    updateSchemeAndFund()
+    if (srcAvailabilityExact) updateSrcAvailability()
+    checkForm()
+  }
+
+  def onOperationDate(event: ActionEvent): Unit = {
+    updateSrcAvailability()
+    checkForm()
+  }
+
+  def onSrcFund(event: ActionEvent): Unit = {
+    // TODO - recompute amount based on units and operation date ?
+    val srcAvailabilityExact = actionKind != AssetActionKind.Payment
+
+    if (srcAvailabilityExact) updateSrcAvailability()
+    checkForm()
+  }
+
+  def onSrcAvailability(event: ActionEvent): Unit = {
+    checkForm()
+  }
+
+  def onDstFund(event: ActionEvent): Unit = {
+    // TODO - recompute amount based on units and operation date ?
+    checkForm()
+  }
+
+  def onDstAvailability(event: ActionEvent): Unit = {
+    checkForm()
+  }
+
+  private def updateSchemeAndFund(): Unit = {
+    // TODO - can have separation between list of proposed scheme&fund ?
+    // Note: previous selected value is kept if still present in new items
+
+    // Scheme&fund with asset
+    val fundsWithAsset = savings.assets.map { asset =>
+      val scheme = savings.getScheme(asset.schemeId)
+      val fund = savings.getFund(asset.fundId)
+      SchemeAndFund(scheme, fund)
+    }.distinct.sorted
+    // Other scheme&fund
+    lazy val fundsOther = savings.schemes.flatMap { scheme =>
+      scheme.funds.map { fundId =>
+        val fund = savings.getFund(fundId)
+        SchemeAndFund(scheme, fund)
+      }
+    }.filterNot(fundsWithAsset.contains).sorted
+    // Other scheme&fund for destination, with first same scheme as source if
+    // selected
+    lazy val fundsDst = Option(srcFundField.getValue).map { schemeAndFund =>
+      val (fundsSameScheme1, fundsOtherScheme1) = fundsWithAsset.partition(_.scheme == schemeAndFund.scheme)
+      val (fundsSameScheme2, fundsOtherScheme2) = fundsOther.partition(_.scheme == schemeAndFund.scheme)
+      fundsSameScheme1 ::: fundsSameScheme2 ::: fundsOtherScheme1 ::: fundsOtherScheme2
+    }.getOrElse(fundsWithAsset ::: fundsOther)
+
+    // Notes: don't empty destination list to keep selected value if needed.
+    // Fields are disabled and the selected item will remain if order is
+    // changed next time the fields are enabled.
+    //
+    // Actually, change destination list to prevent glitch (on Windows at
+    // least) which makes srcFundField take more and more width each time its
+    // items are reseted).
+    actionKind match {
+      case AssetActionKind.Payment  =>
+        srcFundField.setItems(FXCollections.observableList(fundsWithAsset ::: fundsOther))
+        dstFundField.setItems(FXCollections.observableList(fundsDst))
+
+      case AssetActionKind.Transfer =>
+        srcFundField.setItems(FXCollections.observableList(fundsWithAsset))
+        dstFundField.setItems(FXCollections.observableList(fundsDst))
+
+      case AssetActionKind.Refund   =>
+        srcFundField.setItems(FXCollections.observableList(fundsWithAsset))
+        dstFundField.setItems(FXCollections.observableList(fundsDst))
+    }
+  }
+
+  private def updateSrcAvailability(): Unit = {
+    // TODO - share ? (here, or in suiryc-scala)
+    implicit val ordering: Ordering[LocalDate] = new Ordering[LocalDate]() {
+      override def compare(x: LocalDate, y: LocalDate) = x.compareTo(y)
+    }
+
+    Option(operationDateField.getValue) match {
+      case Some(date) =>
+        // Note: changing the combobox format appears to be taken into account
+        // right away (unlike TableView). Probably because the concerned content
+        // is drawn when necessary while the table has some already shown.
+        srcAvailabilityField2.setButtonCell(new AvailabilityListCell(Some(date)))
+        srcAvailabilityField2.setCellFactory(Callback { new AvailabilityListCell(Some(date)) })
+
+        srcAvailabilityField2.setDisable(false)
+        // Note: get availabilities for selected scheme&fund, sorted by date (with
+        // immediate availability first).
+        val availabilities = Option(srcFundField.getValue).map { schemeAndFund =>
+          filterAssets(savings.computeAssets(date).assets, schemeAndFund).map(_.availability).distinct.sortBy { opt =>
+            opt.getOrElse(LocalDate.ofEpochDay(0))
+          }
+        }.getOrElse(Nil)
+        srcAvailabilityField2.setItems(FXCollections.observableList(availabilities))
+
+      case None =>
+        srcAvailabilityField2.setDisable(true)
+    }
+  }
+
+  private def checkForm(): Unit = {
+    val opDateOk = Option(operationDateField.getValue).isDefined
+    Form.toggleError(operationDateField, set = !opDateOk,
+      if (opDateOk) None
+      else Some(mandatoryMsg)
+    )
+
+    val srcAvailabilityExact = actionKind != AssetActionKind.Payment
+    val srcSelected = Option(srcFundField.getValue).isDefined
+    val srcAvailabilitySelected =
+      (!srcAvailabilityExact && Option(srcAvailabilityField.getValue).isDefined) ||
+      (srcAvailabilityExact && Option(srcAvailabilityField2.getValue).isDefined)
+    val srcOk = srcSelected && srcAvailabilitySelected
+    Form.toggleError(srcFundField, set = !srcSelected,
+      if (srcSelected) None
+      else Some(mandatoryMsg)
+    )
+    Form.toggleError(srcAvailabilityField, set = !srcAvailabilitySelected,
+      if (srcAvailabilitySelected) None
+      else Some(mandatoryMsg)
+    )
+    Form.toggleError(srcAvailabilityField2, set = !srcAvailabilitySelected,
+      if (srcAvailabilitySelected) None
+      else Some(mandatoryMsg)
+    )
+
+    val dstNeeded = actionKind == AssetActionKind.Transfer
+    val dstSelected = !dstNeeded || Option(dstFundField.getValue).isDefined
+    val dstAvailabilitySelected = !dstNeeded || {
+      val srcAvailability =
+        if (!srcAvailabilityExact) Option(srcAvailabilityField.getValue)
+        else Option(srcAvailabilityField2.getValue).getOrElse(None)
+      // We require to select a date if source has one
+      srcAvailability.isEmpty || Option(dstAvailabilityField.getValue).isDefined
+    }
+    val dstOk = dstSelected && dstAvailabilitySelected
+    Form.toggleError(dstFundField, set = !dstSelected,
+      if (dstSelected) None
+      else Some(mandatoryMsg)
+    )
+    Form.toggleError(dstAvailabilityField, set = !dstAvailabilitySelected,
+      if (dstAvailabilitySelected) None
+      else Some(mandatoryMsg)
+    )
+
+    // TODO - check source amount/units is ok
+    // TODO - check source amount/units is ok when applicable
+    // TODO - hint (form) error if amount/units exceeds asset for transfer/fund
+
+    buttonOk.setDisable(!opDateOk || !srcOk || !dstOk)
+  }
+
+  private def filterAssets(assets: List[Savings.Asset], schemeAndFund: SchemeAndFund): List[Savings.Asset] =
+    assets.filter { asset =>
+      (asset.schemeId == schemeAndFund.scheme.id) &&
+        (asset.fundId == schemeAndFund.fund.id)
+    }
+
+  private def getToggleKind(toggle: Toggle): AssetActionKind.Value =
+    toggle.getUserData.asInstanceOf[AssetActionKind.Value]
 
 }
 
@@ -72,7 +337,7 @@ object NewAssetActionController {
   }
 
   private def resultConverter(controller: NewAssetActionController)(buttonType: ButtonType): Option[Savings.Event] = {
-    // TODO - build Event from of form fields
+    // TODO - build Event from form fields
     if (buttonType != ButtonType.OK) None
     else None
   }

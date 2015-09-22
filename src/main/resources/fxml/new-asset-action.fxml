@@ -5,10 +5,9 @@
 <?import java.lang.*?>
 <?import javafx.scene.layout.*?>
 
-
-<VBox maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="-Infinity" minWidth="-Infinity" xmlns="http://javafx.com/javafx/8" xmlns:fx="http://javafx.com/fxml/1" fx:controller="epsa.controllers.NewAssetActionController">
+<VBox maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" xmlns="http://javafx.com/javafx/8" xmlns:fx="http://javafx.com/fxml/1" fx:controller="epsa.controllers.NewAssetActionController">
    <children>
-      <GridPane hgap="10.0" minHeight="-Infinity" minWidth="-Infinity" vgap="10.0">
+      <GridPane hgap="10.0" vgap="10.0">
          <columnConstraints>
             <ColumnConstraints fillWidth="false" halignment="CENTER" hgrow="SOMETIMES" minWidth="-Infinity" percentWidth="33.0" />
             <ColumnConstraints fillWidth="false" halignment="CENTER" hgrow="SOMETIMES" minWidth="-Infinity" percentWidth="34.0" />
@@ -18,13 +17,13 @@
             <RowConstraints minHeight="-Infinity" vgrow="SOMETIMES" />
          </rowConstraints>
          <children>
-            <RadioButton fx:id="paymentButton" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="-Infinity" minWidth="-Infinity" mnemonicParsing="false" selected="true" text="%Payment" HBox.hgrow="SOMETIMES">
+            <RadioButton fx:id="paymentButton" maxWidth="1.7976931348623157E308" minWidth="-Infinity" mnemonicParsing="false" text="%Payment" HBox.hgrow="SOMETIMES">
                <toggleGroup>
-                  <ToggleGroup fx:id="actionKind" />
+                  <ToggleGroup fx:id="actionKindGroup" />
                </toggleGroup>
             </RadioButton>
-            <RadioButton fx:id="transferButton" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="-Infinity" minWidth="-Infinity" mnemonicParsing="false" text="%Transfer" toggleGroup="$actionKind" GridPane.columnIndex="1" HBox.hgrow="SOMETIMES" />
-            <RadioButton fx:id="refundButton" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="-Infinity" minWidth="-Infinity" mnemonicParsing="false" text="%Refund" toggleGroup="$actionKind" GridPane.columnIndex="2" HBox.hgrow="SOMETIMES" />
+            <RadioButton fx:id="transferButton" maxWidth="1.7976931348623157E308" minWidth="-Infinity" mnemonicParsing="false" text="%Transfer" toggleGroup="$actionKindGroup" GridPane.columnIndex="1" HBox.hgrow="SOMETIMES" />
+            <RadioButton fx:id="refundButton" maxWidth="1.7976931348623157E308" minWidth="-Infinity" mnemonicParsing="false" text="%Refund" toggleGroup="$actionKindGroup" GridPane.columnIndex="2" HBox.hgrow="SOMETIMES" />
          </children>
          <VBox.margin>
             <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
@@ -32,19 +31,52 @@
       </GridPane>
       <GridPane hgap="10.0" vgap="10.0">
         <columnConstraints>
-          <ColumnConstraints hgrow="SOMETIMES" minWidth="10.0" prefWidth="100.0" />
-          <ColumnConstraints hgrow="SOMETIMES" minWidth="10.0" prefWidth="100.0" />
-            <ColumnConstraints hgrow="SOMETIMES" minWidth="10.0" prefWidth="100.0" />
-            <ColumnConstraints hgrow="SOMETIMES" minWidth="10.0" prefWidth="100.0" />
+          <ColumnConstraints hgrow="NEVER" minWidth="-Infinity" />
+          <ColumnConstraints hgrow="SOMETIMES" />
+            <ColumnConstraints hgrow="SOMETIMES" />
         </columnConstraints>
         <rowConstraints>
-          <RowConstraints minHeight="10.0" prefHeight="30.0" vgrow="SOMETIMES" />
-          <RowConstraints minHeight="10.0" prefHeight="30.0" vgrow="SOMETIMES" />
-          <RowConstraints minHeight="10.0" prefHeight="30.0" vgrow="SOMETIMES" />
+            <RowConstraints minHeight="-Infinity" vgrow="SOMETIMES" />
+          <RowConstraints minHeight="-Infinity" vgrow="SOMETIMES" />
+          <RowConstraints minHeight="-Infinity" vgrow="SOMETIMES" />
+          <RowConstraints minHeight="-Infinity" vgrow="SOMETIMES" />
+            <RowConstraints minHeight="-Infinity" vgrow="SOMETIMES" />
+            <RowConstraints minHeight="-Infinity" vgrow="SOMETIMES" />
         </rowConstraints>
          <VBox.margin>
             <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
          </VBox.margin>
+         <children>
+            <Label text="%Operation date:" GridPane.rowIndex="1" />
+            <DatePicker fx:id="operationDateField" maxWidth="1.7976931348623157E308" onAction="#onOperationDate" GridPane.columnIndex="1" GridPane.rowIndex="1" />
+            <Label text="%Scheme/Fund:" GridPane.rowIndex="2" />
+            <ComboBox fx:id="srcFundField" maxWidth="1.7976931348623157E308" onAction="#onSrcFund" GridPane.columnIndex="1" GridPane.rowIndex="2" />
+            <Label text="%Availability:" GridPane.rowIndex="3" />
+            <AnchorPane maxWidth="1.7976931348623157E308" GridPane.columnIndex="1" GridPane.rowIndex="3">
+               <children>
+                  <DatePicker fx:id="srcAvailabilityField" maxWidth="1.7976931348623157E308" onAction="#onSrcAvailability" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0" GridPane.columnIndex="1" GridPane.rowIndex="3" />
+                  <ComboBox fx:id="srcAvailabilityField2" maxWidth="1.7976931348623157E308" onAction="#onSrcAvailability" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0" />
+               </children>
+            </AnchorPane>
+            <Label text="%Amount:" GridPane.rowIndex="4" />
+            <TextField fx:id="srcAmountField" maxWidth="1.7976931348623157E308" GridPane.columnIndex="1" GridPane.rowIndex="4" />
+            <Label text="%Units:" GridPane.rowIndex="5" />
+            <TextField fx:id="srcUnitsField" maxWidth="1.7976931348623157E308" GridPane.columnIndex="1" GridPane.rowIndex="5" />
+            <Label alignment="CENTER" text="%Source" GridPane.columnIndex="1" GridPane.halignment="CENTER" GridPane.valignment="CENTER">
+               <GridPane.margin>
+                  <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
+               </GridPane.margin>
+            </Label>
+            <Label text="%Destination" GridPane.columnIndex="2" GridPane.halignment="CENTER" GridPane.valignment="CENTER">
+               <GridPane.margin>
+                  <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
+               </GridPane.margin>
+            </Label>
+            <ComboBox fx:id="dstFundField" maxWidth="1.7976931348623157E308" onAction="#onDstFund" GridPane.columnIndex="2" GridPane.rowIndex="2" />
+            <DatePicker fx:id="dstAvailabilityField" maxWidth="1.7976931348623157E308" onAction="#onDstAvailability" GridPane.columnIndex="2" GridPane.rowIndex="3" />
+            <TextField fx:id="dstAmountField" maxWidth="1.7976931348623157E308" GridPane.columnIndex="2" GridPane.rowIndex="4" />
+            <TextField fx:id="dstUnitsField" maxWidth="1.7976931348623157E308" GridPane.columnIndex="2" GridPane.rowIndex="5" />
+         </children>
       </GridPane>
    </children>
 </VBox>
