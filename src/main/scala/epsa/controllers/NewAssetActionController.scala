@@ -129,6 +129,11 @@ class NewAssetActionController {
       field.setPromptText(dateFormat)
       field.setConverter(dateConverter)
     }
+
+    // Re-check form when source/destination amount/units is changed
+    for (field <- List(srcAmountField, srcUnitsField, dstAmountField, dstUnitsField)) {
+      field.textProperty.listen(checkForm())
+    }
   }
 
   def onToggleKind(): Unit = {
@@ -263,7 +268,10 @@ class NewAssetActionController {
     val srcAvailabilitySelected =
       (!srcAvailabilityExact && Option(srcAvailabilityField.getValue).isDefined) ||
       (srcAvailabilityExact && Option(srcAvailabilityField2.getValue).isDefined)
-    val srcOk = srcSelected && srcAvailabilitySelected
+    val srcAmountValued = getSrcAmount > 0
+    val srcUnitsValued = getSrcUnits > 0
+    val srcValued = srcAmountValued && srcUnitsValued
+    val srcOk = srcSelected && srcAvailabilitySelected && srcValued
     Form.toggleError(srcFundField, set = !srcSelected,
       if (srcSelected) None
       else Some(mandatoryMsg)
@@ -276,17 +284,25 @@ class NewAssetActionController {
       if (srcAvailabilitySelected) None
       else Some(mandatoryMsg)
     )
+    Form.toggleError(srcAmountField, set = !srcAmountValued,
+      if (srcAmountValued) None
+      else Some(mandatoryMsg)
+    )
+    Form.toggleError(srcUnitsField, set = !srcUnitsValued,
+      if (srcUnitsValued) None
+      else Some(mandatoryMsg)
+    )
 
     val dstNeeded = actionKind == AssetActionKind.Transfer
     val dstSelected = !dstNeeded || Option(dstFundField.getValue).isDefined
     val dstAvailabilitySelected = !dstNeeded || {
-      val srcAvailability =
-        if (!srcAvailabilityExact) Option(srcAvailabilityField.getValue)
-        else Option(srcAvailabilityField2.getValue).getOrElse(None)
       // We require to select a date if source has one
-      srcAvailability.isEmpty || Option(dstAvailabilityField.getValue).isDefined
+      getSrcAvailability.isEmpty || Option(dstAvailabilityField.getValue).isDefined
     }
-    val dstOk = dstSelected && dstAvailabilitySelected
+    val dstAmountValued = !dstNeeded || (getDstAmount > 0)
+    val dstUnitsValued = !dstNeeded || (getDstUnits > 0)
+    val dstValued = dstAmountValued && dstUnitsValued
+    val dstOk = dstSelected && dstAvailabilitySelected && dstValued
     Form.toggleError(dstFundField, set = !dstSelected,
       if (dstSelected) None
       else Some(mandatoryMsg)
@@ -295,9 +311,16 @@ class NewAssetActionController {
       if (dstAvailabilitySelected) None
       else Some(mandatoryMsg)
     )
+    Form.toggleError(dstAmountField, set = !dstAmountValued,
+      if (dstAmountValued) None
+      else Some(mandatoryMsg)
+    )
+    Form.toggleError(dstUnitsField, set = !dstUnitsValued,
+      if (dstUnitsValued) None
+      else Some(mandatoryMsg)
+    )
 
-    // TODO - check source amount/units is ok
-    // TODO - check source amount/units is ok when applicable
+    // TODO - check source amount/units is ok (limit if transfer/refund)
     // TODO - hint (form) error if amount/units exceeds asset for transfer/fund
 
     buttonOk.setDisable(!opDateOk || !srcOk || !dstOk)
@@ -311,6 +334,31 @@ class NewAssetActionController {
 
   private def getToggleKind(toggle: Toggle): AssetActionKind.Value =
     toggle.getUserData.asInstanceOf[AssetActionKind.Value]
+
+  private def getSrcAvailability: Option[LocalDate] = {
+    val srcAvailabilityExact = actionKind != AssetActionKind.Payment
+
+    if (!srcAvailabilityExact) Option(srcAvailabilityField.getValue)
+    else Option(srcAvailabilityField2.getValue).getOrElse(None)
+  }
+
+  private def getBigDecimal(str: String): BigDecimal = try {
+    Option(str).map(BigDecimal(_)).getOrElse(BigDecimal(0))
+  } catch {
+    case ex: Throwable => BigDecimal(0)
+  }
+
+  private def getSrcAmount: BigDecimal =
+    getBigDecimal(srcAmountField.getText)
+
+  private def getSrcUnits: BigDecimal =
+    getBigDecimal(srcUnitsField.getText)
+
+  private def getDstAmount: BigDecimal =
+    getBigDecimal(dstAmountField.getText)
+
+  private def getDstUnits: BigDecimal =
+    getBigDecimal(dstUnitsField.getText)
 
 }
 
