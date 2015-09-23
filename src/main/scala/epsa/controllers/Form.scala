@@ -55,14 +55,17 @@ object Form {
     }
   }
 
-  def formatAvailability(availability: Option[LocalDate], baseOpt: Option[LocalDate], long: Boolean): String =
+  def formatAvailability(availability: Option[LocalDate], date: Option[LocalDate], long: Boolean): String =
     availability.map { avail =>
-      val base = baseOpt.getOrElse(LocalDate.now)
-      if (avail.compareTo(base) <= 0) {
-        // Actually available
-        I18N.getResources.getString("available") +
-          (if (long) s" ($avail)" else "")
-      } else avail.toString
+      Savings.resolveAvailablity(availability, date) match {
+        case Some(_) =>
+          avail.toString
+
+        case None =>
+          // Actually available
+          I18N.getResources.getString("available") +
+            (if (long) s" ($avail)" else "")
+      }
     }.getOrElse(I18N.getResources.getString("available"))
 
   def formatAmount(amount: BigDecimal): String = {

@@ -7,6 +7,11 @@ import spray.json._
 
 object Savings {
 
+  def resolveAvailablity(availability: Option[LocalDate], date0: Option[LocalDate]): Option[LocalDate] = {
+    val date = date0.getOrElse(LocalDate.now)
+    availability.filter(_.compareTo(date) > 0)
+  }
+
   case class Scheme(id: UUID, name: String, funds: List[UUID])
 
   case class Fund(id: UUID, name: String)
@@ -259,7 +264,7 @@ case class Savings(schemes: List[Savings.Scheme] = Nil, funds: List[Savings.Fund
   protected def testAsset(date: LocalDate, currentAsset: Asset, asset: Asset): Boolean = {
     lazy val checkDate =
       if (asset.availability.nonEmpty) currentAsset.availability == asset.availability
-      else currentAsset.availability.map(date.compareTo).getOrElse(1) >= 0
+      else resolveAvailablity(currentAsset.availability, Some(date)).isEmpty
     (currentAsset.schemeId == asset.schemeId) &&
       (currentAsset.fundId == asset.fundId) &&
       checkDate
@@ -432,7 +437,7 @@ case class Savings(schemes: List[Savings.Scheme] = Nil, funds: List[Savings.Fund
     case class AssetComputation(computed: List[Savings.Asset] = Nil, keys: Set[AssetKey] = Set.empty)
 
     def getKey(asset: Savings.Asset): AssetKey = {
-      val availability = asset.availability.filter(_.compareTo(date) > 0)
+      val availability = resolveAvailablity(asset.availability, Some(date))
       AssetKey(asset.schemeId, asset.fundId, availability)
     }
 

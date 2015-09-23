@@ -18,7 +18,6 @@ import suiryc.scala.javafx.util.Callback
 
 // TODO - button to select (existing) scheme&fund+availability
 // TODO - handle some event (action ?) on amount/units to update counterpart (and also destination data if any)
-// TODO - changing availability updates destination' one ?
 // TODO - use value date to handle amount/units conversion on destination
 // TODO - give info on limits for selected asset (and button to use all)
 // TODO - option of default day/month and number of years for frozen assets ?
@@ -84,6 +83,10 @@ class NewAssetActionController {
 
   private var actionKind: AssetActionKind.Value = _
 
+  private var dstAvailabilityChanging = false
+
+  private var dstAvailabilityChosen = false
+
   //def initialize(): Unit = { }
 
   def initialize(savings0: Savings, dialog: Dialog[_], actionKind0: AssetActionKind.Value, asset: Option[Savings.Asset]): Unit = {
@@ -138,7 +141,7 @@ class NewAssetActionController {
   def onToggleKind(): Unit = {
     actionKind = getToggleKind(actionKindGroup.getSelectedToggle)
 
-    val disableDst = actionKind != AssetActionKind.Transfer
+    val disableDst = !isDstEnabled
     dstFundField.setDisable(disableDst)
     dstAvailabilityField.setDisable(disableDst)
     dstAmountField.setDisable(disableDst)
@@ -150,6 +153,8 @@ class NewAssetActionController {
 
     updateSchemeAndFund()
     if (srcAvailabilityExact) updateSrcAvailability()
+    // Simulate changing source availability (to possibly change destination one)
+    if (!disableDst) onSrcAvailability(new ActionEvent())
     checkForm()
   }
 
@@ -168,6 +173,15 @@ class NewAssetActionController {
   }
 
   def onSrcAvailability(event: ActionEvent): Unit = {
+    if (!dstAvailabilityChosen && isDstEnabled) {
+      // Note: 'onDstAvailability' will be triggered, and we want to distinguish
+      // this event from user ones.
+      dstAvailabilityChanging = true
+      // Note: don't forget to use actual availability based o operation date
+      val availability = Savings.resolveAvailablity(getSrcAvailability, Option(operationDateField.getValue))
+      try { dstAvailabilityField.setValue(availability.orNull) }
+      finally { dstAvailabilityChanging = false }
+    }
     checkForm()
   }
 
@@ -177,7 +191,11 @@ class NewAssetActionController {
   }
 
   def onDstAvailability(event: ActionEvent): Unit = {
-    checkForm()
+    if (!dstAvailabilityChanging) {
+      dstAvailabilityChosen = Option(dstAvailabilityField.getValue).isDefined
+      checkForm()
+    }
+    // else: we are changing the value which triggers an event
   }
 
   private def updateSchemeAndFund(): Unit = {
@@ -358,6 +376,9 @@ class NewAssetActionController {
 
   private def getToggleKind(toggle: Toggle): AssetActionKind.Value =
     toggle.getUserData.asInstanceOf[AssetActionKind.Value]
+
+  private def isDstEnabled: Boolean =
+    actionKind == AssetActionKind.Transfer
 
   private def getSrcAvailability: Option[LocalDate] = {
     val srcAvailabilityExact = actionKind != AssetActionKind.Payment
