@@ -177,7 +177,7 @@ class MainController extends Logging {
         savings.getFund(asset.fundId).name
       }.orNull)
       availabilityField.setText(assetOpt.map { asset =>
-        Form.formatAvailability(asset.availability, baseOpt = None, long = true)
+        Form.formatAvailability(asset.availability, date = None, long = true)
       }.orNull)
       amountField.setText(assetOpt.map { asset =>
         Form.formatAmount(asset.amount)

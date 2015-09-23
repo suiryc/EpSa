@@ -60,7 +60,7 @@ class AvailabilityTableCell[A]
   override protected def updateItem(item: Option[LocalDate], empty: Boolean) {
     super.updateItem(item, empty)
     if (empty) setText(null)
-    else setText(Form.formatAvailability(item, baseOpt = None, long = false))
+    else setText(Form.formatAvailability(item, date = None, long = false))
   }
 
 }
