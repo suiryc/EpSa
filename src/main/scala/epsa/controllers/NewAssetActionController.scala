@@ -13,6 +13,7 @@ import javafx.scene.control._
 import javafx.util.converter.LocalDateStringConverter
 import scala.collection.JavaConversions._
 import suiryc.scala.javafx.beans.value.RichObservableValue._
+import suiryc.scala.javafx.event.EventHandler._
 import suiryc.scala.javafx.stage.Stages
 import suiryc.scala.javafx.util.Callback
 
@@ -23,6 +24,7 @@ import suiryc.scala.javafx.util.Callback
 // TODO - option of default day/month and number of years for frozen assets ?
 // TODO - hint (tooltips/combobox) existing availability dates when applicable ?
 // TODO - select first (if any) value of ComboBoxes by default ?
+// TODO - persist dialog location (or at least size)
 class NewAssetActionController {
 
   //@FXML
@@ -136,8 +138,16 @@ class NewAssetActionController {
 
     // Re-check form when source/destination amount/units is changed
     for (field <- List(srcAmountField, srcUnitsField, dstAmountField, dstUnitsField)) {
-      field.textProperty.listen(checkForm())
+      field.textProperty.listen {
+        checkForm()
+        ()
+      }
     }
+
+    // Really make sure we don't leave if something is not OK
+    buttonOk.addEventFilter(ActionEvent.ACTION, { (event: ActionEvent) =>
+      if (checkForm().isEmpty) event.consume()
+    })
   }
 
   def onToggleKind(): Unit = breakRecursion {
@@ -293,7 +303,7 @@ class NewAssetActionController {
     }
   }
 
-  private def checkForm(): Unit = {
+  private def checkForm(): Option[Savings.Event] = {
     val operationDate = operationDateField.getValue
     val opDateOk = Option(operationDate).isDefined
     Form.toggleError(operationDateField, set = !opDateOk,
@@ -312,13 +322,13 @@ class NewAssetActionController {
     val srcAmountValued = srcAmount > 0
     val srcUnits = getSrcUnits
     val srcUnitsValued = srcUnits > 0
+    lazy val srcAsset = Savings.Asset(srcFund.scheme.id, srcFund.fund.id, srcAvailability, srcAmount, srcUnits)
     val (srcAmountOk, srcUnitsOk) =
       if (!isPayment && srcSelected && srcAvailabilitySelected) {
-        val opAsset = Savings.Asset(srcFund.scheme.id, srcFund.fund.id, srcAvailability, srcAmount, srcUnits)
-        savings.computeAssets(operationDate).findAsset(operationDate, opAsset) match {
+        savings.computeAssets(operationDate).findAsset(operationDate, srcAsset) match {
           case Some(asset) =>
-            (srcAmountValued && (asset.amount >= opAsset.amount),
-              srcUnitsValued && (asset.units >= opAsset.units))
+            (srcAmountValued && (asset.amount >= srcAsset.amount),
+              srcUnitsValued && (asset.units >= srcAsset.units))
 
           case None =>
             (false, false)
@@ -350,14 +360,19 @@ class NewAssetActionController {
     )
 
     val dstNeeded = actionKind == AssetActionKind.Transfer
-    val dstSelected = !dstNeeded || Option(dstFundField.getValue).isDefined
+    lazy val dstFund = dstFundField.getValue
+    val dstSelected = !dstNeeded || Option(dstFund).isDefined
+    lazy val dstAvailability = Option(dstAvailabilityField.getValue)
     val dstAvailabilitySelected = !dstNeeded || {
       // We require to select a date if source has one
-      getSrcAvailability.isEmpty || Option(dstAvailabilityField.getValue).isDefined
+      getSrcAvailability.isEmpty || dstAvailability.isDefined
     }
-    val dstAmountValued = !dstNeeded || (getDstAmount > 0)
-    val dstUnitsValued = !dstNeeded || (getDstUnits > 0)
+    lazy val dstAmount = getDstAmount
+    val dstAmountValued = !dstNeeded || (dstAmount > 0)
+    lazy val dstUnits = getDstUnits
+    val dstUnitsValued = !dstNeeded || (dstUnits > 0)
     val dstValued = dstAmountValued && dstUnitsValued
+    lazy val dstAsset = Savings.Asset(dstFund.scheme.id, dstFund.fund.id, dstAvailability, dstAmount, dstUnits)
     val dstOk = dstSelected && dstAvailabilitySelected && dstValued
     Form.toggleError(dstFundField, set = !dstSelected,
       if (dstSelected) None
@@ -376,7 +391,16 @@ class NewAssetActionController {
       else Some(mandatoryMsg)
     )
 
-    buttonOk.setDisable(!opDateOk || !srcOk || !dstOk)
+    val event = if (opDateOk && srcOk && dstOk) Some {
+      actionKind match {
+        case AssetActionKind.Payment  => Savings.MakePayment(operationDate, srcAsset)
+        case AssetActionKind.Transfer => Savings.MakeTransfer(operationDate, srcAsset, dstAsset)
+        case AssetActionKind.Refund   => Savings.MakeRefund(operationDate, srcAsset)
+      }
+    } else None
+    buttonOk.setDisable(event.isEmpty)
+
+    event
   }
 
   private def filterAssets(assets: List[Savings.Asset], schemeAndFund: SchemeAndFund): List[Savings.Asset] =
@@ -452,9 +476,8 @@ object NewAssetActionController {
   }
 
   private def resultConverter(controller: NewAssetActionController)(buttonType: ButtonType): Option[Savings.Event] = {
-    // TODO - build Event from form fields
     if (buttonType != ButtonType.OK) None
-    else None
+    else controller.checkForm()
   }
 
 }
