@@ -36,7 +36,7 @@ class SchemeAndFundCell
   override protected def updateItem(item: SchemeAndFund, empty: Boolean) {
     super.updateItem(item, empty)
     if (empty) setText(null)
-    else setText(s"${item.scheme.name} / ${item.fund.name}")
+    else setText(s"${item.fund.name} / ${item.scheme.name}")
   }
 
 }

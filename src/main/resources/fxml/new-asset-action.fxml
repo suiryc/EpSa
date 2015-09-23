@@ -49,7 +49,7 @@
          <children>
             <Label text="%Operation date:" GridPane.rowIndex="1" />
             <DatePicker fx:id="operationDateField" onAction="#onOperationDate" GridPane.columnIndex="1" GridPane.rowIndex="1" />
-            <Label text="%Scheme/Fund:" GridPane.rowIndex="2" />
+            <Label text="%Fund/Scheme:" GridPane.rowIndex="2" />
             <ComboBox fx:id="srcFundField" maxWidth="1.7976931348623157E308" onAction="#onSrcFund" GridPane.columnIndex="1" GridPane.rowIndex="2" />
             <Label text="%Availability:" GridPane.rowIndex="3" />
             <DatePicker fx:id="srcAvailabilityField" onAction="#onSrcAvailability" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0" GridPane.columnIndex="1" GridPane.rowIndex="3" />
