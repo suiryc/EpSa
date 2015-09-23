@@ -32,8 +32,8 @@
       <GridPane hgap="10.0" vgap="10.0">
         <columnConstraints>
           <ColumnConstraints hgrow="NEVER" minWidth="-Infinity" />
-          <ColumnConstraints hgrow="SOMETIMES" />
-            <ColumnConstraints hgrow="SOMETIMES" />
+          <ColumnConstraints hgrow="SOMETIMES" maxWidth="1.7976931348623157E308" prefWidth="174.0" />
+            <ColumnConstraints hgrow="SOMETIMES" maxWidth="1.7976931348623157E308" prefWidth="174.0" />
         </columnConstraints>
         <rowConstraints>
             <RowConstraints minHeight="-Infinity" vgrow="SOMETIMES" />
@@ -48,16 +48,12 @@
          </VBox.margin>
          <children>
             <Label text="%Operation date:" GridPane.rowIndex="1" />
-            <DatePicker fx:id="operationDateField" maxWidth="1.7976931348623157E308" onAction="#onOperationDate" GridPane.columnIndex="1" GridPane.rowIndex="1" />
+            <DatePicker fx:id="operationDateField" onAction="#onOperationDate" GridPane.columnIndex="1" GridPane.rowIndex="1" />
             <Label text="%Scheme/Fund:" GridPane.rowIndex="2" />
             <ComboBox fx:id="srcFundField" maxWidth="1.7976931348623157E308" onAction="#onSrcFund" GridPane.columnIndex="1" GridPane.rowIndex="2" />
             <Label text="%Availability:" GridPane.rowIndex="3" />
-            <AnchorPane maxWidth="1.7976931348623157E308" GridPane.columnIndex="1" GridPane.rowIndex="3">
-               <children>
-                  <DatePicker fx:id="srcAvailabilityField" maxWidth="1.7976931348623157E308" onAction="#onSrcAvailability" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0" GridPane.columnIndex="1" GridPane.rowIndex="3" />
-                  <ComboBox fx:id="srcAvailabilityField2" maxWidth="1.7976931348623157E308" onAction="#onSrcAvailability" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0" />
-               </children>
-            </AnchorPane>
+            <DatePicker fx:id="srcAvailabilityField" onAction="#onSrcAvailability" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0" GridPane.columnIndex="1" GridPane.rowIndex="3" />
+            <ComboBox fx:id="srcAvailabilityField2" maxWidth="1.7976931348623157E308" onAction="#onSrcAvailability" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0" GridPane.columnIndex="1" GridPane.rowIndex="3" />
             <Label text="%Amount:" GridPane.rowIndex="4" />
             <TextField fx:id="srcAmountField" maxWidth="1.7976931348623157E308" GridPane.columnIndex="1" GridPane.rowIndex="4" />
             <Label text="%Units:" GridPane.rowIndex="5" />
@@ -73,7 +69,7 @@
                </GridPane.margin>
             </Label>
             <ComboBox fx:id="dstFundField" maxWidth="1.7976931348623157E308" onAction="#onDstFund" GridPane.columnIndex="2" GridPane.rowIndex="2" />
-            <DatePicker fx:id="dstAvailabilityField" maxWidth="1.7976931348623157E308" onAction="#onDstAvailability" GridPane.columnIndex="2" GridPane.rowIndex="3" />
+            <DatePicker fx:id="dstAvailabilityField" onAction="#onDstAvailability" GridPane.columnIndex="2" GridPane.rowIndex="3" />
             <TextField fx:id="dstAmountField" maxWidth="1.7976931348623157E308" GridPane.columnIndex="2" GridPane.rowIndex="4" />
             <TextField fx:id="dstUnitsField" maxWidth="1.7976931348623157E308" GridPane.columnIndex="2" GridPane.rowIndex="5" />
          </children>
