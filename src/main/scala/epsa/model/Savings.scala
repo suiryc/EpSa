@@ -270,7 +270,7 @@ case class Savings(schemes: List[Savings.Scheme] = Nil, funds: List[Savings.Fund
       checkDate
   }
 
-  protected def findAsset(date: LocalDate, asset: Asset): Option[Savings.Asset] =
+  def findAsset(date: LocalDate, asset: Asset): Option[Savings.Asset] =
     assets.find(testAsset(date, _, asset))
 
   protected def updateAsset(date: LocalDate, asset: Asset): Savings =

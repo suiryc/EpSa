@@ -79,11 +79,13 @@ class NewAssetActionController {
 
   private lazy val mandatoryMsg = resources.getString("Mandatory field")
 
+  private lazy val valueLimitMsg = resources.getString("Value exceeds available quantity")
+
   private var savings: Savings = _
 
   private var actionKind: AssetActionKind.Value = _
 
-  private var dstAvailabilityChanging = false
+  private var recursionLevel = 0
 
   private var dstAvailabilityChosen = false
 
@@ -138,7 +140,7 @@ class NewAssetActionController {
     }
   }
 
-  def onToggleKind(): Unit = {
+  def onToggleKind(): Unit = breakRecursion {
     actionKind = getToggleKind(actionKindGroup.getSelectedToggle)
 
     val disableDst = !isDstEnabled
@@ -158,12 +160,12 @@ class NewAssetActionController {
     checkForm()
   }
 
-  def onOperationDate(event: ActionEvent): Unit = {
+  def onOperationDate(event: ActionEvent): Unit = breakRecursion {
     updateSrcAvailability()
     checkForm()
   }
 
-  def onSrcFund(event: ActionEvent): Unit = {
+  def onSrcFund(event: ActionEvent): Unit = breakRecursion {
     // TODO - recompute amount based on units and operation date ?
     val srcAvailabilityExact = actionKind != AssetActionKind.Payment
 
@@ -172,30 +174,23 @@ class NewAssetActionController {
     checkForm()
   }
 
-  def onSrcAvailability(event: ActionEvent): Unit = {
+  def onSrcAvailability(event: ActionEvent): Unit = breakRecursion {
     if (!dstAvailabilityChosen && isDstEnabled) {
-      // Note: 'onDstAvailability' will be triggered, and we want to distinguish
-      // this event from user ones.
-      dstAvailabilityChanging = true
       // Note: don't forget to use actual availability based o operation date
       val availability = Savings.resolveAvailablity(getSrcAvailability, Option(operationDateField.getValue))
-      try { dstAvailabilityField.setValue(availability.orNull) }
-      finally { dstAvailabilityChanging = false }
+      dstAvailabilityField.setValue(availability.orNull)
     }
     checkForm()
   }
 
-  def onDstFund(event: ActionEvent): Unit = {
+  def onDstFund(event: ActionEvent): Unit = breakRecursion {
     // TODO - recompute amount based on units and operation date ?
     checkForm()
   }
 
-  def onDstAvailability(event: ActionEvent): Unit = {
-    if (!dstAvailabilityChanging) {
-      dstAvailabilityChosen = Option(dstAvailabilityField.getValue).isDefined
-      checkForm()
-    }
-    // else: we are changing the value which triggers an event
+  def onDstAvailability(event: ActionEvent): Unit = breakRecursion {
+    dstAvailabilityChosen = Option(dstAvailabilityField.getValue).isDefined
+    checkForm()
   }
 
   private def updateSchemeAndFund(): Unit = {
@@ -299,21 +294,38 @@ class NewAssetActionController {
   }
 
   private def checkForm(): Unit = {
-    val opDateOk = Option(operationDateField.getValue).isDefined
+    val operationDate = operationDateField.getValue
+    val opDateOk = Option(operationDate).isDefined
     Form.toggleError(operationDateField, set = !opDateOk,
       if (opDateOk) None
       else Some(mandatoryMsg)
     )
 
-    val srcAvailabilityExact = actionKind != AssetActionKind.Payment
-    val srcSelected = Option(srcFundField.getValue).isDefined
+    val isPayment = actionKind == AssetActionKind.Payment
+    val srcFund = srcFundField.getValue
+    val srcSelected = Option(srcFund).isDefined
+    val srcAvailability = getSrcAvailability
     val srcAvailabilitySelected =
-      (!srcAvailabilityExact && Option(srcAvailabilityField.getValue).isDefined) ||
-      (srcAvailabilityExact && Option(srcAvailabilityField2.getValue).isDefined)
-    val srcAmountValued = getSrcAmount > 0
-    val srcUnitsValued = getSrcUnits > 0
-    val srcValued = srcAmountValued && srcUnitsValued
-    val srcOk = srcSelected && srcAvailabilitySelected && srcValued
+      (isPayment && Option(srcAvailabilityField.getValue).isDefined) ||
+      (!isPayment && Option(srcAvailabilityField2.getValue).isDefined)
+    val srcAmount = getSrcAmount
+    val srcAmountValued = srcAmount > 0
+    val srcUnits = getSrcUnits
+    val srcUnitsValued = srcUnits > 0
+    val (srcAmountOk, srcUnitsOk) =
+      if (!isPayment && srcSelected && srcAvailabilitySelected) {
+        val opAsset = Savings.Asset(srcFund.scheme.id, srcFund.fund.id, srcAvailability, srcAmount, srcUnits)
+        savings.computeAssets(operationDate).findAsset(operationDate, opAsset) match {
+          case Some(asset) =>
+            (srcAmountValued && (asset.amount >= opAsset.amount),
+              srcUnitsValued && (asset.units >= opAsset.units))
+
+          case None =>
+            (false, false)
+        }
+      } else (srcAmountValued, srcUnitsValued)
+    val srcValuedOk = srcAmountOk && srcUnitsOk
+    val srcOk = srcSelected && srcAvailabilitySelected && srcValuedOk
     Form.toggleError(srcFundField, set = !srcSelected,
       if (srcSelected) None
       else Some(mandatoryMsg)
@@ -326,13 +338,15 @@ class NewAssetActionController {
       if (srcAvailabilitySelected) None
       else Some(mandatoryMsg)
     )
-    Form.toggleError(srcAmountField, set = !srcAmountValued,
-      if (srcAmountValued) None
-      else Some(mandatoryMsg)
+    Form.toggleError(srcAmountField, set = !srcAmountValued || !srcAmountOk,
+      if (!srcAmountValued) Some(mandatoryMsg)
+      else if (!srcAmountOk) Some(valueLimitMsg)
+      else None
     )
-    Form.toggleError(srcUnitsField, set = !srcUnitsValued,
-      if (srcUnitsValued) None
-      else Some(mandatoryMsg)
+    Form.toggleError(srcUnitsField, set = !srcUnitsValued || !srcUnitsOk,
+      if (!srcUnitsValued) Some(mandatoryMsg)
+      else if (!srcUnitsOk) Some(valueLimitMsg)
+      else None
     )
 
     val dstNeeded = actionKind == AssetActionKind.Transfer
@@ -361,9 +375,6 @@ class NewAssetActionController {
       if (dstUnitsValued) None
       else Some(mandatoryMsg)
     )
-
-    // TODO - check source amount/units is ok (limit if transfer/refund)
-    // TODO - hint (form) error if amount/units exceeds asset for transfer/fund
 
     buttonOk.setDisable(!opDateOk || !srcOk || !dstOk)
   }
@@ -404,6 +415,17 @@ class NewAssetActionController {
 
   private def getDstUnits: BigDecimal =
     getBigDecimal(dstUnitsField.getText)
+
+  private def breakRecursion[A](f: => A): Unit =
+    if (recursionLevel == 0) {
+      recursionLevel += 1
+      try {
+        f
+      }
+      finally {
+        recursionLevel -= 1
+      }
+    }
 
 }
 
