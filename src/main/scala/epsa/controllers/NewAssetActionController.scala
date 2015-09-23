@@ -22,7 +22,6 @@ import suiryc.scala.javafx.util.Callback
 // TODO - use value date to handle amount/units conversion on destination
 // TODO - give info on limits for selected asset (and button to use all)
 // TODO - option of default day/month and number of years for frozen assets ?
-// TODO - prevent validation if transferring to same asset
 // TODO - hint (tooltips/combobox) existing availability dates when applicable ?
 // TODO - select first (if any) value of ComboBoxes by default ?
 class NewAssetActionController {
@@ -164,6 +163,7 @@ class NewAssetActionController {
     val srcAvailabilityExact = actionKind != AssetActionKind.Payment
 
     if (srcAvailabilityExact) updateSrcAvailability()
+    updateDstSchemeAndFund()
     checkForm()
   }
 
@@ -190,40 +190,64 @@ class NewAssetActionController {
       val fund = savings.getFund(asset.fundId)
       SchemeAndFund(scheme, fund)
     }.distinct.sorted
-    // Other scheme&fund
-    lazy val fundsOther = savings.schemes.flatMap { scheme =>
-      scheme.funds.map { fundId =>
-        val fund = savings.getFund(fundId)
-        SchemeAndFund(scheme, fund)
-      }
-    }.filterNot(fundsWithAsset.contains).sorted
-    // Other scheme&fund for destination, with first same scheme as source if
-    // selected
-    lazy val fundsDst = Option(srcFundField.getValue).map { schemeAndFund =>
-      val (fundsSameScheme1, fundsOtherScheme1) = fundsWithAsset.partition(_.scheme == schemeAndFund.scheme)
-      val (fundsSameScheme2, fundsOtherScheme2) = fundsOther.partition(_.scheme == schemeAndFund.scheme)
-      fundsSameScheme1 ::: fundsSameScheme2 ::: fundsOtherScheme1 ::: fundsOtherScheme2
-    }.getOrElse(fundsWithAsset ::: fundsOther)
+
+    // Note:
+    // If grid columns have 'computed' preferred width, the ones which items
+    // are changed usually gets resized accordingly, which may not look nice.
+    // Changing both source/destination items often workaround this, but not
+    // always. The best solution is to have an explicit preferred width so
+    // that it does not get recomputed according to content.
+    if (actionKind == AssetActionKind.Payment) {
+      // Other scheme&fund
+      val fundsOther = savings.schemes.flatMap { scheme =>
+        scheme.funds.map { fundId =>
+          val fund = savings.getFund(fundId)
+          SchemeAndFund(scheme, fund)
+        }
+      }.filterNot(fundsWithAsset.contains).sorted
+
+      srcFundField.setItems(FXCollections.observableList(fundsWithAsset ::: fundsOther))
+    } else {
+      srcFundField.setItems(FXCollections.observableList(fundsWithAsset))
+    }
+    updateDstSchemeAndFund()
+  }
+
+  private def updateDstSchemeAndFund(): Unit = {
+    // TODO - can have separation between list of proposed scheme&fund ?
 
     // Notes: don't empty destination list to keep selected value if needed.
     // Fields are disabled and the selected item will remain if order is
     // changed next time the fields are enabled.
     //
-    // Actually, change destination list to prevent glitch (on Windows at
-    // least) which makes srcFundField take more and more width each time its
-    // items are reseted).
-    actionKind match {
-      case AssetActionKind.Payment  =>
-        srcFundField.setItems(FXCollections.observableList(fundsWithAsset ::: fundsOther))
-        dstFundField.setItems(FXCollections.observableList(fundsDst))
+    // If grid columns have 'computed' preferred width, the ones which items
+    // are changed usually gets resized accordingly, which may not look nice.
+    // Changing both source/destination items often workaround this, but not
+    // always. The best solution is to have an explicit preferred width so
+    // that it does not get recomputed according to content.
+    if (actionKind == AssetActionKind.Transfer) {
+      // Scheme&fund with asset
+      val fundsWithAsset = savings.assets.map { asset =>
+        val scheme = savings.getScheme(asset.schemeId)
+        val fund = savings.getFund(asset.fundId)
+        SchemeAndFund(scheme, fund)
+      }.distinct.sorted
+      // Other scheme&fund
+      val fundsOther = savings.schemes.flatMap { scheme =>
+        scheme.funds.map { fundId =>
+          val fund = savings.getFund(fundId)
+          SchemeAndFund(scheme, fund)
+        }
+      }.filterNot(fundsWithAsset.contains).sorted
+      // Other scheme&fund for destination, with first same scheme as source if
+      // selected
+      val fundsDst = Option(srcFundField.getValue).map { schemeAndFund =>
+        val (fundsSameScheme1, fundsOtherScheme1) = fundsWithAsset.filterNot(_ == schemeAndFund).partition(_.scheme == schemeAndFund.scheme)
+        val (fundsSameScheme2, fundsOtherScheme2) = fundsOther.partition(_.scheme == schemeAndFund.scheme)
+        fundsSameScheme1 ::: fundsSameScheme2 ::: fundsOtherScheme1 ::: fundsOtherScheme2
+      }.getOrElse(fundsWithAsset ::: fundsOther)
 
-      case AssetActionKind.Transfer =>
-        srcFundField.setItems(FXCollections.observableList(fundsWithAsset))
-        dstFundField.setItems(FXCollections.observableList(fundsDst))
-
-      case AssetActionKind.Refund   =>
-        srcFundField.setItems(FXCollections.observableList(fundsWithAsset))
-        dstFundField.setItems(FXCollections.observableList(fundsDst))
+      dstFundField.setItems(FXCollections.observableList(fundsDst))
     }
   }
 
