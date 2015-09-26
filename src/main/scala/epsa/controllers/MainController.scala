@@ -307,31 +307,37 @@ class MainController extends Logging {
 
     // See: https://www.marshall.edu/genomicjava/2013/12/30/javafx-tableviews-with-contextmenus/
     val menu = new ContextMenu()
-    val editScheme = new MenuItem(resources.getString("Edit scheme"))
+    // Note: Image(url, requestedWidth, requestedHeight, preserveRatio, smooth, backgroundLoading)
+    val editScheme = new MenuItem(resources.getString("Edit scheme"),
+      new ImageView(new Image("/images/fugue-icons/tables.png", 0.0, 0.0, true, false, false)))
     editScheme.setOnAction { (event: ActionEvent) =>
       Option(row.getItem).foreach { asset =>
         actor ! OnEditSchemes(Some(asset.schemeId))
       }
     }
-    val editFund = new MenuItem(resources.getString("Edit fund"))
+    val editFund = new MenuItem(resources.getString("Edit fund"),
+      new ImageView(new Image("/images/fugue-icons/table.png", 0.0, 0.0, true, false, false)))
     editFund.setOnAction { (event: ActionEvent) =>
       Option(row.getItem).foreach { asset =>
         actor ! OnEditFunds(Some(asset.fundId))
       }
     }
-    val newPayment = new MenuItem(resources.getString("New payment"))
+    val newPayment = new MenuItem(resources.getString("New payment"),
+      new ImageView(new Image("/images/fugue-icons/table-import.png", 0.0, 0.0, true, false, false)))
     newPayment.setOnAction { (event: ActionEvent) =>
       Option(row.getItem).foreach { asset =>
         actor ! OnNewAssetAction(AssetActionKind.Payment, Some(asset))
       }
     }
-    val newArbitrage = new MenuItem(resources.getString("New transfer"))
+    val newArbitrage = new MenuItem(resources.getString("New transfer"),
+      new ImageView(new Image("/images/fugue-icons/tables-relation.png", 0.0, 0.0, true, false, false)))
     newArbitrage.setOnAction { (event: ActionEvent) =>
       Option(row.getItem).foreach { asset =>
         actor ! OnNewAssetAction(AssetActionKind.Transfer, Some(asset))
       }
     }
-    val newRefund = new MenuItem(resources.getString("New refund"))
+    val newRefund = new MenuItem(resources.getString("New refund"),
+      new ImageView(new Image("/images/fugue-icons/table-export.png", 0.0, 0.0, true, false, false)))
     newRefund.setOnAction { (event: ActionEvent) =>
       Option(row.getItem).foreach { asset =>
         actor ! OnNewAssetAction(AssetActionKind.Refund, Some(asset))
