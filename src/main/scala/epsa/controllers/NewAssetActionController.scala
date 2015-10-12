@@ -10,8 +10,11 @@ import javafx.collections.FXCollections
 import javafx.fxml.{FXML, FXMLLoader}
 import javafx.scene.Node
 import javafx.scene.control._
+import javafx.stage.Stage
 import javafx.util.converter.LocalDateStringConverter
 import scala.collection.JavaConversions._
+import suiryc.scala.javafx.stage.Stages.StageLocation
+import suiryc.scala.settings.Preference
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.event.EventHandler._
 import suiryc.scala.javafx.stage.Stages
@@ -24,8 +27,11 @@ import suiryc.scala.javafx.util.Callback
 // TODO - option of default day/month and number of years for frozen assets ?
 // TODO - hint (tooltips/combobox) existing availability dates when applicable ?
 // TODO - select first (if any) value of ComboBoxes by default ?
-// TODO - persist dialog location (or at least size)
 class NewAssetActionController {
+
+  import epsa.Main.prefs
+
+  private val stageLocation = Preference.from("stage.new-asset-action.location", null:StageLocation)
 
   //@FXML
   //protected var location: URL = _
@@ -76,6 +82,8 @@ class NewAssetActionController {
   protected var dstUnitsField: TextField = _
 
   protected var buttonOk: Node = _
+
+  private lazy val stage = paymentButton.getScene.getWindow.asInstanceOf[Stage]
 
   private lazy val toggleButtons = List(paymentButton, transferButton, refundButton)
 
@@ -148,6 +156,25 @@ class NewAssetActionController {
     buttonOk.addEventFilter(ActionEvent.ACTION, { (event: ActionEvent) =>
       if (checkForm().isEmpty) event.consume()
     })
+  }
+
+  /** Restores (persisted) view. */
+  private def restoreView(): Unit = {
+    // Restore stage location
+    Option(stageLocation()).foreach { loc =>
+      Stages.setLocation(stage, loc, setSize = true)
+    }
+  }
+
+  /** Persists view (stage location, ...). */
+  private def persistView(): Unit = {
+    // Persist stage location
+    // Note: if iconified, resets it
+    stageLocation() = Stages.getLocation(stage).orNull
+  }
+
+  def onCloseRequest(event: DialogEvent): Unit = {
+    persistView()
   }
 
   def onToggleKind(): Unit = breakRecursion {
@@ -468,6 +495,15 @@ object NewAssetActionController {
     dialog.getDialogPane.setContent(loader.load())
     val controller = loader.getController[NewAssetActionController]
     controller.initialize(savings, dialog, kind, asset)
+
+    // Delegate closing request to controller
+    dialog.setOnCloseRequest(controller.onCloseRequest _)
+
+    // Wait for dialog to be shown before restoring the view
+    dialog.showingProperty().listen2 { cancellable =>
+      cancellable.cancel()
+      controller.restoreView()
+    }
 
     dialog.setResultConverter(Callback { resultConverter(controller) _ })
     Stages.trackMinimumDimensions(Stages.getStage(dialog))
