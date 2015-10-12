@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
+<?import javafx.scene.input.*?>
 <?import javafx.scene.image.*?>
 <?import javafx.geometry.*?>
 <?import javafx.scene.control.*?>
@@ -20,6 +21,9 @@
                            </image>
                         </ImageView>
                      </graphic>
+                     <accelerator>
+                        <KeyCodeCombination alt="UP" code="N" control="DOWN" meta="UP" shift="UP" shortcut="UP" />
+                     </accelerator>
                   </MenuItem>
                   <MenuItem mnemonicParsing="false" onAction="#onFileOpen" text="%Open">
                      <graphic>
@@ -28,7 +32,10 @@
                               <Image url="@../images/fugue-icons/folder-open-document.png" />
                            </image>
                         </ImageView>
-                     </graphic></MenuItem>
+                     </graphic>
+                     <accelerator>
+                        <KeyCodeCombination alt="UP" code="O" control="DOWN" meta="UP" shift="UP" shortcut="UP" />
+                     </accelerator></MenuItem>
                   <MenuItem fx:id="fileCloseMenu" mnemonicParsing="false" onAction="#onFileClose" text="%Close">
                      <graphic>
                         <ImageView pickOnBounds="true" preserveRatio="true">
@@ -45,7 +52,10 @@
                               <Image url="@../images/fugue-icons/disk.png" />
                            </image>
                         </ImageView>
-                     </graphic></MenuItem>
+                     </graphic>
+                     <accelerator>
+                        <KeyCodeCombination alt="UP" code="S" control="DOWN" meta="UP" shift="UP" shortcut="UP" />
+                     </accelerator></MenuItem>
                   <SeparatorMenuItem mnemonicParsing="false" />
               <MenuItem mnemonicParsing="false" onAction="#onExit" text="%Exit">
                      <graphic>
@@ -54,7 +64,10 @@
                               <Image url="@../images/fugue-icons/application--arrow.png" />
                            </image>
                         </ImageView>
-                     </graphic></MenuItem>
+                     </graphic>
+                     <accelerator>
+                        <KeyCodeCombination alt="UP" code="Q" control="DOWN" meta="UP" shift="UP" shortcut="UP" />
+                     </accelerator></MenuItem>
             </items>
           </Menu>
           <Menu mnemonicParsing="false" text="%Edit">

@@ -33,7 +33,6 @@ import suiryc.scala.javafx.stage.Stages
 import suiryc.scala.javafx.util.Callback
 import suiryc.scala.settings.Preference
 
-// TODO - menu key shortcuts ?
 // TODO - change menu for OS integration ? (e.g. Ubuntu)
 // TODO - save fund value history in datastore
 // TODO - display base and current (to date) amounts in assets table
