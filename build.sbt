@@ -10,7 +10,7 @@ val versions = Map[String, String](
   "logback"      -> "1.1.2",
   "poi"          -> "3.12",
   "scala"        -> "2.11.7",
-  "slick"        -> "3.0.2",
+  "slick"        -> "3.1.0",
   "spray-json"   -> "1.3.2",
   "suiryc-scala" -> "0.0.2-SNAPSHOT",
   "tape"         -> "1.2.3"
