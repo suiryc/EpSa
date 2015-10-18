@@ -5,7 +5,7 @@ import javafx.scene.paint.Color
 import javafx.scene.text.{Text, TextFlow}
 
 /** Chart data. */
-case class ChartData(x: String, y: Double)
+case class ChartData(x: String, y: BigDecimal)
 
 /**
  * Chart data 'label'.
@@ -63,7 +63,7 @@ class ChartDataLabel extends VBox {
   def setData(data: ChartData): Unit = {
     dataText.setText(s"Date: ${data.x}\nVL: ${data.y}€")
     refData.foreach { refData =>
-      val delta = if (refData.y != 0) {
+      val delta: BigDecimal = if (refData.y.compare(java.math.BigDecimal.ZERO) != 0) {
         (data.y - refData.y) * 100 / refData.y
       } else {
         0

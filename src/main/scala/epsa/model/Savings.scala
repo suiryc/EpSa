@@ -19,6 +19,9 @@ object Savings {
   // TODO - fundId ok even if dealing with 'frozen current account' ?
   case class Asset(schemeId: UUID, fundId: UUID, availability: Option[LocalDate], amount: BigDecimal, units: BigDecimal)
 
+  /** Asset value: holds asset value at a given date. */
+  case class AssetValue(date: LocalDate, value: BigDecimal)
+
   sealed trait Event
 
   case class CreateScheme(schemeId: UUID, name: String)

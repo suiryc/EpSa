@@ -1,8 +1,10 @@
 package epsa.tools
 
-import epsa.model.{AssetValue, InvestmentFund}
+import epsa.model.InvestmentFund
+import epsa.model.Savings.AssetValue
 import java.nio.file.Path
-import java.text.SimpleDateFormat
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import org.apache.poi.ss.usermodel.WorkbookFactory
 
 /**
@@ -47,12 +49,12 @@ object EsaliaInvestmentFundProber {
         (row5.getCell(dateCellIdx).getStringCellValue == "Date VL") &&
         (row5.getCell(valueCellIdx).getStringCellValue == "VL"))
       {
-        val dateParser = new SimpleDateFormat("dd/MM/yyyy")
+        val dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
         val name = row1.getCell(1).getStringCellValue
         val values = (6 to sheet.getLastRowNum).toList.map { rowIdx =>
           val row = sheet.getRow(rowIdx)
           AssetValue(
-            date = dateParser.parse(row.getCell(dateCellIdx).getStringCellValue),
+            date = LocalDate.parse(row.getCell(dateCellIdx).getStringCellValue, dateFormatter),
             value = row.getCell(valueCellIdx).getNumericCellValue
           )
         }

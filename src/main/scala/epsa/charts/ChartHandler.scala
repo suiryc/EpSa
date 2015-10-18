@@ -1,7 +1,7 @@
 package epsa.charts
 
 import epsa.model.InvestmentFund
-import java.text.SimpleDateFormat
+import java.time.format.DateTimeFormatter
 import javafx.geometry.Bounds
 import javafx.scene.Node
 import javafx.scene.chart.{CategoryAxis, LineChart, NumberAxis, XYChart}
@@ -28,7 +28,7 @@ class ChartHandler(fund: InvestmentFund) {
   xAxis.setLabel("Date")
 
   /** Date format for 'x' axis. */
-  private val dateFormat = new SimpleDateFormat("yyyy-MM-dd")
+  private val dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
 
   /** Chart 'y' axis. */
   private val yAxis = new NumberAxis()
@@ -43,7 +43,7 @@ class ChartHandler(fund: InvestmentFund) {
   /** Investment fund asset values to display in chart. */
   // TODO - limited to a given number of values for testing
   private val valuesList = fund.values.takeRight(200).map { v =>
-    (dateFormat.format(v.date), v.value)
+    (v.date.format(dateFormatter), v.value)
   }
   /** Number of investment fund asset values. */
   private val valuesCount = valuesList.length
@@ -199,7 +199,7 @@ class ChartHandler(fund: InvestmentFund) {
   /** Gets index of a given 'x' value. */
   private def getValueIndex(x: String): Int = {
     @scala.annotation.tailrec
-    def loop(values: List[(String, Double)], idx: Int): Int = values.headOption match {
+    def loop(values: List[(String, BigDecimal)], idx: Int): Int = values.headOption match {
       case Some((valueX, _)) =>
         if (valueX == x) {
           idx
@@ -539,7 +539,7 @@ class ChartHandler(fund: InvestmentFund) {
       }
 
       @scala.annotation.tailrec
-      def loop(values: List[(String, Double)], idx: Int, xDropLeft: Option[Int]): Option[(Int, Int)] = {
+      def loop(values: List[(String, BigDecimal)], idx: Int, xDropLeft: Option[Int]): Option[(Int, Int)] = {
         values.headOption match {
           case Some((valueX, _)) =>
             xDropLeft match {
