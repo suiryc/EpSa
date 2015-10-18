@@ -5,10 +5,12 @@ import epsa.model.Savings
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
-import java.sql.Timestamp
-import java.time.Instant
+import java.sql.{Date, Timestamp}
+import java.time.{Instant, LocalDate}
+import java.util.UUID
 import javafx.stage.{FileChooser, Window}
 import scala.concurrent.Future
+import slick.driver.H2Driver
 import slick.driver.H2Driver.api._
 import slick.driver.H2Driver.backend.DatabaseDef
 import slick.jdbc.meta.MTable
@@ -123,9 +125,18 @@ object DataStore {
     // Open the new DB, and create missing tables
     val refNew = Database.forURL(s"jdbc:h2:$dbPath", user = "user", password = "pass", driver = "org.h2.Driver")
 
-    refNew.run(MTable.getTables(EventSource.tableName)).flatMap { tables =>
-      if (tables.nonEmpty) Future.successful(())
-      else refNew.run(EventSource.entries.schema.create)
+    // First, get existing tables
+    refNew.run(MTable.getTables).flatMap { mTables =>
+      // We only want the names
+      val tables = mTables.map(_.name.name).toSet
+
+      // Determine missing tables, and create them (sequentially)
+      tableDescs.filterNot { tableDesc =>
+        tables.contains(tableDesc.name)
+      }.foldLeft(Future.successful()) { (f, tableDesc) =>
+        f.flatMap(_ => refNew.run(tableDesc.schema.create))
+      }
+      // Result: future completed after missing tables (if any) creation
     }.map { _ =>
       // Automatically keep in mind the new DB
       val dbInfoNew = DBInfo(refNew, path)
@@ -138,12 +149,19 @@ object DataStore {
     }
   }
 
+  protected case class TableDesc(name: String, schema: H2Driver.SchemaDescription)
+
+  protected val tableDescs = List(
+    TableDesc(EventSource.tableName, EventSource.entries.schema),
+    TableDesc(AssetHistory.tableName, AssetHistory.entries.schema)
+  )
+
   object EventSource {
 
     import spray.json._
     import Savings.JsonProtocol._
 
-    protected[DataStore] val tableName = "eventsource"
+    protected[DataStore] val tableName = "eventSource"
 
     // Note: we manipulate 'Savings.Event' objects, but store them as String
     // so we need to define a mapping between the two.
@@ -174,6 +192,63 @@ object DataStore {
 
     def writeEvents(events: List[Savings.Event]): Future[Unit] =
       writeEvents(events:_*)
+
+  }
+
+  object AssetHistory {
+
+    protected[DataStore] val tableName = "assetHistory"
+
+    // Note: slick does not handle java.time classes (support may appear in
+    // v3.2). java.sql.Date does handle conversion, so use it explicitly in
+    // the meantime.
+    protected implicit val localDateColumnType = MappedColumnType.base[LocalDate, Date](
+      { d => Date.valueOf(d) },
+      { d => d.toLocalDate }
+    )
+
+    // Note: there are 2 ways to associate a case class to a table:
+    // http://slick.typesafe.com/doc/3.1.0/schemas.html#mapped-tables
+    // http://slick.typesafe.com/doc/3.1.0/userdefined.html#monomorphic-case-classes
+    // The monomorphic variant compiles but IntelliJ complains for the '*'
+    // function type.
+    // In our case, we mix column and case class:
+    // http://slick.typesafe.com/doc/3.1.0/userdefined.html#combining-mapped-types
+
+    case class Entry(fundId: UUID, assetValue: Savings.AssetValue)
+
+    case class LiftedAssetValue(date: Rep[LocalDate], value: Rep[BigDecimal])
+    case class LiftedEntry(fundId: Rep[UUID], assetValue: LiftedAssetValue)
+
+    implicit object AssetValueShape extends CaseClassShape(LiftedAssetValue.tupled, Savings.AssetValue.tupled)
+    implicit object EntryShape extends CaseClassShape(LiftedEntry.tupled, Entry.tupled)
+
+    protected class Entries(tag: Tag) extends Table[Entry](tag, tableName) {
+      def fundId = column[UUID]("fundId")
+      def date = column[LocalDate]("date")
+      // TODO - 'scale' shall be configurable ? (usually 4)
+      def value = column[BigDecimal]("value", O.SqlType("DECIMAL(21,6)"))
+      def pk = primaryKey("pk", (fundId, date))
+      def * = LiftedEntry(fundId, LiftedAssetValue(date, value))
+    }
+
+    val entries = TableQuery[Entries]
+
+    def readValues(fundId: UUID): Future[Seq[Savings.AssetValue]] =
+      getDBInfo.db.run(entries.filter(_.fundId === fundId).sortBy(_.date).result).map(_.map(_.assetValue))
+
+    def readValue(fundId: UUID, date: LocalDate): Future[Option[Savings.AssetValue]] =
+      getDBInfo.db.run(entries.filter(_.date === date).result.headOption).map(_.map(_.assetValue))
+
+    def writeValues(fundId: UUID, values: Savings.AssetValue*): Future[Unit] =
+      getDBInfo.db.run {
+        entries ++= values.map { value =>
+          Entry(fundId, value)
+        }
+      }.map(_ => ())
+
+    def writeValues(fundId: UUID, values: List[Savings.AssetValue]): Future[Unit] =
+      writeValues(fundId, values:_*)
 
   }
 
