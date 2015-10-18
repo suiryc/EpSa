@@ -47,8 +47,7 @@ class TestExcel extends Application {
   override def start(stage: Stage) {
     import Preference._
 
-    val fundPathFolder = Preference.from("fund.path.folder", null:Path)
-    val fundPathFile = Preference.from("fund.path.file", null:String)
+    val fundPath = Preference.from("fund.path", null:Path)
 
     val fileChooser = new FileChooser()
     fileChooser.setTitle("Open Investment Fund File")
@@ -56,9 +55,9 @@ class TestExcel extends Application {
       new ExtensionFilter("Excel Files", "*.xls", "*.xlsx"),
       new ExtensionFilter("All Files", "*.*")
     )
-    fundPathFolder.option.foreach { path =>
-      fileChooser.setInitialDirectory(path.toFile)
-      fundPathFile.option.foreach(fileChooser.setInitialFileName)
+    fundPath.option.foreach { path =>
+      fileChooser.setInitialDirectory(path.getParent.toFile)
+      fileChooser.setInitialFileName(path.toFile.getName)
     }
     val selectedFile = fileChooser.showOpenDialog(stage)
     Option(selectedFile).flatMap { file =>
@@ -66,8 +65,7 @@ class TestExcel extends Application {
     } match {
       case Some(fund) =>
         // Save path in preferences
-        fundPathFolder() = selectedFile.getParentFile.toPath
-        fundPathFile() = selectedFile.getName
+        fundPath() = selectedFile.toPath
         // Then build and display chart
         val chartHandler = new ChartHandler(fund)
         val chartPane = chartHandler.chartPane
