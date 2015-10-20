@@ -288,6 +288,10 @@ class MainController extends Logging {
     actor ! OnFundGraph
   }
 
+  def onFundAssetHistory(event: ActionEvent): Unit = {
+    actor ! OnFundAssetHistory(Option(assetsTable.getSelectionModel.getSelectedItem).map(_.fundId))
+  }
+
   def onUpToDateAssets(event: ActionEvent): Unit = {
     actor ! OnUpToDateAssets(event.getSource.asInstanceOf[CheckMenuItem].isSelected)
   }
@@ -376,6 +380,7 @@ class MainController extends Logging {
       case OnOptions         => onOptions(state)
       case OnTest(n)         => onTest(state, n)
       case OnFundGraph       => onFundGraph(state)
+      case OnFundAssetHistory(fundId) => onFundAssetHistory(state, fundId)
       case OnUpToDateAssets(set) => onUpToDateAssets(state, set)
     }
 
@@ -594,6 +599,16 @@ class MainController extends Logging {
       }
     }
 
+    def onFundAssetHistory(state: State, fundId: Option[UUID]): Unit = {
+      val stage = FundAssetHistoryController.buildStage(state.savingsUpd, fundId)
+      // Notes:
+      // Don't set as modal, since we wish to display the window while still
+      // interacting with the main stage.
+      // Don't set owner, otherwise the new windows remains in front of its
+      // owner.
+      stage.show()
+    }
+
     def onUpToDateAssets(state: State, set: Boolean): Unit = {
       applyState(state.copy(viewUpToDateAssets = set))
     }
@@ -728,6 +743,8 @@ object MainController {
   case class OnTest(n: Int)
 
   case object OnFundGraph
+
+  case class OnFundAssetHistory(fundId: Option[UUID])
 
   case class OnUpToDateAssets(set: Boolean)
 

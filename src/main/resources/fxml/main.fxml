@@ -130,6 +130,16 @@
                </items></Menu>
             <Menu mnemonicParsing="false" text="%View">
               <items>
+                  <MenuItem mnemonicParsing="false" onAction="#onFundAssetHistory" text="%Fund asset history">
+                     <graphic>
+                        <ImageView pickOnBounds="true" preserveRatio="true">
+                           <image>
+                              <Image url="@../images/fugue-icons/chart-up.png" />
+                           </image>
+                        </ImageView>
+                     </graphic>
+                  </MenuItem>
+                  <SeparatorMenuItem mnemonicParsing="false" />
                   <CheckMenuItem mnemonicParsing="false" onAction="#onUpToDateAssets" selected="true" text="%Up to date assets" />
               </items>
             </Menu>
