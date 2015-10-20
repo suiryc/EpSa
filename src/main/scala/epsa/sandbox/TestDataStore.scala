@@ -56,7 +56,7 @@ class TestDataStore extends Application {
           println(s"AssetHistory.readValue => $read")
           fundGraph(stage).map { inv =>
             DataStore.AssetHistory.writeValues(uuid, inv.values)
-          }.getOrElse(Future.successful()).onComplete {
+          }.getOrElse(Future.successful(())).onComplete {
             case r => promise.complete(r)
           }
       }

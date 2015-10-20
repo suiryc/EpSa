@@ -133,7 +133,7 @@ object DataStore {
       // Determine missing tables, and create them (sequentially)
       tableDescs.filterNot { tableDesc =>
         tables.contains(tableDesc.name)
-      }.foldLeft(Future.successful()) { (f, tableDesc) =>
+      }.foldLeft(Future.successful(())) { (f, tableDesc) =>
         f.flatMap(_ => refNew.run(tableDesc.schema.create))
       }
       // Result: future completed after missing tables (if any) creation
