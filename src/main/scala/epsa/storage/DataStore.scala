@@ -234,11 +234,20 @@ object DataStore {
 
     val entries = TableQuery[Entries]
 
+    private def getAssetValue(r: Seq[Entry]): Seq[Savings.AssetValue] =
+      r.map { entry =>
+        entry.assetValue.copy(value = entry.assetValue.value.underlying().stripTrailingZeros)
+      }
+
     def readValues(fundId: UUID): Future[Seq[Savings.AssetValue]] =
-      getDBInfo.db.run(entries.filter(_.fundId === fundId).sortBy(_.date).result).map(_.map(_.assetValue))
+      getDBInfo.db.run {
+        entries.filter(_.fundId === fundId).sortBy(_.date).result
+      }.map(getAssetValue)
 
     def readValue(fundId: UUID, date: LocalDate): Future[Option[Savings.AssetValue]] =
-      getDBInfo.db.run(entries.filter(_.date === date).result.headOption).map(_.map(_.assetValue))
+      getDBInfo.db.run {
+        entries.filter(v => (v.fundId === fundId) && (v.date === date)).result
+      }.map(r => getAssetValue(r).headOption)
 
     def writeValues(fundId: UUID, values: Savings.AssetValue*): Future[Unit] =
       getDBInfo.db.run {
