@@ -42,7 +42,7 @@ class FundAssetHistoryController {
     fundField.setItems(FXCollections.observableList(funds))
     fundIdOpt.flatMap { fundId =>
       funds.find(_.id == fundId)
-    }.foreach(fundField.getSelectionModel.select)
+    }.orElse(funds.headOption).foreach(fundField.getSelectionModel.select)
   }
 
   def onSrcFund(event: ActionEvent): Unit = {
