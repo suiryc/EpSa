@@ -130,7 +130,7 @@
                </items></Menu>
             <Menu mnemonicParsing="false" text="%View">
               <items>
-                  <MenuItem mnemonicParsing="false" onAction="#onFundAssetHistory" text="%Fund asset history">
+                  <MenuItem fx:id="viewFundAssetHistoryMenu" mnemonicParsing="false" onAction="#onFundAssetHistory" text="%Fund asset history">
                      <graphic>
                         <ImageView pickOnBounds="true" preserveRatio="true">
                            <image>

@@ -68,6 +68,9 @@ class MainController extends Logging {
   protected var fileSaveMenu: MenuItem = _
 
   @FXML
+  protected var viewFundAssetHistoryMenu: MenuItem = _
+
+  @FXML
   protected var splitPane: SplitPane = _
 
   @FXML
@@ -404,6 +407,7 @@ class MainController extends Logging {
 
       fileCloseMenu.setDisable(newState.dbOpened.isEmpty)
       fileSaveMenu.setDisable(!dirty)
+      viewFundAssetHistoryMenu.setDisable(newState.savingsUpd.funds.isEmpty)
 
       val title = newState.dbOpened.map { name =>
         s"[$name${if (dirty) " *" else ""}] - "
