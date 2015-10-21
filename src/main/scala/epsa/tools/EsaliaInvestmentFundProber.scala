@@ -1,7 +1,6 @@
 package epsa.tools
 
-import epsa.model.InvestmentFund
-import epsa.model.Savings.AssetValue
+import epsa.model.Savings
 import java.nio.file.Path
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -15,7 +14,7 @@ import org.apache.poi.ss.usermodel.WorkbookFactory
  */
 object EsaliaInvestmentFundProber {
 
-  def probe(path: Path): Option[InvestmentFund] = {
+  def probe(path: Path): Option[Savings.AssetValueHistory] = {
     val wb = try {
       Some(WorkbookFactory.create(path.toFile))
     } catch {
@@ -53,12 +52,12 @@ object EsaliaInvestmentFundProber {
         val name = row1.getCell(1).getStringCellValue
         val values = (6 to sheet.getLastRowNum).toList.map { rowIdx =>
           val row = sheet.getRow(rowIdx)
-          AssetValue(
+          Savings.AssetValue(
             date = LocalDate.parse(row.getCell(dateCellIdx).getStringCellValue, dateFormatter),
             value = row.getCell(valueCellIdx).getNumericCellValue
           )
         }
-        Some(InvestmentFund(name, values))
+        Some(Savings.AssetValueHistory(Some(name), values))
       } else {
         None
       }

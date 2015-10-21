@@ -63,11 +63,11 @@ class TestExcel extends Application {
     Option(selectedFile).flatMap { file =>
       EsaliaInvestmentFundProber.probe(file.toPath)
     } match {
-      case Some(fund) =>
+      case Some(hist) =>
         // Save path in preferences
         fundPath() = selectedFile.toPath
         // Then build and display chart
-        val chartHandler = new ChartHandler(fund)
+        val chartHandler = new ChartHandler(hist.name.orNull, hist.values)
         val chartPane = chartHandler.chartPane
         chartPane.setPrefSize(640, 480)
         val scene = new Scene(chartPane)

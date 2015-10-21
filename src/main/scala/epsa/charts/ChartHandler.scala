@@ -1,6 +1,6 @@
 package epsa.charts
 
-import epsa.model.InvestmentFund
+import epsa.model.Savings
 import java.time.format.DateTimeFormatter
 import javafx.geometry.Bounds
 import javafx.scene.Node
@@ -13,6 +13,27 @@ import suiryc.scala.concurrent.Cancellable
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.event.EventHandler._
 
+case class ChartSettings(
+  title: String = "Net asset value history",
+  showTitle: Boolean = true,
+  xLabel: String = "Date",
+  showXLabel: Boolean = true,
+  yLabel: String = "NAV",
+  showYLabel: Boolean = true,
+  legendVisible: Boolean = true
+)
+
+object ChartSettings {
+
+  val hidden: ChartSettings =
+    ChartSettings(
+      showTitle = false,
+      showXLabel = false,
+      showYLabel = false,
+      legendVisible = false
+    )
+}
+
 /**
  * Handles chart for a given investment fund.
  *
@@ -21,28 +42,35 @@ import suiryc.scala.javafx.event.EventHandler._
  *   - displaying chart data value in label
  *   - draw visible lines to spot chart data value
  */
-class ChartHandler(fund: InvestmentFund) {
+class ChartHandler(
+  fundName: String,
+  fundValues: Seq[Savings.AssetValue],
+  settings: ChartSettings = ChartSettings()
+) {
 
   /** Chart 'x' axis. */
   private val xAxis = new CategoryAxis()
-  xAxis.setLabel("Date")
+  if (settings.showXLabel) {
+    xAxis.setLabel(settings.xLabel)
+  }
 
   /** Date format for 'x' axis. */
   private val dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
 
   /** Chart 'y' axis. */
   private val yAxis = new NumberAxis()
-  yAxis.setLabel("VL")
+  if (settings.showYLabel) {
+    yAxis.setLabel(settings.yLabel)
+  }
   yAxis.setTickLabelFormatter(new NumberAxis.DefaultFormatter(yAxis, null, "€"))
   yAxis.setForceZeroInRange(false)
   yAxis.setAutoRanging(true)
 
   /** Chart series. */
   private val series = new XYChart.Series[String, Number]()
-  series.setName(fund.name)
+  series.setName(fundName)
   /** Investment fund asset values to display in chart. */
-  // TODO - limited to a given number of values for testing
-  private val valuesList = fund.values.takeRight(200).map { v =>
+  private val valuesList = fundValues.map { v =>
     (v.date.format(dateFormatter), v.value)
   }
   /** Number of investment fund asset values. */
@@ -68,8 +96,11 @@ class ChartHandler(fund: InvestmentFund) {
   chart.setAnimated(false)
   chart.getStylesheets.add(getClass.getResource("/css/chart-investment-fund.css").toExternalForm)
   chart.getStyleClass.add("custom-chart")
-  chart.setTitle("Valeurs liquidatives")
+  if (settings.showTitle) {
+    chart.setTitle(settings.title)
+  }
   chart.setCreateSymbols(false)
+  chart.setLegendVisible(settings.legendVisible)
   chart.getData.add(series)
 
   /** Chart background. */
@@ -125,15 +156,18 @@ class ChartHandler(fund: InvestmentFund) {
   zoomZone.setDisable(true)
 
   /** Chart data label to display value. */
-  private val labelVL = new ChartDataLabel()
+  private val labelVL = new ChartDataLabel(settings.xLabel, settings.yLabel)
   labelVL.getStyleClass.addAll("default-color0", "chart-line-symbol", "chart-series-line")
   labelVL.setStyle("-fx-font-size: 14; -fx-opacity: 0.6;")
   labelVL.setMinSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE)
   labelVL.setVisible(false)
   labelVL.setDisable(true)
-  /** Label listerning subscription. */
+  /** Label listening subscription. */
   private var labelVLCancellable: List[Cancellable] = Nil
 
+  // Limit initial view to last 100 values
+  xDropLeft = math.max(0, valuesCount - 100)
+  ensureMinValues()
   setData()
 
   /** Chart pane. */
@@ -199,7 +233,7 @@ class ChartHandler(fund: InvestmentFund) {
   /** Gets index of a given 'x' value. */
   private def getValueIndex(x: String): Int = {
     @scala.annotation.tailrec
-    def loop(values: List[(String, BigDecimal)], idx: Int): Int = values.headOption match {
+    def loop(values: Seq[(String, BigDecimal)], idx: Int): Int = values.headOption match {
       case Some((valueX, _)) =>
         if (valueX == x) {
           idx
@@ -539,7 +573,7 @@ class ChartHandler(fund: InvestmentFund) {
       }
 
       @scala.annotation.tailrec
-      def loop(values: List[(String, BigDecimal)], idx: Int, xDropLeft: Option[Int]): Option[(Int, Int)] = {
+      def loop(values: Seq[(String, BigDecimal)], idx: Int, xDropLeft: Option[Int]): Option[(Int, Int)] = {
         values.headOption match {
           case Some((valueX, _)) =>
             xDropLeft match {

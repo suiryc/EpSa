@@ -22,6 +22,8 @@ object Savings {
   /** Asset value: holds asset value at a given date. */
   case class AssetValue(date: LocalDate, value: BigDecimal)
 
+  case class AssetValueHistory(name: Option[String], values: List[Savings.AssetValue] = Nil)
+
   sealed trait Event
 
   case class CreateScheme(schemeId: UUID, name: String)

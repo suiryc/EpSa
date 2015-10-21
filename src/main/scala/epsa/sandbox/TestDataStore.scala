@@ -1,6 +1,6 @@
 package epsa.sandbox
 
-import epsa.model.{InvestmentFund, Savings}
+import epsa.model.Savings
 import epsa.storage.DataStore
 import epsa.tools.EsaliaInvestmentFundProber
 import java.nio.file.Path
@@ -49,13 +49,13 @@ class TestDataStore extends Application {
           }
       }
 
-      val uuid = new UUID(0, 0)
+      val uuid = UUID.fromString("3030f78e-bfa8-4df7-9e2e-f49625f1d2f6")
 
       DataStore.AssetHistory.readValues(uuid).onComplete {
         case read =>
           println(s"AssetHistory.readValue => $read")
-          fundGraph(stage).map { inv =>
-            DataStore.AssetHistory.writeValues(uuid, inv.values)
+          fundGraph(stage).map { hist =>
+            DataStore.AssetHistory.writeValues(uuid, hist.values)
           }.getOrElse(Future.successful(())).onComplete {
             case r => promise.complete(r)
           }
@@ -67,7 +67,7 @@ class TestDataStore extends Application {
     }
   }
 
-  def fundGraph(stage: Stage): Option[InvestmentFund] = JFXSystem.await {
+  def fundGraph(stage: Stage): Option[Savings.AssetValueHistory] = JFXSystem.await {
     import epsa.Main.prefs
     import Preference._
 

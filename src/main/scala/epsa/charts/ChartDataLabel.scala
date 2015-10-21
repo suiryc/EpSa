@@ -14,7 +14,7 @@ case class ChartData(x: String, y: BigDecimal)
  * optional text flow (to apply different styles) for an optional reference
  * data.
  */
-class ChartDataLabel extends VBox {
+class ChartDataLabel(xLabel: String = "Date", yLabel: String = "NAV") extends VBox {
 
   /** Reference data. */
   private var refData: Option[ChartData] = None
@@ -61,7 +61,7 @@ class ChartDataLabel extends VBox {
    * current data is lower, green if greater, black if equal.
    */
   def setData(data: ChartData): Unit = {
-    dataText.setText(s"Date: ${data.x}\nVL: ${data.y}€")
+    dataText.setText(s"$xLabel: ${data.x}\n$yLabel: ${data.y}€")
     refData.foreach { refData =>
       val delta: BigDecimal = if (refData.y.compare(java.math.BigDecimal.ZERO) != 0) {
         (data.y - refData.y) * 100 / refData.y
