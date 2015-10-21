@@ -35,7 +35,6 @@ class FundAssetHistoryController {
     fundField.setButtonCell(new FundCell)
     fundField.setCellFactory(Callback { new FundCell })
 
-    // Scheme&fund with asset
     val funds = savings.schemes.flatMap { scheme =>
       scheme.funds.map(savings.getFund)
     }.distinct.sortBy(_.name)
