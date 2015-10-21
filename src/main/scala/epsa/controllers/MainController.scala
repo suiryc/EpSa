@@ -68,7 +68,7 @@ class MainController extends Logging {
   protected var fileSaveMenu: MenuItem = _
 
   @FXML
-  protected var viewFundAssetHistoryMenu: MenuItem = _
+  protected var viewNetAssetValueHistoryMenu: MenuItem = _
 
   @FXML
   protected var splitPane: SplitPane = _
@@ -291,8 +291,8 @@ class MainController extends Logging {
     actor ! OnFundGraph
   }
 
-  def onFundAssetHistory(event: ActionEvent): Unit = {
-    actor ! OnFundAssetHistory(Option(assetsTable.getSelectionModel.getSelectedItem).map(_.fundId))
+  def onNetAssetValueHistory(event: ActionEvent): Unit = {
+    actor ! OnNetAssetValueHistory(Option(assetsTable.getSelectionModel.getSelectedItem).map(_.fundId))
   }
 
   def onUpToDateAssets(event: ActionEvent): Unit = {
@@ -383,7 +383,7 @@ class MainController extends Logging {
       case OnOptions         => onOptions(state)
       case OnTest(n)         => onTest(state, n)
       case OnFundGraph       => onFundGraph(state)
-      case OnFundAssetHistory(fundId) => onFundAssetHistory(state, fundId)
+      case OnNetAssetValueHistory(fundId) => onNetAssetValueHistory(state, fundId)
       case OnUpToDateAssets(set) => onUpToDateAssets(state, set)
     }
 
@@ -407,7 +407,7 @@ class MainController extends Logging {
 
       fileCloseMenu.setDisable(newState.dbOpened.isEmpty)
       fileSaveMenu.setDisable(!dirty)
-      viewFundAssetHistoryMenu.setDisable(newState.savingsUpd.funds.isEmpty)
+      viewNetAssetValueHistoryMenu.setDisable(newState.savingsUpd.funds.isEmpty)
 
       val title = newState.dbOpened.map { name =>
         s"[$name${if (dirty) " *" else ""}] - "
@@ -603,8 +603,8 @@ class MainController extends Logging {
       }
     }
 
-    def onFundAssetHistory(state: State, fundId: Option[UUID]): Unit = {
-      val stage = FundAssetHistoryController.buildStage(state.savingsUpd, fundId)
+    def onNetAssetValueHistory(state: State, fundId: Option[UUID]): Unit = {
+      val stage = NetAssetValueHistoryController.buildStage(state.savingsUpd, fundId)
       // Notes:
       // Don't set as modal, since we wish to display the window while still
       // interacting with the main stage.
@@ -748,7 +748,7 @@ object MainController {
 
   case object OnFundGraph
 
-  case class OnFundAssetHistory(fundId: Option[UUID])
+  case class OnNetAssetValueHistory(fundId: Option[UUID])
 
   case class OnUpToDateAssets(set: Boolean)
 

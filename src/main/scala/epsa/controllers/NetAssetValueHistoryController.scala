@@ -5,18 +5,19 @@ import javafx.stage.Stage
 
 import epsa.I18N
 import epsa.model.Savings
+import epsa.storage.DataStore
 import java.util.{ResourceBundle, UUID}
 import javafx.collections.FXCollections
 import javafx.event.ActionEvent
 import javafx.fxml.{FXMLLoader, FXML}
 import javafx.scene.control.ComboBox
 import javafx.scene.layout.VBox
-import suiryc.scala.javafx.stage.Stages
-
 import scala.collection.JavaConversions._
+import suiryc.scala.javafx.beans.value.RichObservableValue._
+import suiryc.scala.javafx.stage.Stages
 import suiryc.scala.javafx.util.Callback
 
-class FundAssetHistoryController {
+class NetAssetValueHistoryController {
 
   @FXML
   protected var resources: ResourceBundle = _
@@ -39,6 +40,13 @@ class FundAssetHistoryController {
       scheme.funds.map(savings.getFund)
     }.distinct.sortBy(_.name)
     fundField.setItems(FXCollections.observableList(funds))
+
+    fundField.getSelectionModel.selectedItemProperty.listen { fund =>
+      if (Option(fund).isDefined) {
+        //DataStore.AssetHistory.readValues(fund.id)
+      }
+    }
+
     fundIdOpt.flatMap { fundId =>
       funds.find(_.id == fundId)
     }.orElse(funds.headOption).foreach(fundField.getSelectionModel.select)
@@ -53,19 +61,19 @@ class FundAssetHistoryController {
 
 }
 
-object FundAssetHistoryController {
+object NetAssetValueHistoryController {
 
   /** Builds a stage out of this controller. */
   def buildStage(savings: Savings, fundId: Option[UUID]): Stage = {
     val resources = I18N.getResources
 
-    val loader = new FXMLLoader(getClass.getResource("/fxml/fund-asset-history.fxml"), resources)
+    val loader = new FXMLLoader(getClass.getResource("/fxml/net-asset-value-history.fxml"), resources)
     val scene = new Scene(loader.load())
-    val controller = loader.getController[FundAssetHistoryController]
+    val controller = loader.getController[NetAssetValueHistoryController]
     controller.initialize(savings, fundId)
 
     val stage = new Stage()
-    val title = resources.getString("Fund asset history")
+    val title = resources.getString("Net asset value history")
     stage.setTitle(title)
     stage.setScene(scene)
 
