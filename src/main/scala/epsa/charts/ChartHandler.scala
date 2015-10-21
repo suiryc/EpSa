@@ -34,6 +34,9 @@ object ChartSettings {
     )
 }
 
+// TODO - easy/easier way to move in values list (partial view) ?
+//   zooming and having first/last value in kept list is sometimes difficult
+
 /**
  * Handles chart for a given investment fund.
  *
