@@ -261,4 +261,8 @@ object DataStore {
 
   }
 
+  lazy val writeIssueMsg = I18N.getResources.getString("Could not write data store")
+
+  lazy val readIssueMsg = I18N.getResources.getString("Could not read data store")
+
 }

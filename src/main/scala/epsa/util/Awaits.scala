@@ -26,8 +26,8 @@ object Awaits {
         // Note: if changing, we don't know what path we tried to open, but
         // the user shall know. Otherwise remind the default path.
         val msg =
-          if (change && save) I18N.getResources.getString("Could not write data store")
-          else I18N.getResources.getString("Could not read data store")
+          if (change && save) DataStore.writeIssueMsg
+          else DataStore.readIssueMsg
         if (change) msg
         else s"$msg\n${DataStore.defaultPath}"
       })
@@ -35,13 +35,13 @@ object Awaits {
 
   def readDataStoreEvents(owner: Option[Window]): Try[Seq[Savings.Event]] =
     Awaits.orError(DataStore.EventSource.readEvents(), owner, {
-      I18N.getResources.getString("Could not read data store") +
+      DataStore.readIssueMsg +
         s"\n${DataStore.defaultPath}"
     })
 
   def writeDataStoreEvents(owner: Option[Window], events: List[Savings.Event]): Try[Unit] =
     Awaits.orError(DataStore.EventSource.writeEvents(events), owner, {
-      I18N.getResources.getString("Could not write data store") +
+      DataStore.writeIssueMsg +
         s"\n${DataStore.defaultPath}"
     })
 
