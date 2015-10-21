@@ -9,7 +9,7 @@
    <children>
       <AnchorPane fx:id="historyPane" layoutX="-12.747316360473633" layoutY="-92.76863098144531" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" VBox.vgrow="ALWAYS">
          <children>
-            <ProgressIndicator fx:id="progressIndicator" layoutX="6.047207832336426" layoutY="46.35232162475586" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" prefHeight="240.0" prefWidth="320.0" visible="false" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0" />
+            <ProgressIndicator fx:id="progressIndicator" layoutX="6.047207832336426" layoutY="46.35232162475586" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" prefHeight="360.0" prefWidth="480.0" visible="false" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0" />
          </children>
       </AnchorPane>
       <ComboBox fx:id="fundField" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" onAction="#onSrcFund" VBox.vgrow="NEVER">
