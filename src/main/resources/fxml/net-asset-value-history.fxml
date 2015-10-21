@@ -5,12 +5,16 @@
 <?import java.lang.*?>
 <?import javafx.scene.layout.*?>
 
-
-<VBox fx:id="vbox" alignment="TOP_CENTER" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="-Infinity" minWidth="-Infinity" spacing="10.0" xmlns="http://javafx.com/javafx/8" xmlns:fx="http://javafx.com/fxml/1" fx:controller="epsa.controllers.NetAssetValueHistoryController">
+<VBox fx:id="vbox" alignment="TOP_CENTER" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" xmlns="http://javafx.com/javafx/8" xmlns:fx="http://javafx.com/fxml/1" fx:controller="epsa.controllers.NetAssetValueHistoryController">
    <children>
-      <ComboBox fx:id="fundField" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="-Infinity" minWidth="-Infinity" onAction="#onSrcFund" />
+      <AnchorPane fx:id="historyPane" layoutX="-12.747316360473633" layoutY="-92.76863098144531" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" VBox.vgrow="ALWAYS">
+         <children>
+            <ProgressIndicator fx:id="progressIndicator" layoutX="6.047207832336426" layoutY="46.35232162475586" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" prefHeight="240.0" prefWidth="320.0" visible="false" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0" />
+         </children>
+      </AnchorPane>
+      <ComboBox fx:id="fundField" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" onAction="#onSrcFund" VBox.vgrow="NEVER">
+         <VBox.margin>
+            <Insets bottom="10.0" left="10.0" right="10.0" />
+         </VBox.margin></ComboBox>
    </children>
-   <padding>
-      <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
-   </padding>
 </VBox>
