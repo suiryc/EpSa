@@ -33,7 +33,7 @@ object Main {
   }
 
   def shutdown(): Unit = {
-    Akka.system.shutdown()
+    Akka.system.terminate()
     Platform.exit()
   }
 
