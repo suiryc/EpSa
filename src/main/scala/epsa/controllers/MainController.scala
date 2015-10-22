@@ -42,6 +42,8 @@ import suiryc.scala.settings.Preference
 // TODO - menu entry and dialog to display/edit events history ?
 // TODO - when computing assets, order by scheme/fund/availability ?
 // TODO - manage encryption of datastore ?
+// TODO - delete NAV history values when removing fund
+// TODO - manual/automatic way to check NAV history values without existing fund ?
 class MainController extends Logging {
 
   import epsa.Main.prefs
