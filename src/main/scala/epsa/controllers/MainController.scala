@@ -600,8 +600,6 @@ class MainController extends Logging {
           chartPane.setPrefSize(640, 480)
           val scene = new Scene(chartPane)
           stage.setScene(scene)
-          stage.initModality(Modality.WINDOW_MODAL)
-          stage.initOwner(state.window)
           stage.show()
 
         case None =>
