@@ -28,7 +28,7 @@ import suiryc.scala.javafx
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.javafx.event.EventHandler._
-import suiryc.scala.javafx.scene.control.TableViews
+import suiryc.scala.javafx.scene.control.{Dialogs, TableViews}
 import suiryc.scala.javafx.stage.Stages
 import suiryc.scala.javafx.util.Callback
 import suiryc.scala.settings.Preference
@@ -779,10 +779,11 @@ object MainController {
     Stages.trackMinimumDimensions(stage)
 
     if (needRestart) {
-      val alert = new Alert(Alert.AlertType.INFORMATION)
-      alert.initOwner(state.window)
-      alert.setHeaderText(resources.getString("information.need-restart"))
-      alert.showAndWait()
+      Dialogs.information(
+        owner = Some(state.window),
+        title = None,
+        headerText = Some(resources.getString("information.need-restart"))
+      )
     }
   }
 

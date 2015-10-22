@@ -16,6 +16,7 @@ import suiryc.scala.javafx.collections.RichObservableList._
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.event.EventHandler._
 import suiryc.scala.javafx.event.Events
+import suiryc.scala.javafx.scene.control.Dialogs
 import suiryc.scala.javafx.stage.Stages
 import suiryc.scala.javafx.util.Callback
 
@@ -115,11 +116,13 @@ class EditFundsController {
       }
 
       if (dirty) {
-        val alert = new Alert(Alert.AlertType.CONFIRMATION)
-        alert.initOwner(Stages.getStage(dialog))
-        alert.setHeaderText(resources.getString("confirmation.pending-changes"))
+        val resp = Dialogs.confirmation(
+          owner = Some(Stages.getStage(dialog)),
+          title = None,
+          headerText = Some(resources.getString("confirmation.pending-changes"))
+        )
 
-        if (!alert.showAndWait().contains(ButtonType.OK)) {
+        if (!resp.contains(ButtonType.OK)) {
           event.consume()
         }
       }
@@ -416,10 +419,11 @@ class EditFundsController {
         // Otherwise, re-select needed schemes, which will trigger a form checking.
         if (reselect.isEmpty) checkForm()
         else {
-          val alert = new Alert(Alert.AlertType.WARNING)
-          alert.initOwner(window)
-          alert.setHeaderText(resources.getString("warning.unselecting-nonempty-resource"))
-          alert.showAndWait()
+          Dialogs.warning(
+            owner = Some(window),
+            title = None,
+            headerText = Some(resources.getString("warning.unselecting-nonempty-resource"))
+          )
 
           reselect.map(savings.getScheme).foreach(schemesField.getSelectionModel.select)
         }
