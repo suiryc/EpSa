@@ -28,6 +28,7 @@ import suiryc.scala.javafx.util.Callback
 // TODO - action to load values from excel file and save them in data store
 // TODO - prevent saving if changes are pending in main view ?
 // TODO - be notified (by main view) if funds are added/removed ?
+// TODO - show imported chart and ask confirmation to save it
 class NetAssetValueHistoryController {
 
   import NetAssetValueHistoryController._
