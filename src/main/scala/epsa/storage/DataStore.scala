@@ -249,6 +249,7 @@ object DataStore {
         entries.filter(v => (v.fundId === fundId) && (v.date === date)).result
       }.map(r => getAssetValue(r).headOption)
 
+    // TODO - way to overwrite existing values
     def writeValues(fundId: UUID, values: Savings.AssetValue*): Future[Unit] =
       getDBInfo.db.run {
         entries ++= values.map { value =>

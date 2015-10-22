@@ -14,7 +14,7 @@ object Awaits {
   def orError[A](future: Future[A], owner: Option[Window], msg: => String): Try[A] = {
     val r = Await.ready(future, Duration.Inf).value.get
     r match {
-      case Failure(ex) => Dialogs.error(owner, None, Some(msg), ex)
+      case Failure(ex) => Dialogs.error(owner = owner, title = None, headerText = Some(msg), ex = Some(ex))
       case _           =>
     }
     r
