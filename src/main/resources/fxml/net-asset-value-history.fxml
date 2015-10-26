@@ -28,6 +28,9 @@
                      </image>
                   </ImageView>
                </graphic>
+               <tooltip>
+                  <Tooltip text="%Import net asset value history" />
+               </tooltip>
             </Button>
          </children>
          <VBox.margin>
