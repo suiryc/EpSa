@@ -11,7 +11,7 @@ import javafx.collections.FXCollections
 import javafx.event.ActionEvent
 import javafx.fxml.{FXMLLoader, FXML}
 import javafx.scene.Scene
-import javafx.scene.control.{Button, ComboBox, ProgressIndicator}
+import javafx.scene.control.{Button, ButtonType, ComboBox, ProgressIndicator}
 import javafx.scene.layout.AnchorPane
 import javafx.stage.{FileChooser, Stage}
 import scala.collection.JavaConversions._
@@ -52,6 +52,9 @@ class NetAssetValueHistoryController {
   @FXML
   protected var importButton: Button = _
 
+  @FXML
+  protected var purgeButton: Button = _
+
   private lazy val stage = fundField.getScene.getWindow.asInstanceOf[Stage]
 
   private var chartPane: Option[AnchorPane] = None
@@ -70,6 +73,7 @@ class NetAssetValueHistoryController {
     fundField.setItems(FXCollections.observableList(funds))
 
     importButton.setDisable(funds.isEmpty)
+    purgeButton.setDisable(funds.isEmpty)
 
     fundIdOpt.flatMap { fundId =>
       funds.find(_.id == fundId)
@@ -117,7 +121,22 @@ class NetAssetValueHistoryController {
     }
   }
 
-  private def accessHistory(fund: Savings.Fund, action: => Future[Seq[Savings.AssetValue]], failureMsg: String): Unit = {
+  def onPurge(event: ActionEvent): Unit = {
+    Option(fundField.getValue).foreach { fund =>
+      val resp = Dialogs.confirmation(
+        owner = Some(stage),
+        title = None,
+        headerText = Some(resources.getString("confirmation.irreversible-action")),
+        contentText = Some(resources.getString("Purge net asset value history"))
+      )
+
+      if (resp.contains(ButtonType.OK)) {
+        purgeHistory(fund)
+      }
+    }
+  }
+
+  private def accessHistory[A](action: => Future[A], failureMsg: String, successAction: A => Unit): Unit = {
     import suiryc.scala.javafx.concurrent.JFXExecutor.executor
 
     // Remove previous chart if any
@@ -133,11 +152,11 @@ class NetAssetValueHistoryController {
 
     // Action on history (with timeout)
     action.withTimeout(10.seconds).onComplete {
-      case Success(values) =>
+      case Success(result) =>
         showIndicator.cancel()
         // Hide indicator and display new chart
         progressIndicator.setVisible(false)
-        displayChart(fund, values)
+        successAction(result)
 
       case Failure(ex) =>
         showIndicator.cancel()
@@ -153,22 +172,32 @@ class NetAssetValueHistoryController {
 
   private def loadHistory(fund: Savings.Fund): Unit =
     accessHistory(
-      fund = fund,
       action = DataStore.AssetHistory.readValues(fund.id),
-      failureMsg = DataStore.readIssueMsg
+      failureMsg = DataStore.readIssueMsg,
+      successAction = displayChart(fund, _: Seq[Savings.AssetValue])
     )
 
   private def importHistory(fund: Savings.Fund, values: Seq[Savings.AssetValue]): Unit = {
     import epsa.Main.Akka.dispatcher
 
     accessHistory(
-      fund = fund,
       action = DataStore.AssetHistory.writeValues(fund.id, values: _*).map(_ => values),
-      failureMsg = DataStore.writeIssueMsg
+      failureMsg = DataStore.writeIssueMsg,
+      successAction = (_: Seq[Savings.AssetValue]) => loadHistory(fund)
+    )
+  }
+
+  private def purgeHistory(fund: Savings.Fund): Unit = {
+    accessHistory(
+      action = DataStore.AssetHistory.deleteValues(fund.id),
+      failureMsg = DataStore.writeIssueMsg,
+      successAction = (_: Int) => loadHistory(fund)
     )
   }
 
   private def displayChart(fund: Savings.Fund, values: Seq[Savings.AssetValue]): Unit = {
+    purgeButton.setDisable(values.isEmpty)
+
     val chartHandler = new ChartHandler(
       fundName = fund.name,
       fundValues = values,

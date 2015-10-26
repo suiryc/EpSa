@@ -32,6 +32,18 @@
                   <Tooltip text="%Import net asset value history" />
                </tooltip>
             </Button>
+            <Button fx:id="purgeButton" mnemonicParsing="false" onAction="#onPurge">
+               <graphic>
+                  <ImageView pickOnBounds="true" preserveRatio="true">
+                     <image>
+                        <Image url="@../images/fugue-icons/bin.png" />
+                     </image>
+                  </ImageView>
+               </graphic>
+               <tooltip>
+                  <Tooltip text="%Purge net asset value history" />
+               </tooltip>
+            </Button>
          </children>
          <VBox.margin>
             <Insets bottom="10.0" left="10.0" right="10.0" />

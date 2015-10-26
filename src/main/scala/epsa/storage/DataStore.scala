@@ -249,16 +249,19 @@ object DataStore {
         entries.filter(v => (v.fundId === fundId) && (v.date === date)).result
       }.map(r => getAssetValue(r).headOption)
 
-    // TODO - way to overwrite existing values
     def writeValues(fundId: UUID, values: Savings.AssetValue*): Future[Unit] =
       getDBInfo.db.run {
-        entries ++= values.map { value =>
-          Entry(fundId, value)
-        }
+        // TODO - easy way to batch upserts ?
+        DBIO.sequence(values.map { value =>
+          entries.insertOrUpdate(Entry(fundId, value))
+        })
       }.map(_ => ())
 
     def writeValues(fundId: UUID, values: List[Savings.AssetValue]): Future[Unit] =
       writeValues(fundId, values:_*)
+
+    def deleteValues(fundId: UUID): Future[Int] =
+      getDBInfo.db.run(entries.delete)
 
   }
 
