@@ -90,10 +90,10 @@ object Savings {
           try {
             LocalDate.parse(dateS)
           } catch {
-            case ex: Throwable => deserializationError(s"Invalid LocalData format: $dateS", ex)
+            case ex: Throwable => deserializationError(s"Invalid LocalDate format: $dateS", ex)
           }
 
-        case _ => deserializationError(s"Expected LocalData as JsString. Got $value")
+        case _ => deserializationError(s"Expected LocalDate as JsString. Got $value")
       }
     }
 
