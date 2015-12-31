@@ -302,11 +302,6 @@ class NewAssetActionController {
   }
 
   private def updateSrcAvailability(): Unit = {
-    // TODO - share ? (here, or in suiryc-scala)
-    implicit val ordering: Ordering[LocalDate] = new Ordering[LocalDate]() {
-      override def compare(x: LocalDate, y: LocalDate) = x.compareTo(y)
-    }
-
     Option(operationDateField.getValue) match {
       case Some(date) =>
         // Note: changing the combobox format appears to be taken into account
