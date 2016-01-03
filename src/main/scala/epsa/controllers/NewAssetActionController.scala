@@ -14,6 +14,7 @@ import javafx.stage.Stage
 import javafx.util.converter.LocalDateStringConverter
 import scala.collection.JavaConversions._
 import suiryc.scala.javafx.stage.Stages.StageLocation
+import suiryc.scala.math.Ordering._
 import suiryc.scala.settings.Preference
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.event.EventHandler._
