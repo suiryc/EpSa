@@ -19,6 +19,7 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 import suiryc.scala.concurrent.RichFuture._
+import suiryc.scala.math.Ordering._
 import suiryc.scala.settings.Preference
 import suiryc.scala.javafx.scene.control.Dialogs
 import suiryc.scala.javafx.stage.Stages
@@ -107,7 +108,7 @@ class NetAssetValueHistoryController {
             navHistoryImportPath() = selectedFile.toPath
 
             // And import history
-            importHistory(fund, hist.values)
+            importHistory(fund, hist.values.sortBy(_.date))
 
           case None =>
             Dialogs.warning(
@@ -170,6 +171,64 @@ class NetAssetValueHistoryController {
     }
   }
 
+  // TODO: display comparison result to use
+  // TODO: store imported values in state
+  // TODO: save imported values as for updated state
+  private def compareHistory(fund: Savings.Fund, values: Seq[Savings.AssetValue]): Unit = {
+    import epsa.Main.Akka.dispatcher
+
+    case class ComparedData(old: Long = 0, unchanged: Long = 0, changed: Long = 0, added: Long = 0)
+
+    @scala.annotation.tailrec
+    def compare(values1: Seq[Savings.AssetValue], values2: Seq[Savings.AssetValue], compared: ComparedData): ComparedData = {
+      // We want to compare existing data to new ones.
+      // Both are sorted by date. We need to match dates between both sets of
+      // data. To do so, we simply check each head date, and iterate either the
+      // set which has the oldest one (try to catch on the other set), or both
+      // if the dates match.
+
+      // If there is no more values in the old data, all remaining new ones are
+      // really 'new'.
+      // If there is no more values in the new data, all remaining old ones are
+      // really 'old'.
+      // Otherwise, we need to compare each head date.
+      if (values1.isEmpty) compared.copy(added = compared.added + values2.length)
+      else if (values2.isEmpty) compared.copy(old = compared.old + values1.length)
+      else {
+        // If the existing data head has the oldest date, it corresponds to a
+        // value unmatched ('old') in the new data.
+        // Conversely, if the new data has the oldest date, it corresponds to a
+        // value unmatched ('new') in the old data.
+        // Otherwise, either the old value is 'changed' or 'unchanged' in the
+        // new data.
+        val head1 = values1.head
+        val head2 = values2.head
+        val headCompared = head1.date.compareTo(head2.date)
+        if (headCompared < 0) compare(values1.tail, values2, compared.copy(old = compared.old + 1))
+        else if (headCompared > 0) compare(values1, values2.tail, compared.copy(added = compared.added + 1))
+        else if (head1.value != head2.value) compare(values1.tail, values2.tail, compared.copy(changed = compared.changed + 1))
+        else compare(values1.tail, values2.tail, compared.copy(unchanged = compared.unchanged + 1))
+      }
+    }
+
+    // TODO: check data store is open; if not: no data from it
+    // TODO: if applicable, merge data store current data with pending history changes
+    DataStore.AssetHistory.readValues(fund.id).onComplete {
+      case Success(result) =>
+        println(compare(result, values, ComparedData()))
+
+      case Failure(ex) =>
+        //showIndicator.cancel()
+        //progressIndicator.setVisible(false)
+        Dialogs.error(
+          owner = Some(stage),
+          title = None,
+          headerText = Some(DataStore.readIssueMsg),
+          ex = Some(ex)
+        )
+    }
+  }
+
   private def loadHistory(fund: Savings.Fund): Unit =
     accessHistory(
       action = DataStore.AssetHistory.readValues(fund.id),
@@ -180,8 +239,10 @@ class NetAssetValueHistoryController {
   private def importHistory(fund: Savings.Fund, values: Seq[Savings.AssetValue]): Unit = {
     import epsa.Main.Akka.dispatcher
 
+    compareHistory(fund, values)
+
     accessHistory(
-      action = DataStore.AssetHistory.writeValues(fund.id, values: _*).map(_ => values),
+      action = DataStore.AssetHistory.writeValues(fund.id, values: _*).map(_ => values)/*Future.successful(values)*/,
       failureMsg = DataStore.writeIssueMsg,
       successAction = (_: Seq[Savings.AssetValue]) => loadHistory(fund)
     )
