@@ -69,6 +69,9 @@ class MainController extends Logging {
   protected var fileSaveMenu: MenuItem = _
 
   @FXML
+  protected var editUndoMenu: MenuItem = _
+
+  @FXML
   protected var viewNetAssetValueHistoryMenu: MenuItem = _
 
   @FXML
@@ -264,6 +267,10 @@ class MainController extends Logging {
     actor ! OnExit
   }
 
+  def onEditUndo(event: ActionEvent): Unit = {
+    actor ! OnEditUndo
+  }
+
   def onEditSchemes(event: ActionEvent): Unit = {
     actor ! OnEditSchemes(Option(assetsTable.getSelectionModel.getSelectedItem).map(_.schemeId))
   }
@@ -383,6 +390,7 @@ class MainController extends Logging {
       case OnFileClose       => onFileClose(state)
       case OnFileSave        => onFileSave(state)
       case OnExit            => onExit(state)
+      case OnEditUndo        => onEditUndo(state)
       case OnEditSchemes(id) => onEditSchemes(state, id.map(state.savingsUpd.getScheme))
       case OnEditFunds(id)   => onEditFunds(state, id.map(state.savingsUpd.getFund))
       case OnNewAssetAction(kind, asset) => onNewAssetAction(state, kind, asset)
@@ -413,6 +421,7 @@ class MainController extends Logging {
 
       fileCloseMenu.setDisable(DataStore.dbOpened.isEmpty)
       fileSaveMenu.setDisable(!dirty)
+      editUndoMenu.setDisable(!dirty)
       viewNetAssetValueHistoryMenu.setDisable(newState.savingsUpd.funds.isEmpty)
 
       val title = DataStore.dbOpened.map { name =>
@@ -463,6 +472,20 @@ class MainController extends Logging {
 
         context.stop(self)
         epsa.Main.shutdown(state.stage)
+      }
+    }
+
+    def onEditUndo(state: State): Unit = {
+      val resp = Dialogs.confirmation(
+        owner = Some(state.stage),
+        title = None,
+        headerText = Some(resources.getString("confirmation.irreversible-action")),
+        contentText = Some(resources.getString("Undo all pending changes"))
+      )
+
+      if (resp.contains(ButtonType.OK)) {
+        DataStore.undoChanges()
+        applyState(state.reset)
       }
     }
 
@@ -729,6 +752,9 @@ object MainController {
     def hasPendingChanges: Boolean =
       eventsUpd.nonEmpty || DataStore.hasPendingChanges
 
+    def reset: State =
+      copy(eventsUpd = Nil, savingsUpd = savingsInit)
+
   }
 
   case object Refresh
@@ -742,6 +768,8 @@ object MainController {
   case object OnFileSave
 
   case object OnExit
+
+  case object OnEditUndo
 
   case class OnEditSchemes(schemeId: Option[UUID])
 

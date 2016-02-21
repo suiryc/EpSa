@@ -212,6 +212,15 @@ object DataStore {
     }
   }
 
+  /**
+   * Undo pending changes.
+   *
+   * Simply closes temporary database.
+   */
+  def undoChanges(): Unit = {
+    closeTempDB()
+  }
+
   /** Copies DB. */
   protected def copyDB(from: DatabaseDef, to: DatabaseDef): Future[Unit] = {
     val actions = tables.map { table =>
