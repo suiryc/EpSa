@@ -48,37 +48,30 @@ class Main extends Application {
   override def start(stage: Stage) {
     I18N.loadLocale()
 
-    def startController(dbOpened: Option[String], events: Seq[Savings.Event] = Nil): Unit = {
+    def startController(events: Seq[Savings.Event] = Nil): Unit = {
       val savingsInit = Savings().processEvents(events:_*)
       val state = MainController.State(
         stage = stage,
         savingsInit = savingsInit,
-        savingsUpd = savingsInit,
-        dbOpened = dbOpened
+        savingsUpd = savingsInit
       )
       MainController.build(state)
     }
 
     // Note: if stage has no Scene, have it owns a Dialog fails.
     // In any case, we have yet to build and show the stage.
-    Awaits.openDataStore(None, change = false, save = false) match {
-      case Some(Success(name)) =>
-        val dbOpened = Some(name)
+    val events = Awaits.openDataStore(None, change = false, save = false) match {
+      case Some(Success(())) =>
         // Data store opening succeeded: read events to replay
         Awaits.readDataStoreEvents(None) match  {
-          case Success(events) =>
-            // Apply read events for initial savings
-            startController(dbOpened = dbOpened, events)
-
-          case _ =>
-            // Failed to read events. User was warned.
-            startController(dbOpened = dbOpened)
+          case Success(v) => v
+          // Failed to read events. User was warned.
+          case _          => Nil
         }
-
-      case _ =>
-        // Either there was an issue (notified to user) or no default data store
-        startController(dbOpened = None)
+      // Either there was an issue (notified to user) or no default data store
+      case _ => Nil
     }
+    startController(events)
   }
 
 }

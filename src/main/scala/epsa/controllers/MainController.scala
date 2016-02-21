@@ -34,7 +34,6 @@ import suiryc.scala.javafx.util.Callback
 import suiryc.scala.settings.Preference
 
 // TODO - change menu for OS integration ? (e.g. Ubuntu)
-// TODO - save fund value history in datastore
 // TODO - display base and current (to date) amounts in assets table
 // TODO - display asset gain/loss (amount/percentage) in assets table
 // TODO - display more details for selected asset (values history graph, ...)
@@ -235,6 +234,10 @@ class MainController extends Logging {
     splitPaneDividerPositions() = splitPane.getDividerPositions.mkString(";")
   }
 
+  def refresh(): Unit = {
+    actor ! Refresh
+  }
+
   def onCloseRequest(event: WindowEvent): Unit = {
     actor ! OnExit
     // Note: consume the event, the actor is responsible for shutting down
@@ -374,6 +377,7 @@ class MainController extends Logging {
     override def receive: Receive = receive(state0)
 
     def receive(state: State): Receive = {
+      case Refresh           => refresh(state)
       case OnFileNew         => onFileNew(state)
       case OnFileOpen        => onFileOpen(state)
       case OnFileClose       => onFileClose(state)
@@ -393,7 +397,7 @@ class MainController extends Logging {
       val newEvents = state.eventsUpd ::: events
       val newSavings = state.savingsUpd.processEvents(events)
       val newState = state.copy(eventsUpd = newEvents, savingsUpd = newSavings)
-      val dirty = newState.eventsUpd.nonEmpty
+      val dirty = newState.hasPendingChanges
 
       // First update savings associated to assets table: takes care of
       // schemes/funds updated names if any.
@@ -407,16 +411,20 @@ class MainController extends Logging {
       sortedAssets.comparatorProperty.bind(assetsTable.comparatorProperty)
       assetsTable.setItems(sortedAssets)
 
-      fileCloseMenu.setDisable(newState.dbOpened.isEmpty)
+      fileCloseMenu.setDisable(DataStore.dbOpened.isEmpty)
       fileSaveMenu.setDisable(!dirty)
       viewNetAssetValueHistoryMenu.setDisable(newState.savingsUpd.funds.isEmpty)
 
-      val title = newState.dbOpened.map { name =>
+      val title = DataStore.dbOpened.map { name =>
         s"[$name${if (dirty) " *" else ""}] - "
       }.getOrElse(if (dirty) " * - " else "") + epsa.Main.name
       newState.stage.setTitle(title)
 
       context.become(receive(newState))
+    }
+
+    def refresh(state: State): Unit = {
+      applyState(state)
     }
 
     def onFileNew(state: State): Unit = {
@@ -439,9 +447,9 @@ class MainController extends Logging {
     }
 
     def onFileSave(state: State): Unit = {
-      save(state).foreach { name =>
+      if (save(state)) {
         // Update state
-        val newState = state.copy(savingsInit = state.savingsUpd, eventsUpd = Nil, dbOpened = Some(name))
+        val newState = state.copy(savingsInit = state.savingsUpd, eventsUpd = Nil)
 
         applyState(newState)
       }
@@ -607,7 +615,7 @@ class MainController extends Logging {
     }
 
     def onNetAssetValueHistory(state: State, fundId: Option[UUID]): Unit = {
-      val stage = NetAssetValueHistoryController.buildStage(state.savingsUpd, fundId)
+      val stage = NetAssetValueHistoryController.buildStage(MainController.this, state.savingsUpd, fundId)
       // Notes:
       // Don't set as modal, since we wish to display the window while still
       // interacting with the main stage.
@@ -634,7 +642,7 @@ class MainController extends Logging {
      * @return whether we can continue (changes saved or can be lost)
      */
     private def checkPendingChanges(state: State): Boolean =
-      if (state.eventsUpd.nonEmpty) {
+      if (state.hasPendingChanges) {
         // There are pending changes. Ask user for confirmation, allowing
         // to save before continuing.
         val buttonSaveType = new ButtonType(fileSaveMenu.getText, ButtonBar.ButtonData.OK_DONE)
@@ -651,7 +659,7 @@ class MainController extends Logging {
         val image = new Image("/images/fugue-icons/disk.png", 0.0, 0.0, true, false, false)
         buttonSave.asInstanceOf[Button].setGraphic(new ImageView(image))
         buttonSave.addEventFilter(ActionEvent.ACTION, { (event: ActionEvent) =>
-          if (save(state, Some(Stages.getStage(alert))).isEmpty) event.consume()
+          if (!save(state, Some(Stages.getStage(alert)))) event.consume()
         })
 
         val r = alert.showAndWait()
@@ -662,14 +670,13 @@ class MainController extends Logging {
     private def open(state: State): Unit = {
       val owner = Some(state.stage)
 
-      def read(name: String) = Awaits.readDataStoreEvents(owner) match {
+      def read() = Awaits.readDataStoreEvents(owner) match {
         case Success(events) =>
           val savingsInit = Savings().processEvents(events:_*)
           val newState = State(
             stage = state.stage,
             savingsInit = savingsInit,
-            savingsUpd = savingsInit,
-            dbOpened = Some(name)
+            savingsUpd = savingsInit
           )
           applyState(newState)
 
@@ -677,37 +684,28 @@ class MainController extends Logging {
       }
 
       Awaits.openDataStore(owner, change = true, save = false) match {
-        case Some(Success(name)) => read(name)
-        case _                   =>
+        case Some(Success(())) => read()
+        case _                 =>
       }
     }
 
-    private def save(state: State, owner0: Option[Window] = None): Option[String] = {
+    private def save(state: State, owner0: Option[Window] = None): Boolean = {
       // Note: make sure to not both lock JavaFX (e.g. waiting for a Future) and
       // try to use it (e.g. Dialog to show upon issue).
       // For simplicity, we waits for result and display issue after receiving
       // it.
       val owner = owner0.orElse(Some(state.window))
 
-      def save(name: String) =
-        Awaits.writeDataStoreEvents(owner, state.eventsUpd).toOption.map(_ => name)
+      def save() =
+        Awaits.saveDataStoreChanges(owner, state.eventsUpd).isSuccess
 
-      state.dbOpened match {
-        case Some(name) =>
-          save(name)
-
-        case None =>
+      DataStore.dbOpened match {
+        case Some(name) => save()
+        case None       =>
           // Data store not opened yet: open then save
           Awaits.openDataStore(owner, change = true, save = true) match {
-            case Some(Success(name)) =>
-              // Note: if we succeed, caller will change the state.
-              // If we fail, caller will do nothing, but at least we can set
-              // the db as opened. (provided caller does not change state)
-              applyState(state.copy(dbOpened = Some(name)))
-              save(name)
-
-            case _ =>
-              None
+            case Some(Success(())) => save()
+            case _                 => false
           }
       }
     }
@@ -723,11 +721,17 @@ object MainController {
     savingsInit: Savings = Savings(),
     eventsUpd: List[Savings.Event] = Nil,
     savingsUpd: Savings = Savings(),
-    dbOpened: Option[String] = None,
     viewUpToDateAssets: Boolean = true
   ) {
+
     lazy val window = stage.getScene.getWindow
+
+    def hasPendingChanges: Boolean =
+      eventsUpd.nonEmpty || DataStore.hasPendingChanges
+
   }
+
+  case object Refresh
 
   case object OnFileNew
 

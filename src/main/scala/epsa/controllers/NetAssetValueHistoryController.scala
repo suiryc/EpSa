@@ -25,11 +25,8 @@ import suiryc.scala.javafx.scene.control.Dialogs
 import suiryc.scala.javafx.stage.Stages
 import suiryc.scala.javafx.util.Callback
 
-// TODO - check data store is open (currently fails if not: require to open one ?)
-// TODO - action to load values from excel file and save them in data store
-// TODO - prevent saving if changes are pending in main view ?
 // TODO - be notified (by main view) if funds are added/removed ?
-// TODO - show imported chart and ask confirmation to save it
+// TODO - show imported chart and ask confirmation to apply it (in-memory changes)
 class NetAssetValueHistoryController {
 
   import NetAssetValueHistoryController._
@@ -56,13 +53,17 @@ class NetAssetValueHistoryController {
   @FXML
   protected var purgeButton: Button = _
 
+  private var mainController: MainController = _
+
   private lazy val stage = fundField.getScene.getWindow.asInstanceOf[Stage]
 
   private var chartPane: Option[AnchorPane] = None
 
   //def initialize(): Unit = { }
 
-  def initialize(savings: Savings, fundIdOpt: Option[UUID]): Unit = {
+  def initialize(mainController: MainController, savings: Savings, fundIdOpt: Option[UUID]): Unit = {
+    this.mainController = mainController
+
     // Note: we need to tell the combobox how to display both the 'button' area
     // (what is shown as selected) and the content (list of choices).
     fundField.setButtonCell(new FundCell)
@@ -172,8 +173,6 @@ class NetAssetValueHistoryController {
   }
 
   // TODO: display comparison result to use
-  // TODO: store imported values in state
-  // TODO: save imported values as for updated state
   private def compareHistory(fund: Savings.Fund, values: Seq[Savings.AssetValue]): Unit = {
     import epsa.Main.Akka.dispatcher
 
@@ -211,8 +210,6 @@ class NetAssetValueHistoryController {
       }
     }
 
-    // TODO: check data store is open; if not: no data from it
-    // TODO: if applicable, merge data store current data with pending history changes
     DataStore.AssetHistory.readValues(fund.id).onComplete {
       case Success(result) =>
         println(compare(result, values, ComparedData()))
@@ -244,7 +241,10 @@ class NetAssetValueHistoryController {
     accessHistory(
       action = DataStore.AssetHistory.writeValues(fund.id, values: _*).map(_ => values)/*Future.successful(values)*/,
       failureMsg = DataStore.writeIssueMsg,
-      successAction = (_: Seq[Savings.AssetValue]) => loadHistory(fund)
+      successAction = (_: Seq[Savings.AssetValue]) => {
+        mainController.refresh()
+        loadHistory(fund)
+      }
     )
   }
 
@@ -252,7 +252,10 @@ class NetAssetValueHistoryController {
     accessHistory(
       action = DataStore.AssetHistory.deleteValues(fund.id),
       failureMsg = DataStore.writeIssueMsg,
-      successAction = (_: Int) => loadHistory(fund)
+      successAction = (_: Int) => {
+        mainController.refresh()
+        loadHistory(fund)
+      }
     )
   }
 
@@ -287,13 +290,13 @@ object NetAssetValueHistoryController {
   def labelNAV = I18N.getResources.getString("NAV")
 
   /** Builds a stage out of this controller. */
-  def buildStage(savings: Savings, fundId: Option[UUID]): Stage = {
+  def buildStage(mainController: MainController, savings: Savings, fundId: Option[UUID]): Stage = {
     val resources = I18N.getResources
 
     val loader = new FXMLLoader(getClass.getResource("/fxml/net-asset-value-history.fxml"), resources)
     val scene = new Scene(loader.load())
     val controller = loader.getController[NetAssetValueHistoryController]
-    controller.initialize(savings, fundId)
+    controller.initialize(mainController, savings, fundId)
 
     val stage = new Stage()
     val title = resources.getString("Net asset value history")
