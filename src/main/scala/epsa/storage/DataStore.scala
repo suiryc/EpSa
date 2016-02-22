@@ -486,7 +486,7 @@ object DataStore {
       }
     }
 
-    def writeValues(fundId: UUID, values: List[Savings.AssetValue]): Future[Unit] =
+    def writeValues(fundId: UUID, values: Seq[Savings.AssetValue]): Future[Unit] =
       writeValues(fundId, values:_*)
 
     def deleteValues(fundId: UUID)(implicit dbOpt: Option[DatabaseDef] = None): Future[Int] = {

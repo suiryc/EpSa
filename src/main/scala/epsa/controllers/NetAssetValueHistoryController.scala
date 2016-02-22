@@ -2,18 +2,19 @@ package epsa.controllers
 
 import epsa.I18N
 import epsa.charts.{ChartHandler, ChartSettings}
+import epsa.controllers.MainController.State
 import epsa.model.Savings
 import epsa.storage.DataStore
 import epsa.tools.EsaliaInvestmentFundProber
+import epsa.util.Awaits
 import java.nio.file.Path
 import java.util.{ResourceBundle, UUID}
 import javafx.collections.FXCollections
 import javafx.event.ActionEvent
 import javafx.fxml.{FXMLLoader, FXML}
-import javafx.scene.Scene
 import javafx.scene.control.{Button, ButtonType, ComboBox, ProgressIndicator}
 import javafx.scene.layout.AnchorPane
-import javafx.stage.{FileChooser, Stage}
+import javafx.stage.{FileChooser, Stage, Window}
 import scala.collection.JavaConversions._
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -26,7 +27,6 @@ import suiryc.scala.javafx.stage.Stages
 import suiryc.scala.javafx.util.Callback
 
 // TODO - be notified (by main view) if funds are added/removed ?
-// TODO - show imported chart and ask confirmation to apply it (in-memory changes)
 class NetAssetValueHistoryController {
 
   import NetAssetValueHistoryController._
@@ -55,11 +55,11 @@ class NetAssetValueHistoryController {
 
   private var mainController: MainController = _
 
+  private var changes = Map[Savings.Fund, Option[Seq[Savings.AssetValue]]]()
+
   private lazy val stage = fundField.getScene.getWindow.asInstanceOf[Stage]
 
   private var chartPane: Option[AnchorPane] = None
-
-  //def initialize(): Unit = { }
 
   def initialize(mainController: MainController, savings: Savings, fundIdOpt: Option[UUID]): Unit = {
     this.mainController = mainController
@@ -128,7 +128,7 @@ class NetAssetValueHistoryController {
       val resp = Dialogs.confirmation(
         owner = Some(stage),
         title = None,
-        headerText = Some(resources.getString("confirmation.irreversible-action")),
+        headerText = Some(resources.getString("confirmation.action")),
         contentText = Some(resources.getString("Purge net asset value history"))
       )
 
@@ -153,15 +153,16 @@ class NetAssetValueHistoryController {
     }
 
     // Action on history (with timeout)
-    action.withTimeout(10.seconds).onComplete {
+    action.withTimeout(60.seconds).onComplete {
       case Success(result) =>
         showIndicator.cancel()
-        // Hide indicator and display new chart
+        // Hide indicator and perform success action (e.g. display new chart)
         progressIndicator.setVisible(false)
         successAction(result)
 
       case Failure(ex) =>
         showIndicator.cancel()
+        // Hide indicator and display issue
         progressIndicator.setVisible(false)
         Dialogs.error(
           owner = Some(stage),
@@ -172,14 +173,18 @@ class NetAssetValueHistoryController {
     }
   }
 
-  // TODO: display comparison result to use
-  private def compareHistory(fund: Savings.Fund, values: Seq[Savings.AssetValue]): Unit = {
-    import epsa.Main.Akka.dispatcher
+  case class HistoryChanges(
+    old: Long = 0,
+    unchanged: Long = 0,
+    changed: Seq[Savings.AssetValue] = Seq.empty,
+    added: Seq[Savings.AssetValue] = Seq.empty
+  ) {
+    lazy val cleaned = (changed ++ added).sortBy(_.date)
+  }
 
-    case class ComparedData(old: Long = 0, unchanged: Long = 0, changed: Long = 0, added: Long = 0)
-
+  private def cleanHistory(current: Seq[Savings.AssetValue], update: Seq[Savings.AssetValue]): HistoryChanges = {
     @scala.annotation.tailrec
-    def compare(values1: Seq[Savings.AssetValue], values2: Seq[Savings.AssetValue], compared: ComparedData): ComparedData = {
+    def loop(values1: Seq[Savings.AssetValue], values2: Seq[Savings.AssetValue], changes: HistoryChanges): HistoryChanges = {
       // We want to compare existing data to new ones.
       // Both are sorted by date. We need to match dates between both sets of
       // data. To do so, we simply check each head date, and iterate either the
@@ -191,8 +196,8 @@ class NetAssetValueHistoryController {
       // If there is no more values in the new data, all remaining old ones are
       // really 'old'.
       // Otherwise, we need to compare each head date.
-      if (values1.isEmpty) compared.copy(added = compared.added + values2.length)
-      else if (values2.isEmpty) compared.copy(old = compared.old + values1.length)
+      if (values1.isEmpty) changes.copy(added = changes.added ++ values2)
+      else if (values2.isEmpty) changes.copy(old = changes.old + values1.length)
       else {
         // If the existing data head has the oldest date, it corresponds to a
         // value unmatched ('old') in the new data.
@@ -203,26 +208,38 @@ class NetAssetValueHistoryController {
         val head1 = values1.head
         val head2 = values2.head
         val headCompared = head1.date.compareTo(head2.date)
-        if (headCompared < 0) compare(values1.tail, values2, compared.copy(old = compared.old + 1))
-        else if (headCompared > 0) compare(values1, values2.tail, compared.copy(added = compared.added + 1))
-        else if (head1.value != head2.value) compare(values1.tail, values2.tail, compared.copy(changed = compared.changed + 1))
-        else compare(values1.tail, values2.tail, compared.copy(unchanged = compared.unchanged + 1))
+        if (headCompared < 0) loop(values1.tail, values2, changes.copy(old = changes.old + 1))
+        else if (headCompared > 0) loop(values1, values2.tail, changes.copy(added = changes.added :+ values2.head))
+        else if (head1.value != head2.value) loop(values1.tail, values2.tail, changes.copy(changed = changes.changed :+ values2.head))
+        else loop(values1.tail, values2.tail, changes.copy(unchanged = changes.unchanged + 1))
       }
     }
 
-    DataStore.AssetHistory.readValues(fund.id).onComplete {
-      case Success(result) =>
-        println(compare(result, values, ComparedData()))
+    loop(current, update, HistoryChanges())
+  }
 
-      case Failure(ex) =>
-        //showIndicator.cancel()
-        //progressIndicator.setVisible(false)
-        Dialogs.error(
-          owner = Some(stage),
-          title = None,
-          headerText = Some(DataStore.readIssueMsg),
-          ex = Some(ex)
-        )
+  private def mergeHistory(current: Seq[Savings.AssetValue], update: Seq[Savings.AssetValue]): Seq[Savings.AssetValue] = {
+    @scala.annotation.tailrec
+    def loop(values1: Seq[Savings.AssetValue], values2: Seq[Savings.AssetValue], merged: Seq[Savings.AssetValue]): Seq[Savings.AssetValue] = {
+      if (values1.isEmpty) merged ++ values2
+      else if (values2.isEmpty) merged ++ values1
+      else {
+        val head1 = values1.head
+        val head2 = values2.head
+        val headCompared = head1.date.compareTo(head2.date)
+        if (headCompared < 0) loop(values1.tail, values2, merged :+ values1.head)
+        else if (headCompared > 0) loop(values1, values2.tail, merged :+ values2.head)
+        else loop(values1.tail, values2.tail, merged :+ values2.head)
+      }
+    }
+
+    loop(current, update, Seq.empty)
+  }
+
+  private def updatedHistory(fund: Savings.Fund, current: Seq[Savings.AssetValue]): Seq[Savings.AssetValue] = {
+    changes.getOrElse(fund, Some(Seq.empty)) match {
+      case Some(update) => mergeHistory(current, update)
+      case None         => Seq.empty
     }
   }
 
@@ -236,35 +253,45 @@ class NetAssetValueHistoryController {
   private def importHistory(fund: Savings.Fund, values: Seq[Savings.AssetValue]): Unit = {
     import epsa.Main.Akka.dispatcher
 
-    compareHistory(fund, values)
+    case class ImportResult(current: Seq[Savings.AssetValue], fundChanges: HistoryChanges)
+
+    val action = DataStore.AssetHistory.readValues(fund.id).map { current =>
+      val updated = updatedHistory(fund, current)
+      val fundChanges = cleanHistory(updated, values)
+      changes += fund -> Some(fundChanges.cleaned)
+      ImportResult(current, fundChanges)
+    }
+
+    def showResult(result: ImportResult): Unit = {
+      // TODO: show history changes in a dedicated window (or panel ?)
+      displayChart(fund, result.current)
+    }
 
     accessHistory(
-      action = DataStore.AssetHistory.writeValues(fund.id, values: _*).map(_ => values)/*Future.successful(values)*/,
-      failureMsg = DataStore.writeIssueMsg,
-      successAction = (_: Seq[Savings.AssetValue]) => {
-        mainController.refresh()
-        loadHistory(fund)
-      }
+      action = action,
+      failureMsg = DataStore.readIssueMsg,
+      successAction = showResult
     )
   }
 
   private def purgeHistory(fund: Savings.Fund): Unit = {
     accessHistory(
-      action = DataStore.AssetHistory.deleteValues(fund.id),
-      failureMsg = DataStore.writeIssueMsg,
-      successAction = (_: Int) => {
-        mainController.refresh()
+      action = Future.successful(()),
+      failureMsg = "",
+      successAction = (_: Unit) => {
+        changes += fund -> None
         loadHistory(fund)
       }
     )
   }
 
   private def displayChart(fund: Savings.Fund, values: Seq[Savings.AssetValue]): Unit = {
-    purgeButton.setDisable(values.isEmpty)
+    val actualValues = updatedHistory(fund, values)
+    purgeButton.setDisable(actualValues.isEmpty)
 
     val chartHandler = new ChartHandler(
       fundName = fund.name,
-      fundValues = values,
+      fundValues = actualValues,
       settings = ChartSettings.hidden.copy(xLabel = labelDate, yLabel = labelNAV)
     )
     val pane = chartHandler.chartPane
@@ -290,22 +317,47 @@ object NetAssetValueHistoryController {
   def labelNAV = I18N.getResources.getString("NAV")
 
   /** Builds a stage out of this controller. */
-  def buildStage(mainController: MainController, savings: Savings, fundId: Option[UUID]): Stage = {
+  import javafx.scene.control.Dialog
+  def buildStage(mainController: MainController, state: State, fundId: Option[UUID]): Dialog[Unit] = {
     val resources = I18N.getResources
 
+    val dialog = new Dialog[Unit]()
+    dialog.getDialogPane.getButtonTypes.addAll(ButtonType.OK, ButtonType.CANCEL)
+
     val loader = new FXMLLoader(getClass.getResource("/fxml/net-asset-value-history.fxml"), resources)
-    val scene = new Scene(loader.load())
+    dialog.getDialogPane.setContent(loader.load())
     val controller = loader.getController[NetAssetValueHistoryController]
-    controller.initialize(mainController, savings, fundId)
+    controller.initialize(mainController, state.savingsUpd, fundId)
 
-    val stage = new Stage()
     val title = resources.getString("Net asset value history")
-    stage.setTitle(title)
-    stage.setScene(scene)
+    dialog.setTitle(title)
 
-    Stages.trackMinimumDimensions(stage)
+    state.window
+    dialog.setResultConverter(Callback { resultConverter(state.window, controller) _ })
+    Stages.trackMinimumDimensions(Stages.getStage(dialog))
 
-    stage
+    dialog
+  }
+
+  private def resultConverter(windows: Window, controller: NetAssetValueHistoryController)(buttonType: ButtonType): Unit = {
+    import epsa.Main.Akka.dispatcher
+
+    // Apply changes upon validation
+    if (buttonType == ButtonType.OK) {
+      val actions = controller.changes.map {
+        case (fund, change) =>
+          change match {
+            case Some(values) => Action(DataStore.AssetHistory.writeValues(fund.id, values))
+            case None         => Action(DataStore.AssetHistory.deleteValues(fund.id))
+          }
+      }.toSeq
+      // Apply as many changes as possible
+      val future = executeSequentially(stopOnError = false, actions: _*)
+      // Wait for result and display issue if any
+      Awaits.orError(future, Some(windows), DataStore.writeIssueMsg)
+      // Request main view to refresh (i.e. check for pending changes)
+      controller.mainController.refresh()
+    }
   }
 
 }

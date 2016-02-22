@@ -638,13 +638,15 @@ class MainController extends Logging {
     }
 
     def onNetAssetValueHistory(state: State, fundId: Option[UUID]): Unit = {
-      val stage = NetAssetValueHistoryController.buildStage(MainController.this, state.savingsUpd, fundId)
+      val dialog = NetAssetValueHistoryController.buildStage(MainController.this, state, fundId)
       // Notes:
       // Don't set as modal, since we wish to display the window while still
       // interacting with the main stage.
       // Don't set owner, otherwise the new windows remains in front of its
       // owner.
-      stage.show()
+      dialog.initModality(Modality.NONE)
+      dialog.setResizable(true)
+      dialog.show()
     }
 
     def onUpToDateAssets(state: State, set: Boolean): Unit = {
