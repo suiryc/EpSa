@@ -17,7 +17,7 @@ import javafx.fxml.{FXMLLoader, FXML}
 import javafx.scene.{Parent, Scene}
 import javafx.scene.control._
 import javafx.scene.layout.AnchorPane
-import javafx.stage.{FileChooser, Stage, Window}
+import javafx.stage.{FileChooser, Stage, StageStyle, Window}
 import scala.collection.JavaConversions._
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -56,6 +56,8 @@ class NetAssetValueHistoryController {
   @FXML
   protected var purgeButton: Button = _
 
+  private var dialog: Dialog[_] = _
+
   private var mainController: MainController = _
 
   private var changes = Map[Savings.Fund, Option[Seq[Savings.AssetValue]]]()
@@ -64,7 +66,8 @@ class NetAssetValueHistoryController {
 
   private var chartPane: Option[AnchorPane] = None
 
-  def initialize(mainController: MainController, savings: Savings, fundIdOpt: Option[UUID]): Unit = {
+  def initialize(dialog: Dialog[_], mainController: MainController, savings: Savings, fundIdOpt: Option[UUID]): Unit = {
+    this.dialog = dialog
     this.mainController = mainController
 
     // Note: we need to tell the combobox how to display both the 'button' area
@@ -348,6 +351,7 @@ class NetAssetValueHistoryController {
     val loader = new FXMLLoader(getClass.getResource("/fxml/net-asset-value-history-changes.fxml"), resources)
     val root = loader.load[Parent]()
     val tabPane = root.lookup("#tabPane").asInstanceOf[TabPane]
+    val fundLabel = root.lookup("#fundLabel").asInstanceOf[Label]
     val updatedLabel = root.lookup("#updatedLabel").asInstanceOf[Label]
     // Note: 'TabPane' does not lookup its own 'Tab's but only their content ...
     val updatedTab = tabPane.getTabs.find(_.getId == "updatedTab").get
@@ -357,6 +361,7 @@ class NetAssetValueHistoryController {
     val addedTable = root.lookup("#addedTable").asInstanceOf[TableView[AssetEntry]]
     val unchangedLabel = root.lookup("#unchangedLabel").asInstanceOf[Label]
 
+    fundLabel.setText(fund.name)
     updatedLabel.setText(updatedEntries.size.toString)
     addedLabel.setText(addedEntries.size.toString)
     unchangedLabel.setText(result.fundChanges.unchanged.toString)
@@ -380,9 +385,14 @@ class NetAssetValueHistoryController {
       tabPane.getTabs.remove(addedTab)
     }
 
+    // Notes:
+    // Make a dedicated window. Don't bother close any previous one.
+    // Use current window as owner, and share its title.
+    // Use 'utility' style (we don't need minimize/maximize).
     val stage = new Stage()
-    val title = resources.getString("Net asset value history")
-    stage.setTitle(title)
+    stage.initStyle(StageStyle.UTILITY)
+    stage.initOwner(Stages.getStage(dialog))
+    stage.setTitle(dialog.getTitle)
     val scene = new Scene(root)
     stage.setScene(scene)
     Stages.trackMinimumDimensions(stage)
@@ -413,7 +423,7 @@ object NetAssetValueHistoryController {
     val loader = new FXMLLoader(getClass.getResource("/fxml/net-asset-value-history.fxml"), resources)
     dialog.getDialogPane.setContent(loader.load())
     val controller = loader.getController[NetAssetValueHistoryController]
-    controller.initialize(mainController, state.savingsUpd, fundId)
+    controller.initialize(dialog, mainController, state.savingsUpd, fundId)
 
     val title = resources.getString("Net asset value history")
     dialog.setTitle(title)
