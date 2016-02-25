@@ -8,11 +8,14 @@ import epsa.storage.DataStore
 import epsa.tools.EsaliaInvestmentFundProber
 import epsa.util.Awaits
 import java.nio.file.Path
+import java.time.LocalDate
 import java.util.{ResourceBundle, UUID}
+import javafx.beans.property.SimpleObjectProperty
 import javafx.collections.FXCollections
 import javafx.event.ActionEvent
 import javafx.fxml.{FXMLLoader, FXML}
-import javafx.scene.control.{Button, ButtonType, ComboBox, ProgressIndicator}
+import javafx.scene.{Parent, Scene}
+import javafx.scene.control._
 import javafx.scene.layout.AnchorPane
 import javafx.stage.{FileChooser, Stage, Window}
 import scala.collection.JavaConversions._
@@ -250,20 +253,23 @@ class NetAssetValueHistoryController {
       successAction = displayChart(fund, _: Seq[Savings.AssetValue])
     )
 
+  case class ImportResult(current: Seq[Savings.AssetValue], fundChanges: HistoryChanges)
+
   private def importHistory(fund: Savings.Fund, values: Seq[Savings.AssetValue]): Unit = {
     import epsa.Main.Akka.dispatcher
 
-    case class ImportResult(current: Seq[Savings.AssetValue], fundChanges: HistoryChanges)
-
     val action = DataStore.AssetHistory.readValues(fund.id).map { current =>
+      // Compute import changes (imported values relatively to updated history)
       val updated = updatedHistory(fund, current)
-      val fundChanges = cleanHistory(updated, values)
-      changes += fund -> Some(fundChanges.cleaned)
-      ImportResult(current, fundChanges)
+      val importChanges = cleanHistory(updated, values)
+      // Compute fund changes (all changes relatively to initial history)
+      val fundChanges = mergeHistory(updatedHistory(fund, Seq.empty), values)
+      changes += fund -> Some(fundChanges)
+      ImportResult(updated, importChanges)
     }
 
     def showResult(result: ImportResult): Unit = {
-      // TODO: show history changes in a dedicated window (or panel ?)
+      displayImportResult(fund, result)
       displayChart(fund, result.current)
     }
 
@@ -301,6 +307,86 @@ class NetAssetValueHistoryController {
     AnchorPane.setBottomAnchor(pane, 0.0)
     AnchorPane.setLeftAnchor(pane, 0.0)
     historyPane.getChildren.add(pane)
+  }
+
+  /** Displays history import result in dedicated window. */
+  private def displayImportResult(fund: Savings.Fund, result: ImportResult): Unit = {
+    type AssetEntries = Seq[AssetEntry]
+    case class AssetEntry(date: LocalDate, values: Seq[BigDecimal])
+
+    // Note: it appears hard, if not impossible, to declare the table columns
+    // in fxml while expecting to its widths to adjust to its content upon
+    // populating it.
+    // If columns are created and set here in the code, the width adjust as
+    // wanted.
+
+    def setupTable(table: TableView[AssetEntry], headers: Seq[String], entries: AssetEntries): Unit = {
+      val column1 = new TableColumn[AssetEntry, LocalDate](headers.head)
+      column1.setCellValueFactory(Callback { data =>
+        new SimpleObjectProperty(data.getValue.date)
+      })
+      val columns = column1 +: headers.tail.zipWithIndex.map {
+        case (header, idx) =>
+          val column2 = new TableColumn[AssetEntry, BigDecimal](header)
+          column2.setCellValueFactory(Callback { data =>
+            new SimpleObjectProperty(data.getValue.values(idx))
+          })
+          column2
+      }
+      table.getColumns.setAll(columns)
+      table.setItems(FXCollections.observableList(entries))
+    }
+
+    val current = result.current.groupBy(_.date).mapValues(_.head)
+    val updatedEntries = result.fundChanges.changed.map { changed =>
+      AssetEntry(changed.date, Seq(current(changed.date).value, changed.value))
+    }
+    val addedEntries = result.fundChanges.added.map { added =>
+      AssetEntry(added.date, Seq(added.value))
+    }
+
+    val loader = new FXMLLoader(getClass.getResource("/fxml/net-asset-value-history-changes.fxml"), resources)
+    val root = loader.load[Parent]()
+    val tabPane = root.lookup("#tabPane").asInstanceOf[TabPane]
+    val updatedLabel = root.lookup("#updatedLabel").asInstanceOf[Label]
+    // Note: 'TabPane' does not lookup its own 'Tab's but only their content ...
+    val updatedTab = tabPane.getTabs.find(_.getId == "updatedTab").get
+    val updatedTable = root.lookup("#updatedTable").asInstanceOf[TableView[AssetEntry]]
+    val addedLabel = root.lookup("#addedLabel").asInstanceOf[Label]
+    val addedTab = tabPane.getTabs.find(_.getId == "addedTab").get
+    val addedTable = root.lookup("#addedTable").asInstanceOf[TableView[AssetEntry]]
+    val unchangedLabel = root.lookup("#unchangedLabel").asInstanceOf[Label]
+
+    updatedLabel.setText(updatedEntries.size.toString)
+    addedLabel.setText(addedEntries.size.toString)
+    unchangedLabel.setText(result.fundChanges.unchanged.toString)
+    if (updatedEntries.nonEmpty) {
+      val headers = Seq(
+        resources.getString("Date"),
+        resources.getString("Old value"),
+        resources.getString("New value")
+      )
+      setupTable(updatedTable, headers, updatedEntries)
+    } else {
+      tabPane.getTabs.remove(updatedTab)
+    }
+    if (addedEntries.nonEmpty) {
+      val headers = Seq(
+        resources.getString("Date"),
+        resources.getString("NAV")
+      )
+      setupTable(addedTable, headers, addedEntries)
+    } else {
+      tabPane.getTabs.remove(addedTab)
+    }
+
+    val stage = new Stage()
+    val title = resources.getString("Net asset value history")
+    stage.setTitle(title)
+    val scene = new Scene(root)
+    stage.setScene(scene)
+    Stages.trackMinimumDimensions(stage)
+    stage.show()
   }
 
 }

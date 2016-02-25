@@ -414,6 +414,7 @@ class EditSchemesController {
         // Otherwise, re-select needed funds, which will trigger a form checking.
         if (reselect.isEmpty) checkForm()
         else {
+          // TODO: any way prevent unselecting entries without having to warn ? (also in fund editing controller)
           Dialogs.warning(
             owner = Some(window),
             title = None,
