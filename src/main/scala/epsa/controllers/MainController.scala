@@ -56,9 +56,6 @@ class MainController extends Logging {
 
   private val assetsColumnsPref = Preference.from("stage.main.assets.columns", null:String)
 
-  //@FXML
-  //protected var location: URL = _
-
   @FXML
   protected var resources: ResourceBundle = _
 
@@ -119,8 +116,6 @@ class MainController extends Logging {
     "amount"       -> columnAmount,
     "units"        -> columnUnits
   )
-
-  //def initialize(): Unit = { }
 
   def initialize(state: State): Unit = {
     // Note: make the actor name unique (with timestamp) so that it can be

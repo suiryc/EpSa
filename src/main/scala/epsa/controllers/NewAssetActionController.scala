@@ -34,9 +34,6 @@ class NewAssetActionController {
 
   private val stageLocation = Preference.from("stage.new-asset-action.location", null:StageLocation)
 
-  //@FXML
-  //protected var location: URL = _
-
   @FXML
   protected var resources: ResourceBundle = _
 
@@ -99,8 +96,6 @@ class NewAssetActionController {
   private var recursionLevel = 0
 
   private var dstAvailabilityChosen = false
-
-  //def initialize(): Unit = { }
 
   def initialize(savings0: Savings, dialog: Dialog[_], actionKind0: AssetActionKind.Value, asset: Option[Savings.Asset]): Unit = {
     // Save initial state

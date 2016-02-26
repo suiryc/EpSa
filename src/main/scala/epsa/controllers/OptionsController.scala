@@ -12,16 +12,11 @@ import suiryc.scala.util.I18NLocale
 
 class OptionsController {
 
-  //@FXML
-  //protected var location: URL = _
-
   @FXML
   protected var resources: ResourceBundle = _
 
   @FXML
   protected var languageChoice: ComboBox[I18NLocale] = _
-
-  //def initialize(): Unit = { }
 
   def initialize(snapshot: SettingsSnapshot): Unit = {
     snapshot.add(SettingSnapshot(I18N.pref))

@@ -3,6 +3,7 @@ package epsa.controllers
 import epsa.I18N
 import epsa.model.Savings
 import java.util.ResourceBundle
+import javafx.beans.property.SimpleBooleanProperty
 import javafx.collections.FXCollections
 import javafx.event.{ActionEvent, Event}
 import javafx.fxml.{FXMLLoader, FXML}
@@ -12,8 +13,8 @@ import javafx.scene.image.ImageView
 import javafx.scene.input.{KeyCode, KeyEvent, MouseEvent}
 import scala.collection.JavaConversions._
 import suiryc.scala.RichOption._
-import suiryc.scala.javafx.collections.RichObservableList._
 import suiryc.scala.javafx.beans.value.RichObservableValue._
+import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.javafx.event.EventHandler._
 import suiryc.scala.javafx.event.Events
 import suiryc.scala.javafx.scene.control.Dialogs
@@ -22,8 +23,7 @@ import suiryc.scala.javafx.util.Callback
 
 class EditFundsController {
 
-  //@FXML
-  //protected var location: URL = _
+  import EditFundsController._
 
   @FXML
   protected var resources: ResourceBundle = _
@@ -35,7 +35,7 @@ class EditFundsController {
   protected var nameField: TextField = _
 
   @FXML
-  protected var schemesField: ListView[Savings.Scheme] = _
+  protected var schemesField: ListView[SelectableScheme] = _
 
   @FXML
   protected var plusField: ImageView = _
@@ -65,8 +65,6 @@ class EditFundsController {
 
   private var deleteReady = false
 
-  //def initialize(): Unit = { }
-
   def initialize(savings0: Savings, dialog: Dialog[_], edit0: Option[Savings.Fund]): Unit = {
     // Save initial state
     this.savings0 = savings0
@@ -90,11 +88,44 @@ class EditFundsController {
     nameField.textProperty.listen(checkForm())
 
     // Initialize schemes list view
-    schemesField.setCellFactory(Callback { new SchemeCell })
-    schemesField.getSelectionModel.setSelectionMode(SelectionMode.MULTIPLE)
-    schemesField.setItems(FXCollections.observableList(savings.schemes))
-    // Check selected schemes upon change, triggers form re-check if necessary
-    schemesField.getSelectionModel.getSelectedItems.listen(checkSelectedSchemes())
+    // Use CheckBox ListCell elements to populate its content.
+    class CheckBoxSchemeCell extends CheckBoxListCellEx[SelectableScheme] {
+
+      import CheckBoxListCellEx._
+
+      override def getInfo(item: SelectableScheme): CellInfo =
+        CellInfo(
+          text = item.scheme.name,
+          observable = item.check,
+          checked = edit.exists(fund => item.scheme.funds.contains(fund.id)),
+          locked = edit.exists(fund => savings.hasAsset(item.scheme.id, fund.id))
+        )
+
+      override protected def setLocked(locked: Boolean): Unit = {
+        // If locked (i.e. cell is disabled) use a higher opacity than usual,
+        // and display a tooltip explaining why the checkbox can't be changed.
+        if (!locked) {
+          setTooltip(null)
+          setOpacity(1.0)
+        }
+        else {
+          setTooltip(new Tooltip(resources.getString("warning.unselecting-nonempty-resource")))
+          setOpacity(0.8)
+        }
+      }
+
+      override protected def statusChanged(oldValue: Boolean, newValue: Boolean): Unit = {
+        checkForm()
+      }
+
+    }
+
+    schemesField.setCellFactory(Callback { new CheckBoxSchemeCell })
+    schemesField.setItems(FXCollections.observableList(savings.schemes.map(SelectableScheme)))
+    // Prevent item selection
+    schemesField.getSelectionModel.selectedIndexProperty.listen {
+      JFXSystem.runLater(schemesField.getSelectionModel.clearSelection())
+    }
 
     // Select initial fund if any
     edit0.foreach(fundsField.getSelectionModel.select)
@@ -107,7 +138,7 @@ class EditFundsController {
       val dirty = edit match {
         case Some(fund) =>
           val oldSchemes = savings.schemes.filter(_.funds.contains(fund.id)).map(_.id).toSet
-          val newSchemes = schemesField.getSelectionModel.getSelectedItems.toList.map(_.id).toSet
+          val newSchemes = getSelectedSchemes.map(_.id).toSet
           (fund.name != name) ||
             oldSchemes != newSchemes
 
@@ -159,6 +190,9 @@ class EditFundsController {
     nameField.requestFocus()
   }
 
+  private def getSelectedSchemes: List[Savings.Scheme] =
+    schemesField.getItems.toList.filter(_.check.get).map(_.scheme)
+
   /**
    * Called when releasing mouse/touch on 'plus' image.
    *
@@ -187,7 +221,7 @@ class EditFundsController {
 
       val event = savings.createFundEvent(name)
       val newEvents = event ::
-        schemesField.getSelectionModel.getSelectedItems.toList.map { scheme =>
+        getSelectedSchemes.map { scheme =>
           Savings.AssociateFund(scheme.id, event.fundId)
         }
 
@@ -270,7 +304,7 @@ class EditFundsController {
           else Some(Savings.UpdateFund(fund.id, name))
 
         val oldSchemes = savings.schemes.filter(_.funds.contains(fund.id)).map(_.id).toSet
-        val newSchemes = schemesField.getSelectionModel.getSelectedItems.toList.map(_.id).toSet
+        val newSchemes = getSelectedSchemes.map(_.id).toSet
 
         val newEvents = event1.toList ++ (oldSchemes -- newSchemes).toList.map { schemeId =>
           Savings.DissociateFund(schemeId, fund.id)
@@ -293,6 +327,12 @@ class EditFundsController {
       // schemes due to some checking.
       edit = None
       updateEditFields(fund)
+    }
+    // If fund was de-selected, we still want refresh schemes view
+    if (newEdit.isEmpty) {
+      // Refresh ListView in order to re-create cells with appropriate content
+      // (checkbox selection, etc).
+      schemesField.refresh()
     }
     edit = newEdit
 
@@ -366,8 +406,10 @@ class EditFundsController {
 
   /** Updates the list of schemes. */
   private def updateSchemes(): Unit = {
-    schemesField.getSelectionModel.clearSelection()
-    schemesField.setItems(FXCollections.observableList(savings.schemes))
+    schemesField.setItems(FXCollections.observableList(savings.schemes.map(SelectableScheme)))
+    // Refresh ListView in order to re-create cells with appropriate content
+    // (checkbox selection, etc).
+    schemesField.refresh()
   }
 
   /** Updates the list of funds. */
@@ -383,10 +425,9 @@ class EditFundsController {
    */
   private def updateEditFields(fund: Savings.Fund): Unit = {
     nameField.setText(fund.name)
-    schemesField.getSelectionModel.clearSelection()
-    savings.schemes.filter { scheme =>
-      scheme.funds.contains(fund.id)
-    }.foreach(schemesField.getSelectionModel.select)
+    // Refresh ListView in order to re-create cells with appropriate content
+    // (checkbox selection, etc).
+    schemesField.refresh()
   }
 
   /**
@@ -396,41 +437,7 @@ class EditFundsController {
    */
   private def resetEditFields(): Unit = {
     nameField.clear()
-    schemesField.getSelectionModel.clearSelection()
   }
-
-  /**
-   * Checks selected schemes.
-   *
-   * If not editing, check form.
-   * If editing, ensure schemes with assets cannot be de-selected.
-   */
-  private def checkSelectedSchemes(): Unit =
-    edit match {
-      case Some(fund) =>
-        // Note: on Linux selectedItems may contain a 'null' value the first
-        // time it is called ...
-        val selected = schemesField.getSelectionModel.getSelectedItems.toList.flatMap(Option(_)).map(_.id).toSet
-        val unselected = savings.schemes.map(_.id).filterNot(selected.contains)
-        val reselect = unselected.filter { schemeId =>
-          savings.hasAsset(schemeId, fund.id)
-        }
-        // If selected schemes are OK, simply check form.
-        // Otherwise, re-select needed schemes, which will trigger a form checking.
-        if (reselect.isEmpty) checkForm()
-        else {
-          Dialogs.warning(
-            owner = Some(window),
-            title = None,
-            headerText = Some(resources.getString("warning.unselecting-nonempty-resource"))
-          )
-
-          reselect.map(savings.getScheme).foreach(schemesField.getSelectionModel.select)
-        }
-
-      case None =>
-        checkForm()
-    }
 
   /**
    * Checks form.
@@ -442,7 +449,7 @@ class EditFundsController {
     // Edition is OK if either name or schemes are changed.
     val editOk = edit.exists { fund =>
       val oldSchemes = savings.schemes.filter(_.funds.contains(fund.id)).map(_.id).toSet
-      val newSchemes = schemesField.getSelectionModel.getSelectedItems.toList.map(_.id).toSet
+      val newSchemes = getSelectedSchemes.map(_.id).toSet
       (fund.name != name) ||
         oldSchemes != newSchemes
     }
@@ -508,6 +515,11 @@ object EditFundsController {
   def resultConverter(controller: EditFundsController)(buttonType: ButtonType): List[Savings.Event] = {
     if (buttonType != ButtonType.OK) Nil
     else controller.events
+  }
+
+  /** ListCell content associated to a CheckBox. */
+  case class SelectableScheme(scheme: Savings.Scheme) {
+    val check = new SimpleBooleanProperty(false)
   }
 
 }
