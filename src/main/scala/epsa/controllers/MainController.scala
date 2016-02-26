@@ -41,7 +41,6 @@ import suiryc.scala.settings.Preference
 // TODO - menu entry and dialog to display/edit events history ?
 // TODO - when computing assets, order by scheme/fund/availability ?
 // TODO - manage encryption of datastore ?
-// TODO - delete NAV history values when removing fund
 // TODO - manual/automatic way to check NAV history values without existing fund ?
 class MainController extends Logging {
 
@@ -397,6 +396,10 @@ class MainController extends Logging {
     }
 
     def processEvents(state: State, events: List[Savings.Event]): Unit = {
+      // Time to delete Net asset value history upon deleting fund
+      events.collect {
+        case Savings.DeleteFund(fundId) => DataStore.AssetHistory.deleteValues(fundId)
+      }
       val newEvents = state.eventsUpd ::: events
       val newSavings = state.savingsUpd.processEvents(events)
       val newState = state.copy(eventsUpd = newEvents, savingsUpd = newSavings)
