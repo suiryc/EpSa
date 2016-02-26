@@ -520,7 +520,6 @@ class MainController extends Logging {
       dialog.initOwner(state.window)
       dialog.setResizable(true)
       val (reload, needRestart) = dialog.showAndWait().orElse((false, false))
-      println(s"reload = $reload; needRestart = $needRestart")
       if (reload) {
         // Persist now to restore it when rebuilding the stage
         persistView(state)

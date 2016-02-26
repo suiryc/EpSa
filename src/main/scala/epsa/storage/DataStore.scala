@@ -9,6 +9,7 @@ import java.sql.{Date, Timestamp}
 import java.time.{Instant, LocalDate}
 import java.util.UUID
 import javafx.stage.{FileChooser, Window}
+import org.h2.engine.Constants
 import scala.concurrent.Future
 import slick.driver.H2Driver.api._
 import slick.driver.H2Driver.backend.DatabaseDef
@@ -24,7 +25,7 @@ object DataStore {
   import epsa.Main.prefs
   import Preference._
 
-  private val dbExtension = ".mv.db"
+  private val dbExtension = Constants.SUFFIX_MV_FILE
 
   protected val dbPathPref = Preference.from("datastore.path", null:Path)
 
