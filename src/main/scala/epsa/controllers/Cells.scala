@@ -3,96 +3,59 @@ package epsa.controllers
 import epsa.model.Savings
 import java.time.LocalDate
 import javafx.beans.property.{BooleanProperty, SimpleBooleanProperty}
-import javafx.scene.control.{ListCell, TableCell}
+import javafx.scene.control.{Cell, ListCell, TableCell}
 import javafx.scene.control.cell.CheckBoxListCell
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.util.Callback
 import suiryc.scala.util.I18NLocale
 
-// TODO: use a common 'ListCellEx'/'TableCellEx' class/trait with 'itemText: String' function to implement
+// TODO: move CellEx/ListCellEx/TableCellEx/CheckBoxListCellEx in suiryc-scala-javafx ?
 
-class SchemeCell
-  extends ListCell[Savings.Scheme]
-{
+/** Cell extension that knows how to update cell text. */
+trait CellEx[A] extends Cell[A] {
 
-  override protected def updateItem(item: Savings.Scheme, empty: Boolean) {
+  protected def itemText(item: A): String
+
+  override protected def updateItem(item: A, empty: Boolean) {
     super.updateItem(item, empty)
     if (empty) setText(null)
-    else setText(item.name)
+    else setText(itemText(item))
   }
 
 }
 
-class FundCell
-  extends ListCell[Savings.Fund]
-{
+/** ListCell extension with CellEx. */
+trait ListCellEx[A] extends ListCell[A] with CellEx[A]
 
-  override protected def updateItem(item: Savings.Fund, empty: Boolean) {
-    super.updateItem(item, empty)
-    if (empty) setText(null)
-    else setText(item.name)
-  }
+/** TableCell extension with CellEx. */
+trait TableCellEx[A, B] extends TableCell[A, B] with CellEx[B]
 
+class SchemeCell extends ListCellEx[Savings.Scheme] {
+  override def itemText(item: Savings.Scheme) = item.name
 }
 
-class SchemeAndFundCell
-  extends ListCell[SchemeAndFund]
-{
-
-  override protected def updateItem(item: SchemeAndFund, empty: Boolean) {
-    super.updateItem(item, empty)
-    if (empty) setText(null)
-    else setText(s"${item.fund.name} / ${item.scheme.name}")
-  }
-
+class FundCell extends ListCellEx[Savings.Fund] {
+  override def itemText(item: Savings.Fund) = item.name
 }
 
-class AvailabilityListCell(baseOpt: Option[LocalDate])
-  extends ListCell[Option[LocalDate]]
-{
-
-  override protected def updateItem(item: Option[LocalDate], empty: Boolean) {
-    super.updateItem(item, empty)
-    if (empty) setText(null)
-    else setText(Form.formatAvailability(item, baseOpt, long = false))
-  }
-
+class SchemeAndFundCell extends ListCellEx[SchemeAndFund] {
+  override def itemText(item: SchemeAndFund) = s"${item.fund.name} / ${item.scheme.name}"
 }
 
-class AvailabilityTableCell[A]
-  extends TableCell[A, Option[LocalDate]]
-{
-
-  override protected def updateItem(item: Option[LocalDate], empty: Boolean) {
-    super.updateItem(item, empty)
-    if (empty) setText(null)
-    else setText(Form.formatAvailability(item, date = None, long = false))
-  }
-
+class AvailabilityListCell(baseOpt: Option[LocalDate]) extends ListCellEx[Option[LocalDate]] {
+  override def itemText(item: Option[LocalDate]) = Form.formatAvailability(item, baseOpt, long = false)
 }
 
-class AmountCell[A]
-  extends TableCell[A, BigDecimal]
-{
-
-  override protected def updateItem(item: BigDecimal, empty: Boolean) {
-    super.updateItem(item, empty)
-    if (empty) setText(null)
-    else setText(Form.formatAmount(item))
-  }
-
+class AvailabilityTableCell[A] extends TableCellEx[A, Option[LocalDate]] {
+  override def itemText(item: Option[LocalDate]) = Form.formatAvailability(item, date = None, long = false)
 }
 
-class I18NLocaleCell
-  extends ListCell[I18NLocale]
-{
+class AmountCell[A] extends TableCellEx[A, BigDecimal] {
+  override def itemText(item: BigDecimal) = Form.formatAmount(item)
+}
 
-  override protected def updateItem(item: I18NLocale, empty: Boolean) {
-    super.updateItem(item, empty)
-    if (empty) setText(null)
-    else setText(item.displayName)
-  }
-
+class I18NLocaleCell extends ListCellEx[I18NLocale] {
+  override def itemText(item: I18NLocale) = item.displayName
 }
 
 /**
@@ -103,7 +66,6 @@ class I18NLocaleCell
  *
  * @tparam A cell data type
  */
-// TODO: move in suiryc-scala-javafx ?
 abstract class CheckBoxListCellEx[A] extends CheckBoxListCell[A] {
 
   import CheckBoxListCellEx._
