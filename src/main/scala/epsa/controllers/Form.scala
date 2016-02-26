@@ -68,10 +68,8 @@ object Form {
       }
     }.getOrElse(I18N.getResources.getString("available"))
 
-  def formatAmount(amount: BigDecimal): String = {
-    // TODO - currency as setting ?
-    s"$amount €"
-  }
+  def formatAmount(amount: BigDecimal, currency: String): String =
+    s"$amount $currency"
 
 }
 

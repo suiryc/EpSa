@@ -20,6 +20,7 @@ case class ChartSettings(
   showXLabel: Boolean = true,
   yLabel: String = "NAV",
   showYLabel: Boolean = true,
+  ySuffix: String = epsa.Main.defaultCurrency,
   legendVisible: Boolean = true
 )
 
@@ -65,7 +66,7 @@ class ChartHandler(
   if (settings.showYLabel) {
     yAxis.setLabel(settings.yLabel)
   }
-  yAxis.setTickLabelFormatter(new NumberAxis.DefaultFormatter(yAxis, null, "€"))
+  yAxis.setTickLabelFormatter(new NumberAxis.DefaultFormatter(yAxis, null, settings.ySuffix))
   yAxis.setForceZeroInRange(false)
   yAxis.setAutoRanging(true)
 
@@ -159,7 +160,7 @@ class ChartHandler(
   zoomZone.setDisable(true)
 
   /** Chart data label to display value. */
-  private val labelVL = new ChartDataLabel(settings.xLabel, settings.yLabel)
+  private val labelVL = new ChartDataLabel(settings.xLabel, settings.yLabel, settings.ySuffix)
   labelVL.getStyleClass.addAll("default-color0", "chart-line-symbol", "chart-series-line")
   labelVL.setStyle("-fx-font-size: 14; -fx-opacity: 0.6;")
   labelVL.setMinSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE)

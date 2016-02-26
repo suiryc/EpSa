@@ -3,8 +3,11 @@ package epsa.controllers
 import epsa.I18N
 import java.util.ResourceBundle
 import javafx.collections.FXCollections
+import javafx.event.ActionEvent
 import javafx.fxml.{FXMLLoader, FXML}
 import javafx.scene.control.{ButtonType, ComboBox, Dialog}
+import suiryc.scala.javafx.beans.value.RichObservableValue._
+import suiryc.scala.javafx.event.EventHandler._
 import suiryc.scala.javafx.stage.Stages
 import suiryc.scala.javafx.util.Callback
 import suiryc.scala.settings.{SettingSnapshot, SettingsSnapshot}
@@ -18,8 +21,12 @@ class OptionsController {
   @FXML
   protected var languageChoice: ComboBox[I18NLocale] = _
 
+  @FXML
+  protected var currencyChoice: ComboBox[String] = _
+
   def initialize(snapshot: SettingsSnapshot): Unit = {
     snapshot.add(SettingSnapshot(I18N.pref))
+    snapshot.add(SettingSnapshot(epsa.Main.currency))
 
     // Note: we need to tell the combobox how to display both the 'button' area
     // (what is shown as selected) and the content (list of choices).
@@ -32,6 +39,15 @@ class OptionsController {
     locales.find(_.code == I18N.pref()).foreach { locale =>
       languageChoice.getSelectionModel.select(locale)
     }
+
+    val currency = epsa.Main.currency()
+    val currencies = if (epsa.Main.preferredCurrencies.contains(currency)) {
+      epsa.Main.preferredCurrencies
+    } else {
+      currency :: epsa.Main.preferredCurrencies
+    }
+    currencyChoice.setItems(FXCollections.observableList(currencies))
+    currencyChoice.getSelectionModel.select(currency)
   }
 
 }
@@ -41,10 +57,10 @@ object OptionsController {
   // Note: the result of this dialog is whether the owner window needs to be
   // reloaded (language change)
 
-  def buildDialog(): Dialog[Boolean] = {
+  def buildDialog(): Dialog[(Boolean, Boolean)] = {
     val resources = I18N.getResources
 
-    val dialog = new Dialog[Boolean]()
+    val dialog = new Dialog[(Boolean, Boolean)]()
     dialog.setTitle(resources.getString("Options"))
     dialog.getDialogPane.getButtonTypes.addAll(ButtonType.OK, ButtonType.CANCEL)
 
@@ -61,13 +77,21 @@ object OptionsController {
     dialog
   }
 
-  def resultConverter(snapshot: SettingsSnapshot, controller: OptionsController)(buttonType: ButtonType): Boolean = {
+  def resultConverter(snapshot: SettingsSnapshot, controller: OptionsController)(buttonType: ButtonType): (Boolean, Boolean) = {
     if (buttonType != ButtonType.OK) {
       snapshot.reset()
-      false
+      (false, false)
     }
     else {
-      Option(controller.languageChoice.getValue) match {
+      val reload = Option(controller.currencyChoice.getEditor.getText).filterNot(_.isEmpty) match {
+        case Some(currency) =>
+          epsa.Main.currency() = currency
+          true
+
+        case None =>
+          false
+      }
+      val restart = Option(controller.languageChoice.getValue) match {
         case Some(locale) if locale.code != I18N.pref() =>
           I18N.setLocale(locale.code)
           true
@@ -75,6 +99,8 @@ object OptionsController {
         case _ =>
           false
       }
+
+      (reload || restart, restart)
     }
   }
 

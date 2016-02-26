@@ -157,7 +157,7 @@ class MainController extends Logging {
     columnAmount.setCellValueFactory(Callback { data =>
       new SimpleObjectProperty(data.getValue.amount)
     })
-    columnAmount.setCellFactory(Callback { new AmountCell[Savings.Asset] })
+    columnAmount.setCellFactory(Callback { new AmountCell[Savings.Asset](epsa.Main.currency()) })
     columnUnits.setCellValueFactory(Callback { data =>
       new SimpleObjectProperty(data.getValue.units)
     })
@@ -181,7 +181,7 @@ class MainController extends Logging {
         Form.formatAvailability(asset.availability, date = None, long = true)
       }.orNull)
       amountField.setText(assetOpt.map { asset =>
-        Form.formatAmount(asset.amount)
+        Form.formatAmount(asset.amount, epsa.Main.currency())
       }.orNull)
       unitsField.setText(assetOpt.map { asset =>
         asset.units.toString()
@@ -516,12 +516,13 @@ class MainController extends Logging {
       dialog.initModality(Modality.WINDOW_MODAL)
       dialog.initOwner(state.window)
       dialog.setResizable(true)
-      val reload = dialog.showAndWait().orElse(false)
+      val (reload, needRestart) = dialog.showAndWait().orElse((false, false))
+      println(s"reload = $reload; needRestart = $needRestart")
       if (reload) {
         // Persist now to restore it when rebuilding the stage
         persistView(state)
         context.stop(self)
-        MainController.build(state, needRestart = true)
+        MainController.build(state, needRestart)
       }
     }
 

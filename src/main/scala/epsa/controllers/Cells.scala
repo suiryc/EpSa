@@ -50,8 +50,8 @@ class AvailabilityTableCell[A] extends TableCellEx[A, Option[LocalDate]] {
   override def itemText(item: Option[LocalDate]) = Form.formatAvailability(item, date = None, long = false)
 }
 
-class AmountCell[A] extends TableCellEx[A, BigDecimal] {
-  override def itemText(item: BigDecimal) = Form.formatAmount(item)
+class AmountCell[A](currency: String) extends TableCellEx[A, BigDecimal] {
+  override def itemText(item: BigDecimal) = Form.formatAmount(item, currency)
 }
 
 class I18NLocaleCell extends ListCellEx[I18NLocale] {
