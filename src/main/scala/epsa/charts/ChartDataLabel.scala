@@ -24,7 +24,7 @@ class ChartDataLabel(xLabel: String = "Date", yLabel: String = "NAV", ySuffix: S
   /** Text (optional) for reference data. */
   private val refText = new TextFlow()
   /** Reference data label. */
-  private val refTextLabel = new Text("Var.: ")
+  private val refTextLabel = new Text("Δ: ")
   /** Reference data variation value. */
   private val refTextValue = new Text()
   /** Reference data data. */
