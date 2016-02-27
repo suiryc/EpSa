@@ -2,7 +2,6 @@ package epsa.controllers
 
 import epsa.I18N
 import epsa.charts.{ChartHandler, ChartSettings}
-import epsa.controllers.MainController.State
 import epsa.model.Savings
 import epsa.storage.DataStore
 import epsa.tools.EsaliaInvestmentFundProber
@@ -58,15 +57,11 @@ class NetAssetValueHistoryController {
 
   private lazy val stage = fundField.getScene.getWindow.asInstanceOf[Stage]
 
-  private var mainController: MainController = _
-
   private var changes = Map[Savings.Fund, Option[Seq[Savings.AssetValue]]]()
 
   private var chartPane: Option[AnchorPane] = None
 
-  def initialize(mainController: MainController, savings: Savings, fundIdOpt: Option[UUID]): Unit = {
-    this.mainController = mainController
-
+  def initialize(savings: Savings, fundIdOpt: Option[UUID]): Unit = {
     // Note: we need to tell the combobox how to display both the 'button' area
     // (what is shown as selected) and the content (list of choices).
     fundField.setButtonCell(new FundCell)
@@ -405,34 +400,33 @@ object NetAssetValueHistoryController {
 
   protected val navHistoryImportPath = Preference.from("nav.history.import.path", null:Path)
 
+  def title = I18N.getResources.getString("Net asset value history")
+
   def labelDate = I18N.getResources.getString("Date")
 
   def labelNAV = I18N.getResources.getString("NAV")
 
   /** Builds a stage out of this controller. */
-  import javafx.scene.control.Dialog
-  def buildStage(mainController: MainController, state: State, fundId: Option[UUID]): Dialog[Unit] = {
+  def buildStage(mainController: MainController, savings: Savings, fundId: Option[UUID], window: Window): Dialog[Boolean] = {
     val resources = I18N.getResources
 
-    val dialog = new Dialog[Unit]()
+    val dialog = new Dialog[Boolean]()
     dialog.getDialogPane.getButtonTypes.addAll(ButtonType.OK, ButtonType.CANCEL)
 
     val loader = new FXMLLoader(getClass.getResource("/fxml/net-asset-value-history.fxml"), resources)
     dialog.getDialogPane.setContent(loader.load())
     val controller = loader.getController[NetAssetValueHistoryController]
-    controller.initialize(mainController, state.savingsUpd, fundId)
+    controller.initialize(savings, fundId)
 
-    val title = resources.getString("Net asset value history")
     dialog.setTitle(title)
 
-    state.window
-    dialog.setResultConverter(Callback { resultConverter(state.window, controller) _ })
+    dialog.setResultConverter(Callback { resultConverter(mainController, window, controller) _ })
     Stages.trackMinimumDimensions(Stages.getStage(dialog))
 
     dialog
   }
 
-  private def resultConverter(windows: Window, controller: NetAssetValueHistoryController)(buttonType: ButtonType): Unit = {
+  private def resultConverter(mainController: MainController, windows: Window, controller: NetAssetValueHistoryController)(buttonType: ButtonType): Boolean = {
     import epsa.Main.Akka.dispatcher
 
     // Apply changes upon validation
@@ -449,7 +443,10 @@ object NetAssetValueHistoryController {
       // Wait for result and display issue if any
       Awaits.orError(future, Some(windows), DataStore.writeIssueMsg())
       // Request main view to refresh (i.e. check for pending changes)
-      controller.mainController.refresh()
+      mainController.refresh()
+      true
+    } else {
+      false
     }
   }
 

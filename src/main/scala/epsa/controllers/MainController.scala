@@ -357,7 +357,7 @@ class MainController extends Logging {
       }
     }
 
-    val navHistory = new MenuItem(resources.getString("Net asset value history"),
+    val navHistory = new MenuItem(NetAssetValueHistoryController.title,
       new ImageView(new Image("/images/fugue-icons/chart-up.png", 0.0, 0.0, true, false, false)))
     navHistory.setOnAction { (event: ActionEvent) =>
       Option(row.getItem).foreach { asset =>
@@ -517,7 +517,7 @@ class MainController extends Logging {
     }
 
     def onNewAssetAction(state: State, kind: AssetActionKind.Value, asset: Option[Savings.Asset]): Unit = {
-      val dialog = NewAssetActionController.buildDialog(state.savingsUpd, kind, asset)
+      val dialog = NewAssetActionController.buildDialog(MainController.this, state.savingsUpd, kind, asset)
       dialog.initModality(Modality.WINDOW_MODAL)
       dialog.initOwner(state.window)
       dialog.setResizable(true)
@@ -647,7 +647,7 @@ class MainController extends Logging {
     }
 
     def onNetAssetValueHistory(state: State, fundId: Option[UUID]): Unit = {
-      val dialog = NetAssetValueHistoryController.buildStage(MainController.this, state, fundId)
+      val dialog = NetAssetValueHistoryController.buildStage(MainController.this, state.savingsUpd, fundId, state.window)
       // Notes:
       // Don't set as modal, since we wish to display the window while still
       // interacting with the main stage.

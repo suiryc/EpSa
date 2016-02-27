@@ -9,9 +9,10 @@ import java.util.ResourceBundle
 import javafx.event.ActionEvent
 import javafx.collections.FXCollections
 import javafx.fxml.{FXML, FXMLLoader}
+import javafx.geometry.Insets
 import javafx.scene.Node
 import javafx.scene.control._
-import javafx.stage.Stage
+import javafx.stage.{Modality, Stage}
 import javafx.util.converter.LocalDateStringConverter
 import scala.collection.JavaConversions._
 import suiryc.scala.javafx.stage.Stages.StageLocation
@@ -66,6 +67,9 @@ class NewAssetActionController {
   protected var srcNAVField: TextField = _
 
   @FXML
+  protected var srcNAVButton: Button = _
+
+  @FXML
   protected var srcAmountField: TextField = _
 
   @FXML
@@ -81,12 +85,17 @@ class NewAssetActionController {
   protected var dstNAVField: TextField = _
 
   @FXML
+  protected var dstNAVButton: Button = _
+
+  @FXML
   protected var dstAmountField: TextField = _
 
   @FXML
   protected var dstUnitsField: TextField = _
 
   protected var buttonOk: Node = _
+
+  private var mainController: MainController = _
 
   private lazy val stage = paymentButton.getScene.getWindow.asInstanceOf[Stage]
 
@@ -104,8 +113,9 @@ class NewAssetActionController {
 
   private var dstAvailabilityChosen = false
 
-  def initialize(savings0: Savings, dialog: Dialog[_], actionKind0: AssetActionKind.Value, asset: Option[Savings.Asset]): Unit = {
+  def initialize(mainController0: MainController, savings0: Savings, dialog: Dialog[_], actionKind0: AssetActionKind.Value, asset: Option[Savings.Asset]): Unit = {
     // Save initial state
+    mainController = mainController0
     savings = savings0
     actionKind = actionKind0
 
@@ -157,6 +167,25 @@ class NewAssetActionController {
     for (field <- List(operationDateField, srcAvailabilityField, dstAvailabilityField)) {
       field.setPromptText(dateFormat)
       field.setConverter(dateConverter)
+    }
+
+    // Setup NAV history buttons
+    for (field <- List(srcNAVButton, dstNAVButton)) {
+      // Disable by default; will be enabled when a fund is selected
+      field.setDisable(true)
+      // Reset padding of button; by default uses 8 on each horizontal side
+      // and 4 on each vertical side, which gives a rectangle. We will use
+      // 4 on each side to get a square to display our square icon inside.
+      field.setPadding(new Insets(4))
+      field.setTooltip(new Tooltip(NetAssetValueHistoryController.title))
+      field.setOnAction { (event: ActionEvent) =>
+        val opt =
+          if (field == dstNAVButton) Option(dstFundField.getValue)
+          else Option(srcFundField.getValue)
+        opt.foreach { schemeAndFund =>
+          onNAVHistory(schemeAndFund.fund)
+        }
+      }
     }
 
     // Re-check form when source/destination amount/units is changed
@@ -218,6 +247,7 @@ class NewAssetActionController {
     dstFundField.setDisable(disableDst)
     dstAvailabilityField.setDisable(disableDst)
     dstNAVField.setDisable(disableDst)
+    dstNAVButton.setDisable(disableDst)
     dstAmountField.setDisable(disableDst)
     dstUnitsField.setDisable(disableDst)
 
@@ -243,6 +273,8 @@ class NewAssetActionController {
 
     if (srcAvailabilityExact) updateSrcAvailability()
     updateDstSchemeAndFund()
+    // Since a fund is now selected, we can enable its NAV history button
+    srcNAVButton.setDisable(false)
     updateNAV()
     checkForm()
   }
@@ -257,6 +289,8 @@ class NewAssetActionController {
   }
 
   def onDstFund(): Unit = breakRecursion {
+    // Since a fund is now selected, we can enable its NAV history button
+    dstNAVButton.setDisable(false)
     updateNAV()
     checkForm()
   }
@@ -264,6 +298,14 @@ class NewAssetActionController {
   def onDstAvailability(): Unit = breakRecursion {
     dstAvailabilityChosen = Option(dstAvailabilityField.getValue).isDefined
     checkForm()
+  }
+
+  def onNAVHistory(fund: Savings.Fund): Unit = {
+    val dialog = NetAssetValueHistoryController.buildStage(mainController, savings, Some(fund.id), stage)
+    dialog.initModality(Modality.WINDOW_MODAL)
+    dialog.initOwner(stage)
+    dialog.setResizable(true)
+    if (dialog.showAndWait().orElse(false)) updateNAV()
   }
 
   private def updateSchemeAndFund(): Unit = {
@@ -541,7 +583,7 @@ class NewAssetActionController {
 object NewAssetActionController {
 
   /** Builds a dialog out of this controller. */
-  def buildDialog(savings: Savings, kind: AssetActionKind.Value, asset: Option[Savings.Asset]): Dialog[Option[Savings.Event]] = {
+  def buildDialog(mainController: MainController, savings: Savings, kind: AssetActionKind.Value, asset: Option[Savings.Asset]): Dialog[Option[Savings.Event]] = {
     val resources = I18N.getResources
 
     val dialog = new Dialog[Option[Savings.Event]]()
@@ -552,7 +594,7 @@ object NewAssetActionController {
     val loader = new FXMLLoader(getClass.getResource("/fxml/new-asset-action.fxml"), resources)
     dialog.getDialogPane.setContent(loader.load())
     val controller = loader.getController[NewAssetActionController]
-    controller.initialize(savings, dialog, kind, asset)
+    controller.initialize(mainController, savings, dialog, kind, asset)
 
     // Delegate closing request to controller
     dialog.setOnCloseRequest(controller.onCloseRequest _)
