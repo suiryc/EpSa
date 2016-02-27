@@ -56,18 +56,15 @@ class NetAssetValueHistoryController {
   @FXML
   protected var purgeButton: Button = _
 
-  private var dialog: Dialog[_] = _
+  private lazy val stage = fundField.getScene.getWindow.asInstanceOf[Stage]
 
   private var mainController: MainController = _
 
   private var changes = Map[Savings.Fund, Option[Seq[Savings.AssetValue]]]()
 
-  private lazy val stage = fundField.getScene.getWindow.asInstanceOf[Stage]
-
   private var chartPane: Option[AnchorPane] = None
 
-  def initialize(dialog: Dialog[_], mainController: MainController, savings: Savings, fundIdOpt: Option[UUID]): Unit = {
-    this.dialog = dialog
+  def initialize(mainController: MainController, savings: Savings, fundIdOpt: Option[UUID]): Unit = {
     this.mainController = mainController
 
     // Note: we need to tell the combobox how to display both the 'button' area
@@ -144,7 +141,7 @@ class NetAssetValueHistoryController {
     }
   }
 
-  private def accessHistory[A](action: => Future[A], failureMsg: String, successAction: A => Unit): Unit = {
+  private def accessHistory[A](action: => Future[A], failureMsg: => String, successAction: A => Unit): Unit = {
     import suiryc.scala.javafx.concurrent.JFXExecutor.executor
 
     // Remove previous chart if any
@@ -252,7 +249,7 @@ class NetAssetValueHistoryController {
   private def loadHistory(fund: Savings.Fund): Unit =
     accessHistory(
       action = DataStore.AssetHistory.readValues(fund.id),
-      failureMsg = DataStore.readIssueMsg,
+      failureMsg = DataStore.readIssueMsg(),
       successAction = displayChart(fund, _: Seq[Savings.AssetValue])
     )
 
@@ -278,7 +275,7 @@ class NetAssetValueHistoryController {
 
     accessHistory(
       action = action,
-      failureMsg = DataStore.readIssueMsg,
+      failureMsg = DataStore.readIssueMsg(),
       successAction = showResult
     )
   }
@@ -389,14 +386,14 @@ class NetAssetValueHistoryController {
     // Make a dedicated window. Don't bother close any previous one.
     // Use current window as owner, and share its title.
     // Use 'utility' style (we don't need minimize/maximize).
-    val stage = new Stage()
-    stage.initStyle(StageStyle.UTILITY)
-    stage.initOwner(Stages.getStage(dialog))
-    stage.setTitle(dialog.getTitle)
+    val resultStage = new Stage()
+    resultStage.initStyle(StageStyle.UTILITY)
+    resultStage.initOwner(stage)
+    resultStage.setTitle(stage.getTitle)
     val scene = new Scene(root)
-    stage.setScene(scene)
-    Stages.trackMinimumDimensions(stage)
-    stage.show()
+    resultStage.setScene(scene)
+    Stages.trackMinimumDimensions(resultStage)
+    resultStage.show()
   }
 
 }
@@ -423,7 +420,7 @@ object NetAssetValueHistoryController {
     val loader = new FXMLLoader(getClass.getResource("/fxml/net-asset-value-history.fxml"), resources)
     dialog.getDialogPane.setContent(loader.load())
     val controller = loader.getController[NetAssetValueHistoryController]
-    controller.initialize(dialog, mainController, state.savingsUpd, fundId)
+    controller.initialize(mainController, state.savingsUpd, fundId)
 
     val title = resources.getString("Net asset value history")
     dialog.setTitle(title)
@@ -450,7 +447,7 @@ object NetAssetValueHistoryController {
       // Apply as many changes as possible
       val future = executeSequentially(stopOnError = false, actions: _*)
       // Wait for result and display issue if any
-      Awaits.orError(future, Some(windows), DataStore.writeIssueMsg)
+      Awaits.orError(future, Some(windows), DataStore.writeIssueMsg())
       // Request main view to refresh (i.e. check for pending changes)
       controller.mainController.refresh()
     }

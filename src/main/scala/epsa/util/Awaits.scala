@@ -2,6 +2,8 @@ package epsa.util
 
 import epsa.model.Savings
 import epsa.storage.DataStore
+import java.time.LocalDate
+import java.util.UUID
 import javafx.stage.Window
 import scala.concurrent.{Await, Future}
 import scala.concurrent.duration.Duration
@@ -27,20 +29,14 @@ object Awaits {
     DataStore.open(owner, change, save).map { future =>
       orError(future, owner, {
         // Note: if changing, we don't know what path we tried to open, but
-        // the user shall know. Otherwise remind the default path.
-        val msg =
-          if (change && save) DataStore.writeIssueMsg
-          else DataStore.readIssueMsg
-        if (change) msg
-        else s"$msg\n${DataStore.defaultPath}"
+        // the user shall know. Otherwise remind the real path.
+        if (change && save) DataStore.writeIssueMsg(!change)
+        else DataStore.readIssueMsg(!change)
       })
     }
 
   def readDataStoreEvents(owner: Option[Window]): Try[Seq[Savings.Event]] =
-    orError(DataStore.EventSource.readEvents(), owner, {
-      DataStore.readIssueMsg +
-        s"\n${DataStore.defaultPath}"
-    })
+    orError(DataStore.EventSource.readEvents(), owner, DataStore.readIssueMsg())
 
   def saveDataStoreChanges(owner: Option[Window], events: List[Savings.Event]): Try[Unit] = {
     // Note: we are supposed to have a real database opened by now. So we have
@@ -52,10 +48,10 @@ object Awaits {
       None
     }).toSeq
     val f = RichFuture.executeSequentially(stopOnError = true, actions: _*).map(_ => ())
-    orError(f, owner, {
-      DataStore.writeIssueMsg +
-        s"\n${DataStore.defaultPath}"
-    })
+    orError(f, owner, DataStore.writeIssueMsg(real = true))
   }
+
+  def readDataStoreNAV(owner: Option[Window], fundId: UUID, date: LocalDate, exactDate: Boolean = false): Try[Option[Savings.AssetValue]] =
+    orError(DataStore.AssetHistory.readValue(fundId, date, exactDate), owner, DataStore.readIssueMsg())
 
 }

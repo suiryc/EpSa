@@ -461,20 +461,32 @@ object DataStore {
         }.map(getAssetValue)
       }
 
-    def readValue(fundId: UUID, date: LocalDate): Future[Option[Savings.AssetValue]] =
+    def readValue(fundId: UUID, date: LocalDate, exactDate: Boolean = false): Future[Option[Savings.AssetValue]] =
       getDBRead.flatMap { db =>
         db.run {
-          entries.filter(v => (v.fundId === fundId) && (v.date === date)).result
+          // Ideally we would like the value for the given date, but any
+          // preceding date could do too.
+          if (exactDate) {
+            entries.filter(v => (v.fundId === fundId) && (v.date === date)).result
+          } else {
+            entries.filter(v => (v.fundId === fundId) && (v.date <= date)).sortBy(_.date.desc).result
+          }
         }.map(r => getAssetValue(r).headOption)
       }
 
     def writeValues(fundId: UUID, values: Savings.AssetValue*)(implicit dbOpt: Option[DatabaseDef] = None): Future[Unit] = {
+      // Note: we may have to update existing values, not only insert.
+      // The easiest way to do that is to call 'insertOrUpdate' for every entry
+      // to process, then group all those actions in a DBIO.sequence to run,
+      // possibly with 'transactionally' or 'withPinnedSession'.
+      // To be maybe faster, we could also do that directly as a JDBC batch,
+      // but that's not really worth it here.
+      // See: http://stackoverflow.com/a/35006433
       def write(db: DatabaseDef): Future[Unit] =
         db.run {
-          // TODO - easy way to batch upserts ?
           DBIO.sequence(values.map { value =>
             entries.insertOrUpdate(Entry(fundId, value))
-          })
+          }).transactionally
         }.map(_ => ())
 
       dbOpt match {
@@ -515,8 +527,27 @@ object DataStore {
 
   }
 
-  lazy val writeIssueMsg = I18N.getResources.getString("Could not write data store")
+  private def issueMsg(msg: String, real: Boolean): String = {
+    if (real) s"$msg\n$defaultPath"
+    else msg
+  }
 
-  lazy val readIssueMsg = I18N.getResources.getString("Could not read data store")
+  /**
+   * Formats writing issue message.
+   *
+   * By default, writing is performed in-memory, so don't indicate real
+   * database path.
+   */
+  def writeIssueMsg(real: Boolean = false): String =
+    issueMsg(I18N.getResources.getString("Could not write data store"), real)
+
+  /**
+   * Formats reading issue message.
+   *
+   * By default, reading is performed on real database if it is opened and no
+   * in-memory one exists; so indicate its path in this case.
+   */
+  def readIssueMsg(real: Boolean = dbTempOpt.isEmpty && dbRealOpt.nonEmpty): String =
+    issueMsg(I18N.getResources.getString("Could not read data store"), real)
 
 }
