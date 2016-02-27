@@ -334,6 +334,7 @@ class MainController extends Logging {
         actor ! OnEditFunds(Some(asset.fundId))
       }
     }
+
     val newPayment = new MenuItem(resources.getString("New payment"),
       new ImageView(new Image("/images/fugue-icons/table-import.png", 0.0, 0.0, true, false, false)))
     newPayment.setOnAction { (event: ActionEvent) =>
@@ -355,8 +356,18 @@ class MainController extends Logging {
         actor ! OnNewAssetAction(AssetActionKind.Refund, Some(asset))
       }
     }
+
+    val navHistory = new MenuItem(resources.getString("Net asset value history"),
+      new ImageView(new Image("/images/fugue-icons/chart-up.png", 0.0, 0.0, true, false, false)))
+    navHistory.setOnAction { (event: ActionEvent) =>
+      Option(row.getItem).foreach { asset =>
+        actor ! OnNetAssetValueHistory(Some(asset.fundId))
+      }
+    }
+
     menu.getItems.addAll(editScheme, editFund, new SeparatorMenuItem(),
-      newPayment, newArbitrage, newRefund)
+      newPayment, newArbitrage, newRefund, new SeparatorMenuItem(),
+      navHistory)
 
     row.contextMenuProperty().bind {
       Bindings.when(Bindings.isNotNull(row.itemProperty))
