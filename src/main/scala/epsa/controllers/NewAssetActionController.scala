@@ -120,12 +120,22 @@ class NewAssetActionController {
     // Select initial toggle button
     toggleButtons.find(getToggleKind(_) == actionKind).foreach(actionKindGroup.selectToggle)
 
+    // Listen to operation date changes
+    operationDateField.valueProperty.listen(onOperationDate())
+
+    // Listen to source fund changes
+    srcFundField.valueProperty.listen(onSrcFund())
+
     // Note: we need to tell the combobox how to display both the 'button' area
     // (what is shown as selected) and the content (list of choices).
     for (field <- List(srcFundField, dstFundField)) {
       field.setButtonCell(new SchemeAndFundCell)
       field.setCellFactory(Callback { new SchemeAndFundCell })
     }
+
+    // Listen to source availability date changes
+    srcAvailabilityField.valueProperty.listen(onSrcAvailability())
+    srcAvailabilityField2.getSelectionModel.selectedItemProperty.listen(onSrcAvailability())
 
     // Note: we set the availability combobox format now and change it later
     // if operation date if changed.
@@ -153,12 +163,24 @@ class NewAssetActionController {
       if (checkForm().isEmpty) event.consume()
     })
 
+    // Set now as operation date default
+    operationDateField.setValue(LocalDate.now)
+
     // Select initial scheme and fund (as source)
     for {
       a <- asset
       scheme <- savings.findScheme(a.schemeId)
       fund <- savings.findFund(a.fundId)
-    } srcFundField.getSelectionModel.select(SchemeAndFund(scheme, fund))
+    } {
+      srcFundField.getSelectionModel.select(SchemeAndFund(scheme, fund))
+      // There is no meaning to pre-select source availability in case of
+      // payment. In other cases, use the source asset one.
+      if (actionKind != AssetActionKind.Payment) {
+        srcAvailabilityField2.getSelectionModel.select(a.availability)
+      }
+    }
+
+    checkForm()
   }
 
   /** Restores (persisted) view. */
@@ -196,16 +218,16 @@ class NewAssetActionController {
     updateSchemeAndFund()
     if (srcAvailabilityExact) updateSrcAvailability()
     // Simulate changing source availability (to possibly change destination one)
-    if (!disableDst) onSrcAvailability(new ActionEvent())
+    if (!disableDst) onSrcAvailability()
     checkForm()
   }
 
-  def onOperationDate(event: ActionEvent): Unit = breakRecursion {
+  def onOperationDate(): Unit = breakRecursion {
     updateSrcAvailability()
     checkForm()
   }
 
-  def onSrcFund(event: ActionEvent): Unit = breakRecursion {
+  def onSrcFund(): Unit = breakRecursion {
     // TODO - recompute amount based on units and operation date ?
     val srcAvailabilityExact = actionKind != AssetActionKind.Payment
 
@@ -214,7 +236,7 @@ class NewAssetActionController {
     checkForm()
   }
 
-  def onSrcAvailability(event: ActionEvent): Unit = breakRecursion {
+  def onSrcAvailability(): Unit = breakRecursion {
     if (!dstAvailabilityChosen && isDstEnabled) {
       // Note: don't forget to use actual availability based o operation date
       val availability = Savings.resolveAvailablity(getSrcAvailability, Option(operationDateField.getValue))
