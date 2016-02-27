@@ -504,7 +504,7 @@ object DataStore {
 
     def deleteValues(fundId: UUID)(implicit dbOpt: Option[DatabaseDef] = None): Future[Int] = {
       def delete(db: DatabaseDef): Future[Int] =
-        db.run(entries.delete)
+        db.run(entries.filter(_.fundId === fundId).delete)
 
       dbOpt match {
         case Some(db) => delete(db)
