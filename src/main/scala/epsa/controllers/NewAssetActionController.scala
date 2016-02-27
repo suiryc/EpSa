@@ -2,6 +2,7 @@ package epsa.controllers
 
 import epsa.I18N
 import epsa.model.Savings
+import epsa.util.Awaits
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.ResourceBundle
@@ -62,6 +63,9 @@ class NewAssetActionController {
   protected var srcAvailabilityField2: ComboBox[Option[LocalDate]] = _
 
   @FXML
+  protected var srcNAVField: TextField = _
+
+  @FXML
   protected var srcAmountField: TextField = _
 
   @FXML
@@ -72,6 +76,9 @@ class NewAssetActionController {
 
   @FXML
   protected var dstAvailabilityField: DatePicker = _
+
+  @FXML
+  protected var dstNAVField: TextField = _
 
   @FXML
   protected var dstAmountField: TextField = _
@@ -123,8 +130,9 @@ class NewAssetActionController {
     // Listen to operation date changes
     operationDateField.valueProperty.listen(onOperationDate())
 
-    // Listen to source fund changes
+    // Listen to fund changes
     srcFundField.valueProperty.listen(onSrcFund())
+    dstFundField.valueProperty.listen(onDstFund())
 
     // Note: we need to tell the combobox how to display both the 'button' area
     // (what is shown as selected) and the content (list of choices).
@@ -133,9 +141,10 @@ class NewAssetActionController {
       field.setCellFactory(Callback { new SchemeAndFundCell })
     }
 
-    // Listen to source availability date changes
+    // Listen to availability date changes
     srcAvailabilityField.valueProperty.listen(onSrcAvailability())
     srcAvailabilityField2.getSelectionModel.selectedItemProperty.listen(onSrcAvailability())
+    dstAvailabilityField.valueProperty.listen(onDstAvailability())
 
     // Note: we set the availability combobox format now and change it later
     // if operation date if changed.
@@ -208,6 +217,7 @@ class NewAssetActionController {
     val disableDst = !isDstEnabled
     dstFundField.setDisable(disableDst)
     dstAvailabilityField.setDisable(disableDst)
+    dstNAVField.setDisable(disableDst)
     dstAmountField.setDisable(disableDst)
     dstUnitsField.setDisable(disableDst)
 
@@ -224,15 +234,16 @@ class NewAssetActionController {
 
   def onOperationDate(): Unit = breakRecursion {
     updateSrcAvailability()
+    updateNAV()
     checkForm()
   }
 
   def onSrcFund(): Unit = breakRecursion {
-    // TODO - recompute amount based on units and operation date ?
     val srcAvailabilityExact = actionKind != AssetActionKind.Payment
 
     if (srcAvailabilityExact) updateSrcAvailability()
     updateDstSchemeAndFund()
+    updateNAV()
     checkForm()
   }
 
@@ -245,12 +256,12 @@ class NewAssetActionController {
     checkForm()
   }
 
-  def onDstFund(event: ActionEvent): Unit = breakRecursion {
-    // TODO - recompute amount based on units and operation date ?
+  def onDstFund(): Unit = breakRecursion {
+    updateNAV()
     checkForm()
   }
 
-  def onDstAvailability(event: ActionEvent): Unit = breakRecursion {
+  def onDstAvailability(): Unit = breakRecursion {
     dstAvailabilityChosen = Option(dstAvailabilityField.getValue).isDefined
     checkForm()
   }
@@ -347,6 +358,33 @@ class NewAssetActionController {
 
       case None =>
         srcAvailabilityField2.setDisable(true)
+    }
+  }
+
+  private def updateNAV(): Unit = {
+    // TODO - recompute amount based on units and operation date ?
+    Option(operationDateField.getValue).foreach { operationDate =>
+      val labelDate = resources.getString("Date")
+
+      def updateField(field: TextField, fund: Savings.Fund): Unit = {
+        val navOpt = Awaits.readDataStoreNAV(Some(stage), fund.id, operationDate).getOrElse(None)
+        navOpt match {
+          case Some(nav) =>
+            field.setText(nav.value.toString)
+            field.setTooltip(new Tooltip(s"$labelDate: ${nav.date}"))
+
+          case None =>
+            field.setText(null)
+            field.setTooltip(null)
+        }
+      }
+
+      Option(srcFundField.getValue).foreach { schemeAndFund =>
+        updateField(srcNAVField, schemeAndFund.fund)
+      }
+      Option(dstFundField.getValue).foreach { schemeAndFund =>
+        updateField(dstNAVField, schemeAndFund.fund)
+      }
     }
   }
 

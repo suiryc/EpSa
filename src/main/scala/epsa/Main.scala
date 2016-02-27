@@ -70,11 +70,8 @@ class Main extends Application {
     val events = Awaits.openDataStore(None, change = false, save = false) match {
       case Some(Success(())) =>
         // Data store opening succeeded: read events to replay
-        Awaits.readDataStoreEvents(None) match  {
-          case Success(v) => v
-          // Failed to read events. User was warned.
-          case _          => Nil
-        }
+        // If we failed to read events, user was warned.
+        Awaits.readDataStoreEvents(None).getOrElse(Nil)
       // Either there was an issue (notified to user) or no default data store
       case _ => Nil
     }
