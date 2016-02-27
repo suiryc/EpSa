@@ -152,6 +152,13 @@ class NewAssetActionController {
     buttonOk.addEventFilter(ActionEvent.ACTION, { (event: ActionEvent) =>
       if (checkForm().isEmpty) event.consume()
     })
+
+    // Select initial scheme and fund (as source)
+    for {
+      a <- asset
+      scheme <- savings.findScheme(a.schemeId)
+      fund <- savings.findFund(a.fundId)
+    } srcFundField.getSelectionModel.select(SchemeAndFund(scheme, fund))
   }
 
   /** Restores (persisted) view. */
