@@ -17,7 +17,7 @@ import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.javafx.event.EventHandler._
 import suiryc.scala.javafx.event.Events
-import suiryc.scala.javafx.scene.control.Dialogs
+import suiryc.scala.javafx.scene.control.{CheckBoxListCellEx, Dialogs}
 import suiryc.scala.javafx.stage.Stages
 import suiryc.scala.javafx.util.Callback
 
