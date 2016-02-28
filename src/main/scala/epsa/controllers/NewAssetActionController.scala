@@ -20,16 +20,13 @@ import suiryc.scala.math.Ordering._
 import suiryc.scala.settings.Preference
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.event.EventHandler._
+import suiryc.scala.javafx.scene.control.DatePickers
 import suiryc.scala.javafx.stage.Stages
 import suiryc.scala.javafx.util.Callback
 
-// TODO - button to select (existing) scheme&fund+availability
 // TODO - handle some event (action ?) on amount/units to update counterpart (and also destination data if any)
-// TODO - use value date to handle amount/units conversion on destination
 // TODO - give info on limits for selected asset (and button to use all)
 // TODO - option of default day/month and number of years for frozen assets ?
-// TODO - hint (tooltips/combobox) existing availability dates when applicable ?
-// TODO - select first (if any) value of ComboBoxes by default ?
 class NewAssetActionController {
 
   import epsa.Main.prefs
@@ -167,6 +164,27 @@ class NewAssetActionController {
     for (field <- List(operationDateField, srcAvailabilityField, dstAvailabilityField)) {
       field.setPromptText(dateFormat)
       field.setConverter(dateConverter)
+      // Track field editor to apply value when possible
+      DatePickers.trackEdition(field)
+    }
+    // Override availability date pickers to disable dates anterior to operation date.
+    for (field <- List(srcAvailabilityField, dstAvailabilityField)) {
+      field.setDayCellFactory(Callback { _ =>
+        new DateCell {
+          override def updateItem(item: LocalDate, empty: Boolean) {
+            super.updateItem(item, empty)
+            Option(operationDateField.getValue).foreach { operationDate =>
+              val unavailable = !empty && item.isBefore(operationDate)
+              setDisable(unavailable)
+              // Note: ideally we would like to set a tooltip explaining why a
+              // date is not available; but this is not possible on a disabled
+              // node (see: https://bugs.openjdk.java.net/browse/JDK-8090379).
+              if (!unavailable) setStyle("")
+              else setStyle("-fx-background-color: #ffc0cb;")
+            }
+          }
+        }
+      })
     }
 
     // Setup NAV history buttons
@@ -281,7 +299,7 @@ class NewAssetActionController {
 
   def onSrcAvailability(): Unit = breakRecursion {
     if (!dstAvailabilityChosen && isDstEnabled) {
-      // Note: don't forget to use actual availability based o operation date
+      // Note: don't forget to use actual availability based on operation date
       val availability = Savings.resolveAvailablity(getSrcAvailability, Option(operationDateField.getValue))
       dstAvailabilityField.setValue(availability.orNull)
     }
@@ -432,10 +450,14 @@ class NewAssetActionController {
 
   private def checkForm(): Option[Savings.Event] = {
     val operationDate = operationDateField.getValue
-    val opDateOk = Option(operationDate).isDefined
-    Form.toggleError(operationDateField, set = !opDateOk,
-      if (opDateOk) None
-      else Some(mandatoryMsg)
+    val opDateSelected = Option(operationDate).isDefined
+    val opDateAnterior = opDateSelected && savings.latestAssetAction.exists(_.isAfter(operationDate))
+    // Selecting a date of operation anterior to the latest asset action date is allowed even if discouraged
+    val opDateOk = opDateSelected
+    val warningMsgOpt = savings.latestAssetAction.map(resources.getString("warning.anterior-operation-date").format(_))
+    Form.toggleStyles(operationDateField, None,
+      Form.ErrorStyle(!opDateSelected, mandatoryMsg),
+      Form.WarningStyle(opDateAnterior, warningMsgOpt.getOrElse(""))
     )
 
     val isPayment = actionKind == AssetActionKind.Payment
@@ -445,6 +467,7 @@ class NewAssetActionController {
     val srcAvailabilitySelected =
       (isPayment && Option(srcAvailabilityField.getValue).isDefined) ||
       (!isPayment && Option(srcAvailabilityField2.getValue).isDefined)
+    val srcAvailabilityAnterior = opDateSelected && srcAvailability.exists(_.isBefore(operationDate))
     val srcAmount = getSrcAmount
     val srcAmountValued = srcAmount > 0
     val srcUnits = getSrcUnits
@@ -462,25 +485,25 @@ class NewAssetActionController {
         }
       } else (srcAmountValued, srcUnitsValued)
     val srcValuedOk = srcAmountOk && srcUnitsOk
-    val srcOk = srcSelected && srcAvailabilitySelected && srcValuedOk
-    Form.toggleError(srcFundField, set = !srcSelected,
+    val srcOk = srcSelected && srcAvailabilitySelected && !srcAvailabilityAnterior && srcValuedOk
+    Form.toggleError(srcFundField, !srcSelected,
       if (srcSelected) None
       else Some(mandatoryMsg)
     )
-    Form.toggleError(srcAvailabilityField, set = !srcAvailabilitySelected,
+    Form.toggleStyles(srcAvailabilityField, None,
+      Form.ErrorStyle(!srcAvailabilitySelected, mandatoryMsg),
+      Form.ErrorStyle(srcAvailabilityAnterior, resources.getString("error.anterior-availability-date"))
+    )
+    Form.toggleError(srcAvailabilityField2, !srcAvailabilitySelected,
       if (srcAvailabilitySelected) None
       else Some(mandatoryMsg)
     )
-    Form.toggleError(srcAvailabilityField2, set = !srcAvailabilitySelected,
-      if (srcAvailabilitySelected) None
-      else Some(mandatoryMsg)
-    )
-    Form.toggleError(srcAmountField, set = !srcAmountValued || !srcAmountOk,
+    Form.toggleError(srcAmountField, !srcAmountValued || !srcAmountOk,
       if (!srcAmountValued) Some(mandatoryMsg)
       else if (!srcAmountOk) Some(valueLimitMsg)
       else None
     )
-    Form.toggleError(srcUnitsField, set = !srcUnitsValued || !srcUnitsOk,
+    Form.toggleError(srcUnitsField, !srcUnitsValued || !srcUnitsOk,
       if (!srcUnitsValued) Some(mandatoryMsg)
       else if (!srcUnitsOk) Some(valueLimitMsg)
       else None
@@ -494,26 +517,29 @@ class NewAssetActionController {
       // We require to select a date if source has one
       getSrcAvailability.isEmpty || dstAvailability.isDefined
     }
+    val dstAvailabilityAnterior = dstNeeded && {
+      opDateSelected && dstAvailability.exists(_.isBefore(operationDate))
+    }
     lazy val dstAmount = getDstAmount
     val dstAmountValued = !dstNeeded || (dstAmount > 0)
     lazy val dstUnits = getDstUnits
     val dstUnitsValued = !dstNeeded || (dstUnits > 0)
     val dstValued = dstAmountValued && dstUnitsValued
     lazy val dstAsset = Savings.Asset(dstFund.scheme.id, dstFund.fund.id, dstAvailability, dstAmount, dstUnits)
-    val dstOk = dstSelected && dstAvailabilitySelected && dstValued
-    Form.toggleError(dstFundField, set = !dstSelected,
+    val dstOk = dstSelected && dstAvailabilitySelected && !dstAvailabilityAnterior && dstValued
+    Form.toggleError(dstFundField, !dstSelected,
       if (dstSelected) None
       else Some(mandatoryMsg)
     )
-    Form.toggleError(dstAvailabilityField, set = !dstAvailabilitySelected,
-      if (dstAvailabilitySelected) None
-      else Some(mandatoryMsg)
+    Form.toggleStyles(dstAvailabilityField, None,
+      Form.ErrorStyle(!dstAvailabilitySelected, mandatoryMsg),
+      Form.ErrorStyle(dstAvailabilityAnterior, resources.getString("error.anterior-availability-date"))
     )
-    Form.toggleError(dstAmountField, set = !dstAmountValued,
+    Form.toggleError(dstAmountField, !dstAmountValued,
       if (dstAmountValued) None
       else Some(mandatoryMsg)
     )
-    Form.toggleError(dstUnitsField, set = !dstUnitsValued,
+    Form.toggleError(dstUnitsField, !dstUnitsValued,
       if (dstUnitsValued) None
       else Some(mandatoryMsg)
     )

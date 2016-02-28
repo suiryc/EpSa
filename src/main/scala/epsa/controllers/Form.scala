@@ -10,19 +10,33 @@ import javafx.scene.image.ImageView
 
 object Form {
 
+  private val warningClass = PseudoClass.getPseudoClass("warning")
+
   private val errorClass = PseudoClass.getPseudoClass("error")
 
   private val imageButtonClass = "image-button"
 
-  def setStyleError(node: Node, set: Boolean): Unit =
-  // See: http://stackoverflow.com/a/24231728
-    setPseudoClass(node, errorClass, set)
-
   private def setPseudoClass(node: Node, pseudoClass: PseudoClass, set: Boolean): Unit =
+  // See: http://stackoverflow.com/a/24231728
     node.pseudoClassStateChanged(pseudoClass, set)
 
+  def toggleStyles(node: Control, msgOpt: Option[String], styles: Style*): Unit = {
+    // Apply all style changes
+    styles.foreach { style =>
+      setPseudoClass(node, style.pseudoClass, style.set)
+    }
+    // Get the first enabled style provided message, or the default one.
+    val opt = styles.find(_.set).map(_.msg).orElse(msgOpt)
+    node.setTooltip(opt.filterNot(_.isEmpty).map(new Tooltip(_)).orNull)
+  }
+
+  def toggleWarning(node: Control, set: Boolean, msgOpt: Option[String] = None): Unit = {
+    setPseudoClass(node, warningClass, set)
+    node.setTooltip(msgOpt.map(new Tooltip(_)).orNull)
+  }
+
   def toggleError(node: Control, set: Boolean, msgOpt: Option[String] = None): Unit = {
-    setStyleError(node, set)
+    setPseudoClass(node, errorClass, set)
     node.setTooltip(msgOpt.map(new Tooltip(_)).orNull)
   }
 
@@ -70,6 +84,20 @@ object Form {
 
   def formatAmount(amount: BigDecimal, currency: String): String =
     s"$amount $currency"
+
+  trait Style {
+    val pseudoClass: PseudoClass
+    val set: Boolean
+    val msg: String
+  }
+
+  case class ErrorStyle(set: Boolean, msg: String = "") extends Style {
+    override val pseudoClass = errorClass
+  }
+
+  case class WarningStyle(set: Boolean, msg: String = "") extends Style {
+    override val pseudoClass = warningClass
+  }
 
 }
 

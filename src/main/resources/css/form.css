@@ -1,21 +1,27 @@
-.text-field:error {
-  -fx-text-box-border: red;
-  -fx-focus-color: red;
+/* 'warning' class uses orange to highlight fields */
+:warning {
+  -fx-border-color: rgb(255, 165, 0);
+  -fx-focus-color: rgb(255, 165, 0);
+  -fx-accent: rgb(255, 165, 0);
+  -fx-faint-focus-color: rgba(255, 165, 0, 0.2);
 }
 
+/* 'error' class uses red to highlight fields */
 :error {
-  -fx-border-color: red;
-  -fx-focus-color: red;
+  -fx-border-color: rgb(255, 0, 0);
+  -fx-focus-color: rgb(255, 0, 0);
+  -fx-accent: rgb(255, 0, 0);
+  -fx-faint-focus-color: rgba(255, 0, 0, 0.2);
 }
 
 .image-button {
-  -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.6), 6, 0.0, 0, 1);
+  -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.6), 6, 0.0, 0, 1);
 }
 
 .image-button:hover {
-  -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,1.0), 6, 0.0, 0, 1);
+  -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 1.0), 6, 0.0, 0, 1);
 }
 
 .image-button:pressed {
-  -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,1.0), 3, 0.0, 0, 1);
+  -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 1.0), 3, 0.0, 0, 1);
 }

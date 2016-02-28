@@ -157,7 +157,12 @@ object Savings {
 
 }
 
-case class Savings(schemes: List[Savings.Scheme] = Nil, funds: List[Savings.Fund] = Nil, assets: List[Savings.Asset] = Nil) extends Logging {
+case class Savings(
+  schemes: List[Savings.Scheme] = Nil,
+  funds: List[Savings.Fund] = Nil,
+  assets: List[Savings.Asset] = Nil,
+  latestAssetAction: Option[LocalDate] = None
+) extends Logging {
 
   import Savings._
 
@@ -237,8 +242,8 @@ case class Savings(schemes: List[Savings.Scheme] = Nil, funds: List[Savings.Fund
     copy(schemes = updated)
   }
 
-  protected def makePayment(date: LocalDate, asset: Asset): Savings =
-    findAsset(date, asset) match {
+  protected def makePayment(date: LocalDate, asset: Asset): Savings = {
+    val savings = findAsset(date, asset) match {
       case Some(currentAsset) =>
         val amount = currentAsset.amount + asset.amount
         val units = currentAsset.units + asset.units
@@ -251,6 +256,9 @@ case class Savings(schemes: List[Savings.Scheme] = Nil, funds: List[Savings.Fund
         copy(assets = assets :+ asset)
     }
 
+    savings.copy(latestAssetAction = Some(date))
+  }
+
   protected def makeTransfer(date: LocalDate, assetSrc: Asset, assetDst: Asset): Savings =
     makeRefund(date, assetSrc).makePayment(date, assetDst)
 
@@ -262,8 +270,10 @@ case class Savings(schemes: List[Savings.Scheme] = Nil, funds: List[Savings.Fund
     // Note: keep existing asset availability date if any, instead of using
     // given one (which may be empty if asset is actually available for the
     // given date).
-    if (units <= 0) removeAsset(date, asset)
-    else updateAsset(date, Asset(asset.schemeId, asset.fundId, currentAsset.availability, amount, units))
+    val savings =
+      if (units <= 0) removeAsset(date, asset)
+      else updateAsset(date, Asset(asset.schemeId, asset.fundId, currentAsset.availability, amount, units))
+    savings.copy(latestAssetAction = Some(date))
   }
 
   protected def testAsset(date: LocalDate, currentAsset: Asset, asset: Asset): Boolean = {
