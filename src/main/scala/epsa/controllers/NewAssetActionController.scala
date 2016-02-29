@@ -25,7 +25,6 @@ import suiryc.scala.javafx.stage.Stages
 import suiryc.scala.javafx.util.Callback
 
 // TODO - handle some event (action ?) on amount/units to update counterpart (and also destination data if any)
-// TODO - give info on limits for selected asset (and button to use all)
 // TODO - option of default day/month and number of years for frozen assets ?
 class NewAssetActionController {
 
@@ -514,6 +513,13 @@ class NewAssetActionController {
     val srcUnits = getSrcUnits
     val srcUnitsValued = srcUnits > 0
     lazy val srcAsset = Savings.Asset(srcFund.scheme.id, srcFund.fund.id, srcAvailability, srcAmount, srcUnits)
+    val srcAvailableAsset =
+      if (isPayment || !opDateSelected || !srcSelected || !srcAvailabilitySelected) None
+      else savings.computeAssets(operationDate).findAsset(operationDate, srcAsset)
+    val (srcAmountPrompt, srcUnitsPrompt) = srcAvailableAsset match {
+      case Some(asset) => (Some(s"≤${asset.amount}"), Some(s"≤${asset.units}"))
+      case None        => (None, None)
+    }
     val (srcAmountIssue, srcUnitsIssue) = {
       val srcAmountValueIssue =
         if (srcAmountValued) None
@@ -522,7 +528,7 @@ class NewAssetActionController {
         if (srcUnitsValued) None
         else Some(positiveValueMsg)
       if (!isPayment && srcSelected && srcAvailabilitySelected) {
-        savings.computeAssets(operationDate).findAsset(operationDate, srcAsset) match {
+        srcAvailableAsset match {
           case Some(asset) =>
             val emptyOne = ((srcAsset.amount == asset.amount) && (srcAsset.units != asset.units)) ||
               ((srcAsset.amount != asset.amount) && (srcAsset.units == asset.units))
@@ -557,8 +563,10 @@ class NewAssetActionController {
       if (srcAvailabilitySelected) None
       else Some(mandatoryMsg)
     )
-    Form.toggleError(srcAmountField, srcAmountIssue.nonEmpty, srcAmountIssue)
-    Form.toggleError(srcUnitsField, srcUnitsIssue.nonEmpty, srcUnitsIssue)
+    srcAmountField.setPromptText(srcAmountPrompt.orNull)
+    Form.toggleError(srcAmountField, srcAmountIssue.nonEmpty, srcAmountIssue.orElse(srcAmountPrompt))
+    srcUnitsField.setPromptText(srcUnitsPrompt.orNull)
+    Form.toggleError(srcUnitsField, srcUnitsIssue.nonEmpty, srcUnitsIssue.orElse(srcUnitsPrompt))
 
     val dstNeeded = actionKind == AssetActionKind.Transfer
     lazy val dstFund = getDstFund.orNull
