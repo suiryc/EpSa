@@ -2,7 +2,8 @@ package epsa.controllers
 
 import epsa.model.Savings
 import java.time.LocalDate
-import suiryc.scala.javafx.scene.control.{ListCellEx, TableCellEx}
+import javafx.scene.control.ListCell
+import suiryc.scala.javafx.scene.control.{CellWithSeparator, ListCellEx, TableCellEx}
 import suiryc.scala.util.I18NLocale
 
 class SchemeCell extends ListCellEx[Savings.Scheme] {
@@ -13,7 +14,7 @@ class FundCell extends ListCellEx[Savings.Fund] {
   override def itemText(item: Savings.Fund) = item.name
 }
 
-class SchemeAndFundCell extends ListCellEx[SchemeAndFund] {
+class SchemeAndFundCell extends ListCell[Option[SchemeAndFund]] with CellWithSeparator[SchemeAndFund] {
   override def itemText(item: SchemeAndFund) = s"${item.fund.name} / ${item.scheme.name}"
 }
 

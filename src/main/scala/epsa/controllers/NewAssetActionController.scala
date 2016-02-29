@@ -52,7 +52,7 @@ class NewAssetActionController {
   protected var operationDateField: DatePicker = _
 
   @FXML
-  protected var srcFundField: ComboBox[SchemeAndFund] = _
+  protected var srcFundField: ComboBox[Option[SchemeAndFund]] = _
 
   @FXML
   protected var srcAvailabilityField: DatePicker = _
@@ -73,7 +73,7 @@ class NewAssetActionController {
   protected var srcUnitsField: TextField = _
 
   @FXML
-  protected var dstFundField: ComboBox[SchemeAndFund] = _
+  protected var dstFundField: ComboBox[Option[SchemeAndFund]] = _
 
   @FXML
   protected var dstAvailabilityField: DatePicker = _
@@ -198,8 +198,8 @@ class NewAssetActionController {
       field.setTooltip(new Tooltip(NetAssetValueHistoryController.title))
       field.setOnAction { (event: ActionEvent) =>
         val opt =
-          if (field == dstNAVButton) Option(dstFundField.getValue)
-          else Option(srcFundField.getValue)
+          if (field == dstNAVButton) getDstFund
+          else getSrcFund
         opt.foreach { schemeAndFund =>
           onNAVHistory(schemeAndFund.fund)
         }
@@ -228,7 +228,7 @@ class NewAssetActionController {
       scheme <- savings.findScheme(a.schemeId)
       fund <- savings.findFund(a.fundId)
     } {
-      srcFundField.getSelectionModel.select(SchemeAndFund(scheme, fund))
+      srcFundField.getSelectionModel.select(Some(SchemeAndFund(scheme, fund)))
       // There is no meaning to pre-select source availability in case of
       // payment. In other cases, use the source asset one.
       if (actionKind != AssetActionKind.Payment) {
@@ -291,8 +291,6 @@ class NewAssetActionController {
 
     if (srcAvailabilityExact) updateSrcAvailability()
     updateDstSchemeAndFund()
-    // Since a fund is now selected, we can enable its NAV history button
-    srcNAVButton.setDisable(false)
     updateNAV()
     checkForm()
   }
@@ -307,8 +305,6 @@ class NewAssetActionController {
   }
 
   def onDstFund(): Unit = breakRecursion {
-    // Since a fund is now selected, we can enable its NAV history button
-    dstNAVButton.setDisable(false)
     updateNAV()
     checkForm()
   }
@@ -326,8 +322,14 @@ class NewAssetActionController {
     if (dialog.showAndWait().orElse(false)) updateNAV()
   }
 
+  private def buildSchemeAndFunds(entries: List[SchemeAndFund]*): List[Option[SchemeAndFund]] =
+    entries.foldLeft(List[Option[SchemeAndFund]]()) { (acc, schemeAndFunds) =>
+      val rest = schemeAndFunds.map(Some(_))
+      if (acc.isEmpty || schemeAndFunds.isEmpty) acc ::: rest
+      else acc ::: None :: rest
+    }
+
   private def updateSchemeAndFund(): Unit = {
-    // TODO - can have separation between list of proposed scheme&fund ?
     // Note: previous selected value is kept if still present in new items
 
     // Scheme&fund with asset
@@ -352,16 +354,18 @@ class NewAssetActionController {
         }
       }.filterNot(fundsWithAsset.contains).sorted
 
-      srcFundField.setItems(FXCollections.observableList(fundsWithAsset ::: fundsOther))
+      // Choices are listed by order of 'preference' (chances to be chosen),
+      // with a separator between categories:
+      //   - funds that already have assets
+      //   - funds without assets
+      srcFundField.setItems(FXCollections.observableList(buildSchemeAndFunds(fundsWithAsset, fundsOther)))
     } else {
-      srcFundField.setItems(FXCollections.observableList(fundsWithAsset))
+      srcFundField.setItems(FXCollections.observableList(buildSchemeAndFunds(fundsWithAsset)))
     }
     updateDstSchemeAndFund()
   }
 
   private def updateDstSchemeAndFund(): Unit = {
-    // TODO - can have separation between list of proposed scheme&fund ?
-
     // Notes: don't empty destination list to keep selected value if needed.
     // Fields are disabled and the selected item will remain if order is
     // changed next time the fields are enabled.
@@ -387,12 +391,18 @@ class NewAssetActionController {
       }.filterNot(fundsWithAsset.contains).sorted
       // Other scheme&fund for destination, with first same scheme as source if
       // selected
-      val fundsDst = Option(srcFundField.getValue).map { schemeAndFund =>
+      val fundsDst = getSrcFund.map { schemeAndFund =>
         val (fundsSameScheme1, fundsOtherScheme1) = fundsWithAsset.filterNot(_ == schemeAndFund).partition(_.scheme == schemeAndFund.scheme)
         val (fundsSameScheme2, fundsOtherScheme2) = fundsOther.partition(_.scheme == schemeAndFund.scheme)
-        fundsSameScheme1 ::: fundsSameScheme2 ::: fundsOtherScheme1 ::: fundsOtherScheme2
-      }.getOrElse(fundsWithAsset ::: fundsOther)
+        buildSchemeAndFunds(fundsSameScheme1, fundsSameScheme2, fundsOtherScheme1, fundsOtherScheme2)
+      }.getOrElse(buildSchemeAndFunds(fundsWithAsset, fundsOther))
 
+      // Choices are listed by order of 'preference' (chances to be chosen),
+      // with a separator between categories:
+      //   - funds in the source scheme that already have assets
+      //   - funds in the source scheme without assets
+      //   - funds in another scheme that already have assets
+      //   - funds in another scheme without assets
       dstFundField.setItems(FXCollections.observableList(fundsDst))
     }
   }
@@ -409,7 +419,7 @@ class NewAssetActionController {
         srcAvailabilityField2.setDisable(false)
         // Note: get availabilities for selected scheme&fund, sorted by date (with
         // immediate availability first).
-        val availabilities = Option(srcFundField.getValue).map { schemeAndFund =>
+        val availabilities = getSrcFund.map { schemeAndFund =>
           filterAssets(savings.computeAssets(date).assets, schemeAndFund).map(_.availability).distinct.sortBy { opt =>
             opt.getOrElse(LocalDate.ofEpochDay(0))
           }
@@ -439,10 +449,10 @@ class NewAssetActionController {
         }
       }
 
-      Option(srcFundField.getValue).foreach { schemeAndFund =>
+      getSrcFund.foreach { schemeAndFund =>
         updateField(srcNAVField, schemeAndFund.fund)
       }
-      Option(dstFundField.getValue).foreach { schemeAndFund =>
+      getDstFund.foreach { schemeAndFund =>
         updateField(dstNAVField, schemeAndFund.fund)
       }
     }
@@ -461,7 +471,7 @@ class NewAssetActionController {
     )
 
     val isPayment = actionKind == AssetActionKind.Payment
-    val srcFund = srcFundField.getValue
+    val srcFund = getSrcFund.orNull
     val srcSelected = Option(srcFund).isDefined
     val srcAvailability = getSrcAvailability
     val srcAvailabilitySelected =
@@ -510,7 +520,7 @@ class NewAssetActionController {
     )
 
     val dstNeeded = actionKind == AssetActionKind.Transfer
-    lazy val dstFund = dstFundField.getValue
+    lazy val dstFund = getDstFund.orNull
     val dstSelected = !dstNeeded || Option(dstFund).isDefined
     lazy val dstAvailability = Option(dstAvailabilityField.getValue)
     val dstAvailabilitySelected = !dstNeeded || {
@@ -551,6 +561,9 @@ class NewAssetActionController {
         case AssetActionKind.Refund   => Savings.MakeRefund(operationDate, srcAsset)
       }
     } else None
+
+    srcNAVButton.setDisable(!srcSelected)
+    dstNAVButton.setDisable(!dstSelected)
     buttonOk.setDisable(event.isEmpty)
 
     event
@@ -567,6 +580,9 @@ class NewAssetActionController {
 
   private def isDstEnabled: Boolean =
     actionKind == AssetActionKind.Transfer
+
+  private def getSrcFund: Option[SchemeAndFund] =
+    Option(srcFundField.getValue).flatten
 
   private def getSrcAvailability: Option[LocalDate] = {
     val srcAvailabilityExact = actionKind != AssetActionKind.Payment
@@ -586,6 +602,9 @@ class NewAssetActionController {
 
   private def getSrcUnits: BigDecimal =
     getBigDecimal(srcUnitsField.getText)
+
+  private def getDstFund: Option[SchemeAndFund] =
+    Option(dstFundField.getValue).flatten
 
   private def getDstAmount: BigDecimal =
     getBigDecimal(dstAmountField.getText)
