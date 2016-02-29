@@ -103,7 +103,11 @@ class NewAssetActionController {
 
   private lazy val mandatoryMsg = resources.getString("Mandatory field")
 
+  private lazy val positiveValueMsg = resources.getString("Positive value expected")
+
   private lazy val valueLimitMsg = resources.getString("Value exceeds available quantity")
+
+  private lazy val emptyOneMsg = resources.getString("warning.empty-amount-and-units")
 
   private var savings: Savings = _
 
@@ -318,8 +322,6 @@ class NewAssetActionController {
   }
 
   def onSrcEmpty(): Unit = {
-    // TODO: since actual asset value changes with net asset value, check that emptying it
-    // (remaining parts == 0) also empties in value in checkForm (or even force it ?)
     for {
       operationDate <- Option(operationDateField.getValue)
       schemeAndFund <- getSrcFund
@@ -512,18 +514,36 @@ class NewAssetActionController {
     val srcUnits = getSrcUnits
     val srcUnitsValued = srcUnits > 0
     lazy val srcAsset = Savings.Asset(srcFund.scheme.id, srcFund.fund.id, srcAvailability, srcAmount, srcUnits)
-    val (srcAmountOk, srcUnitsOk) =
+    val (srcAmountIssue, srcUnitsIssue) = {
+      val srcAmountValueIssue =
+        if (srcAmountValued) None
+        else Some(positiveValueMsg)
+      val srcUnitsValueIssue =
+        if (srcUnitsValued) None
+        else Some(positiveValueMsg)
       if (!isPayment && srcSelected && srcAvailabilitySelected) {
         savings.computeAssets(operationDate).findAsset(operationDate, srcAsset) match {
           case Some(asset) =>
-            (srcAmountValued && (asset.amount >= srcAsset.amount),
-              srcUnitsValued && (asset.units >= srcAsset.units))
+            val emptyOne = ((srcAsset.amount == asset.amount) && (srcAsset.units != asset.units)) ||
+              ((srcAsset.amount != asset.amount) && (srcAsset.units == asset.units))
+            val amountIssue =
+              if (srcAmountValueIssue.nonEmpty) srcAmountValueIssue
+              else if (srcAsset.amount > asset.amount) Some(valueLimitMsg.format(asset.amount))
+              else if (emptyOne) Some(emptyOneMsg)
+              else None
+            val unitsIssue =
+              if (srcUnitsValueIssue.nonEmpty) srcUnitsValueIssue
+              else if (srcAsset.units > asset.units) Some(valueLimitMsg.format(asset.units))
+              else if (emptyOne) Some(emptyOneMsg)
+              else None
+            (amountIssue, unitsIssue)
 
           case None =>
-            (false, false)
+            (srcAmountValueIssue, srcUnitsValueIssue)
         }
-      } else (srcAmountValued, srcUnitsValued)
-    val srcValuedOk = srcAmountOk && srcUnitsOk
+      } else (srcAmountValueIssue, srcUnitsValueIssue)
+    }
+    val srcValuedOk = srcAmountIssue.isEmpty && srcUnitsIssue.isEmpty
     val srcOk = srcSelected && srcAvailabilitySelected && !srcAvailabilityAnterior && srcValuedOk
     Form.toggleError(srcFundField, !srcSelected,
       if (srcSelected) None
@@ -537,16 +557,8 @@ class NewAssetActionController {
       if (srcAvailabilitySelected) None
       else Some(mandatoryMsg)
     )
-    Form.toggleError(srcAmountField, !srcAmountValued || !srcAmountOk,
-      if (!srcAmountValued) Some(mandatoryMsg)
-      else if (!srcAmountOk) Some(valueLimitMsg)
-      else None
-    )
-    Form.toggleError(srcUnitsField, !srcUnitsValued || !srcUnitsOk,
-      if (!srcUnitsValued) Some(mandatoryMsg)
-      else if (!srcUnitsOk) Some(valueLimitMsg)
-      else None
-    )
+    Form.toggleError(srcAmountField, srcAmountIssue.nonEmpty, srcAmountIssue)
+    Form.toggleError(srcUnitsField, srcUnitsIssue.nonEmpty, srcUnitsIssue)
 
     val dstNeeded = actionKind == AssetActionKind.Transfer
     lazy val dstFund = getDstFund.orNull
@@ -576,11 +588,11 @@ class NewAssetActionController {
     )
     Form.toggleError(dstAmountField, !dstAmountValued,
       if (dstAmountValued) None
-      else Some(mandatoryMsg)
+      else Some(positiveValueMsg)
     )
     Form.toggleError(dstUnitsField, !dstUnitsValued,
       if (dstUnitsValued) None
-      else Some(mandatoryMsg)
+      else Some(positiveValueMsg)
     )
 
     val event = if (opDateOk && srcOk && dstOk) Some {
