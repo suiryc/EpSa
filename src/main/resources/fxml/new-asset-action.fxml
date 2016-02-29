@@ -41,37 +41,65 @@
             <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
          </VBox.margin>
       </GridPane>
-      <GridPane hgap="10.0" vgap="10.0">
+      <GridPane hgap="5.0" vgap="10.0">
         <columnConstraints>
           <ColumnConstraints hgrow="NEVER" minWidth="-Infinity" />
-          <ColumnConstraints hgrow="SOMETIMES" maxWidth="1.7976931348623157E308" prefWidth="174.0" />
-            <ColumnConstraints hgrow="SOMETIMES" maxWidth="1.7976931348623157E308" prefWidth="174.0" />
+          <ColumnConstraints hgrow="SOMETIMES" maxWidth="1.7976931348623157E308" prefWidth="170.0" />
+            <ColumnConstraints hgrow="SOMETIMES" maxWidth="1.7976931348623157E308" prefWidth="170.0" />
         </columnConstraints>
         <rowConstraints>
             <RowConstraints minHeight="-Infinity" vgrow="SOMETIMES" />
-          <RowConstraints minHeight="-Infinity" vgrow="SOMETIMES" />
-          <RowConstraints minHeight="-Infinity" vgrow="SOMETIMES" />
-          <RowConstraints minHeight="-Infinity" vgrow="SOMETIMES" />
-            <RowConstraints minHeight="-Infinity" vgrow="SOMETIMES" />
-            <RowConstraints minHeight="-Infinity" vgrow="SOMETIMES" />
-            <RowConstraints minHeight="-Infinity" vgrow="SOMETIMES" />
+          <RowConstraints vgrow="SOMETIMES" />
+          <RowConstraints vgrow="SOMETIMES" />
+          <RowConstraints vgrow="SOMETIMES" />
+            <RowConstraints vgrow="SOMETIMES" />
+            <RowConstraints vgrow="SOMETIMES" />
+            <RowConstraints vgrow="SOMETIMES" />
         </rowConstraints>
          <VBox.margin>
             <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
          </VBox.margin>
          <children>
+            <Label alignment="CENTER" text="%Source" GridPane.columnIndex="1" GridPane.halignment="CENTER" GridPane.valignment="CENTER">
+               <GridPane.margin>
+                  <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
+               </GridPane.margin>
+            </Label>
             <Label text="%Operation date:" GridPane.rowIndex="1" />
-            <DatePicker fx:id="operationDateField" GridPane.columnIndex="1" GridPane.rowIndex="1" />
+            <DatePicker fx:id="operationDateField" minWidth="110.0" GridPane.columnIndex="1" GridPane.rowIndex="1">
+               <GridPane.margin>
+                  <Insets left="5.0" right="5.0" />
+               </GridPane.margin></DatePicker>
             <Label text="%Fund/Scheme:" GridPane.rowIndex="2" />
-            <ComboBox fx:id="srcFundField" maxWidth="1.7976931348623157E308" GridPane.columnIndex="1" GridPane.rowIndex="2" />
+            <ComboBox fx:id="srcFundField" maxWidth="1.7976931348623157E308" GridPane.columnIndex="1" GridPane.rowIndex="2">
+               <GridPane.margin>
+                  <Insets left="5.0" right="5.0" />
+               </GridPane.margin></ComboBox>
             <Label text="%Availability:" GridPane.rowIndex="3" />
-            <DatePicker fx:id="srcAvailabilityField" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0" GridPane.columnIndex="1" GridPane.rowIndex="3" />
-            <ComboBox fx:id="srcAvailabilityField2" maxWidth="1.7976931348623157E308" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0" GridPane.columnIndex="1" GridPane.rowIndex="3" />
+            <DatePicker fx:id="srcAvailabilityField" minWidth="110.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0" GridPane.columnIndex="1" GridPane.rowIndex="3">
+               <GridPane.margin>
+                  <Insets left="5.0" right="5.0" />
+               </GridPane.margin></DatePicker>
+            <ComboBox fx:id="srcAvailabilityField2" maxWidth="1.7976931348623157E308" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0" GridPane.columnIndex="1" GridPane.rowIndex="3">
+               <GridPane.margin>
+                  <Insets left="5.0" right="5.0" />
+               </GridPane.margin></ComboBox>
             <Label text="%NAV:" GridPane.rowIndex="4" />
-            <HBox maxWidth="1.7976931348623157E308" GridPane.columnIndex="1" GridPane.rowIndex="4">
+            <Label text="%Amount:" GridPane.rowIndex="5" />
+            <Label text="%Units:" GridPane.rowIndex="6" />
+            <GridPane hgap="5.0" vgap="10.0" GridPane.columnIndex="1" GridPane.rowIndex="4" GridPane.rowSpan="3">
+               <columnConstraints>
+                  <ColumnConstraints hgrow="NEVER" maxWidth="1.7976931348623157E308" />
+                  <ColumnConstraints hgrow="NEVER" maxWidth="1.7976931348623157E308" />
+               </columnConstraints>
+               <rowConstraints>
+                  <RowConstraints minHeight="-Infinity" vgrow="SOMETIMES" />
+                  <RowConstraints minHeight="-Infinity" vgrow="SOMETIMES" />
+                  <RowConstraints minHeight="-Infinity" vgrow="SOMETIMES" />
+               </rowConstraints>
                <children>
-                  <TextField fx:id="srcNAVField" editable="false" maxWidth="1.7976931348623157E308" HBox.hgrow="SOMETIMES" />
-                  <Button fx:id="srcNAVButton" mnemonicParsing="false" HBox.hgrow="NEVER">
+                  <TextField fx:id="srcNAVField" editable="false" maxWidth="150.0" minWidth="60.0" />
+                  <Button fx:id="srcNAVButton" mnemonicParsing="false" GridPane.columnIndex="1">
                      <graphic>
                         <ImageView pickOnBounds="true" preserveRatio="true">
                            <image>
@@ -79,32 +107,43 @@
                            </image>
                         </ImageView>
                      </graphic>
-                     <HBox.margin>
-                        <Insets left="5.0" />
-                     </HBox.margin>
                   </Button>
+                  <TextField fx:id="srcAmountField" maxWidth="150.0" minWidth="60.0" GridPane.rowIndex="1" />
+                  <Button fx:id="srcEmptyButton" mnemonicParsing="false" GridPane.columnIndex="1" GridPane.rowIndex="1" GridPane.rowSpan="2">
+                     <graphic>
+                        <ImageView pickOnBounds="true" preserveRatio="true">
+                           <image>
+                              <Image url="@../images/fugue-icons/piggy-bank-empty.png" />
+                           </image>
+                        </ImageView>
+                     </graphic>
+                  </Button>
+                  <TextField fx:id="srcUnitsField" maxWidth="150.0" minWidth="60.0" GridPane.rowIndex="2" />
                </children>
-            </HBox>
-            <Label text="%Amount:" GridPane.rowIndex="5" />
-            <TextField fx:id="srcAmountField" maxWidth="1.7976931348623157E308" GridPane.columnIndex="1" GridPane.rowIndex="5" />
-            <Label text="%Units:" GridPane.rowIndex="6" />
-            <TextField fx:id="srcUnitsField" maxWidth="1.7976931348623157E308" GridPane.columnIndex="1" GridPane.rowIndex="6" />
-            <Label alignment="CENTER" text="%Source" GridPane.columnIndex="1" GridPane.halignment="CENTER" GridPane.valignment="CENTER">
                <GridPane.margin>
-                  <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
+                  <Insets left="5.0" right="5.0" />
                </GridPane.margin>
-            </Label>
+            </GridPane>
             <Label text="%Destination" GridPane.columnIndex="2" GridPane.halignment="CENTER" GridPane.valignment="CENTER">
                <GridPane.margin>
                   <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
                </GridPane.margin>
             </Label>
             <ComboBox fx:id="dstFundField" maxWidth="1.7976931348623157E308" GridPane.columnIndex="2" GridPane.rowIndex="2" />
-            <DatePicker fx:id="dstAvailabilityField" GridPane.columnIndex="2" GridPane.rowIndex="3" />
-            <HBox maxWidth="1.7976931348623157E308" GridPane.columnIndex="2" GridPane.rowIndex="4">
+            <DatePicker fx:id="dstAvailabilityField" minWidth="110.0" GridPane.columnIndex="2" GridPane.rowIndex="3" />
+            <GridPane hgap="5.0" vgap="10.0" GridPane.columnIndex="2" GridPane.rowIndex="4" GridPane.rowSpan="3">
+               <columnConstraints>
+                  <ColumnConstraints hgrow="NEVER" maxWidth="1.7976931348623157E308" />
+                  <ColumnConstraints hgrow="NEVER" maxWidth="1.7976931348623157E308" />
+               </columnConstraints>
+               <rowConstraints>
+                  <RowConstraints minHeight="-Infinity" vgrow="SOMETIMES" />
+                  <RowConstraints minHeight="-Infinity" vgrow="SOMETIMES" />
+                  <RowConstraints minHeight="-Infinity" vgrow="SOMETIMES" />
+               </rowConstraints>
                <children>
-                  <TextField fx:id="dstNAVField" editable="false" maxWidth="1.7976931348623157E308" HBox.hgrow="SOMETIMES" />
-                  <Button fx:id="dstNAVButton" mnemonicParsing="false" HBox.hgrow="NEVER">
+                  <TextField fx:id="dstNAVField" editable="false" maxWidth="150.0" minWidth="60.0" />
+                  <Button fx:id="dstNAVButton" mnemonicParsing="false" GridPane.columnIndex="1">
                      <graphic>
                         <ImageView pickOnBounds="true" preserveRatio="true">
                            <image>
@@ -112,14 +151,11 @@
                            </image>
                         </ImageView>
                      </graphic>
-                     <HBox.margin>
-                        <Insets left="5.0" />
-                     </HBox.margin>
                   </Button>
+                  <TextField fx:id="dstAmountField" maxWidth="150.0" minWidth="60.0" GridPane.rowIndex="1" />
+                  <TextField fx:id="dstUnitsField" maxWidth="150.0" minWidth="60.0" GridPane.rowIndex="2" />
                </children>
-            </HBox>
-            <TextField fx:id="dstAmountField" maxWidth="1.7976931348623157E308" GridPane.columnIndex="2" GridPane.rowIndex="5" />
-            <TextField fx:id="dstUnitsField" maxWidth="1.7976931348623157E308" GridPane.columnIndex="2" GridPane.rowIndex="6" />
+            </GridPane>
          </children>
       </GridPane>
    </children>

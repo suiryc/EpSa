@@ -70,6 +70,9 @@ class NewAssetActionController {
   protected var srcAmountField: TextField = _
 
   @FXML
+  protected var srcEmptyButton: Button = _
+
+  @FXML
   protected var srcUnitsField: TextField = _
 
   @FXML
@@ -187,14 +190,18 @@ class NewAssetActionController {
       })
     }
 
-    // Setup NAV history buttons
-    for (field <- List(srcNAVButton, dstNAVButton)) {
+    // Setup funds buttons
+    for (field <- List(srcNAVButton, srcEmptyButton, dstNAVButton)) {
       // Disable by default; will be enabled when a fund is selected
       field.setDisable(true)
       // Reset padding of button; by default uses 8 on each horizontal side
       // and 4 on each vertical side, which gives a rectangle. We will use
       // 4 on each side to get a square to display our square icon inside.
       field.setPadding(new Insets(4))
+    }
+
+    // Setup NAV history buttons
+    for (field <- List(srcNAVButton, dstNAVButton)) {
       field.setTooltip(new Tooltip(NetAssetValueHistoryController.title))
       field.setOnAction { (event: ActionEvent) =>
         val opt =
@@ -204,6 +211,12 @@ class NewAssetActionController {
           onNAVHistory(schemeAndFund.fund)
         }
       }
+    }
+
+    // Setup source fund emptying button
+    srcEmptyButton.setTooltip(new Tooltip(resources.getString("Empty")))
+    srcEmptyButton.setOnAction { (event: ActionEvent) =>
+      onSrcEmpty()
     }
 
     // Re-check form when source/destination amount/units is changed
@@ -302,6 +315,22 @@ class NewAssetActionController {
       dstAvailabilityField.setValue(availability.orNull)
     }
     checkForm()
+  }
+
+  def onSrcEmpty(): Unit = {
+    // TODO: since actual asset value changes with net asset value, check that emptying it
+    // (remaining parts == 0) also empties in value in checkForm (or even force it ?)
+    for {
+      operationDate <- Option(operationDateField.getValue)
+      schemeAndFund <- getSrcFund
+    } {
+      val srcAvailability = getSrcAvailability
+      val searchAsset = Savings.Asset(schemeAndFund.scheme.id, schemeAndFund.fund.id, srcAvailability, 0, 0)
+      savings.computeAssets(operationDate).findAsset(operationDate, searchAsset).foreach { asset =>
+        srcAmountField.setText(asset.amount.toString)
+        srcUnitsField.setText(asset.units.toString)
+      }
+    }
   }
 
   def onDstFund(): Unit = breakRecursion {
@@ -563,7 +592,13 @@ class NewAssetActionController {
     } else None
 
     srcNAVButton.setDisable(!srcSelected)
-    dstNAVButton.setDisable(!dstSelected)
+    if (isPayment) {
+      srcEmptyButton.setVisible(false)
+    } else {
+      srcEmptyButton.setVisible(true)
+      srcEmptyButton.setDisable(!opDateSelected || !srcSelected || !srcAvailabilitySelected)
+    }
+    dstNAVButton.setDisable(!dstNeeded || !dstSelected)
     buttonOk.setDisable(event.isEmpty)
 
     event
