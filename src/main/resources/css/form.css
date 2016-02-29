@@ -2,7 +2,8 @@
 :warning {
   -fx-border-color: rgb(255, 165, 0);
   -fx-focus-color: rgb(255, 165, 0);
-  -fx-accent: rgb(255, 165, 0);
+  /* -fx-accent is used e.g. on combobox entry highlighting */
+  /* -fx-accent: rgb(255, 165, 0); */
   -fx-faint-focus-color: rgba(255, 165, 0, 0.2);
 }
 
@@ -10,7 +11,7 @@
 :error {
   -fx-border-color: rgb(255, 0, 0);
   -fx-focus-color: rgb(255, 0, 0);
-  -fx-accent: rgb(255, 0, 0);
+  /* -fx-accent: rgb(255, 0, 0); */
   -fx-faint-focus-color: rgba(255, 0, 0, 0.2);
 }
 
