@@ -22,8 +22,9 @@ object Form {
 
   def toggleStyles(node: Control, msgOpt: Option[String], styles: Style*): Unit = {
     // Apply all style changes
-    styles.foreach { style =>
-      setPseudoClass(node, style.pseudoClass, style.set)
+    // Group by style and check whether at least one instance is set
+    styles.groupBy(_.pseudoClass).mapValues(_.exists(_.set)).foreach {
+      case (pseudoClass, set) => setPseudoClass(node, pseudoClass, set)
     }
     // Get the first enabled style provided message, or the default one.
     val opt = styles.find(_.set).map(_.msg).orElse(msgOpt)
