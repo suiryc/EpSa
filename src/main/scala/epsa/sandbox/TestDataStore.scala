@@ -7,6 +7,8 @@ import java.nio.file.Path
 import java.util.UUID
 import javafx.application.Application
 import javafx.stage.{FileChooser, Stage}
+import suiryc.scala.javafx.stage.FileChoosers
+
 import scala.concurrent.{Await, Future, Promise}
 import scala.concurrent.duration.Duration
 import suiryc.scala.javafx.concurrent.JFXSystem
@@ -80,8 +82,7 @@ class TestDataStore extends Application {
       new FileChooser.ExtensionFilter("All Files", "*.*")
     )
     fundPath.option.foreach { path =>
-      fileChooser.setInitialDirectory(path.getParent.toFile)
-      fileChooser.setInitialFileName(path.toFile.getName)
+      FileChoosers.setInitialPath(fileChooser, path.toFile)
     }
     val selectedFile = fileChooser.showOpenDialog(stage)
     Option(selectedFile).flatMap { file =>

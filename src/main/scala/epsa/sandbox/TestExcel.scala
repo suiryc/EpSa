@@ -9,6 +9,7 @@ import javafx.application.Application
 import javafx.scene.Scene
 import javafx.stage.FileChooser.ExtensionFilter
 import javafx.stage.{FileChooser, Stage, WindowEvent}
+import suiryc.scala.javafx.stage.FileChoosers
 import suiryc.scala.settings.Preference
 
 object TestExcel {
@@ -56,8 +57,7 @@ class TestExcel extends Application {
       new ExtensionFilter("All Files", "*.*")
     )
     fundPath.option.foreach { path =>
-      fileChooser.setInitialDirectory(path.getParent.toFile)
-      fileChooser.setInitialFileName(path.toFile.getName)
+      FileChoosers.setInitialPath(fileChooser, path.toFile)
     }
     val selectedFile = fileChooser.showOpenDialog(stage)
     Option(selectedFile).flatMap { file =>

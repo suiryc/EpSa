@@ -17,6 +17,7 @@ import slick.jdbc.meta.MTable
 import suiryc.scala.concurrent.RichFuture
 import suiryc.scala.concurrent.RichFuture.Action
 import suiryc.scala.javafx.concurrent.JFXSystem
+import suiryc.scala.javafx.stage.FileChoosers
 import suiryc.scala.settings.Preference
 
 object DataStore {
@@ -139,8 +140,7 @@ object DataStore {
       fileChooser.getExtensionFilters.addAll(
         new FileChooser.ExtensionFilter(resources.getString("Data store"), "*.mv.db")
       )
-      fileChooser.setInitialDirectory(defaultPath.getParent.toFile)
-      fileChooser.setInitialFileName(defaultPath.toFile.getName)
+      FileChoosers.setInitialPath(fileChooser, defaultPath.toFile)
 
       // Note: file chooser must operate within JavaFX thread
       val selectedFile = if (save) {

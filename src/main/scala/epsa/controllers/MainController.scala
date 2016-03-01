@@ -29,7 +29,7 @@ import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.javafx.event.EventHandler._
 import suiryc.scala.javafx.scene.control.{Dialogs, TableViews}
-import suiryc.scala.javafx.stage.Stages
+import suiryc.scala.javafx.stage.{FileChoosers, Stages}
 import suiryc.scala.javafx.util.Callback
 import suiryc.scala.settings.Preference
 
@@ -621,8 +621,7 @@ class MainController extends Logging {
         new FileChooser.ExtensionFilter("All Files", "*.*")
       )
       fundPath.option.foreach { path =>
-        fileChooser.setInitialDirectory(path.getParent.toFile)
-        fileChooser.setInitialFileName(path.toFile.getName)
+        FileChoosers.setInitialPath(fileChooser, path.toFile)
       }
       val selectedFile = fileChooser.showOpenDialog(stage)
       Option(selectedFile).flatMap { file =>

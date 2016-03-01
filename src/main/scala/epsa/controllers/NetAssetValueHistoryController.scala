@@ -25,7 +25,7 @@ import suiryc.scala.concurrent.RichFuture._
 import suiryc.scala.math.Ordering._
 import suiryc.scala.settings.Preference
 import suiryc.scala.javafx.scene.control.Dialogs
-import suiryc.scala.javafx.stage.Stages
+import suiryc.scala.javafx.stage.{FileChoosers, Stages}
 import suiryc.scala.javafx.util.Callback
 
 // TODO - be notified (by main view) if funds are added/removed ?
@@ -96,8 +96,7 @@ class NetAssetValueHistoryController {
         new FileChooser.ExtensionFilter(resources.getString("All files"), "*.*")
       )
       navHistoryImportPath.option.foreach { path =>
-        fileChooser.setInitialDirectory(path.getParent.toFile)
-        fileChooser.setInitialFileName(path.toFile.getName)
+        FileChoosers.setInitialPath(fileChooser, path.toFile)
       }
       val selectedFile = fileChooser.showOpenDialog(stage)
       Option(selectedFile).foreach { file =>
