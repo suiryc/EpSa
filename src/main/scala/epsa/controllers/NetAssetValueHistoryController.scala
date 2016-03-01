@@ -395,7 +395,7 @@ class NetAssetValueHistoryController {
 
 object NetAssetValueHistoryController {
 
-  import epsa.Main.prefs
+  import epsa.Settings.prefs
   import Preference._
 
   protected val navHistoryImportPath = Preference.from("nav.history.import.path", null:Path)

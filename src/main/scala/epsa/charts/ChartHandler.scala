@@ -20,7 +20,7 @@ case class ChartSettings(
   showXLabel: Boolean = true,
   yLabel: String = "NAV",
   showYLabel: Boolean = true,
-  ySuffix: String = epsa.Main.defaultCurrency,
+  ySuffix: String = epsa.Settings.defaultCurrency,
   legendVisible: Boolean = true
 )
 

@@ -28,7 +28,7 @@ import suiryc.scala.javafx.util.Callback
 // TODO - option of default day/month and number of years for frozen assets ?
 class NewAssetActionController {
 
-  import epsa.Main.prefs
+  import epsa.Settings.prefs
 
   private val stageLocation = Preference.from("stage.new-asset-action.location", null:StageLocation)
 

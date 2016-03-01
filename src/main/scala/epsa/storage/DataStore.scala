@@ -22,7 +22,7 @@ import suiryc.scala.settings.Preference
 object DataStore {
 
   import epsa.Main.Akka._
-  import epsa.Main.prefs
+  import epsa.Settings.prefs
   import Preference._
 
   private val dbExtension = Constants.SUFFIX_MV_FILE

@@ -3,11 +3,8 @@ package epsa.controllers
 import epsa.I18N
 import java.util.ResourceBundle
 import javafx.collections.FXCollections
-import javafx.event.ActionEvent
 import javafx.fxml.{FXMLLoader, FXML}
 import javafx.scene.control.{ButtonType, ComboBox, Dialog}
-import suiryc.scala.javafx.beans.value.RichObservableValue._
-import suiryc.scala.javafx.event.EventHandler._
 import suiryc.scala.javafx.stage.Stages
 import suiryc.scala.javafx.util.Callback
 import suiryc.scala.settings.{SettingSnapshot, SettingsSnapshot}
@@ -26,7 +23,7 @@ class OptionsController {
 
   def initialize(snapshot: SettingsSnapshot): Unit = {
     snapshot.add(SettingSnapshot(I18N.pref))
-    snapshot.add(SettingSnapshot(epsa.Main.currency))
+    snapshot.add(SettingSnapshot(epsa.Settings.currency))
 
     // Note: we need to tell the combobox how to display both the 'button' area
     // (what is shown as selected) and the content (list of choices).
@@ -40,11 +37,11 @@ class OptionsController {
       languageChoice.getSelectionModel.select(locale)
     }
 
-    val currency = epsa.Main.currency()
-    val currencies = if (epsa.Main.preferredCurrencies.contains(currency)) {
-      epsa.Main.preferredCurrencies
+    val currency = epsa.Settings.currency()
+    val currencies = if (epsa.Settings.preferredCurrencies.contains(currency)) {
+      epsa.Settings.preferredCurrencies
     } else {
-      currency :: epsa.Main.preferredCurrencies
+      currency :: epsa.Settings.preferredCurrencies
     }
     currencyChoice.setItems(FXCollections.observableList(currencies))
     currencyChoice.getSelectionModel.select(currency)
@@ -85,7 +82,7 @@ object OptionsController {
     else {
       val reload = Option(controller.currencyChoice.getEditor.getText).filterNot(_.isEmpty) match {
         case Some(currency) =>
-          epsa.Main.currency() = currency
+          epsa.Settings.currency() = currency
           true
 
         case None =>

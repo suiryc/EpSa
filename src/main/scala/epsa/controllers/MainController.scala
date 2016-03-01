@@ -44,7 +44,7 @@ import suiryc.scala.settings.Preference
 // TODO - manual/automatic way to check NAV history values without existing fund ?
 class MainController extends Logging {
 
-  import epsa.Main.prefs
+  import epsa.Settings.prefs
   import MainController._
   import Preference._
   import Stages.StageLocation
@@ -156,7 +156,7 @@ class MainController extends Logging {
     columnAmount.setCellValueFactory(Callback { data =>
       new SimpleObjectProperty(data.getValue.amount)
     })
-    columnAmount.setCellFactory(Callback { new AmountCell[Savings.Asset](epsa.Main.currency()) })
+    columnAmount.setCellFactory(Callback { new AmountCell[Savings.Asset](epsa.Settings.currency()) })
     columnUnits.setCellValueFactory(Callback { data =>
       new SimpleObjectProperty(data.getValue.units)
     })
@@ -180,7 +180,7 @@ class MainController extends Logging {
         Form.formatAvailability(asset.availability, date = None, long = true)
       }.orNull)
       amountField.setText(assetOpt.map { asset =>
-        Form.formatAmount(asset.amount, epsa.Main.currency())
+        Form.formatAmount(asset.amount, epsa.Settings.currency())
       }.orNull)
       unitsField.setText(assetOpt.map { asset =>
         asset.units.toString()

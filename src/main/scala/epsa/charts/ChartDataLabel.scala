@@ -14,7 +14,7 @@ case class ChartData(x: String, y: BigDecimal)
  * optional text flow (to apply different styles) for an optional reference
  * data.
  */
-class ChartDataLabel(xLabel: String = "Date", yLabel: String = "NAV", ySuffix: String = epsa.Main.defaultCurrency) extends VBox {
+class ChartDataLabel(xLabel: String = "Date", yLabel: String = "NAV", ySuffix: String = epsa.Settings.defaultCurrency) extends VBox {
 
   /** Reference data. */
   private var refData: Option[ChartData] = None

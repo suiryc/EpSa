@@ -68,7 +68,7 @@ class TestDataStore extends Application {
   }
 
   def fundGraph(stage: Stage): Option[Savings.AssetValueHistory] = JFXSystem.await {
-    import epsa.Main.prefs
+    import epsa.Settings.prefs
     import Preference._
 
     val fundPath = Preference.from("fund.path", null:Path)
