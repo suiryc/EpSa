@@ -171,7 +171,6 @@ object DataStore {
 
   /** Builds temporary DB out of physical one. */
   protected def buildTempDB(): Future[DBTemp] = {
-    closeTempDB()
     dbOpen().flatMap { tmp =>
       val copy = dbRealOpt match {
         case Some(dbInfo) => copyDB(dbInfo.db, tmp.db)
@@ -245,22 +244,28 @@ object DataStore {
     dbTempOpt = None
   }
 
+  /** Closes real database. */
+  protected def closeRealDB(): Unit = {
+    dbRealOpt.foreach(_.db.close())
+    dbRealOpt = None
+  }
+
   /** Close data store. */
   def close(): Unit = {
     closeTempDB()
-    dbRealOpt.foreach(_.db.close())
-    dbRealOpt = None
+    closeRealDB()
   }
 
   /**
    * Changes db path.
    *
-   * If not equal to previous path, closes db and opens new path.
+   * If not equal to previous path, closes real db and opens new path.
+   * Caller is expected to have closed temporary database when necessary.
    */
   protected def changePath(newPath: Path): Future[Unit] =
     if (!dbRealOpt.map(_.path).exists(_.compareTo(newPath) == 0)) {
       try {
-        close()
+        closeRealDB()
         dbOpen(newPath).map(_ => ())
       } catch {
         case ex: Throwable => Future.failed(ex)
