@@ -4,13 +4,15 @@ import epsa.I18N
 import java.util.ResourceBundle
 import javafx.collections.FXCollections
 import javafx.fxml.{FXMLLoader, FXML}
-import javafx.scene.control.{ButtonType, ComboBox, Dialog}
+import javafx.scene.control.{Slider, ButtonType, ComboBox, Dialog}
 import suiryc.scala.javafx.stage.Stages
 import suiryc.scala.javafx.util.Callback
 import suiryc.scala.settings.{SettingSnapshot, SettingsSnapshot}
 import suiryc.scala.util.I18NLocale
 
 class OptionsController {
+
+  import OptionsController._
 
   @FXML
   protected var resources: ResourceBundle = _
@@ -21,9 +23,27 @@ class OptionsController {
   @FXML
   protected var currencyChoice: ComboBox[String] = _
 
+  @FXML
+  protected var amountScale: Slider = _
+
+  @FXML
+  protected var amountRounding: ComboBox[BigDecimal.RoundingMode.Value] = _
+
+  @FXML
+  protected var unitsScale: Slider = _
+
+  @FXML
+  protected var unitsRounding: ComboBox[BigDecimal.RoundingMode.Value] = _
+
   def initialize(snapshot: SettingsSnapshot): Unit = {
-    snapshot.add(SettingSnapshot(I18N.pref))
-    snapshot.add(SettingSnapshot(epsa.Settings.currency))
+    snapshot.add(
+      SettingSnapshot(I18N.pref),
+      SettingSnapshot(settings.currency),
+      SettingSnapshot(settings.amountScale),
+      SettingSnapshot(settings.amountRounding),
+      SettingSnapshot(settings.unitsScale),
+      SettingSnapshot(settings.unitsRounding)
+    )
 
     // Note: we need to tell the combobox how to display both the 'button' area
     // (what is shown as selected) and the content (list of choices).
@@ -37,14 +57,47 @@ class OptionsController {
       languageChoice.getSelectionModel.select(locale)
     }
 
-    val currency = epsa.Settings.currency()
-    val currencies = if (epsa.Settings.preferredCurrencies.contains(currency)) {
-      epsa.Settings.preferredCurrencies
+    val currency = settings.currency()
+    val currencies = if (settings.preferredCurrencies.contains(currency)) {
+      settings.preferredCurrencies
     } else {
-      currency :: epsa.Settings.preferredCurrencies
+      currency :: settings.preferredCurrencies
     }
     currencyChoice.setItems(FXCollections.observableList(currencies))
     currencyChoice.getSelectionModel.select(currency)
+
+    amountScale.setValue(settings.amountScale())
+    amountRounding.setItems(FXCollections.observableList(BigDecimal.RoundingMode.values.toList))
+    amountRounding.getSelectionModel.select(settings.amountRounding())
+
+    unitsScale.setValue(settings.unitsScale())
+    unitsRounding.setItems(FXCollections.observableList(BigDecimal.RoundingMode.values.toList))
+    unitsRounding.getSelectionModel.select(settings.unitsRounding())
+  }
+
+  protected def applyChanges(snapshot: SettingsSnapshot): (Boolean, Boolean) = {
+    Option(currencyChoice.getEditor.getText).filterNot(_.isEmpty).foreach { currency =>
+      settings.currency() = currency
+    }
+    val restart = Option(languageChoice.getValue) match {
+      case Some(locale) if locale.code != I18N.pref() =>
+        I18N.setLocale(locale.code)
+        true
+
+      case _ =>
+        false
+    }
+
+    settings.amountScale() = amountScale.getValue.round.toInt
+    settings.amountRounding() = amountRounding.getValue
+
+    settings.unitsScale() = unitsScale.getValue.round.toInt
+    settings.unitsRounding() = unitsRounding.getValue
+
+    // Caller needs to reload (view) if something changed
+    val reload = snapshot.changed()
+
+    (reload || restart, restart)
   }
 
 }
@@ -54,6 +107,8 @@ object OptionsController {
   // Note: the result of this dialog is whether the owner window needs to be
   // reloaded (language change)
 
+  private val settings = epsa.Settings
+
   def buildDialog(): Dialog[(Boolean, Boolean)] = {
     val resources = I18N.getResources
 
@@ -61,6 +116,8 @@ object OptionsController {
     dialog.setTitle(resources.getString("Options"))
     dialog.getDialogPane.getButtonTypes.addAll(ButtonType.OK, ButtonType.CANCEL)
 
+    // Note: snapshot is used to check whether something changed.
+    // The controller does not actually apply changes until asked to.
     val snapshot = new SettingsSnapshot()
 
     val loader = new FXMLLoader(getClass.getResource("/fxml/options.fxml"), resources)
@@ -74,31 +131,8 @@ object OptionsController {
     dialog
   }
 
-  def resultConverter(snapshot: SettingsSnapshot, controller: OptionsController)(buttonType: ButtonType): (Boolean, Boolean) = {
-    if (buttonType != ButtonType.OK) {
-      snapshot.reset()
-      (false, false)
-    }
-    else {
-      val reload = Option(controller.currencyChoice.getEditor.getText).filterNot(_.isEmpty) match {
-        case Some(currency) =>
-          epsa.Settings.currency() = currency
-          true
-
-        case None =>
-          false
-      }
-      val restart = Option(controller.languageChoice.getValue) match {
-        case Some(locale) if locale.code != I18N.pref() =>
-          I18N.setLocale(locale.code)
-          true
-
-        case _ =>
-          false
-      }
-
-      (reload || restart, restart)
-    }
-  }
+  def resultConverter(snapshot: SettingsSnapshot, controller: OptionsController)(buttonType: ButtonType): (Boolean, Boolean) =
+    if (buttonType != ButtonType.OK) (false, false)
+    else controller.applyChanges(snapshot)
 
 }

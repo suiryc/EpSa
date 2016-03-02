@@ -6,12 +6,13 @@ import epsa.util.Awaits
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.ResourceBundle
-import javafx.event.ActionEvent
+import javafx.event.{ActionEvent, Event}
 import javafx.collections.FXCollections
 import javafx.fxml.{FXML, FXMLLoader}
 import javafx.geometry.Insets
 import javafx.scene.Node
 import javafx.scene.control._
+import javafx.scene.layout.{GridPane, Region}
 import javafx.stage.{Modality, Stage}
 import javafx.util.converter.LocalDateStringConverter
 import scala.collection.JavaConversions._
@@ -24,13 +25,13 @@ import suiryc.scala.javafx.scene.control.DatePickers
 import suiryc.scala.javafx.stage.Stages
 import suiryc.scala.javafx.util.Callback
 
-// TODO - handle some event (action ?) on amount/units to update counterpart (and also destination data if any)
-// TODO - option of default day/month and number of years for frozen assets ?
+// TODO: button (refresh icon) ? to reset NAV to history value ?
+// TODO: breakRecursion prevent propagating computation to destination fund parts when source amount is changed
+// TODO: option of default day/month and number of years for frozen assets ?
 class NewAssetActionController {
 
-  import epsa.Settings.prefs
-
-  private val stageLocation = Preference.from("stage.new-asset-action.location", null:StageLocation)
+  import epsa.Settings.{scaleAmount, scaleUnits}
+  import NewAssetActionController._
 
   @FXML
   protected var resources: ResourceBundle = _
@@ -69,10 +70,16 @@ class NewAssetActionController {
   protected var srcAmountField: TextField = _
 
   @FXML
+  protected var srcAmountAutoButton: ToggleButton = _
+
+  @FXML
   protected var srcEmptyButton: Button = _
 
   @FXML
   protected var srcUnitsField: TextField = _
+
+  @FXML
+  protected var srcUnitsAutoButton: ToggleButton = _
 
   @FXML
   protected var dstFundField: ComboBox[Option[SchemeAndFund]] = _
@@ -90,7 +97,13 @@ class NewAssetActionController {
   protected var dstAmountField: TextField = _
 
   @FXML
+  protected var dstAmountAutoButton: ToggleButton = _
+
+  @FXML
   protected var dstUnitsField: TextField = _
+
+  @FXML
+  protected var dstUnitsAutoButton: ToggleButton = _
 
   protected var buttonOk: Node = _
 
@@ -98,15 +111,11 @@ class NewAssetActionController {
 
   private lazy val stage = paymentButton.getScene.getWindow.asInstanceOf[Stage]
 
+  private lazy val srcFundGridPane = srcEmptyButton.getParent.asInstanceOf[GridPane]
+
+  private lazy val columnConstraints = srcFundGridPane.getColumnConstraints.get(GridPane.getColumnIndex(srcEmptyButton))
+
   private lazy val toggleButtons = List(paymentButton, transferButton, refundButton)
-
-  private lazy val mandatoryMsg = resources.getString("Mandatory field")
-
-  private lazy val positiveValueMsg = resources.getString("Positive value expected")
-
-  private lazy val valueLimitMsg = resources.getString("Value exceeds available quantity")
-
-  private lazy val emptyOneMsg = resources.getString("warning.empty-amount-and-units")
 
   private var savings: Savings = _
 
@@ -177,7 +186,7 @@ class NewAssetActionController {
     for (field <- List(srcAvailabilityField, dstAvailabilityField)) {
       field.setDayCellFactory(Callback { _ =>
         new DateCell {
-          override def updateItem(item: LocalDate, empty: Boolean) {
+          override def updateItem(item: LocalDate, empty: Boolean): Unit = {
             super.updateItem(item, empty)
             Option(operationDateField.getValue).foreach { operationDate =>
               val unavailable = !empty && item.isBefore(operationDate)
@@ -189,12 +198,25 @@ class NewAssetActionController {
               else setStyle("-fx-background-color: #ffc0cb;")
             }
           }
-        }
+        }:DateCell
       })
     }
 
+    // Check edited NAV is a positive value
+    for (field <- List(srcNAVField, dstNAVField)) {
+      field.setOnKeyReleased { (event: Event) =>
+        val value = getBigDecimal(field.getText)
+        val msg =
+          if (value > 0) None
+          else Some(positiveValueMsg)
+        Form.toggleError(field, msg.nonEmpty, msg)
+      }
+    }
+
     // Setup funds buttons
-    for (field <- List(srcNAVButton, srcEmptyButton, dstNAVButton)) {
+    for (field <- List(srcNAVButton, srcAmountAutoButton, srcUnitsAutoButton, srcEmptyButton,
+      dstNAVButton, dstAmountAutoButton, dstUnitsAutoButton))
+    {
       // Disable by default; will be enabled when a fund is selected
       field.setDisable(true)
       // Reset padding of button; by default uses 8 on each horizontal side
@@ -222,11 +244,27 @@ class NewAssetActionController {
       onSrcEmpty()
     }
 
-    // Re-check form when source/destination amount/units is changed
-    for (field <- List(srcAmountField, srcUnitsField, dstAmountField, dstUnitsField)) {
-      field.textProperty.listen {
-        checkForm()
-        ()
+    // Setup src/dst amount/units field listeners
+    for ((field, cb) <- List(
+      (srcAmountField, onSrcAmount _),
+      (srcUnitsField, onSrcUnits _),
+      (dstAmountField, onDstAmount _),
+      (dstUnitsField, onDstUnits _)
+    )) {
+      field.textProperty.listen(cb())
+    }
+
+    // Setup amount/units auto buttons: select if necessary, and compute
+    // once selected.
+    for ((field, pref, cb) <- List(
+      (srcAmountAutoButton, srcAmountAuto, computeSrcAmount _),
+      (srcUnitsAutoButton, srcUnitsAuto, computeSrcUnits _),
+      (dstAmountAutoButton, dstAmountAuto, computeDstAmount _),
+      (dstUnitsAutoButton, dstUnitsAuto, computeDstUnits _)
+    )) {
+      field.setSelected(pref())
+      field.selectedProperty.listen { selected =>
+        if (selected) cb()
       }
     }
 
@@ -281,9 +319,9 @@ class NewAssetActionController {
     dstFundField.setDisable(disableDst)
     dstAvailabilityField.setDisable(disableDst)
     dstNAVField.setDisable(disableDst)
-    dstNAVButton.setDisable(disableDst)
     dstAmountField.setDisable(disableDst)
     dstUnitsField.setDisable(disableDst)
+    if (isDstEnabled) dstAmountField.setText(srcAmountField.getText)
 
     val srcAvailabilityExact = actionKind != AssetActionKind.Payment
     srcAvailabilityField.setVisible(!srcAvailabilityExact)
@@ -320,6 +358,18 @@ class NewAssetActionController {
     checkForm()
   }
 
+  def onSrcAmount(): Unit = breakRecursion {
+    val value = getSrcAmount
+    if ((value > 0) && isDstEnabled) dstAmountField.setText(value.toString)
+    computeSrcUnits()
+    checkForm()
+  }
+
+  def onSrcUnits(): Unit = breakRecursion {
+    computeSrcAmount()
+    checkForm()
+  }
+
   def onSrcEmpty(): Unit = {
     for {
       operationDate <- Option(operationDateField.getValue)
@@ -344,6 +394,16 @@ class NewAssetActionController {
     checkForm()
   }
 
+  def onDstAmount(): Unit = breakRecursion {
+    computeDstUnits()
+    checkForm()
+  }
+
+  def onDstUnits(): Unit = breakRecursion {
+    computeDstAmount()
+    checkForm()
+  }
+
   def onNAVHistory(fund: Savings.Fund): Unit = {
     val dialog = NetAssetValueHistoryController.buildStage(mainController, savings, Some(fund.id), stage)
     dialog.initModality(Modality.WINDOW_MODAL)
@@ -351,6 +411,32 @@ class NewAssetActionController {
     dialog.setResizable(true)
     if (dialog.showAndWait().orElse(false)) updateNAV()
   }
+
+  private def computeUnits(amount: BigDecimal, nav: BigDecimal, unitsField: TextField, auto: Boolean): Unit = {
+    if ((amount > 0) && (nav > 0) && auto) {
+      val units = scaleUnits(amount / nav)
+      unitsField.setText(units.toString)
+    }
+  }
+
+  private def computeAmount(units: BigDecimal, nav: BigDecimal, amountField: TextField, auto: Boolean): Unit = {
+    if ((units > 0) && (nav > 0) && auto) {
+      val amount = scaleAmount(units * nav)
+      amountField.setText(amount.toString)
+    }
+  }
+
+  private def computeSrcUnits(): Unit =
+    computeUnits(getSrcAmount, getSrcNAV, srcUnitsField, srcUnitsAutoButton.isSelected)
+
+  private def computeSrcAmount(): Unit =
+    computeAmount(getSrcUnits, getSrcNAV, srcAmountField, srcAmountAutoButton.isSelected)
+
+  private def computeDstUnits(): Unit =
+    computeUnits(getDstAmount, getDstNAV, dstUnitsField, dstUnitsAutoButton.isSelected)
+
+  private def computeDstAmount(): Unit =
+    computeAmount(getDstUnits, getDstNAV, dstAmountField, dstAmountAutoButton.isSelected)
 
   private def buildSchemeAndFunds(entries: List[SchemeAndFund]*): List[Option[SchemeAndFund]] =
     entries.foldLeft(List[Option[SchemeAndFund]]()) { (acc, schemeAndFunds) =>
@@ -612,13 +698,22 @@ class NewAssetActionController {
     } else None
 
     srcNAVButton.setDisable(!srcSelected)
+    srcAmountAutoButton.setDisable(!srcSelected)
+    srcUnitsAutoButton.setDisable(!srcSelected)
     if (isPayment) {
       srcEmptyButton.setVisible(false)
+      // Set column preferred width to zero, which visually renders as if there
+      // was not such column.
+      columnConstraints.setPrefWidth(0.0)
     } else {
+      // Reset column preferred width before displaying its content.
+      columnConstraints.setPrefWidth(Region.USE_COMPUTED_SIZE)
       srcEmptyButton.setVisible(true)
       srcEmptyButton.setDisable(!opDateSelected || !srcSelected || !srcAvailabilitySelected)
     }
     dstNAVButton.setDisable(!dstNeeded || !dstSelected)
+    dstAmountAutoButton.setDisable(!dstNeeded || !dstSelected)
+    dstUnitsAutoButton.setDisable(!dstNeeded || !dstSelected)
     buttonOk.setDisable(event.isEmpty)
 
     event
@@ -652,6 +747,9 @@ class NewAssetActionController {
     case ex: Throwable => BigDecimal(0)
   }
 
+  private def getSrcNAV: BigDecimal =
+    getBigDecimal(srcNAVField.getText)
+
   private def getSrcAmount: BigDecimal =
     getBigDecimal(srcAmountField.getText)
 
@@ -660,6 +758,9 @@ class NewAssetActionController {
 
   private def getDstFund: Option[SchemeAndFund] =
     Option(dstFundField.getValue).flatten
+
+  private def getDstNAV: BigDecimal =
+    getBigDecimal(dstNAVField.getText)
 
   private def getDstAmount: BigDecimal =
     getBigDecimal(dstAmountField.getText)
@@ -681,6 +782,29 @@ class NewAssetActionController {
 }
 
 object NewAssetActionController {
+
+  import epsa.Settings.prefs
+  import Preference._
+
+  private val prefsKeyPrefix = "stage.new-asset-action"
+
+  private val stageLocation = Preference.from(s"$prefsKeyPrefix.location", null:StageLocation)
+
+  private val srcAmountAuto = Preference.from(s"$prefsKeyPrefix.src-amount-auto", true)
+
+  private val srcUnitsAuto = Preference.from(s"$prefsKeyPrefix.src-units-auto", true)
+
+  private val dstAmountAuto = Preference.from(s"$prefsKeyPrefix.dst-amount-auto", true)
+
+  private val dstUnitsAuto = Preference.from(s"$prefsKeyPrefix.dst-units-auto", true)
+
+  private lazy val mandatoryMsg = I18N.getResources.getString("Mandatory field")
+
+  private lazy val positiveValueMsg = I18N.getResources.getString("Positive value expected")
+
+  private lazy val valueLimitMsg = I18N.getResources.getString("Value exceeds available quantity")
+
+  private lazy val emptyOneMsg = I18N.getResources.getString("warning.empty-amount-and-units")
 
   /** Builds a dialog out of this controller. */
   def buildDialog(mainController: MainController, savings: Savings, kind: AssetActionKind.Value, asset: Option[Savings.Asset]): Dialog[Option[Savings.Event]] = {
@@ -713,7 +837,13 @@ object NewAssetActionController {
 
   private def resultConverter(controller: NewAssetActionController)(buttonType: ButtonType): Option[Savings.Event] = {
     if (buttonType != ButtonType.OK) None
-    else controller.checkForm()
+    else {
+      srcAmountAuto() = controller.srcAmountAutoButton.isSelected
+      srcUnitsAuto() = controller.srcUnitsAutoButton.isSelected
+      dstAmountAuto() = controller.dstAmountAutoButton.isSelected
+      dstUnitsAuto() = controller.dstUnitsAutoButton.isSelected
+      controller.checkForm()
+    }
   }
 
 }

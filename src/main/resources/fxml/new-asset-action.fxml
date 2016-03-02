@@ -7,6 +7,7 @@
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.RadioButton?>
 <?import javafx.scene.control.TextField?>
+<?import javafx.scene.control.ToggleButton?>
 <?import javafx.scene.control.ToggleGroup?>
 <?import javafx.scene.image.Image?>
 <?import javafx.scene.image.ImageView?>
@@ -91,6 +92,7 @@
                <columnConstraints>
                   <ColumnConstraints hgrow="NEVER" maxWidth="1.7976931348623157E308" />
                   <ColumnConstraints hgrow="NEVER" maxWidth="1.7976931348623157E308" />
+                  <ColumnConstraints hgrow="NEVER" maxWidth="1.7976931348623157E308" />
                </columnConstraints>
                <rowConstraints>
                   <RowConstraints minHeight="-Infinity" vgrow="SOMETIMES" />
@@ -98,8 +100,8 @@
                   <RowConstraints minHeight="-Infinity" vgrow="SOMETIMES" />
                </rowConstraints>
                <children>
-                  <TextField fx:id="srcNAVField" editable="false" maxWidth="150.0" minWidth="60.0" />
-                  <Button fx:id="srcNAVButton" mnemonicParsing="false" GridPane.columnIndex="1">
+                  <TextField fx:id="srcNAVField" maxWidth="150.0" minWidth="60.0" />
+                  <Button fx:id="srcNAVButton" mnemonicParsing="false" GridPane.columnIndex="1" GridPane.columnSpan="2">
                      <graphic>
                         <ImageView pickOnBounds="true" preserveRatio="true">
                            <image>
@@ -107,9 +109,21 @@
                            </image>
                         </ImageView>
                      </graphic>
+                     <GridPane.margin>
+                        <Insets right="5.0" />
+                     </GridPane.margin>
                   </Button>
                   <TextField fx:id="srcAmountField" maxWidth="150.0" minWidth="60.0" GridPane.rowIndex="1" />
-                  <Button fx:id="srcEmptyButton" mnemonicParsing="false" GridPane.columnIndex="1" GridPane.rowIndex="1" GridPane.rowSpan="2">
+                  <ToggleButton fx:id="srcAmountAutoButton" mnemonicParsing="false" selected="true" GridPane.columnIndex="1" GridPane.rowIndex="1">
+                     <graphic>
+                        <ImageView pickOnBounds="true" preserveRatio="true">
+                           <image>
+                              <Image url="@../images/fugue-icons/calculator.png" />
+                           </image>
+                        </ImageView>
+                     </graphic>
+                  </ToggleButton>
+                  <Button fx:id="srcEmptyButton" mnemonicParsing="false" GridPane.columnIndex="2" GridPane.rowIndex="1" GridPane.rowSpan="2">
                      <graphic>
                         <ImageView pickOnBounds="true" preserveRatio="true">
                            <image>
@@ -117,11 +131,23 @@
                            </image>
                         </ImageView>
                      </graphic>
+                     <GridPane.margin>
+                        <Insets right="5.0" />
+                     </GridPane.margin>
                   </Button>
                   <TextField fx:id="srcUnitsField" maxWidth="150.0" minWidth="60.0" GridPane.rowIndex="2" />
+                  <ToggleButton fx:id="srcUnitsAutoButton" mnemonicParsing="false" selected="true" GridPane.columnIndex="1" GridPane.rowIndex="2">
+                     <graphic>
+                        <ImageView pickOnBounds="true" preserveRatio="true">
+                           <image>
+                              <Image url="@../images/fugue-icons/calculator.png" />
+                           </image>
+                        </ImageView>
+                     </graphic>
+                  </ToggleButton>
                </children>
                <GridPane.margin>
-                  <Insets left="5.0" right="5.0" />
+                  <Insets left="5.0" />
                </GridPane.margin>
             </GridPane>
             <Label text="%Destination" GridPane.columnIndex="2" GridPane.halignment="CENTER" GridPane.valignment="CENTER">
@@ -142,7 +168,7 @@
                   <RowConstraints minHeight="-Infinity" vgrow="SOMETIMES" />
                </rowConstraints>
                <children>
-                  <TextField fx:id="dstNAVField" editable="false" maxWidth="150.0" minWidth="60.0" />
+                  <TextField fx:id="dstNAVField" maxWidth="150.0" minWidth="60.0" />
                   <Button fx:id="dstNAVButton" mnemonicParsing="false" GridPane.columnIndex="1">
                      <graphic>
                         <ImageView pickOnBounds="true" preserveRatio="true">
@@ -154,6 +180,24 @@
                   </Button>
                   <TextField fx:id="dstAmountField" maxWidth="150.0" minWidth="60.0" GridPane.rowIndex="1" />
                   <TextField fx:id="dstUnitsField" maxWidth="150.0" minWidth="60.0" GridPane.rowIndex="2" />
+                  <ToggleButton fx:id="dstAmountAutoButton" mnemonicParsing="false" selected="true" GridPane.columnIndex="1" GridPane.rowIndex="1">
+                     <graphic>
+                        <ImageView pickOnBounds="true" preserveRatio="true">
+                           <image>
+                              <Image url="@../images/fugue-icons/calculator.png" />
+                           </image>
+                        </ImageView>
+                     </graphic>
+                  </ToggleButton>
+                  <ToggleButton fx:id="dstUnitsAutoButton" mnemonicParsing="false" selected="true" GridPane.columnIndex="1" GridPane.rowIndex="2">
+                     <graphic>
+                        <ImageView pickOnBounds="true" preserveRatio="true">
+                           <image>
+                              <Image url="@../images/fugue-icons/calculator.png" />
+                           </image>
+                        </ImageView>
+                     </graphic>
+                  </ToggleButton>
                </children>
             </GridPane>
          </children>
