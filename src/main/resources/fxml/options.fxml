@@ -8,7 +8,7 @@
 <?import javafx.scene.layout.GridPane?>
 <?import javafx.scene.layout.RowConstraints?>
 
-<GridPane maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="-Infinity" minWidth="-Infinity" xmlns="http://javafx.com/javafx/8.0.65" xmlns:fx="http://javafx.com/fxml/1" fx:controller="epsa.controllers.OptionsController">
+<GridPane hgap="10.0" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="-Infinity" minWidth="-Infinity" vgap="10.0" xmlns="http://javafx.com/javafx/8.0.65" xmlns:fx="http://javafx.com/fxml/1" fx:controller="epsa.controllers.OptionsController">
   <columnConstraints>
     <ColumnConstraints hgrow="NEVER" minWidth="-Infinity" />
     <ColumnConstraints hgrow="NEVER" maxWidth="1.7976931348623157E308" minWidth="-Infinity" />
@@ -20,68 +20,29 @@
       <RowConstraints minHeight="-Infinity" vgrow="NEVER" />
   </rowConstraints>
    <children>
-      <Label text="%Language">
-         <GridPane.margin>
-            <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
-         </GridPane.margin>
-      </Label>
-      <ComboBox fx:id="languageChoice" prefWidth="120.0" GridPane.columnIndex="1">
-         <GridPane.margin>
-            <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
-         </GridPane.margin>
-      </ComboBox>
-      <Label text="%Currency" GridPane.rowIndex="1">
-         <GridPane.margin>
-            <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
-         </GridPane.margin>
-      </Label>
-      <ComboBox fx:id="currencyChoice" editable="true" prefWidth="120.0" GridPane.columnIndex="1" GridPane.rowIndex="1">
-         <GridPane.margin>
-            <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
-         </GridPane.margin>
-      </ComboBox>
-      <Label text="%Amount" GridPane.rowIndex="2">
-         <GridPane.margin>
-            <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
-         </GridPane.margin>
-      </Label>
+      <Label text="%Language" />
+      <ComboBox fx:id="languageChoice" prefWidth="120.0" GridPane.columnIndex="1" />
+      <Label text="%Currency" GridPane.rowIndex="1" />
+      <ComboBox fx:id="currencyChoice" editable="true" prefWidth="120.0" GridPane.columnIndex="1" GridPane.rowIndex="1" />
+      <Label text="%Amount" GridPane.rowIndex="2" />
       <GridPane hgap="10.0" GridPane.columnIndex="1" GridPane.rowIndex="2">
         <columnConstraints>
           <ColumnConstraints halignment="CENTER" hgrow="SOMETIMES" minWidth="-Infinity" />
           <ColumnConstraints halignment="CENTER" hgrow="SOMETIMES" minWidth="-Infinity" />
         </columnConstraints>
         <rowConstraints>
-          <RowConstraints minHeight="10.0" prefHeight="30.0" vgrow="SOMETIMES" />
+          <RowConstraints minHeight="-Infinity" vgrow="SOMETIMES" />
           <RowConstraints minHeight="-Infinity" valignment="TOP" vgrow="SOMETIMES" />
         </rowConstraints>
          <children>
-            <Label text="%Scale">
-               <GridPane.margin>
-                  <Insets left="10.0" right="10.0" />
-               </GridPane.margin>
-            </Label>
-            <Label text="%Rounding" GridPane.columnIndex="1">
-               <GridPane.margin>
-                  <Insets left="10.0" right="10.0" />
-               </GridPane.margin>
-            </Label>
-            <Slider fx:id="amountScale" blockIncrement="1.0" majorTickUnit="2.0" max="4.0" minorTickCount="1" showTickLabels="true" showTickMarks="true" snapToTicks="true" value="2.0" GridPane.rowIndex="1">
-               <GridPane.margin>
-                  <Insets top="6.0" />
-               </GridPane.margin>
-            </Slider>
-            <ComboBox fx:id="amountRounding" GridPane.columnIndex="1" GridPane.rowIndex="1">
-               <GridPane.margin>
-                  <Insets />
-               </GridPane.margin>
-            </ComboBox>
+            <Label text="%Scale" />
+            <Label text="%Rounding" GridPane.columnIndex="1" />
+            <Slider fx:id="amountScale" blockIncrement="1.0" majorTickUnit="1.0" max="4.0" minorTickCount="0" prefWidth="120.0" showTickLabels="true" showTickMarks="true" snapToTicks="true" value="2.0" GridPane.rowIndex="1" />
+            <ComboBox fx:id="amountRounding" GridPane.columnIndex="1" GridPane.rowIndex="1" />
          </children>
          <opaqueInsets>
             <Insets />
          </opaqueInsets>
-         <GridPane.margin>
-            <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
-         </GridPane.margin>
       </GridPane>
       <GridPane hgap="10.0" GridPane.columnIndex="1" GridPane.rowIndex="3">
          <columnConstraints>
@@ -89,39 +50,23 @@
             <ColumnConstraints halignment="CENTER" hgrow="SOMETIMES" minWidth="-Infinity" />
          </columnConstraints>
          <rowConstraints>
-            <RowConstraints minHeight="10.0" prefHeight="30.0" vgrow="SOMETIMES" />
+            <RowConstraints minHeight="-Infinity" vgrow="SOMETIMES" />
             <RowConstraints minHeight="-Infinity" valignment="TOP" vgrow="SOMETIMES" />
          </rowConstraints>
          <children>
-            <Label text="%Scale">
-               <GridPane.margin>
-                  <Insets left="10.0" right="10.0" />
-               </GridPane.margin>
-            </Label>
-            <Label text="%Rounding" GridPane.columnIndex="1">
-               <GridPane.margin>
-                  <Insets left="10.0" right="10.0" />
-               </GridPane.margin>
-            </Label>
-            <Slider fx:id="unitsScale" blockIncrement="1.0" majorTickUnit="2.0" max="4.0" minorTickCount="1" showTickLabels="true" showTickMarks="true" snapToTicks="true" value="2.0" GridPane.rowIndex="1">
-               <GridPane.margin>
-                  <Insets top="6.0" />
-               </GridPane.margin>
-            </Slider>
+            <Label text="%Scale" />
+            <Label text="%Rounding" GridPane.columnIndex="1" />
+            <Slider fx:id="unitsScale" blockIncrement="1.0" majorTickUnit="1.0" max="4.0" minorTickCount="0" prefWidth="120.0" showTickLabels="true" showTickMarks="true" snapToTicks="true" value="2.0" GridPane.rowIndex="1" />
             <ComboBox fx:id="unitsRounding" GridPane.columnIndex="1" GridPane.rowIndex="1">
                <GridPane.margin>
                   <Insets />
                </GridPane.margin>
             </ComboBox>
          </children>
-         <GridPane.margin>
-            <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
-         </GridPane.margin>
       </GridPane>
-      <Label text="%Units" GridPane.rowIndex="3">
-         <GridPane.margin>
-            <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
-         </GridPane.margin>
-      </Label>
+      <Label text="%Units" GridPane.rowIndex="3" />
    </children>
+   <padding>
+      <Insets bottom="15.0" left="15.0" right="15.0" top="15.0" />
+   </padding>
 </GridPane>
