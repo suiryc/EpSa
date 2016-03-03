@@ -6,7 +6,7 @@ import epsa.util.Awaits
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.ResourceBundle
-import javafx.event.{ActionEvent, Event}
+import javafx.event.ActionEvent
 import javafx.collections.FXCollections
 import javafx.fxml.{FXML, FXMLLoader}
 import javafx.geometry.Insets
