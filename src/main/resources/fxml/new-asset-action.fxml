@@ -17,6 +17,7 @@
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.RowConstraints?>
 <?import javafx.scene.layout.VBox?>
+<?import suiryc.scala.javafx.scene.control.TextFieldWithButton?>
 
 <VBox maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" xmlns="http://javafx.com/javafx/8.0.65" xmlns:fx="http://javafx.com/fxml/1" fx:controller="epsa.controllers.NewAssetActionController">
    <children>
@@ -100,7 +101,7 @@
                   <RowConstraints minHeight="-Infinity" vgrow="SOMETIMES" />
                </rowConstraints>
                <children>
-                  <TextField fx:id="srcNAVField" maxWidth="150.0" minWidth="60.0" />
+                  <TextFieldWithButton fx:id="srcNAVField" buttonDisable="true" customStyleClass="text-field-with-refresh-button" maxWidth="150.0" minWidth="100.0" />
                   <Button fx:id="srcNAVButton" mnemonicParsing="false" GridPane.columnIndex="1" GridPane.columnSpan="2">
                      <graphic>
                         <ImageView pickOnBounds="true" preserveRatio="true">
@@ -168,7 +169,7 @@
                   <RowConstraints minHeight="-Infinity" vgrow="SOMETIMES" />
                </rowConstraints>
                <children>
-                  <TextField fx:id="dstNAVField" maxWidth="150.0" minWidth="60.0" />
+                  <TextFieldWithButton fx:id="dstNAVField" buttonDisable="true" customStyleClass="text-field-with-refresh-button" maxWidth="150.0" minWidth="100.0" />
                   <Button fx:id="dstNAVButton" mnemonicParsing="false" GridPane.columnIndex="1">
                      <graphic>
                         <ImageView pickOnBounds="true" preserveRatio="true">

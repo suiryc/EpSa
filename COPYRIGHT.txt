@@ -3,3 +3,9 @@
 (C) 2013 Yusuke Kamiyamane. All rights reserved.
 <http://p.yusukekamiyamane.com/>
 <http://creativecommons.org/licenses/by/3.0/>
+
+
+"Refresh" SVG icon by simpleicon
+<http://simpleicon.com/>
+<http://simpleicon.com/refresh.html>
+<http://simpleicon.com/license-agreement/>

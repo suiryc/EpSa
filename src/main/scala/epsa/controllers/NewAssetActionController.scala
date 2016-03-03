@@ -21,11 +21,10 @@ import suiryc.scala.math.Ordering._
 import suiryc.scala.settings.Preference
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.event.EventHandler._
-import suiryc.scala.javafx.scene.control.DatePickers
+import suiryc.scala.javafx.scene.control.{DatePickers, TextFieldWithButton}
 import suiryc.scala.javafx.stage.Stages
 import suiryc.scala.javafx.util.Callback
 
-// TODO: button (refresh icon) ? to reset NAV to history value ?
 // TODO: breakRecursion prevent propagating computation to destination fund parts when source amount is changed
 // TODO: option of default day/month and number of years for frozen assets ?
 class NewAssetActionController {
@@ -61,7 +60,7 @@ class NewAssetActionController {
   protected var srcAvailabilityField2: ComboBox[Option[LocalDate]] = _
 
   @FXML
-  protected var srcNAVField: TextField = _
+  protected var srcNAVField: TextFieldWithButton = _
 
   @FXML
   protected var srcNAVButton: Button = _
@@ -88,7 +87,7 @@ class NewAssetActionController {
   protected var dstAvailabilityField: DatePicker = _
 
   @FXML
-  protected var dstNAVField: TextField = _
+  protected var dstNAVField: TextFieldWithButton = _
 
   @FXML
   protected var dstNAVButton: Button = _
@@ -202,12 +201,12 @@ class NewAssetActionController {
       })
     }
 
-    // Check edited NAV is a positive value
+    // Check NAV is a positive value
     for (field <- List(srcNAVField, dstNAVField)) {
-      field.setOnKeyReleased { (event: Event) =>
-        val value = getBigDecimal(field.getText)
+      field.textField.textProperty.listen { text =>
+        val value = getBigDecimal(text)
         val msg =
-          if (value > 0) None
+          if ((value > 0) || text.isEmpty) None
           else Some(positiveValueMsg)
         Form.toggleError(field, msg.nonEmpty, msg)
       }
@@ -552,16 +551,25 @@ class NewAssetActionController {
     Option(operationDateField.getValue).foreach { operationDate =>
       val labelDate = resources.getString("Date")
 
-      def updateField(field: TextField, fund: Savings.Fund): Unit = {
+      def updateField(field: TextFieldWithButton, fund: Savings.Fund): Unit = {
         val navOpt = Awaits.readDataStoreNAV(Some(stage), fund.id, operationDate).getOrElse(None)
         navOpt match {
           case Some(nav) =>
-            field.setText(nav.value.toString)
+            val text = nav.value.toString
+            field.setText(text)
             field.setTooltip(new Tooltip(s"$labelDate: ${nav.date}"))
+            field.setOnButtonAction { (event: ActionEvent) =>
+              field.setText(text)
+            }
+            // Bind so that changing value allows to reset it
+            field.buttonDisableProperty.bind(field.textField.textProperty.isEqualTo(text))
 
           case None =>
             field.setText(null)
             field.setTooltip(null)
+            field.buttonDisableProperty.unbind()
+            field.setOnButtonAction(null)
+            field.setButtonDisable(true)
         }
       }
 
