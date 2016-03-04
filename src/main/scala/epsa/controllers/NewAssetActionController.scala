@@ -25,7 +25,6 @@ import suiryc.scala.javafx.scene.control.{DatePickers, TextFieldWithButton}
 import suiryc.scala.javafx.stage.Stages
 import suiryc.scala.javafx.util.Callback
 
-// TODO: breakRecursion prevent propagating computation to destination fund parts when source amount is changed
 // TODO: option of default day/month and number of years for frozen assets ?
 class NewAssetActionController {
 
@@ -120,7 +119,7 @@ class NewAssetActionController {
 
   private var actionKind: AssetActionKind.Value = _
 
-  private var recursionLevel = 0
+  private var recursion: Set[String] = Set.empty
 
   private var dstAvailabilityChosen = false
 
@@ -203,7 +202,8 @@ class NewAssetActionController {
 
     // Check NAV is a positive value
     for (field <- List(srcNAVField, dstNAVField)) {
-      field.textField.textProperty.listen { text =>
+      field.textField.textProperty.listen { v =>
+        val text = Option(v).getOrElse("")
         val value = getBigDecimal(text)
         val msg =
           if ((value > 0) || text.isEmpty) None
@@ -255,15 +255,19 @@ class NewAssetActionController {
 
     // Setup amount/units auto buttons: select if necessary, and compute
     // once selected.
-    for ((field, pref, cb) <- List(
-      (srcAmountAutoButton, srcAmountAuto, computeSrcAmount _),
-      (srcUnitsAutoButton, srcUnitsAuto, computeSrcUnits _),
-      (dstAmountAutoButton, dstAmountAuto, computeDstAmount _),
-      (dstUnitsAutoButton, dstUnitsAuto, computeDstUnits _)
+    // Note: behave as if counterpart value was modified ('initRecursion'), so
+    // that recursion can be broken as expected.
+    for ((field, pref, recursionKey, cb) <- List(
+      (srcAmountAutoButton, srcAmountAuto, "srcUnits",  computeSrcAmount _),
+      (srcUnitsAutoButton,  srcUnitsAuto,  "srcAmount", computeSrcUnits _),
+      (dstAmountAutoButton, dstAmountAuto, "dstUnits",  computeDstAmount _),
+      (dstUnitsAutoButton,  dstUnitsAuto,  "dstAmount", computeDstUnits _)
     )) {
       field.setSelected(pref())
       field.selectedProperty.listen { selected =>
-        if (selected) cb()
+        if (selected) initRecursion(recursionKey) {
+          cb()
+        }
       }
     }
 
@@ -311,7 +315,7 @@ class NewAssetActionController {
     persistView()
   }
 
-  def onToggleKind(): Unit = breakRecursion {
+  def onToggleKind(): Unit = {
     actionKind = getToggleKind(actionKindGroup.getSelectedToggle)
 
     val disableDst = !isDstEnabled
@@ -321,25 +325,32 @@ class NewAssetActionController {
     dstAmountField.setDisable(disableDst)
     dstUnitsField.setDisable(disableDst)
     if (isDstEnabled) dstAmountField.setText(srcAmountField.getText)
+    // Reset user choice of destination availability when changing to action
+    // other than transfer.
+    if (disableDst) dstAvailabilityChosen = false
 
     val srcAvailabilityExact = actionKind != AssetActionKind.Payment
     srcAvailabilityField.setVisible(!srcAvailabilityExact)
     srcAvailabilityField2.setVisible(srcAvailabilityExact)
 
-    updateSchemeAndFund()
-    if (srcAvailabilityExact) updateSrcAvailability()
-    // Simulate changing source availability (to possibly change destination one)
-    if (!disableDst) onSrcAvailability()
+    // Updating comboboxes usually cleans and re-sets selected value. We want to
+    // disabling handlers while we do that, then call them manually.
+    initRecursion("*") {
+      updateSchemeAndFund()
+    }
+    onSrcFund()
+    if (!disableDst) onDstFund()
     checkForm()
   }
 
-  def onOperationDate(): Unit = breakRecursion {
+  def onOperationDate(): Unit = {
     updateSrcAvailability()
     updateNAV()
     checkForm()
   }
 
-  def onSrcFund(): Unit = breakRecursion {
+  // Breaks recursion triggered from changing action kind.
+  def onSrcFund(): Unit = breakRecursion("srcFund") {
     val srcAvailabilityExact = actionKind != AssetActionKind.Payment
 
     if (srcAvailabilityExact) updateSrcAvailability()
@@ -348,7 +359,11 @@ class NewAssetActionController {
     checkForm()
   }
 
-  def onSrcAvailability(): Unit = breakRecursion {
+  // Note: use 'breakRecursion' together with 'onDstAvailability' so that we
+  // can differentiate whether value was auto-set from source or whether user
+  // did select a value (in which cas we don't auto-set it anymore).
+  // Also breaks recursion triggered from changing action kind.
+  def onSrcAvailability(): Unit = breakRecursion("availability") {
     if (!dstAvailabilityChosen && isDstEnabled) {
       // Note: don't forget to use actual availability based on operation date
       val availability = Savings.resolveAvailablity(getSrcAvailability, Option(operationDateField.getValue))
@@ -357,19 +372,19 @@ class NewAssetActionController {
     checkForm()
   }
 
-  def onSrcAmount(): Unit = breakRecursion {
+  def onSrcAmount(): Unit = initRecursion("srcAmount") {
     val value = getSrcAmount
     if ((value > 0) && isDstEnabled) dstAmountField.setText(value.toString)
     computeSrcUnits()
     checkForm()
   }
 
-  def onSrcUnits(): Unit = breakRecursion {
+  def onSrcUnits(): Unit = initRecursion("srcUnits") {
     computeSrcAmount()
     checkForm()
   }
 
-  def onSrcEmpty(): Unit = {
+  def onSrcEmpty(): Unit = initRecursion("*") {
     for {
       operationDate <- Option(operationDateField.getValue)
       schemeAndFund <- getSrcFund
@@ -383,22 +398,22 @@ class NewAssetActionController {
     }
   }
 
-  def onDstFund(): Unit = breakRecursion {
+  def onDstFund(): Unit = breakRecursion("dstFund") {
     updateNAV()
     checkForm()
   }
 
-  def onDstAvailability(): Unit = breakRecursion {
+  def onDstAvailability(): Unit = breakRecursion("availability") {
     dstAvailabilityChosen = Option(dstAvailabilityField.getValue).isDefined
     checkForm()
   }
 
-  def onDstAmount(): Unit = breakRecursion {
+  def onDstAmount(): Unit = initRecursion("dstAmount") {
     computeDstUnits()
     checkForm()
   }
 
-  def onDstUnits(): Unit = breakRecursion {
+  def onDstUnits(): Unit = initRecursion("dstUnits") {
     computeDstAmount()
     checkForm()
   }
@@ -425,17 +440,21 @@ class NewAssetActionController {
     }
   }
 
-  private def computeSrcUnits(): Unit =
+  private def computeSrcUnits(): Unit = breakRecursion("srcUnits") {
     computeUnits(getSrcAmount, getSrcNAV, srcUnitsField, srcUnitsAutoButton.isSelected)
+  }
 
-  private def computeSrcAmount(): Unit =
+  private def computeSrcAmount(): Unit = breakRecursion("srcAmount") {
     computeAmount(getSrcUnits, getSrcNAV, srcAmountField, srcAmountAutoButton.isSelected)
+  }
 
-  private def computeDstUnits(): Unit =
+  private def computeDstUnits(): Unit = breakRecursion("dstUnits") {
     computeUnits(getDstAmount, getDstNAV, dstUnitsField, dstUnitsAutoButton.isSelected)
+  }
 
-  private def computeDstAmount(): Unit =
+  private def computeDstAmount(): Unit = breakRecursion("dstAmount") {
     computeAmount(getDstUnits, getDstNAV, dstAmountField, dstAmountAutoButton.isSelected)
+  }
 
   private def buildSchemeAndFunds(entries: List[SchemeAndFund]*): List[Option[SchemeAndFund]] =
     entries.foldLeft(List[Option[SchemeAndFund]]()) { (acc, schemeAndFunds) =>
@@ -547,7 +566,6 @@ class NewAssetActionController {
   }
 
   private def updateNAV(): Unit = {
-    // TODO - recompute amount based on units and operation date ?
     Option(operationDateField.getValue).foreach { operationDate =>
       val labelDate = resources.getString("Date")
 
@@ -776,14 +794,37 @@ class NewAssetActionController {
   private def getDstUnits: BigDecimal =
     getBigDecimal(dstUnitsField.getText)
 
-  private def breakRecursion[A](f: => A): Unit =
-    if (recursionLevel == 0) {
-      recursionLevel += 1
+  /**
+   * Recursion init point.
+   *
+   * Handlers do init 'recursion' by indicating which value was modified, so
+   * that it won't be modified by recursion.
+   * Given key is registered while code is executed.
+   * Special key '*' matches all values.
+   */
+  private def initRecursion[A](key: String)(f: => A): Unit = {
+    recursion += key
+    try {
+      f
+    } finally {
+      recursion -= key
+    }
+  }
+
+  /**
+   * Recursion breaker.
+   *
+   * Code breaks recursion by indicating which value it is about to modify.
+   * If it is already registered, code is not executed.
+   * Otherwise given key is registered while code is executed.
+   */
+  private def breakRecursion[A](key: String)(f: => A): Unit =
+    if (!recursion.contains(key) && !recursion.contains("*")) {
+      recursion += key
       try {
         f
-      }
-      finally {
-        recursionLevel -= 1
+      } finally {
+        recursion -= key
       }
     }
 
