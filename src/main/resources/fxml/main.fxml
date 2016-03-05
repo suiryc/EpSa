@@ -137,11 +137,6 @@
                         </ImageView>
                      </graphic></MenuItem>
                   <SeparatorMenuItem mnemonicParsing="false" />
-                  <MenuItem mnemonicParsing="false" onAction="#onTest" text="Test 1" />
-                  <MenuItem mnemonicParsing="false" onAction="#onTest" text="Test 2" />
-                  <MenuItem mnemonicParsing="false" onAction="#onTest" text="Test 3" />
-                  <MenuItem mnemonicParsing="false" onAction="#onFundGraph" text="%Fund graph" />
-                  <SeparatorMenuItem mnemonicParsing="false" />
                   <MenuItem mnemonicParsing="false" onAction="#onOptions" text="%Options">
                      <graphic>
                         <ImageView pickOnBounds="true" preserveRatio="true">
@@ -165,6 +160,16 @@
                   <SeparatorMenuItem mnemonicParsing="false" />
                   <CheckMenuItem mnemonicParsing="false" onAction="#onUpToDateAssets" selected="true" text="%Up to date assets" />
               </items>
+            </Menu>
+            <Menu mnemonicParsing="false" text="%Tools">
+               <items>
+                  <MenuItem mnemonicParsing="false" onAction="#onCleanupDataStore" text="%Cleanup data store" />
+                  <SeparatorMenuItem mnemonicParsing="false" />
+                  <MenuItem mnemonicParsing="false" onAction="#onTest" text="Test 1" />
+                  <MenuItem mnemonicParsing="false" onAction="#onTest" text="Test 2" />
+                  <MenuItem mnemonicParsing="false" onAction="#onTest" text="Test 3" />
+                  <MenuItem mnemonicParsing="false" onAction="#onFundGraph" text="%Fund graph" />
+               </items>
             </Menu>
         </menus>
       </MenuBar>

@@ -299,8 +299,8 @@ class MainController extends Logging {
     actor ! OnFundGraph
   }
 
-  def onCleanup(): Unit = {
-    actor ! OnCleanup
+  def onCleanupDataStore(event: ActionEvent = null): Unit = {
+    actor ! OnCleanupDataStore
   }
 
   def onNetAssetValueHistory(event: ActionEvent): Unit = {
@@ -408,7 +408,7 @@ class MainController extends Logging {
       case OnOptions         => onOptions(state)
       case OnTest(n)         => onTest(state, n)
       case OnFundGraph       => onFundGraph(state)
-      case OnCleanup         => onCleanup(state)
+      case OnCleanupDataStore => onCleanupDataStore(state)
       case OnNetAssetValueHistory(fundId) => onNetAssetValueHistory(state, fundId)
       case OnUpToDateAssets(set) => onUpToDateAssets(state, set)
     }
@@ -652,7 +652,7 @@ class MainController extends Logging {
       }
     }
 
-    def onCleanup(state: State): Unit = {
+    def onCleanupDataStore(state: State): Unit = {
       Awaits.cleanupDataStore(Some(state.window), state.savingsUpd.funds.map(_.id))
       refresh(state)
     }
@@ -725,7 +725,7 @@ class MainController extends Logging {
           )
           applyState(newState)
           // Cleanup datastore if necessary
-          self ! OnCleanup
+          self ! OnCleanupDataStore
 
         case _ =>
       }
@@ -807,7 +807,7 @@ object MainController {
 
   case object OnFundGraph
 
-  case object OnCleanup
+  case object OnCleanupDataStore
 
   case class OnNetAssetValueHistory(fundId: Option[UUID])
 
@@ -844,7 +844,7 @@ object MainController {
       )
     }
 
-    if (applicationStart) controller.onCleanup()
+    if (applicationStart) controller.onCleanupDataStore()
   }
 
 }
