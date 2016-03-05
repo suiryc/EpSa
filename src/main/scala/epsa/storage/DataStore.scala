@@ -535,6 +535,25 @@ object DataStore {
       }
     }
 
+    def cleanup(fundIds: List[UUID]): Future[Set[UUID]] = {
+      val known = fundIds.toSet
+      getDBRead.flatMap { db =>
+        entries.distinctOn(_.fundId)
+        db.run(entries.distinctOn(_.fundId).map(_.fundId).result).map { existing =>
+          val orphans = existing.toSet -- known
+          // Delete orphans if any
+          if (orphans.nonEmpty) {
+            val actions = orphans.toSeq.map { orphan =>
+              Action(deleteValues(orphan))
+            }
+            // Delete as many as possible
+            RichFuture.executeSequentially(stopOnError = false, actions)
+          }
+          orphans
+        }
+      }
+    }
+
   }
 
   private def issueMsg(msg: String, real: Boolean): String = {
@@ -559,5 +578,21 @@ object DataStore {
    */
   def readIssueMsg(real: Boolean = dbTempOpt.isEmpty && dbRealOpt.nonEmpty): String =
     issueMsg(I18N.getResources.getString("Could not read data store"), real)
+
+  /**
+   * Formats cleanup message.
+   *
+   * Cleanup is based on real database.
+   */
+  lazy val cleanupMsg: String =
+    issueMsg(I18N.getResources.getString("Cleaned up data store"), real = true)
+
+  /**
+   * Formats cleanup issue message.
+   *
+   * Cleanup is based on real database.
+   */
+  lazy val cleanupIssueMsg: String =
+    issueMsg(I18N.getResources.getString("Could not cleanup data store"), real = true)
 
 }

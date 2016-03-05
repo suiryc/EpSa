@@ -41,7 +41,9 @@ import suiryc.scala.settings.Preference
 // TODO - menu entry and dialog to display/edit events history ?
 // TODO - when computing assets, order by scheme/fund/availability ?
 // TODO - manage encryption of datastore ?
-// TODO - manual/automatic way to check NAV history values without existing fund ?
+//          -> possible to read/write
+//          -> how to determine beforehand ?
+//          -> FileChooser does not allow to customize its content (to insert password upon open)
 class MainController extends Logging {
 
   import epsa.Settings.prefs
@@ -297,6 +299,10 @@ class MainController extends Logging {
     actor ! OnFundGraph
   }
 
+  def onCleanup(): Unit = {
+    actor ! OnCleanup
+  }
+
   def onNetAssetValueHistory(event: ActionEvent): Unit = {
     actor ! OnNetAssetValueHistory(Option(assetsTable.getSelectionModel.getSelectedItem).map(_.fundId))
   }
@@ -402,6 +408,7 @@ class MainController extends Logging {
       case OnOptions         => onOptions(state)
       case OnTest(n)         => onTest(state, n)
       case OnFundGraph       => onFundGraph(state)
+      case OnCleanup         => onCleanup(state)
       case OnNetAssetValueHistory(fundId) => onNetAssetValueHistory(state, fundId)
       case OnUpToDateAssets(set) => onUpToDateAssets(state, set)
     }
@@ -535,7 +542,7 @@ class MainController extends Logging {
         // Persist now to restore it when rebuilding the stage
         persistView(state)
         context.stop(self)
-        MainController.build(state, needRestart)
+        MainController.build(state, needRestart, applicationStart = false)
       }
     }
 
@@ -645,6 +652,11 @@ class MainController extends Logging {
       }
     }
 
+    def onCleanup(state: State): Unit = {
+      Awaits.cleanupDataStore(Some(state.window), state.savingsUpd.funds.map(_.id))
+      refresh(state)
+    }
+
     def onNetAssetValueHistory(state: State, fundId: Option[UUID]): Unit = {
       val dialog = NetAssetValueHistoryController.buildStage(MainController.this, state.savingsUpd, fundId, state.window)
       // Notes:
@@ -712,6 +724,8 @@ class MainController extends Logging {
             savingsUpd = savingsInit
           )
           applyState(newState)
+          // Cleanup datastore if necessary
+          self ! OnCleanup
 
         case _ =>
       }
@@ -793,11 +807,13 @@ object MainController {
 
   case object OnFundGraph
 
+  case object OnCleanup
+
   case class OnNetAssetValueHistory(fundId: Option[UUID])
 
   case class OnUpToDateAssets(set: Boolean)
 
-  def build(state: State, needRestart: Boolean = false): Unit = {
+  def build(state: State, needRestart: Boolean = false, applicationStart: Boolean = false): Unit = {
     val stage = state.stage
 
     val resources = I18N.getResources
@@ -827,6 +843,8 @@ object MainController {
         headerText = Some(resources.getString("information.need-restart"))
       )
     }
+
+    if (applicationStart) controller.onCleanup()
   }
 
 }

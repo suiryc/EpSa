@@ -51,7 +51,7 @@ class Main extends Application {
         savingsInit = savingsInit,
         savingsUpd = savingsInit
       )
-      MainController.build(state)
+      MainController.build(state, applicationStart = true)
     }
 
     // Note: if stage has no Scene, have it owns a Dialog fails.
