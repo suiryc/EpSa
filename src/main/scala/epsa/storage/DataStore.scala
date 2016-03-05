@@ -446,7 +446,6 @@ object DataStore {
     protected class Entries(tag: Tag) extends Table[Entry](tag, tableName) {
       def fundId = column[UUID]("fundId")
       def date = column[LocalDate]("date")
-      // TODO - 'scale' shall be configurable ? (usually 4)
       def value = column[BigDecimal]("value", O.SqlType("DECIMAL(21,6)"))
       def pk = primaryKey("pk", (fundId, date))
       def * = LiftedEntry(fundId, LiftedAssetValue(date, value))
@@ -521,11 +520,17 @@ object DataStore {
 
             // No need to keep previous actions since we delete everything
             tmp.resetActions(this)
-            // TODO: should we keep in mind real db we are based on (if any)
-            // and not register the delete action if there was originally no
-            // data ?
-            tmp.addAction(this, delete)
-            delete(tmp.db)
+
+            // We register action only if there was data to begin with, which
+            // is not the case if there is no real db (yet) or real db had no
+            // data for this fund.
+            val hadData = dbRealOpt.map { dbReal =>
+              dbReal.db.run(entries.filter(_.fundId === fundId).length.result).map(_ > 0)
+            }.getOrElse(Future.successful(false))
+            hadData.flatMap { v =>
+              if (v) tmp.addAction(this, delete)
+              delete(tmp.db)
+            }
           }
       }
     }
