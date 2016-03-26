@@ -33,17 +33,17 @@ import suiryc.scala.javafx.stage.{FileChoosers, Stages}
 import suiryc.scala.javafx.util.Callback
 import suiryc.scala.settings.Preference
 
-// TODO - change menu for OS integration ? (e.g. Ubuntu)
-// TODO - display base and current (to date) amounts in assets table
-// TODO - display asset gain/loss (amount/percentage) in assets table
-// TODO - display more details for selected asset (values history graph, ...)
-// TODO - menu entries with latest datastore locations ?
-// TODO - menu entry and dialog to display/edit events history ?
-// TODO - when computing assets, order by scheme/fund/availability ?
-// TODO - manage encryption of datastore ?
-//          -> possible to read/write
-//          -> how to determine beforehand ?
-//          -> FileChooser does not allow to customize its content (to insert password upon open)
+// TODO: change menu for OS integration ? (e.g. Ubuntu)
+// TODO: display base and current (to date) amounts in assets table
+// TODO: display asset gain/loss (amount/percentage) in assets table
+// TODO: display more details for selected asset (values history graph, ...)
+// TODO: menu entries with latest datastore locations ?
+// TODO: menu entry and dialog to display/edit events history ?
+// TODO: when computing assets, order by scheme/fund/availability ?
+// TODO: manage encryption of datastore ?
+//         -> possible to read/write
+//         -> how to determine beforehand ?
+//         -> FileChooser does not allow to customize its content (to give password upon open)
 class MainController extends Logging {
 
   import epsa.Settings.prefs
@@ -138,6 +138,7 @@ class MainController extends Logging {
     // corresponding assets will disappear from the table right away (items
     // updated after savings).
     val savingsProperty = new SimpleObjectProperty[Savings](state.savingsUpd)
+    assetsTable.setTableMenuButtonVisible(true)
     assetsTable.setUserData(savingsProperty)
     columnScheme.setCellValueFactory(Callback { data =>
       Bindings.createStringBinding(
