@@ -7,7 +7,9 @@ import spray.json._
 
 object Savings {
 
-  def resolveAvailablity(availability: Option[LocalDate], date0: Option[LocalDate]): Option[LocalDate] = {
+  import epsa.Settings._
+
+  def resolveAvailability(availability: Option[LocalDate], date0: Option[LocalDate]): Option[LocalDate] = {
     val date = date0.getOrElse(LocalDate.now)
     availability.filter(_.compareTo(date) > 0)
   }
@@ -16,13 +18,30 @@ object Savings {
 
   case class Fund(id: UUID, name: String)
 
-  // TODO - fundId ok even if dealing with 'frozen current account' ?
-  case class Asset(schemeId: UUID, fundId: UUID, availability: Option[LocalDate], amount: BigDecimal, units: BigDecimal)
+  trait AssetEntry {
+    val schemeId: UUID
+    val fundId: UUID
+    val availability: Option[LocalDate]
+  }
+
+  // TODO: fundId ok even if dealing with 'frozen current account' ?
+  case class Asset(schemeId: UUID, fundId: UUID, availability: Option[LocalDate], units: BigDecimal, vwap: BigDecimal)
+    extends AssetEntry
+  {
+    def amount(value: BigDecimal): BigDecimal = scaleAmount(units * value)
+    lazy val investedAmount: BigDecimal = scaleAmount(units * vwap)
+  }
 
   /** Asset value: holds asset value at a given date. */
   case class AssetValue(date: LocalDate, value: BigDecimal)
 
   case class AssetValueHistory(name: Option[String], values: List[Savings.AssetValue] = Nil)
+
+  case class AssetPart(schemeId: UUID, fundId: UUID, availability: Option[LocalDate], units: BigDecimal, value: BigDecimal)
+    extends AssetEntry
+  {
+    def amount(value: BigDecimal) = scaleAmount(units * value)
+  }
 
   sealed trait Event
 
@@ -50,13 +69,13 @@ object Savings {
   case class DissociateFund(schemeId: UUID, fundId: UUID)
     extends Event
 
-  case class MakePayment(date: LocalDate, asset: Asset)
+  case class MakePayment(date: LocalDate, part: AssetPart)
     extends Event
 
-  case class MakeTransfer(date: LocalDate, assetSrc: Asset, assetDst: Asset)
+  case class MakeTransfer(date: LocalDate, partSrc: AssetPart, partDst: AssetPart)
     extends Event
 
-  case class MakeRefund(date: LocalDate, asset: Asset)
+  case class MakeRefund(date: LocalDate, part: AssetPart)
     extends Event
 
   object JsonProtocol extends DefaultJsonProtocol {
@@ -105,7 +124,7 @@ object Savings {
     implicit val deleteFundFormat = jsonFormat1(DeleteFund)
     implicit val associateFundFormat = jsonFormat2(AssociateFund)
     implicit val dissociateFundFormat = jsonFormat2(DissociateFund)
-    implicit val assetFormat = jsonFormat5(Asset)
+    implicit val assetPartFormat = jsonFormat5(AssetPart)
     implicit val makePaymentFormat = jsonFormat2(MakePayment)
     implicit val makeTransferFormat = jsonFormat3(MakeTransfer)
     implicit val makeRefundFormat = jsonFormat2(MakeRefund)
@@ -166,6 +185,27 @@ case class Savings(
 
   import Savings._
 
+  // Notes on VWAP:
+  // VWAP = invested amount / units
+  //  => invested amount = units * VWAP
+  //
+  // U: number of units
+  // V: value of a unit
+  // n: iteration
+  // Xn: value of X for asset operation n
+  // X(n): asset value of X after operation n
+  //
+  // U(n) = U(n-1) + Un
+  // VWAP(n) = (U(n-1) * VWAP(n-1) + Un * Vn) / U(n)
+  //
+  // Refunds don't change VWAP: Un * (Vn - VWAP(n-1)) = gain/loss compared to invested amount
+  //
+  // Upon transferring, (invested) amount for operation is the same on source and destination:
+  // invested (operation) = srcU * srcVWAP
+  // amount (operation) = dstUn * dstVn = srcU * srcV
+  //  => dstUn = (srcU * srcV) / dstVn
+  // dstVWAP(n) = (dstU(n-1) * dstVWAP(n-1) + srcU * srcVWAP) / dstU(n)
+
   def processActions(actions: (Savings => Savings.Event)*): Savings =
     actions.foldLeft(this) { (savings, action) =>
       val event = action(savings)
@@ -181,17 +221,17 @@ case class Savings(
     processEvents(events:_*)
 
   def processEvent(event: Event): Savings = event match {
-    case CreateScheme(id, name)                 => createScheme(id, name)
-    case UpdateScheme(id, name)                 => updateScheme(id, name)
-    case DeleteScheme(id)                       => deleteScheme(id)
-    case CreateFund(id, name)                   => createFund(id, name)
-    case UpdateFund(id, name)                   => updateFund(id, name)
-    case DeleteFund(id)                         => deleteFund(id)
-    case AssociateFund(schemeId, fundId)        => associateFund(schemeId, fundId)
-    case DissociateFund(schemeId, fundId)       => dissociateFund(schemeId, fundId)
-    case MakePayment(date, asset)               => computeAssets(date).makePayment(date, asset)
-    case MakeTransfer(date, assetSrc, assetDst) => computeAssets(date).makeTransfer(date, assetSrc, assetDst)
-    case MakeRefund(date, asset)                => computeAssets(date).makeRefund(date, asset)
+    case CreateScheme(id, name)               => createScheme(id, name)
+    case UpdateScheme(id, name)               => updateScheme(id, name)
+    case DeleteScheme(id)                     => deleteScheme(id)
+    case CreateFund(id, name)                 => createFund(id, name)
+    case UpdateFund(id, name)                 => updateFund(id, name)
+    case DeleteFund(id)                       => deleteFund(id)
+    case AssociateFund(schemeId, fundId)      => associateFund(schemeId, fundId)
+    case DissociateFund(schemeId, fundId)     => dissociateFund(schemeId, fundId)
+    case MakePayment(date, part)              => computeAssets(date).makePayment(date, part)
+    case MakeTransfer(date, partSrc, partDst) => computeAssets(date).makeTransfer(date, partSrc, partDst)
+    case MakeRefund(date, part)               => computeAssets(date).makeRefund(date, part)
   }
 
   protected def createScheme(id: UUID, name: String): Savings = {
@@ -242,50 +282,59 @@ case class Savings(
     copy(schemes = updated)
   }
 
-  protected def makePayment(date: LocalDate, asset: Asset): Savings = {
-    val savings = findAsset(date, asset) match {
+  protected def makePayment(date: LocalDate, part: AssetPart, srcInvestedAmount: Option[BigDecimal] = None): Savings = {
+    // Note: VWAP = invested amount / units
+    // TODO: apply scale on VWAP ?
+    val savings = findAsset(date, part) match {
       case Some(currentAsset) =>
-        val amount = currentAsset.amount + asset.amount
-        val units = currentAsset.units + asset.units
+        val units = currentAsset.units + part.units
+        val vwap = (currentAsset.investedAmount + srcInvestedAmount.getOrElse(part.amount(part.value))) / units
         // Note: keeping the given (and not existing) asset availability date
-        // has the nice side effect of reseting it if the existing asset is
+        // has the nice side effect of resetting it if the existing asset is
         // actually available for the given date.
-        updateAsset(date, Asset(asset.schemeId, asset.fundId, asset.availability, amount, units))
+        val asset = Asset(part.schemeId, part.fundId, part.availability, units, vwap)
+        updateAsset(date, asset)
 
       case None =>
+        val vwap = srcInvestedAmount.map(_ / part.units).getOrElse(part.value)
+        val asset = Asset(part.schemeId, part.fundId, part.availability, part.units, vwap)
         copy(assets = assets :+ asset)
     }
 
     savings.copy(latestAssetAction = Some(date))
   }
 
-  protected def makeTransfer(date: LocalDate, assetSrc: Asset, assetDst: Asset): Savings =
-    makeRefund(date, assetSrc).makePayment(date, assetDst)
+  protected def makeTransfer(date: LocalDate, partSrc: AssetPart, partDst: AssetPart): Savings = {
+    val srcAsset = findAsset(date, partSrc).get
+    // Note: invested amount = units * VWAP
+    val srcInvestedAmount = partSrc.amount(srcAsset.vwap)
+    makeRefund(date, partSrc, Some(srcAsset)).makePayment(date, partDst, Some(srcInvestedAmount))
+  }
 
-  protected def makeRefund(date: LocalDate, asset: Asset): Savings = {
-    val currentAsset = findAsset(date, asset).get
-    val amount = currentAsset.amount - asset.amount
-    val units = currentAsset.units - asset.units
+  protected def makeRefund(date: LocalDate, part: AssetPart, srcAsset: Option[Savings.Asset] = None): Savings = {
+    val currentAsset = srcAsset.orElse(findAsset(date, part)).get
+    val units = currentAsset.units - part.units
+    val vwap = currentAsset.vwap
 
     // Note: keep existing asset availability date if any, instead of using
     // given one (which may be empty if asset is actually available for the
     // given date).
     val savings =
-      if (units <= 0) removeAsset(date, asset)
-      else updateAsset(date, Asset(asset.schemeId, asset.fundId, currentAsset.availability, amount, units))
+      if (units <= 0) removeAsset(date, part)
+      else updateAsset(date, Asset(part.schemeId, part.fundId, currentAsset.availability, units, vwap))
     savings.copy(latestAssetAction = Some(date))
   }
 
-  protected def testAsset(date: LocalDate, currentAsset: Asset, asset: Asset): Boolean = {
+  protected def testAsset(date: LocalDate, currentAsset: AssetEntry, asset: AssetEntry): Boolean = {
     lazy val checkDate =
       if (asset.availability.nonEmpty) currentAsset.availability == asset.availability
-      else resolveAvailablity(currentAsset.availability, Some(date)).isEmpty
+      else resolveAvailability(currentAsset.availability, Some(date)).isEmpty
     (currentAsset.schemeId == asset.schemeId) &&
       (currentAsset.fundId == asset.fundId) &&
       checkDate
   }
 
-  def findAsset(date: LocalDate, asset: Asset): Option[Savings.Asset] =
+  def findAsset(date: LocalDate, asset: AssetEntry): Option[Savings.Asset] =
     assets.find(testAsset(date, _, asset))
 
   protected def updateAsset(date: LocalDate, asset: Asset): Savings =
@@ -294,7 +343,7 @@ case class Savings(
       else currentAsset
     })
 
-  protected def removeAsset(date: LocalDate, asset: Asset): Savings =
+  protected def removeAsset(date: LocalDate, asset: AssetEntry): Savings =
     copy(assets = assets.filterNot(testAsset(date, _, asset)))
 
   def findScheme(schemeId: UUID): Option[Scheme] =
@@ -452,7 +501,7 @@ case class Savings(
     case class AssetComputation(computed: List[Savings.Asset] = Nil, keys: Set[AssetKey] = Set.empty)
 
     def getKey(asset: Savings.Asset): AssetKey = {
-      val availability = resolveAvailablity(asset.availability, Some(date))
+      val availability = resolveAvailability(asset.availability, Some(date))
       AssetKey(asset.schemeId, asset.fundId, availability)
     }
 
@@ -465,13 +514,14 @@ case class Savings(
           schemeId = key.schemeId,
           fundId = key.fundId,
           availability = key.availability,
-          amount = 0.0,
-          units = 0.0
+          units = BigDecimal(0),
+          vwap = BigDecimal(0)
         )
         val computedAsset = (previous :+ asset).foldLeft(asset0) { (computed, asset) =>
-          val amount = computed.amount + asset.amount
           val units = computed.units + asset.units
-          computed.copy(amount = amount, units = units)
+          // TODO: apply scale on VWAP ?
+          val vwap = (computed.investedAmount + asset.investedAmount) / units
+          computed.copy(units = units, vwap = vwap)
         }
         computation.copy(computed = filtered :+ computedAsset)
       }

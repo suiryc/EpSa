@@ -26,6 +26,7 @@ import suiryc.scala.javafx.stage.Stages
 import suiryc.scala.javafx.util.Callback
 
 // TODO: option of default day/month and number of years for frozen assets ?
+// TODO: warning on dst amount field if value differs from more than '1' (scaled) compared to src amount
 class NewAssetActionController {
 
   import epsa.Settings.{scaleAmount, scaleUnits}
@@ -68,16 +69,10 @@ class NewAssetActionController {
   protected var srcAmountField: TextField = _
 
   @FXML
-  protected var srcAmountAutoButton: ToggleButton = _
-
-  @FXML
   protected var srcEmptyButton: Button = _
 
   @FXML
   protected var srcUnitsField: TextField = _
-
-  @FXML
-  protected var srcUnitsAutoButton: ToggleButton = _
 
   @FXML
   protected var dstFundField: ComboBox[Option[SchemeAndFund]] = _
@@ -93,9 +88,6 @@ class NewAssetActionController {
 
   @FXML
   protected var dstAmountField: TextField = _
-
-  @FXML
-  protected var dstAmountAutoButton: ToggleButton = _
 
   @FXML
   protected var dstUnitsField: TextField = _
@@ -119,7 +111,7 @@ class NewAssetActionController {
 
   private var actionKind: AssetActionKind.Value = _
 
-  private var recursion: Set[String] = Set.empty
+  private var recursionLevel = 0
 
   private var dstAvailabilityChosen = false
 
@@ -200,22 +192,8 @@ class NewAssetActionController {
       })
     }
 
-    // Check NAV is a positive value
-    for (field <- List(srcNAVField, dstNAVField)) {
-      field.textField.textProperty.listen { v =>
-        val text = Option(v).getOrElse("")
-        val value = getBigDecimal(text)
-        val msg =
-          if ((value > 0) || text.isEmpty) None
-          else Some(positiveValueMsg)
-        Form.toggleError(field, msg.nonEmpty, msg)
-      }
-    }
-
     // Setup funds buttons
-    for (field <- List(srcNAVButton, srcAmountAutoButton, srcUnitsAutoButton, srcEmptyButton,
-      dstNAVButton, dstAmountAutoButton, dstUnitsAutoButton))
-    {
+    for (field <- List(srcNAVButton, srcEmptyButton, dstNAVButton, dstUnitsAutoButton)) {
       // Disable by default; will be enabled when a fund is selected
       field.setDisable(true)
       // Reset padding of button; by default uses 8 on each horizontal side
@@ -243,32 +221,24 @@ class NewAssetActionController {
       onSrcEmpty()
     }
 
-    // Setup src/dst amount/units field listeners
+    // Setup src/dst NAV/amount/units field listeners
     for ((field, cb) <- List(
+      (srcNAVField.textField, onSrcNAV _),
       (srcAmountField, onSrcAmount _),
       (srcUnitsField, onSrcUnits _),
-      (dstAmountField, onDstAmount _),
+      (dstNAVField.textField, onDstNAV _),
       (dstUnitsField, onDstUnits _)
     )) {
       field.textProperty.listen(cb())
     }
 
-    // Setup amount/units auto buttons: select if necessary, and compute
-    // once selected.
+    // Setup dst units auto button: select if necessary, and compute once
+    // selected.
     // Note: behave as if counterpart value was modified ('initRecursion'), so
     // that recursion can be broken as expected.
-    for ((field, pref, recursionKey, cb) <- List(
-      (srcAmountAutoButton, srcAmountAuto, "srcUnits",  computeSrcAmount _),
-      (srcUnitsAutoButton,  srcUnitsAuto,  "srcAmount", computeSrcUnits _),
-      (dstAmountAutoButton, dstAmountAuto, "dstUnits",  computeDstAmount _),
-      (dstUnitsAutoButton,  dstUnitsAuto,  "dstAmount", computeDstUnits _)
-    )) {
-      field.setSelected(pref())
-      field.selectedProperty.listen { selected =>
-        if (selected) initRecursion(recursionKey) {
-          cb()
-        }
-      }
+    dstUnitsAutoButton.setSelected(dstUnitsAuto())
+    dstUnitsAutoButton.selectedProperty.listen { selected =>
+      if (selected) onSrcAmount()
     }
 
     // Really make sure we don't leave if something is not OK
@@ -315,7 +285,7 @@ class NewAssetActionController {
     persistView()
   }
 
-  def onToggleKind(): Unit = {
+  private def onToggleKind(): Unit = {
     actionKind = getToggleKind(actionKindGroup.getSelectedToggle)
 
     val disableDst = !isDstEnabled
@@ -335,22 +305,25 @@ class NewAssetActionController {
 
     // Updating comboboxes usually cleans and re-sets selected value. We want to
     // disabling handlers while we do that, then call them manually.
-    initRecursion("*") {
+    breakRecursion {
       updateSchemeAndFund()
     }
     onSrcFund()
-    if (!disableDst) onDstFund()
+    if (!disableDst) {
+      onSrcAvailability()
+      onDstFund()
+    }
     checkForm()
   }
 
-  def onOperationDate(): Unit = {
+  private def onOperationDate(): Unit = {
     updateSrcAvailability()
     updateNAV()
     checkForm()
   }
 
   // Breaks recursion triggered from changing action kind.
-  def onSrcFund(): Unit = breakRecursion("srcFund") {
+  private def onSrcFund(): Unit = breakRecursion {
     val srcAvailabilityExact = actionKind != AssetActionKind.Payment
 
     if (srcAvailabilityExact) updateSrcAvailability()
@@ -361,30 +334,39 @@ class NewAssetActionController {
 
   // Note: use 'breakRecursion' together with 'onDstAvailability' so that we
   // can differentiate whether value was auto-set from source or whether user
-  // did select a value (in which cas we don't auto-set it anymore).
+  // did select a value (in which case we don't auto-set it anymore).
   // Also breaks recursion triggered from changing action kind.
-  def onSrcAvailability(): Unit = breakRecursion("availability") {
+  private def onSrcAvailability(): Unit = breakRecursion {
     if (!dstAvailabilityChosen && isDstEnabled) {
       // Note: don't forget to use actual availability based on operation date
-      val availability = Savings.resolveAvailablity(getSrcAvailability, Option(operationDateField.getValue))
+      val availability = Savings.resolveAvailability(getSrcAvailability, Option(operationDateField.getValue))
       dstAvailabilityField.setValue(availability.orNull)
     }
     checkForm()
   }
 
-  def onSrcAmount(): Unit = initRecursion("srcAmount") {
-    val value = getSrcAmount
-    if ((value > 0) && isDstEnabled) dstAmountField.setText(value.toString)
-    computeSrcUnits()
-    checkForm()
-  }
-
-  def onSrcUnits(): Unit = initRecursion("srcUnits") {
+  private def onSrcNAV(): Unit = {
     computeSrcAmount()
     checkForm()
   }
 
-  def onSrcEmpty(): Unit = initRecursion("*") {
+  def onSrcAmount(): Unit = {
+    val value = getSrcAmount
+    if ((value > 0) && isDstEnabled && dstUnitsAutoButton.isSelected) {
+      val dstNAV = getDstNAV
+      if (dstNAV > 0) {
+        val dstUnits = scaleUnits(value / dstNAV)
+        dstUnitsField.setText(dstUnits.toString)
+      }
+    }
+  }
+
+  private def onSrcUnits(): Unit = {
+    computeSrcAmount()
+    checkForm()
+  }
+
+  private def onSrcEmpty(): Unit = {
     for {
       operationDate <- Option(operationDateField.getValue)
       schemeAndFund <- getSrcFund
@@ -392,33 +374,35 @@ class NewAssetActionController {
       val srcAvailability = getSrcAvailability
       val searchAsset = Savings.Asset(schemeAndFund.scheme.id, schemeAndFund.fund.id, srcAvailability, 0, 0)
       savings.computeAssets(operationDate).findAsset(operationDate, searchAsset).foreach { asset =>
-        srcAmountField.setText(asset.amount.toString)
+        srcAmountField.setText(asset.amount(getSrcNAV).toString)
         srcUnitsField.setText(asset.units.toString)
       }
     }
   }
 
-  def onDstFund(): Unit = breakRecursion("dstFund") {
+  private def onDstFund(): Unit = {
     updateNAV()
+    // Trigger units/amount computation from source amount
+    onSrcAmount()
     checkForm()
   }
 
-  def onDstAvailability(): Unit = breakRecursion("availability") {
+  private def onDstAvailability(): Unit = breakRecursion {
     dstAvailabilityChosen = Option(dstAvailabilityField.getValue).isDefined
     checkForm()
   }
 
-  def onDstAmount(): Unit = initRecursion("dstAmount") {
-    computeDstUnits()
-    checkForm()
-  }
-
-  def onDstUnits(): Unit = initRecursion("dstUnits") {
+  private def onDstNAV(): Unit = {
     computeDstAmount()
     checkForm()
   }
 
-  def onNAVHistory(fund: Savings.Fund): Unit = {
+  private def onDstUnits(): Unit = {
+    computeDstAmount()
+    checkForm()
+  }
+
+  private def onNAVHistory(fund: Savings.Fund): Unit = {
     val dialog = NetAssetValueHistoryController.buildStage(mainController, savings, Some(fund.id), stage)
     dialog.initModality(Modality.WINDOW_MODAL)
     dialog.initOwner(stage)
@@ -426,34 +410,19 @@ class NewAssetActionController {
     if (dialog.showAndWait().orElse(false)) updateNAV()
   }
 
-  private def computeUnits(amount: BigDecimal, nav: BigDecimal, unitsField: TextField, auto: Boolean): Unit = {
-    if ((amount > 0) && (nav > 0) && auto) {
-      val units = scaleUnits(amount / nav)
-      unitsField.setText(units.toString)
-    }
-  }
-
-  private def computeAmount(units: BigDecimal, nav: BigDecimal, amountField: TextField, auto: Boolean): Unit = {
-    if ((units > 0) && (nav > 0) && auto) {
+  private def computeAmount(units: BigDecimal, nav: BigDecimal, amountField: TextField): Unit = {
+    if ((units > 0) && (nav > 0)) {
       val amount = scaleAmount(units * nav)
       amountField.setText(amount.toString)
     }
   }
 
-  private def computeSrcUnits(): Unit = breakRecursion("srcUnits") {
-    computeUnits(getSrcAmount, getSrcNAV, srcUnitsField, srcUnitsAutoButton.isSelected)
+  private def computeSrcAmount(): Unit = {
+    computeAmount(getSrcUnits, getSrcNAV, srcAmountField)
   }
 
-  private def computeSrcAmount(): Unit = breakRecursion("srcAmount") {
-    computeAmount(getSrcUnits, getSrcNAV, srcAmountField, srcAmountAutoButton.isSelected)
-  }
-
-  private def computeDstUnits(): Unit = breakRecursion("dstUnits") {
-    computeUnits(getDstAmount, getDstNAV, dstUnitsField, dstUnitsAutoButton.isSelected)
-  }
-
-  private def computeDstAmount(): Unit = breakRecursion("dstAmount") {
-    computeAmount(getDstUnits, getDstNAV, dstAmountField, dstAmountAutoButton.isSelected)
+  private def computeDstAmount(): Unit = {
+    computeAmount(getDstUnits, getDstNAV, dstAmountField)
   }
 
   private def buildSchemeAndFunds(entries: List[SchemeAndFund]*): List[Option[SchemeAndFund]] =
@@ -509,7 +478,7 @@ class NewAssetActionController {
     // Changing both source/destination items often workaround this, but not
     // always. The best solution is to have an explicit preferred width so
     // that it does not get recomputed according to content.
-    if (actionKind == AssetActionKind.Transfer) {
+    if (isDstEnabled) {
       // Scheme&fund with asset
       val fundsWithAsset = savings.assets.map { asset =>
         val scheme = savings.getScheme(asset.schemeId)
@@ -620,49 +589,35 @@ class NewAssetActionController {
       (isPayment && Option(srcAvailabilityField.getValue).isDefined) ||
       (!isPayment && Option(srcAvailabilityField2.getValue).isDefined)
     val srcAvailabilityAnterior = opDateSelected && srcAvailability.exists(_.isBefore(operationDate))
-    val srcAmount = getSrcAmount
-    val srcAmountValued = srcAmount > 0
+    val srcNAV = getSrcNAV
+    val srcNAVValued = srcNAV > 0
     val srcUnits = getSrcUnits
     val srcUnitsValued = srcUnits > 0
-    lazy val srcAsset = Savings.Asset(srcFund.scheme.id, srcFund.fund.id, srcAvailability, srcAmount, srcUnits)
+    lazy val srcAsset = Savings.AssetPart(srcFund.scheme.id, srcFund.fund.id, srcAvailability, srcUnits, getSrcNAV)
     val srcAvailableAsset =
       if (isPayment || !opDateSelected || !srcSelected || !srcAvailabilitySelected) None
       else savings.computeAssets(operationDate).findAsset(operationDate, srcAsset)
-    val (srcAmountPrompt, srcUnitsPrompt) = srcAvailableAsset match {
-      case Some(asset) => (Some(s"≤${asset.amount}"), Some(s"≤${asset.units}"))
-      case None        => (None, None)
+    val srcUnitsPrompt = srcAvailableAsset match {
+      case Some(asset) => Some(s"≤${asset.units}")
+      case None        => None
     }
-    val (srcAmountIssue, srcUnitsIssue) = {
-      val srcAmountValueIssue =
-        if (srcAmountValued) None
-        else Some(positiveValueMsg)
+    val srcUnitsIssue = {
       val srcUnitsValueIssue =
         if (srcUnitsValued) None
         else Some(positiveValueMsg)
       if (!isPayment && srcSelected && srcAvailabilitySelected) {
         srcAvailableAsset match {
           case Some(asset) =>
-            val emptyOne = ((srcAsset.amount == asset.amount) && (srcAsset.units != asset.units)) ||
-              ((srcAsset.amount != asset.amount) && (srcAsset.units == asset.units))
-            val amountIssue =
-              if (srcAmountValueIssue.nonEmpty) srcAmountValueIssue
-              else if (srcAsset.amount > asset.amount) Some(valueLimitMsg.format(asset.amount))
-              else if (emptyOne) Some(emptyOneMsg)
-              else None
-            val unitsIssue =
-              if (srcUnitsValueIssue.nonEmpty) srcUnitsValueIssue
-              else if (srcAsset.units > asset.units) Some(valueLimitMsg.format(asset.units))
-              else if (emptyOne) Some(emptyOneMsg)
-              else None
-            (amountIssue, unitsIssue)
+            if (srcUnitsValueIssue.nonEmpty) srcUnitsValueIssue
+            else if (srcAsset.units > asset.units) Some(valueLimitMsg.format(asset.units))
+            else None
 
           case None =>
-            (srcAmountValueIssue, srcUnitsValueIssue)
+            srcUnitsValueIssue
         }
-      } else (srcAmountValueIssue, srcUnitsValueIssue)
+      } else srcUnitsValueIssue
     }
-    val srcValuedOk = srcAmountIssue.isEmpty && srcUnitsIssue.isEmpty
-    val srcOk = srcSelected && srcAvailabilitySelected && !srcAvailabilityAnterior && srcValuedOk
+    val srcOk = srcSelected && srcAvailabilitySelected && !srcAvailabilityAnterior && srcNAVValued && srcUnitsIssue.isEmpty
     Form.toggleError(srcFundField, !srcSelected,
       if (srcSelected) None
       else Some(mandatoryMsg)
@@ -675,12 +630,14 @@ class NewAssetActionController {
       if (srcAvailabilitySelected) None
       else Some(mandatoryMsg)
     )
-    srcAmountField.setPromptText(srcAmountPrompt.orNull)
-    Form.toggleError(srcAmountField, srcAmountIssue.nonEmpty, srcAmountIssue.orElse(srcAmountPrompt))
+    Form.toggleError(srcNAVField, !srcNAVValued,
+      if (srcNAVValued) None
+      else Some(positiveValueMsg)
+    )
     srcUnitsField.setPromptText(srcUnitsPrompt.orNull)
     Form.toggleError(srcUnitsField, srcUnitsIssue.nonEmpty, srcUnitsIssue.orElse(srcUnitsPrompt))
 
-    val dstNeeded = actionKind == AssetActionKind.Transfer
+    val dstNeeded = isDstEnabled
     lazy val dstFund = getDstFund.orNull
     val dstSelected = !dstNeeded || Option(dstFund).isDefined
     lazy val dstAvailability = Option(dstAvailabilityField.getValue)
@@ -691,13 +648,12 @@ class NewAssetActionController {
     val dstAvailabilityAnterior = dstNeeded && {
       opDateSelected && dstAvailability.exists(_.isBefore(operationDate))
     }
-    lazy val dstAmount = getDstAmount
-    val dstAmountValued = !dstNeeded || (dstAmount > 0)
+    lazy val dsnNAV = getDstNAV
+    val dstNAVValued = !dstNeeded || (dsnNAV > 0)
     lazy val dstUnits = getDstUnits
     val dstUnitsValued = !dstNeeded || (dstUnits > 0)
-    val dstValued = dstAmountValued && dstUnitsValued
-    lazy val dstAsset = Savings.Asset(dstFund.scheme.id, dstFund.fund.id, dstAvailability, dstAmount, dstUnits)
-    val dstOk = dstSelected && dstAvailabilitySelected && !dstAvailabilityAnterior && dstValued
+    lazy val dstAsset = Savings.AssetPart(dstFund.scheme.id, dstFund.fund.id, dstAvailability, dstUnits, getDstNAV)
+    val dstOk = dstSelected && dstAvailabilitySelected && !dstAvailabilityAnterior && dstNAVValued && dstUnitsValued
     Form.toggleError(dstFundField, !dstSelected,
       if (dstSelected) None
       else Some(mandatoryMsg)
@@ -706,8 +662,8 @@ class NewAssetActionController {
       Form.ErrorStyle(!dstAvailabilitySelected, mandatoryMsg),
       Form.ErrorStyle(dstAvailabilityAnterior, resources.getString("error.anterior-availability-date"))
     )
-    Form.toggleError(dstAmountField, !dstAmountValued,
-      if (dstAmountValued) None
+    Form.toggleError(dstNAVField, !dstNAVValued,
+      if (dstNAVValued) None
       else Some(positiveValueMsg)
     )
     Form.toggleError(dstUnitsField, !dstUnitsValued,
@@ -724,8 +680,6 @@ class NewAssetActionController {
     } else None
 
     srcNAVButton.setDisable(!srcSelected)
-    srcAmountAutoButton.setDisable(!srcSelected)
-    srcUnitsAutoButton.setDisable(!srcSelected)
     if (isPayment) {
       srcEmptyButton.setVisible(false)
       // Set column preferred width to zero, which visually renders as if there
@@ -738,7 +692,6 @@ class NewAssetActionController {
       srcEmptyButton.setDisable(!opDateSelected || !srcSelected || !srcAvailabilitySelected)
     }
     dstNAVButton.setDisable(!dstNeeded || !dstSelected)
-    dstAmountAutoButton.setDisable(!dstNeeded || !dstSelected)
     dstUnitsAutoButton.setDisable(!dstNeeded || !dstSelected)
     buttonOk.setDisable(event.isEmpty)
 
@@ -788,43 +741,17 @@ class NewAssetActionController {
   private def getDstNAV: BigDecimal =
     getBigDecimal(dstNAVField.getText)
 
-  private def getDstAmount: BigDecimal =
-    getBigDecimal(dstAmountField.getText)
-
   private def getDstUnits: BigDecimal =
     getBigDecimal(dstUnitsField.getText)
 
-  /**
-   * Recursion init point.
-   *
-   * Handlers do init 'recursion' by indicating which value was modified, so
-   * that it won't be modified by recursion.
-   * Given key is registered while code is executed.
-   * Special key '*' matches all values.
-   */
-  private def initRecursion[A](key: String)(f: => A): Unit = {
-    recursion += key
-    try {
-      f
-    } finally {
-      recursion -= key
-    }
-  }
-
-  /**
-   * Recursion breaker.
-   *
-   * Code breaks recursion by indicating which value it is about to modify.
-   * If it is already registered, code is not executed.
-   * Otherwise given key is registered while code is executed.
-   */
-  private def breakRecursion[A](key: String)(f: => A): Unit =
-    if (!recursion.contains(key) && !recursion.contains("*")) {
-      recursion += key
+  private def breakRecursion[A](f: => A): Unit =
+    if (recursionLevel == 0) {
+      recursionLevel += 1
       try {
         f
-      } finally {
-        recursion -= key
+      }
+      finally {
+        recursionLevel -= 1
       }
     }
 
@@ -839,12 +766,6 @@ object NewAssetActionController {
 
   private val stageLocation = Preference.from(s"$prefsKeyPrefix.location", null:StageLocation)
 
-  private val srcAmountAuto = Preference.from(s"$prefsKeyPrefix.src-amount-auto", true)
-
-  private val srcUnitsAuto = Preference.from(s"$prefsKeyPrefix.src-units-auto", true)
-
-  private val dstAmountAuto = Preference.from(s"$prefsKeyPrefix.dst-amount-auto", true)
-
   private val dstUnitsAuto = Preference.from(s"$prefsKeyPrefix.dst-units-auto", true)
 
   private lazy val mandatoryMsg = I18N.getResources.getString("Mandatory field")
@@ -852,8 +773,6 @@ object NewAssetActionController {
   private lazy val positiveValueMsg = I18N.getResources.getString("Positive value expected")
 
   private lazy val valueLimitMsg = I18N.getResources.getString("Value exceeds available quantity")
-
-  private lazy val emptyOneMsg = I18N.getResources.getString("warning.empty-amount-and-units")
 
   /** Builds a dialog out of this controller. */
   def buildDialog(mainController: MainController, savings: Savings, kind: AssetActionKind.Value, asset: Option[Savings.Asset]): Dialog[Option[Savings.Event]] = {
@@ -887,9 +806,6 @@ object NewAssetActionController {
   private def resultConverter(controller: NewAssetActionController)(buttonType: ButtonType): Option[Savings.Event] = {
     if (buttonType != ButtonType.OK) None
     else {
-      srcAmountAuto() = controller.srcAmountAutoButton.isSelected
-      srcUnitsAuto() = controller.srcUnitsAutoButton.isSelected
-      dstAmountAuto() = controller.dstAmountAutoButton.isSelected
       dstUnitsAuto() = controller.dstUnitsAutoButton.isSelected
       controller.checkForm()
     }

@@ -72,7 +72,7 @@ object Form {
 
   def formatAvailability(availability: Option[LocalDate], date: Option[LocalDate], long: Boolean): String =
     availability.map { avail =>
-      Savings.resolveAvailablity(availability, date) match {
+      Savings.resolveAvailability(availability, date) match {
         case Some(_) =>
           avail.toString
 

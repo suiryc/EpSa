@@ -1,0 +1,4 @@
+/* Center text (which applies to multilines) and not only label for column headers. */
+.table-view .column-header .label {
+  -fx-text-alignment: CENTER;
+}

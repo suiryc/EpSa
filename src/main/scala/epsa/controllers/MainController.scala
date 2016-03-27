@@ -34,9 +34,10 @@ import suiryc.scala.javafx.util.Callback
 import suiryc.scala.settings.Preference
 
 // TODO: change menu for OS integration ? (e.g. Ubuntu)
-// TODO: display base and current (to date) amounts in assets table
-// TODO: display asset gain/loss (amount/percentage) in assets table
+// TODO: display more information in assets table: gain/loss (amount/percentage)
 // TODO: display more details for selected asset (values history graph, ...)
+// TODO: use table to display selected asset data ? (List of property->value)
+// TODO: ability to copy asset entry data in clipboard ? Or how to copy details ?
 // TODO: menu entries with latest datastore locations ?
 // TODO: menu entry and dialog to display/edit events history ?
 // TODO: when computing assets, order by scheme/fund/availability ?
@@ -104,18 +105,34 @@ class MainController extends Logging {
   lazy private val columnAvailability =
     new TableColumn[Savings.Asset, Option[LocalDate]](resources.getString("Availability"))
 
-  lazy private val columnAmount =
-    new TableColumn[Savings.Asset, BigDecimal](resources.getString("Amount"))
-
   lazy private val columnUnits =
     new TableColumn[Savings.Asset, BigDecimal](resources.getString("Units"))
 
+  lazy private val columnVWAP =
+    new TableColumn[Savings.Asset, Option[BigDecimal]](resources.getString("VWAP"))
+
+  lazy private val columnInvestedAmount =
+    new TableColumn[Savings.Asset, Option[BigDecimal]](resources.getString("Invested\namount"))
+
+  lazy private val columnDate =
+    new TableColumn[Savings.Asset, Option[LocalDate]](resources.getString("Date"))
+
+  lazy private val columnNAV =
+    new TableColumn[Savings.Asset, Option[BigDecimal]](resources.getString("NAV"))
+
+  lazy private val columnAmount =
+    new TableColumn[Savings.Asset, Option[BigDecimal]](resources.getString("Amount"))
+
   lazy private val assetsColumns = List(
-    "scheme"       -> columnScheme,
-    "fund"         -> columnFund,
-    "availability" -> columnAvailability,
-    "amount"       -> columnAmount,
-    "units"        -> columnUnits
+    "scheme"         -> columnScheme,
+    "fund"           -> columnFund,
+    "availability"   -> columnAvailability,
+    "units"          -> columnUnits,
+    "vwap"           -> columnVWAP,
+    "investedAmount" -> columnInvestedAmount,
+    "date"           -> columnDate,
+    "nav"            -> columnNAV,
+    "amount"         -> columnAmount
   )
 
   def initialize(state: State): Unit = {
@@ -130,39 +147,68 @@ class MainController extends Logging {
     // Savings instance. We could try to define those in the actor, but table
     // view handling makes it difficult or impossible to ensure all updated
     // values (e.g. changed scheme/fund name) are applied.
-    // Instead, have the savings a Property that triggers cell content updating
+    // Instead, have the state a Property that triggers cell content updating
     // when changed. Store it as the table user data since we don't use it for
     // anything else while it needs to be shared between the controller and its
     // actor.
     // Note: handle unknown scheme/fund in updated Savings. It if happens,
     // corresponding assets will disappear from the table right away (items
     // updated after savings).
-    val savingsProperty = new SimpleObjectProperty[Savings](state.savingsUpd)
+    val stateProperty = new SimpleObjectProperty[State](state)
     assetsTable.setTableMenuButtonVisible(true)
-    assetsTable.setUserData(savingsProperty)
+    assetsTable.setUserData(stateProperty)
     columnScheme.setCellValueFactory(Callback { data =>
       Bindings.createStringBinding(
-        Callable(savingsProperty.get().findScheme(data.getValue.schemeId).map(_.name).orNull),
-        savingsProperty
+        Callable(stateProperty.get().savingsUpd.findScheme(data.getValue.schemeId).map(_.name).orNull),
+        stateProperty
       )
     })
     columnFund.setCellValueFactory(Callback { data =>
       Bindings.createStringBinding(
-        Callable(savingsProperty.get().findFund(data.getValue.fundId).map(_.name).orNull),
-        savingsProperty
+        Callable(stateProperty.get().savingsUpd.findFund(data.getValue.fundId).map(_.name).orNull),
+        stateProperty
       )
     })
     columnAvailability.setCellValueFactory(Callback { data =>
       new SimpleObjectProperty(data.getValue.availability)
     })
     columnAvailability.setCellFactory(Callback { new AvailabilityTableCell[Savings.Asset] })
-    columnAmount.setCellValueFactory(Callback { data =>
-      new SimpleObjectProperty(data.getValue.amount)
-    })
-    columnAmount.setCellFactory(Callback { new AmountCell[Savings.Asset](epsa.Settings.currency()) })
     columnUnits.setCellValueFactory(Callback { data =>
       new SimpleObjectProperty(data.getValue.units)
     })
+    columnVWAP.setCellValueFactory(Callback { data =>
+      new SimpleObjectProperty(Some(data.getValue.vwap))
+    })
+    columnVWAP.setCellFactory(Callback { new AmountCell[Savings.Asset](epsa.Settings.currency(), na) })
+    columnInvestedAmount.setCellValueFactory(Callback { data =>
+      new SimpleObjectProperty(Some(data.getValue.investedAmount))
+    })
+    columnInvestedAmount.setCellFactory(Callback { new AmountCell[Savings.Asset](epsa.Settings.currency(), na) })
+    columnDate.setCellValueFactory(Callback { data =>
+      Bindings.createObjectBinding[Option[LocalDate]](
+        Callable(stateProperty.get().assetsValue.get(data.getValue.fundId).map(_.date)),
+        stateProperty
+      )
+    })
+    columnDate.setCellFactory(Callback { new DateOptCell[Savings.Asset](na) })
+    columnNAV.setCellValueFactory(Callback { data =>
+      Bindings.createObjectBinding[Option[BigDecimal]](
+        Callable(stateProperty.get().assetsValue.get(data.getValue.fundId).map(_.value)),
+        stateProperty
+      )
+    })
+    columnNAV.setCellFactory(Callback { new AmountCell[Savings.Asset](epsa.Settings.currency(), na) })
+    columnAmount.setCellValueFactory(Callback { data =>
+      Bindings.createObjectBinding[Option[BigDecimal]](
+        Callable {
+          stateProperty.get().assetsValue.get(data.getValue.fundId).map { assetValue =>
+            data.getValue.amount(assetValue.value)
+          }
+        },
+        stateProperty
+      )
+    })
+    columnAmount.setCellFactory(Callback { new AmountCell[Savings.Asset](epsa.Settings.currency(), na) })
 
     // Note: Asset gives scheme/fund UUID. Since State is immutable (and is
     // changed when applying events in controller) we must delegate scheme/fund
@@ -171,7 +217,8 @@ class MainController extends Logging {
 
     // Show details of selected asset
     assetsTable.getSelectionModel.selectedItemProperty.listen { asset0 =>
-      val savings = getAssetsSavings.get()
+      val state = getState.get
+      val savings = state.savingsUpd
       val assetOpt = Option(asset0)
       schemeField.setText(assetOpt.map { asset =>
         savings.getScheme(asset.schemeId).name
@@ -182,8 +229,10 @@ class MainController extends Logging {
       availabilityField.setText(assetOpt.map { asset =>
         Form.formatAvailability(asset.availability, date = None, long = true)
       }.orNull)
-      amountField.setText(assetOpt.map { asset =>
-        Form.formatAmount(asset.amount, epsa.Settings.currency())
+      amountField.setText(assetOpt.flatMap { asset =>
+        state.assetsValue.get(asset.fundId).map { assetValue =>
+          Form.formatAmount(asset.amount(assetValue.value), epsa.Settings.currency())
+        }
       }.orNull)
       unitsField.setText(assetOpt.map { asset =>
         asset.units.toString()
@@ -312,8 +361,8 @@ class MainController extends Logging {
     actor ! OnUpToDateAssets(event.getSource.asInstanceOf[CheckMenuItem].isSelected)
   }
 
-  private def getAssetsSavings: SimpleObjectProperty[Savings] = {
-    assetsTable.getUserData.asInstanceOf[SimpleObjectProperty[Savings]]
+  private def getState: SimpleObjectProperty[State] = {
+    assetsTable.getUserData.asInstanceOf[SimpleObjectProperty[State]]
   }
 
   /**
@@ -391,7 +440,7 @@ class MainController extends Logging {
 
   class ControllerActor(state0: State) extends Actor {
 
-    applyState(state0)
+    applyState(state0, updateAssetsValue = true)
 
     override def receive: Receive = receive(state0)
 
@@ -414,19 +463,25 @@ class MainController extends Logging {
       case OnUpToDateAssets(set) => onUpToDateAssets(state, set)
     }
 
-    def processEvents(state: State, events: List[Savings.Event]): Unit = {
+    def processEvents(state: State, events: List[Savings.Event], updateAssetsValue: Boolean = false): Unit = {
       // Time to delete Net asset value history upon deleting fund
       events.collect {
         case Savings.DeleteFund(fundId) => DataStore.AssetHistory.deleteValues(fundId)
       }
       val newEvents = state.eventsUpd ::: events
       val newSavings = state.savingsUpd.processEvents(events)
-      val newState = state.copy(eventsUpd = newEvents, savingsUpd = newSavings)
+      val newAssetsValue = if (updateAssetsValue) {
+        newSavings.assets.map(_.fundId).distinct.flatMap { fundId =>
+          val nav = Awaits.readDataStoreNAV(Some(state.window), fundId, LocalDate.now).getOrElse(None)
+          nav.map(fundId -> _)
+        }.toMap
+      } else state.assetsValue
+      val newState = state.copy(eventsUpd = newEvents, savingsUpd = newSavings, assetsValue = newAssetsValue)
       val dirty = newState.hasPendingChanges
 
-      // First update savings associated to assets table: takes care of
+      // First update state associated to assets table: takes care of
       // schemes/funds updated names if any.
-      getAssetsSavings.set(newSavings)
+      getState.set(newState)
       // Then update table content: takes care of added/removed entries
       import scala.collection.JavaConversions._
       val assets =
@@ -450,7 +505,7 @@ class MainController extends Logging {
     }
 
     def refresh(state: State): Unit = {
-      applyState(state)
+      applyState(state, updateAssetsValue = true)
     }
 
     def onFileNew(state: State): Unit = {
@@ -579,16 +634,26 @@ class MainController extends Logging {
             Savings.AssociateFund(s1.schemeId, f1.fundId),
             Savings.AssociateFund(s1.schemeId, f2.fundId),
             Savings.AssociateFund(s2.schemeId, f2.fundId),
-            Savings.MakePayment(LocalDate.now.minusMonths(24), Savings.Asset(s1.schemeId, f1.fundId, Some(LocalDate.now.minusMonths(12)), 10.0, 10.0)),
-            Savings.MakePayment(LocalDate.now.minusMonths(24), Savings.Asset(s1.schemeId, f1.fundId, Some(LocalDate.now.minusMonths(12)), 20.0, 10.0)),
-            Savings.MakePayment(LocalDate.now.minusMonths(24), Savings.Asset(s1.schemeId, f2.fundId, Some(LocalDate.now.minusMonths(12)), 5.0, 5.0)),
-            Savings.MakePayment(LocalDate.now.minusMonths(24), Savings.Asset(s1.schemeId, f1.fundId, Some(LocalDate.now.minusMonths(1)), 25.0, 15.0)),
-            Savings.MakePayment(LocalDate.now.minusMonths(24), Savings.Asset(s1.schemeId, f2.fundId, Some(LocalDate.now.plusMonths(12)), 15.0, 15.0)),
-            Savings.MakeRefund(LocalDate.now.minusMonths(12), Savings.Asset(s1.schemeId, f1.fundId, Some(LocalDate.now.minusMonths(1)), 20.0, 10.0)),
-            Savings.MakeRefund(LocalDate.now.minusMonths(1), Savings.Asset(s1.schemeId, f1.fundId, None, 25.0, 10.0)),
-            Savings.MakeTransfer(LocalDate.now.minusMonths(1), Savings.Asset(s1.schemeId, f1.fundId, None, 5.0, 10.0), Savings.Asset(s1.schemeId, f2.fundId, None, 5.0, 5.0)),
-            Savings.MakePayment(LocalDate.now.minusMonths(1), Savings.Asset(s2.schemeId, f2.fundId, Some(LocalDate.now.minusMonths(1)), 10.0, 10.0)),
-            Savings.MakePayment(LocalDate.now.minusMonths(1), Savings.Asset(s2.schemeId, f2.fundId, Some(LocalDate.now), 10.0, 10.0))
+            Savings.MakePayment(LocalDate.now.minusMonths(24),
+              Savings.AssetPart(s1.schemeId, f1.fundId, Some(LocalDate.now.minusMonths(12)), 10.0, 1.0)),
+            Savings.MakePayment(LocalDate.now.minusMonths(24),
+              Savings.AssetPart(s1.schemeId, f1.fundId, Some(LocalDate.now.minusMonths(12)), 10.0, 2.0)),
+            Savings.MakePayment(LocalDate.now.minusMonths(24),
+              Savings.AssetPart(s1.schemeId, f2.fundId, Some(LocalDate.now.minusMonths(12)), 5.0, 1.0)),
+            Savings.MakePayment(LocalDate.now.minusMonths(24),
+              Savings.AssetPart(s1.schemeId, f1.fundId, Some(LocalDate.now.minusMonths(1)), 15.0, 2.0)),
+            Savings.MakePayment(LocalDate.now.minusMonths(24),
+              Savings.AssetPart(s1.schemeId, f2.fundId, Some(LocalDate.now.plusMonths(12)), 15.0, 1.0)),
+            Savings.MakeRefund(LocalDate.now.minusMonths(12),
+              Savings.AssetPart(s1.schemeId, f1.fundId, Some(LocalDate.now.minusMonths(1)), 10.0, 2.0)),
+            Savings.MakeRefund(LocalDate.now.minusMonths(1),
+              Savings.AssetPart(s1.schemeId, f1.fundId, None, 10.0, 2.5)),
+            Savings.MakeTransfer(LocalDate.now.minusMonths(1),
+              Savings.AssetPart(s1.schemeId, f1.fundId, None, 10.0, 0.5), Savings.AssetPart(s1.schemeId, f2.fundId, None, 5.0, 1.0)),
+            Savings.MakePayment(LocalDate.now.minusMonths(1),
+              Savings.AssetPart(s2.schemeId, f2.fundId, Some(LocalDate.now.minusMonths(1)), 10.0, 1.0)),
+            Savings.MakePayment(LocalDate.now.minusMonths(1),
+              Savings.AssetPart(s2.schemeId, f2.fundId, Some(LocalDate.now), 10.0, 1.0))
           ))
 
         case 2 =>
@@ -597,8 +662,10 @@ class MainController extends Logging {
           // Resulting asset shall have its availability date reseted due to the second payment
           processEvents(state, List(s1, f1,
             Savings.AssociateFund(s1.schemeId, f1.fundId),
-            Savings.MakePayment(LocalDate.now.minusMonths(24), Savings.Asset(s1.schemeId, f1.fundId, Some(LocalDate.now.minusMonths(12)), 5.0, 5.0)),
-            Savings.MakePayment(LocalDate.now.minusMonths(12), Savings.Asset(s1.schemeId, f1.fundId, None, 5.0, 5.0))
+            Savings.MakePayment(LocalDate.now.minusMonths(24),
+              Savings.AssetPart(s1.schemeId, f1.fundId, Some(LocalDate.now.minusMonths(12)), 5.0, 1.0)),
+            Savings.MakePayment(LocalDate.now.minusMonths(12),
+              Savings.AssetPart(s1.schemeId, f1.fundId, None, 5.0, 1.0))
           ))
 
         case 3 =>
@@ -609,8 +676,10 @@ class MainController extends Logging {
           processEvents(state, List(s1, f1, f2,
             Savings.AssociateFund(s1.schemeId, f1.fundId),
             Savings.AssociateFund(s1.schemeId, f2.fundId),
-            Savings.MakePayment(LocalDate.now.minusMonths(24), Savings.Asset(s1.schemeId, f1.fundId, Some(LocalDate.now.minusMonths(12)), 10.0, 10.0)),
-            Savings.MakeTransfer(LocalDate.now.minusMonths(12), Savings.Asset(s1.schemeId, f1.fundId, None, 5.0, 5.0), Savings.Asset(s1.schemeId, f2.fundId, None, 5.0, 5.0))
+            Savings.MakePayment(LocalDate.now.minusMonths(24),
+              Savings.AssetPart(s1.schemeId, f1.fundId, Some(LocalDate.now.minusMonths(12)), 10.0, 1.0)),
+            Savings.MakeTransfer(LocalDate.now.minusMonths(12),
+              Savings.AssetPart(s1.schemeId, f1.fundId, None, 5.0, 1.0), Savings.AssetPart(s1.schemeId, f2.fundId, None, 5.0, 1.0))
           ))
       }
     }
@@ -674,9 +743,9 @@ class MainController extends Logging {
       applyState(state.copy(viewUpToDateAssets = set))
     }
 
-    private def applyState(state: State): Unit = {
+    private def applyState(state: State, updateAssetsValue: Boolean = false): Unit = {
       // Cheap trick to fill fields with Savings data
-      processEvents(state, Nil)
+      processEvents(state, Nil, updateAssetsValue)
     }
 
     /**
@@ -764,12 +833,15 @@ class MainController extends Logging {
 
 object MainController {
 
+  private val na = I18N.getResources.getString("n/a")
+
   case class State(
     stage: Stage,
     savingsInit: Savings = Savings(),
     eventsUpd: List[Savings.Event] = Nil,
     savingsUpd: Savings = Savings(),
-    viewUpToDateAssets: Boolean = true
+    viewUpToDateAssets: Boolean = true,
+    assetsValue: Map[UUID, Savings.AssetValue] = Map.empty
   ) {
 
     lazy val window = stage.getScene.getWindow
@@ -827,6 +899,7 @@ object MainController {
     // Delegate closing request to controller
     stage.setOnCloseRequest(controller.onCloseRequest _)
     stage.setScene(new Scene(root))
+    stage.getScene.getStylesheets.add(getClass.getResource("/css/main.css").toExternalForm)
     stage.show()
 
     // It is important to restore view after showing the stage, at least for
