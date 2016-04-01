@@ -43,6 +43,8 @@ object Savings {
     def amount(value: BigDecimal) = scaleAmount(units * value)
   }
 
+  // TODO: optional comment on event ? (update serializer/deserializer and asset action window)
+
   sealed trait Event
 
   case class CreateScheme(schemeId: UUID, name: String)
