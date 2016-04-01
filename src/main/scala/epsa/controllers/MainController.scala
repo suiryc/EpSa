@@ -35,10 +35,8 @@ import suiryc.scala.javafx.stage.{FileChoosers, Stages}
 import suiryc.scala.javafx.util.Callback
 import suiryc.scala.settings.Preference
 
-// TODO: change menu for OS integration ? (e.g. Ubuntu)
-// TODO: display more information in assets table: gain/loss (amount/percentage)
-// TODO: display more details for selected asset (values history graph, ...)
-// TODO: use table to display selected asset data ? (List of property->value)
+// TODO: display more information in assets table and details: gain/loss (amount/percentage)
+// TODO: display more details for selected asset (e.g. values history graph)
 // TODO: ability to copy asset entry data in clipboard ? Or how to copy details ?
 // TODO: menu entries with latest datastore locations ?
 // TODO: menu entry and dialog to display/edit events history ?
@@ -60,8 +58,10 @@ class MainController extends Logging {
 
   private val assetsColumnsPref = Preference.from("stage.main.assets.columns", null:String)
 
-  @FXML
-  protected var resources: ResourceBundle = _
+  // Get resources now (so that language change applies after reloading view).
+  private val resources = I18N.getResources
+
+  private val na = resources.getString("n/a")
 
   @FXML
   protected var fileCloseMenu: MenuItem = _
@@ -85,6 +85,20 @@ class MainController extends Logging {
   protected var assetsTable: TableView[Savings.Asset] = _
 
   private var actor: ActorRef = _
+
+  // Note: declare the fields here so that changing language applies upon
+  // reloading view.
+  private val assetFields = ListMap(
+    ASSET_KEY_SCHEME          -> AssetField(resources.getString("Scheme"), resources.getString("Scheme:")),
+    ASSET_KEY_FUND            -> AssetField(resources.getString("Fund"), resources.getString("Fund:")),
+    ASSET_KEY_AVAILABILITY    -> AssetField(resources.getString("Availability"), resources.getString("Availability:")),
+    ASSET_KEY_UNITS           -> AssetField(resources.getString("Units"), resources.getString("Units:")),
+    ASSET_KEY_VWAP            -> AssetField(resources.getString("VWAP"), resources.getString("VWAP:")),
+    ASSET_KEY_INVESTED_AMOUNT -> AssetField(resources.getString("Invested\namount"), resources.getString("Invested amount:")),
+    ASSET_KEY_DATE            -> AssetField(resources.getString("Date"), resources.getString("Date:")),
+    ASSET_KEY_NAV             -> AssetField(resources.getString("NAV"), resources.getString("NAV:")),
+    ASSET_KEY_AMOUNT          -> AssetField(resources.getString("Amount"), resources.getString("Amount:"))
+  )
 
   private val columnScheme =
     new TableColumn[Savings.Asset, String](assetFields(ASSET_KEY_SCHEME).tableLabel)
@@ -206,9 +220,7 @@ class MainController extends Logging {
     assetsTable.setRowFactory(Callback { newAssetRow() })
 
     // Show details of selected asset
-    // TODO: set row constraints ?
-    // TODO: leave only one row in fxml ?
-    // TODO: clear/refresh details if needed (language changed)
+    // Note: setting constraints on each row does not seem necessary
     assetFields.values.zipWithIndex.foreach {
       case (field, idx) =>
         val label = new Label(field.detailsLabel)
@@ -853,10 +865,6 @@ class MainController extends Logging {
 
 object MainController {
 
-  private val resources = I18N.getResources
-
-  private val na = resources.getString("n/a")
-
   private val ASSET_KEY_SCHEME = "scheme"
 
   private val ASSET_KEY_FUND = "fund"
@@ -874,18 +882,6 @@ object MainController {
   private val ASSET_KEY_NAV = "nav"
 
   private val ASSET_KEY_AMOUNT = "amount"
-
-  private val assetFields = ListMap(
-    ASSET_KEY_SCHEME          -> AssetField(resources.getString("Scheme"), resources.getString("Scheme:")),
-    ASSET_KEY_FUND            -> AssetField(resources.getString("Fund"), resources.getString("Fund:")),
-    ASSET_KEY_AVAILABILITY    -> AssetField(resources.getString("Availability"), resources.getString("Availability:")),
-    ASSET_KEY_UNITS           -> AssetField(resources.getString("Units"), resources.getString("Units:")),
-    ASSET_KEY_VWAP            -> AssetField(resources.getString("VWAP"), resources.getString("VWAP:")),
-    ASSET_KEY_INVESTED_AMOUNT -> AssetField(resources.getString("Invested\namount"), resources.getString("Invested amount:")),
-    ASSET_KEY_DATE            -> AssetField(resources.getString("Date"), resources.getString("Date:")),
-    ASSET_KEY_NAV             -> AssetField(resources.getString("NAV"), resources.getString("NAV:")),
-    ASSET_KEY_AMOUNT          -> AssetField(resources.getString("Amount"), resources.getString("Amount:"))
-  )
 
   case class State(
     stage: Stage,
@@ -952,6 +948,7 @@ object MainController {
 
   def build(state: State, needRestart: Boolean = false, applicationStart: Boolean = false): Unit = {
     val stage = state.stage
+    val resources = I18N.getResources
 
     val loader = new FXMLLoader(getClass.getResource("/fxml/main.fxml"), resources)
     val root = loader.load[Parent]()
