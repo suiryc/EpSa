@@ -18,13 +18,15 @@ import javafx.collections.transformation.SortedList
 import javafx.event.ActionEvent
 import javafx.fxml.{FXML, FXMLLoader}
 import javafx.scene.{Parent, Scene}
+import javafx.scene.layout.{GridPane, Region}
 import javafx.scene.control._
 import javafx.scene.image.{Image, ImageView}
 import javafx.stage._
+import scala.collection.immutable.ListMap
 import scala.util.Success
 import suiryc.scala.RichOption._
 import suiryc.scala.concurrent.Callable
-import suiryc.scala.javafx
+import suiryc.scala.{javafx => jfx}
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.javafx.event.EventHandler._
@@ -77,62 +79,50 @@ class MainController extends Logging {
   protected var splitPane: SplitPane = _
 
   @FXML
-  protected var schemeField: Label = _
-
-  @FXML
-  protected var fundField: Label = _
-
-  @FXML
-  protected var availabilityField: Label = _
-
-  @FXML
-  protected var amountField: Label = _
-
-  @FXML
-  protected var unitsField: Label = _
+  protected var assetDetails: GridPane = _
 
   @FXML
   protected var assetsTable: TableView[Savings.Asset] = _
 
   private var actor: ActorRef = _
 
-  lazy private val columnScheme =
-    new TableColumn[Savings.Asset, String](resources.getString("Scheme"))
+  private val columnScheme =
+    new TableColumn[Savings.Asset, String](assetFields(ASSET_KEY_SCHEME).tableLabel)
 
-  lazy private val columnFund =
-    new TableColumn[Savings.Asset, String](resources.getString("Fund"))
+  private val columnFund =
+    new TableColumn[Savings.Asset, String](assetFields(ASSET_KEY_FUND).tableLabel)
 
-  lazy private val columnAvailability =
-    new TableColumn[Savings.Asset, Option[LocalDate]](resources.getString("Availability"))
+  private val columnAvailability =
+    new TableColumn[Savings.Asset, Option[LocalDate]](assetFields(ASSET_KEY_AVAILABILITY).tableLabel)
 
-  lazy private val columnUnits =
-    new TableColumn[Savings.Asset, BigDecimal](resources.getString("Units"))
+  private val columnUnits =
+    new TableColumn[Savings.Asset, BigDecimal](assetFields(ASSET_KEY_UNITS).tableLabel)
 
-  lazy private val columnVWAP =
-    new TableColumn[Savings.Asset, Option[BigDecimal]](resources.getString("VWAP"))
+  private val columnVWAP =
+    new TableColumn[Savings.Asset, Option[BigDecimal]](assetFields(ASSET_KEY_VWAP).tableLabel)
 
-  lazy private val columnInvestedAmount =
-    new TableColumn[Savings.Asset, Option[BigDecimal]](resources.getString("Invested\namount"))
+  private val columnInvestedAmount =
+    new TableColumn[Savings.Asset, Option[BigDecimal]](assetFields(ASSET_KEY_INVESTED_AMOUNT).tableLabel)
 
-  lazy private val columnDate =
-    new TableColumn[Savings.Asset, Option[LocalDate]](resources.getString("Date"))
+  private val columnDate =
+    new TableColumn[Savings.Asset, Option[LocalDate]](assetFields(ASSET_KEY_DATE).tableLabel)
 
-  lazy private val columnNAV =
-    new TableColumn[Savings.Asset, Option[BigDecimal]](resources.getString("NAV"))
+  private val columnNAV =
+    new TableColumn[Savings.Asset, Option[BigDecimal]](assetFields(ASSET_KEY_NAV).tableLabel)
 
-  lazy private val columnAmount =
-    new TableColumn[Savings.Asset, Option[BigDecimal]](resources.getString("Amount"))
+  private val columnAmount =
+    new TableColumn[Savings.Asset, Option[BigDecimal]](assetFields(ASSET_KEY_AMOUNT).tableLabel)
 
-  lazy private val assetsColumns = List(
-    "scheme"         -> columnScheme,
-    "fund"           -> columnFund,
-    "availability"   -> columnAvailability,
-    "units"          -> columnUnits,
-    "vwap"           -> columnVWAP,
-    "investedAmount" -> columnInvestedAmount,
-    "date"           -> columnDate,
-    "nav"            -> columnNAV,
-    "amount"         -> columnAmount
+  private val assetsColumns = List(
+    ASSET_KEY_SCHEME          -> columnScheme,
+    ASSET_KEY_FUND            -> columnFund,
+    ASSET_KEY_AVAILABILITY    -> columnAvailability,
+    ASSET_KEY_UNITS           -> columnUnits,
+    ASSET_KEY_VWAP            -> columnVWAP,
+    ASSET_KEY_INVESTED_AMOUNT -> columnInvestedAmount,
+    ASSET_KEY_DATE            -> columnDate,
+    ASSET_KEY_NAV             -> columnNAV,
+    ASSET_KEY_AMOUNT          -> columnAmount
   )
 
   def initialize(state: State): Unit = {
@@ -216,26 +206,56 @@ class MainController extends Logging {
     assetsTable.setRowFactory(Callback { newAssetRow() })
 
     // Show details of selected asset
+    // TODO: set row constraints ?
+    // TODO: leave only one row in fxml ?
+    // TODO: clear/refresh details if needed (language changed)
+    assetFields.values.zipWithIndex.foreach {
+      case (field, idx) =>
+        val label = new Label(field.detailsLabel)
+        assetDetails.getChildren.add(label)
+        GridPane.setColumnIndex(label, 0)
+        GridPane.setRowIndex(label, idx)
+        val value = field.detailsValue
+        assetDetails.getChildren.add(value)
+        GridPane.setColumnIndex(value, 1)
+        GridPane.setRowIndex(value, idx)
+    }
+
     assetsTable.getSelectionModel.selectedItemProperty.listen { asset0 =>
-      val state = getState.get
+      val state = stateProperty.get()
       val savings = state.savingsUpd
       val assetOpt = Option(asset0)
-      schemeField.setText(assetOpt.map { asset =>
+      val currency = epsa.Settings.currency()
+      assetFields(ASSET_KEY_SCHEME).detailsValue.setText(assetOpt.map { asset =>
         savings.getScheme(asset.schemeId).name
       }.orNull)
-      fundField.setText(assetOpt.map { asset =>
+      assetFields(ASSET_KEY_FUND).detailsValue.setText(assetOpt.map { asset =>
         savings.getFund(asset.fundId).name
       }.orNull)
-      availabilityField.setText(assetOpt.map { asset =>
+      assetFields(ASSET_KEY_AVAILABILITY).detailsValue.setText(assetOpt.map { asset =>
         Form.formatAvailability(asset.availability, date = None, long = true)
       }.orNull)
-      amountField.setText(assetOpt.flatMap { asset =>
-        state.assetsValue.get(asset.fundId).map { assetValue =>
-          Form.formatAmount(asset.amount(assetValue.value), epsa.Settings.currency())
-        }
-      }.orNull)
-      unitsField.setText(assetOpt.map { asset =>
+      assetFields(ASSET_KEY_UNITS).detailsValue.setText(assetOpt.map { asset =>
         asset.units.toString()
+      }.orNull)
+      assetFields(ASSET_KEY_VWAP).detailsValue.setText(assetOpt.map { asset =>
+        Form.formatAmount(asset.vwap, currency)
+      }.orNull)
+      assetFields(ASSET_KEY_INVESTED_AMOUNT).detailsValue.setText(assetOpt.map { asset =>
+        Form.formatAmount(asset.investedAmount, currency)
+      }.orNull)
+      assetFields(ASSET_KEY_DATE).detailsValue.setText(assetOpt.map { asset =>
+        state.assetsValue.get(asset.fundId).map(_.date.toString).getOrElse(na)
+      }.orNull)
+      assetFields(ASSET_KEY_NAV).detailsValue.setText(assetOpt.map { asset =>
+        state.assetsValue.get(asset.fundId).map { nav =>
+          Form.formatAmount(nav.value, currency)
+        }.getOrElse(na)
+      }.orNull)
+      assetFields(ASSET_KEY_AMOUNT).detailsValue.setText(assetOpt.map { asset =>
+        state.assetsValue.get(asset.fundId).map { assetValue =>
+          Form.formatAmount(asset.amount(assetValue.value), currency)
+        }.getOrElse(na)
       }.orNull)
     }
   }
@@ -266,7 +286,7 @@ class MainController extends Logging {
     // divider positions, otherwise the value gets altered a bit by stage
     // resizing ...
     import scala.concurrent.duration._
-    if (!javafx.isLinux) restoreDividerPositions()
+    if (!jfx.isLinux) restoreDividerPositions()
     else JFXSystem.scheduleOnce(200.millis)(restoreDividerPositions())
   }
 
@@ -833,7 +853,39 @@ class MainController extends Logging {
 
 object MainController {
 
-  private val na = I18N.getResources.getString("n/a")
+  private val resources = I18N.getResources
+
+  private val na = resources.getString("n/a")
+
+  private val ASSET_KEY_SCHEME = "scheme"
+
+  private val ASSET_KEY_FUND = "fund"
+
+  private val ASSET_KEY_AVAILABILITY = "availability"
+
+  private val ASSET_KEY_UNITS = "units"
+
+  private val ASSET_KEY_VWAP = "vwap"
+
+  private val ASSET_KEY_INVESTED_AMOUNT = "investedAmount"
+
+  private val ASSET_KEY_DATE = "date"
+
+  private val ASSET_KEY_NAV = "nav"
+
+  private val ASSET_KEY_AMOUNT = "amount"
+
+  private val assetFields = ListMap(
+    ASSET_KEY_SCHEME          -> AssetField(resources.getString("Scheme"), resources.getString("Scheme:")),
+    ASSET_KEY_FUND            -> AssetField(resources.getString("Fund"), resources.getString("Fund:")),
+    ASSET_KEY_AVAILABILITY    -> AssetField(resources.getString("Availability"), resources.getString("Availability:")),
+    ASSET_KEY_UNITS           -> AssetField(resources.getString("Units"), resources.getString("Units:")),
+    ASSET_KEY_VWAP            -> AssetField(resources.getString("VWAP"), resources.getString("VWAP:")),
+    ASSET_KEY_INVESTED_AMOUNT -> AssetField(resources.getString("Invested\namount"), resources.getString("Invested amount:")),
+    ASSET_KEY_DATE            -> AssetField(resources.getString("Date"), resources.getString("Date:")),
+    ASSET_KEY_NAV             -> AssetField(resources.getString("NAV"), resources.getString("NAV:")),
+    ASSET_KEY_AMOUNT          -> AssetField(resources.getString("Amount"), resources.getString("Amount:"))
+  )
 
   case class State(
     stage: Stage,
@@ -886,10 +938,21 @@ object MainController {
 
   case class OnUpToDateAssets(set: Boolean)
 
+  case class AssetField(tableLabel: String, detailsLabel: String) {
+    val detailsValue = new Label
+    detailsValue.setMinWidth(Region.USE_PREF_SIZE)
+    detailsValue.setMinHeight(Region.USE_PREF_SIZE)
+  }
+
+  case class AssetDetailsField(label: String) {
+    val value = new Label
+    value.setMinWidth(Region.USE_PREF_SIZE)
+    value.setMinHeight(Region.USE_PREF_SIZE)
+  }
+
   def build(state: State, needRestart: Boolean = false, applicationStart: Boolean = false): Unit = {
     val stage = state.stage
 
-    val resources = I18N.getResources
     val loader = new FXMLLoader(getClass.getResource("/fxml/main.fxml"), resources)
     val root = loader.load[Parent]()
     val controller = loader.getController[MainController]
