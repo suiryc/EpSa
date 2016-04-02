@@ -5,6 +5,7 @@ import java.nio.file.Path
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import org.apache.poi.ss.usermodel.WorkbookFactory
+import suiryc.scala.io.PathsEx
 
 /**
  * Esalia investment fund file prober.
@@ -12,18 +13,23 @@ import org.apache.poi.ss.usermodel.WorkbookFactory
  * Probes whether a given file contains investment fund information (name and
  * asset values) provided by Esalia site (excel file).
  */
-object EsaliaInvestmentFundProber {
+object EsaliaInvestmentFundProber extends InvestmentFundProber {
 
-  def probe(path: Path): Option[Savings.AssetValueHistory] = {
-    val wb = try {
-      Some(WorkbookFactory.create(path.toFile))
+  override def probe(path: Path): Option[Savings.AssetValueHistory] = {
+    val extension = PathsEx.extension(path).toLowerCase
+    try {
+      if ((extension == "xls") || (extension == "xlsx")) {
+        probeExcel(path)
+      } else None
     } catch {
       case ex: Exception =>
         ex.printStackTrace()
         None
     }
+  }
 
-    wb.filter { book =>
+  private def probeExcel(path: Path): Option[Savings.AssetValueHistory] = {
+    Some(WorkbookFactory.create(path.toFile)).filter { book =>
       // There should only be one sheet
       book.getNumberOfSheets == 1
     }.map { book =>

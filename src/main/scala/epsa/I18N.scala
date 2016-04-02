@@ -52,8 +52,7 @@ object I18N extends suiryc.scala.util.I18N("i18n.epsa") with I18NWithPreference 
     def refund = getString("Refund")
     def oldValue = getString("Old value")
     def newValue = getString("New value")
-    def excelFiles = getString("Excel files")
-    def allFiles = getString("All files")
+    def spreadsheets = getString("Spreadsheets")
     def dataStore = getString("Data store")
 
     // Messages (information, warning, error), ...

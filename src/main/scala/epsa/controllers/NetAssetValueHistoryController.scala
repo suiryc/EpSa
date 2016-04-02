@@ -5,7 +5,7 @@ import epsa.I18N.Strings
 import epsa.charts.{ChartHandler, ChartSettings}
 import epsa.model.Savings
 import epsa.storage.DataStore
-import epsa.tools.EsaliaInvestmentFundProber
+import epsa.tools.{EsaliaInvestmentFundProber, SpreadsheetInvestmentFundProber}
 import epsa.util.Awaits
 import java.nio.file.Path
 import java.time.LocalDate
@@ -31,7 +31,6 @@ import suiryc.scala.javafx.util.Callback
 
 // TODO: be notified (by main view) if funds are added/removed ?
 // TODO: possibility to manually edit the value for a given date ?
-// TODO: also handle one 'standard' excel/libreoffice format ?
 class NetAssetValueHistoryController {
 
   import NetAssetValueHistoryController._
@@ -60,6 +59,8 @@ class NetAssetValueHistoryController {
   private var changes = Map[Savings.Fund, Option[Seq[Savings.AssetValue]]]()
 
   private var chartPane: Option[AnchorPane] = None
+
+  private val probers = List(EsaliaInvestmentFundProber, SpreadsheetInvestmentFundProber)
 
   def initialize(savings: Savings, fundIdOpt: Option[UUID]): Unit = {
     // Note: we need to tell the combobox how to display both the 'button' area
@@ -92,15 +93,17 @@ class NetAssetValueHistoryController {
       val fileChooser = new FileChooser()
       fileChooser.setTitle(Strings.importNAVHistory)
       fileChooser.getExtensionFilters.addAll(
-        new FileChooser.ExtensionFilter(Strings.excelFiles, "*.xls", "*.xlsx"),
-        new FileChooser.ExtensionFilter(Strings.allFiles, "*.*")
+        new FileChooser.ExtensionFilter(Strings.spreadsheets, "*.ods", "*.xls", "*.xlsx")
       )
       navHistoryImportPath.option.foreach { path =>
         FileChoosers.setInitialPath(fileChooser, path.toFile)
       }
       val selectedFile = fileChooser.showOpenDialog(stage)
       Option(selectedFile).foreach { file =>
-        EsaliaInvestmentFundProber.probe(file.toPath) match {
+        val path = file.toPath
+        probers.toStream.map { prober =>
+          prober.probe(path)
+        }.find(_.isDefined).map(_.get) match {
           case Some(hist) =>
             // Save path in preferences
             navHistoryImportPath() = selectedFile.toPath
