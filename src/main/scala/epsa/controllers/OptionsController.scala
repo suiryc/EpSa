@@ -1,7 +1,7 @@
 package epsa.controllers
 
 import epsa.I18N
-import java.util.ResourceBundle
+import epsa.I18N.Strings
 import javafx.collections.FXCollections
 import javafx.fxml.{FXMLLoader, FXML}
 import javafx.scene.control.{Slider, ButtonType, ComboBox, Dialog}
@@ -13,9 +13,6 @@ import suiryc.scala.util.I18NLocale
 class OptionsController {
 
   import OptionsController._
-
-  @FXML
-  protected var resources: ResourceBundle = _
 
   @FXML
   protected var languageChoice: ComboBox[I18NLocale] = _
@@ -110,17 +107,15 @@ object OptionsController {
   private val settings = epsa.Settings
 
   def buildDialog(): Dialog[(Boolean, Boolean)] = {
-    val resources = I18N.getResources
-
     val dialog = new Dialog[(Boolean, Boolean)]()
-    dialog.setTitle(resources.getString("Options"))
+    dialog.setTitle(Strings.options)
     dialog.getDialogPane.getButtonTypes.addAll(ButtonType.OK, ButtonType.CANCEL)
 
     // Note: snapshot is used to check whether something changed.
     // The controller does not actually apply changes until asked to.
     val snapshot = new SettingsSnapshot()
 
-    val loader = new FXMLLoader(getClass.getResource("/fxml/options.fxml"), resources)
+    val loader = new FXMLLoader(getClass.getResource("/fxml/options.fxml"), I18N.getResources)
     dialog.getDialogPane.setContent(loader.load())
     val controller = loader.getController[OptionsController]
     controller.initialize(snapshot)

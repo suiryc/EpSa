@@ -2,6 +2,7 @@ package epsa.controllers
 
 import akka.actor.{Actor, ActorRef, Props}
 import epsa.I18N
+import epsa.I18N.Strings
 import epsa.charts.ChartHandler
 import epsa.model.Savings
 import epsa.storage.DataStore
@@ -10,7 +11,7 @@ import epsa.util.Awaits
 import grizzled.slf4j.Logging
 import java.nio.file.Path
 import java.time.LocalDate
-import java.util.{ResourceBundle, UUID}
+import java.util.UUID
 import javafx.beans.binding.Bindings
 import javafx.beans.property.SimpleObjectProperty
 import javafx.collections.FXCollections
@@ -58,11 +59,6 @@ class MainController extends Logging {
 
   private val assetsColumnsPref = Preference.from("stage.main.assets.columns", null:String)
 
-  // Get resources now (so that language change applies after reloading view).
-  private val resources = I18N.getResources
-
-  private val na = resources.getString("n/a")
-
   @FXML
   protected var fileCloseMenu: MenuItem = _
 
@@ -89,15 +85,15 @@ class MainController extends Logging {
   // Note: declare the fields here so that changing language applies upon
   // reloading view.
   private val assetFields = ListMap(
-    ASSET_KEY_SCHEME          -> AssetField(resources.getString("Scheme"), resources.getString("Scheme:")),
-    ASSET_KEY_FUND            -> AssetField(resources.getString("Fund"), resources.getString("Fund:")),
-    ASSET_KEY_AVAILABILITY    -> AssetField(resources.getString("Availability"), resources.getString("Availability:")),
-    ASSET_KEY_UNITS           -> AssetField(resources.getString("Units"), resources.getString("Units:")),
-    ASSET_KEY_VWAP            -> AssetField(resources.getString("VWAP"), resources.getString("VWAP:")),
-    ASSET_KEY_INVESTED_AMOUNT -> AssetField(resources.getString("Invested\namount"), resources.getString("Invested amount:")),
-    ASSET_KEY_DATE            -> AssetField(resources.getString("Date"), resources.getString("Date:")),
-    ASSET_KEY_NAV             -> AssetField(resources.getString("NAV"), resources.getString("NAV:")),
-    ASSET_KEY_AMOUNT          -> AssetField(resources.getString("Amount"), resources.getString("Amount:"))
+    ASSET_KEY_SCHEME          -> AssetField(Strings.scheme, Strings.schemeColon),
+    ASSET_KEY_FUND            -> AssetField(Strings.fund, Strings.fundColon),
+    ASSET_KEY_AVAILABILITY    -> AssetField(Strings.availability, Strings.availabilityColon),
+    ASSET_KEY_UNITS           -> AssetField(Strings.units, Strings.unitsColon),
+    ASSET_KEY_VWAP            -> AssetField(Strings.vwap, Strings.vwapColon),
+    ASSET_KEY_INVESTED_AMOUNT -> AssetField(Strings.investedLFAmount, Strings.investedAmountColon),
+    ASSET_KEY_DATE            -> AssetField(Strings.date, Strings.dateColon),
+    ASSET_KEY_NAV             -> AssetField(Strings.nav, Strings.navColon),
+    ASSET_KEY_AMOUNT          -> AssetField(Strings.amount, Strings.amountColon)
   )
 
   private val columnScheme =
@@ -183,25 +179,25 @@ class MainController extends Logging {
     columnVWAP.setCellValueFactory(Callback { data =>
       new SimpleObjectProperty(Some(data.getValue.vwap))
     })
-    columnVWAP.setCellFactory(Callback { new AmountCell[Savings.Asset](epsa.Settings.currency(), na) })
+    columnVWAP.setCellFactory(Callback { new AmountCell[Savings.Asset](epsa.Settings.currency(), Strings.na) })
     columnInvestedAmount.setCellValueFactory(Callback { data =>
       new SimpleObjectProperty(Some(data.getValue.investedAmount))
     })
-    columnInvestedAmount.setCellFactory(Callback { new AmountCell[Savings.Asset](epsa.Settings.currency(), na) })
+    columnInvestedAmount.setCellFactory(Callback { new AmountCell[Savings.Asset](epsa.Settings.currency(), Strings.na) })
     columnDate.setCellValueFactory(Callback { data =>
       Bindings.createObjectBinding[Option[LocalDate]](
         Callable(stateProperty.get().assetsValue.get(data.getValue.fundId).map(_.date)),
         stateProperty
       )
     })
-    columnDate.setCellFactory(Callback { new DateOptCell[Savings.Asset](na) })
+    columnDate.setCellFactory(Callback { new DateOptCell[Savings.Asset](Strings.na) })
     columnNAV.setCellValueFactory(Callback { data =>
       Bindings.createObjectBinding[Option[BigDecimal]](
         Callable(stateProperty.get().assetsValue.get(data.getValue.fundId).map(_.value)),
         stateProperty
       )
     })
-    columnNAV.setCellFactory(Callback { new AmountCell[Savings.Asset](epsa.Settings.currency(), na) })
+    columnNAV.setCellFactory(Callback { new AmountCell[Savings.Asset](epsa.Settings.currency(), Strings.na) })
     columnAmount.setCellValueFactory(Callback { data =>
       Bindings.createObjectBinding[Option[BigDecimal]](
         Callable {
@@ -212,7 +208,7 @@ class MainController extends Logging {
         stateProperty
       )
     })
-    columnAmount.setCellFactory(Callback { new AmountCell[Savings.Asset](epsa.Settings.currency(), na) })
+    columnAmount.setCellFactory(Callback { new AmountCell[Savings.Asset](epsa.Settings.currency(), Strings.na) })
 
     // Note: Asset gives scheme/fund UUID. Since State is immutable (and is
     // changed when applying events in controller) we must delegate scheme/fund
@@ -257,17 +253,17 @@ class MainController extends Logging {
         Form.formatAmount(asset.investedAmount, currency)
       }.orNull)
       assetFields(ASSET_KEY_DATE).detailsValue.setText(assetOpt.map { asset =>
-        state.assetsValue.get(asset.fundId).map(_.date.toString).getOrElse(na)
+        state.assetsValue.get(asset.fundId).map(_.date.toString).getOrElse(Strings.na)
       }.orNull)
       assetFields(ASSET_KEY_NAV).detailsValue.setText(assetOpt.map { asset =>
         state.assetsValue.get(asset.fundId).map { nav =>
           Form.formatAmount(nav.value, currency)
-        }.getOrElse(na)
+        }.getOrElse(Strings.na)
       }.orNull)
       assetFields(ASSET_KEY_AMOUNT).detailsValue.setText(assetOpt.map { asset =>
         state.assetsValue.get(asset.fundId).map { assetValue =>
           Form.formatAmount(asset.amount(assetValue.value), currency)
-        }.getOrElse(na)
+        }.getOrElse(Strings.na)
       }.orNull)
     }
   }
@@ -408,14 +404,14 @@ class MainController extends Logging {
     // See: https://www.marshall.edu/genomicjava/2013/12/30/javafx-tableviews-with-contextmenus/
     val menu = new ContextMenu()
     // Note: Image(url, requestedWidth, requestedHeight, preserveRatio, smooth, backgroundLoading)
-    val editScheme = new MenuItem(resources.getString("Edit scheme"),
+    val editScheme = new MenuItem(Strings.editScheme,
       new ImageView(new Image("/images/fugue-icons/tables.png", 0.0, 0.0, true, false, false)))
     editScheme.setOnAction { (event: ActionEvent) =>
       Option(row.getItem).foreach { asset =>
         actor ! OnEditSchemes(Some(asset.schemeId))
       }
     }
-    val editFund = new MenuItem(resources.getString("Edit fund"),
+    val editFund = new MenuItem(Strings.editFund,
       new ImageView(new Image("/images/fugue-icons/table.png", 0.0, 0.0, true, false, false)))
     editFund.setOnAction { (event: ActionEvent) =>
       Option(row.getItem).foreach { asset =>
@@ -423,21 +419,21 @@ class MainController extends Logging {
       }
     }
 
-    val newPayment = new MenuItem(resources.getString("New payment"),
+    val newPayment = new MenuItem(Strings.newPayment,
       new ImageView(new Image("/images/fugue-icons/table-import.png", 0.0, 0.0, true, false, false)))
     newPayment.setOnAction { (event: ActionEvent) =>
       Option(row.getItem).foreach { asset =>
         actor ! OnNewAssetAction(AssetActionKind.Payment, Some(asset))
       }
     }
-    val newArbitrage = new MenuItem(resources.getString("New transfer"),
+    val newArbitrage = new MenuItem(Strings.newTransfer,
       new ImageView(new Image("/images/fugue-icons/tables-relation.png", 0.0, 0.0, true, false, false)))
     newArbitrage.setOnAction { (event: ActionEvent) =>
       Option(row.getItem).foreach { asset =>
         actor ! OnNewAssetAction(AssetActionKind.Transfer, Some(asset))
       }
     }
-    val newRefund = new MenuItem(resources.getString("New refund"),
+    val newRefund = new MenuItem(Strings.newRefund,
       new ImageView(new Image("/images/fugue-icons/table-export.png", 0.0, 0.0, true, false, false)))
     newRefund.setOnAction { (event: ActionEvent) =>
       Option(row.getItem).foreach { asset =>
@@ -583,8 +579,8 @@ class MainController extends Logging {
       val resp = Dialogs.confirmation(
         owner = Some(state.stage),
         title = None,
-        headerText = Some(resources.getString("confirmation.irreversible-action")),
-        contentText = Some(resources.getString("Undo all pending changes"))
+        headerText = Some(Strings.irreversibleAction),
+        contentText = Some(Strings.undoPending)
       )
 
       if (resp.contains(ButtonType.OK)) {
@@ -627,6 +623,8 @@ class MainController extends Logging {
       dialog.setResizable(true)
       val (reload, needRestart) = dialog.showAndWait().orElse((false, false))
       if (reload) {
+        // Reset I18N cache to apply any language change
+        I18N.reset()
         // Persist now to restore it when rebuilding the stage
         persistView(state)
         context.stop(self)
@@ -796,7 +794,7 @@ class MainController extends Logging {
         val alert = new Alert(Alert.AlertType.CONFIRMATION, "",
           ButtonType.OK, ButtonType.CANCEL, buttonSaveType)
         alert.initOwner(state.window)
-        alert.setHeaderText(resources.getString("confirmation.pending-changes"))
+        alert.setHeaderText(Strings.pendingChanges)
 
         // Filter action on "Save" button to trigger saving and check result:
         // If saving failed (user was notified), consume event to get back to
@@ -948,9 +946,8 @@ object MainController {
 
   def build(state: State, needRestart: Boolean = false, applicationStart: Boolean = false): Unit = {
     val stage = state.stage
-    val resources = I18N.getResources
 
-    val loader = new FXMLLoader(getClass.getResource("/fxml/main.fxml"), resources)
+    val loader = new FXMLLoader(getClass.getResource("/fxml/main.fxml"), I18N.getResources)
     val root = loader.load[Parent]()
     val controller = loader.getController[MainController]
     controller.initialize(state)
@@ -974,7 +971,7 @@ object MainController {
       Dialogs.information(
         owner = Some(state.window),
         title = None,
-        headerText = Some(resources.getString("information.need-restart"))
+        headerText = Some(Strings.needRestart)
       )
     }
 

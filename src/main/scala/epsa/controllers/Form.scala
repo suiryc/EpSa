@@ -1,6 +1,6 @@
 package epsa.controllers
 
-import epsa.I18N
+import epsa.I18N.Strings
 import epsa.model.Savings
 import java.time.LocalDate
 import javafx.css.PseudoClass
@@ -78,10 +78,10 @@ object Form {
 
         case None =>
           // Actually available
-          I18N.getResources.getString("available") +
+          Strings.available +
             (if (long) s" ($avail)" else "")
       }
-    }.getOrElse(I18N.getResources.getString("available"))
+    }.getOrElse(Strings.available)
 
   def formatAmount(amount: BigDecimal, currency: String): String =
     s"$amount $currency"

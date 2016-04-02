@@ -1,12 +1,12 @@
 package epsa.controllers
 
 import epsa.I18N
+import epsa.I18N.Strings
 import epsa.model.Savings
-import java.util.ResourceBundle
 import javafx.beans.property.SimpleBooleanProperty
 import javafx.collections.FXCollections
 import javafx.event.{ActionEvent, Event}
-import javafx.fxml.{FXMLLoader, FXML}
+import javafx.fxml.{FXML, FXMLLoader}
 import javafx.scene.Node
 import javafx.scene.control._
 import javafx.scene.image.ImageView
@@ -24,9 +24,6 @@ import suiryc.scala.javafx.util.Callback
 class EditSchemesController {
 
   import EditSchemesController._
-
-  @FXML
-  protected var resources: ResourceBundle = _
 
   @FXML
   protected var schemesField: ListView[Savings.Scheme] = _
@@ -109,7 +106,7 @@ class EditSchemesController {
           setOpacity(1.0)
         }
         else {
-          setTooltip(new Tooltip(resources.getString("warning.unselecting-nonempty-resource")))
+          setTooltip(new Tooltip(Strings.unselectingNonEmptyResource))
           setOpacity(0.8)
         }
       }
@@ -149,7 +146,7 @@ class EditSchemesController {
         val resp = Dialogs.confirmation(
           owner = Some(Stages.getStage(dialog)),
           title = None,
-          headerText = Some(resources.getString("confirmation.pending-changes"))
+          headerText = Some(Strings.pendingChanges)
         )
 
         if (!resp.contains(ButtonType.OK)) {
@@ -262,11 +259,11 @@ class EditSchemesController {
       val alert = new Alert(Alert.AlertType.CONFIRMATION)
       alert.initOwner(window)
 
-      val loader = new FXMLLoader(getClass.getResource("/fxml/select-resources.fxml"), resources)
+      val loader = new FXMLLoader(getClass.getResource("/fxml/select-resources.fxml"), I18N.getResources)
       val root = loader.load[Node]()
       alert.getDialogPane.setContent(root)
       val label = root.lookup("#labelField").asInstanceOf[Label]
-      label.setText(resources.getString("confirmation.delete-associated-funds"))
+      label.setText(Strings.deleteAssociatedFunds)
       val resourcesField = root.lookup("#resourcesField").asInstanceOf[ListView[Savings.Fund]]
       resourcesField.setCellFactory(Callback { new FundCell })
       resourcesField.getSelectionModel.setSelectionMode(SelectionMode.MULTIPLE)
@@ -453,8 +450,8 @@ class EditSchemesController {
 
     // Apply name field status: set error style if name is not OK
     Form.toggleError(nameField, !nameOk,
-      if (exists) Some(resources.getString("Name already exists"))
-      else if (name.isEmpty) Some(resources.getString("Name cannot be empty"))
+      if (exists) Some(Strings.nameExists)
+      else if (name.isEmpty) Some(Strings.nameEmpty)
       else None
     )
 
@@ -467,7 +464,7 @@ class EditSchemesController {
       case Some(scheme) =>
         deleteReady = canDeleteScheme(scheme)
         if (deleteReady) Form.toggleImageButton(minusField, set = deleteReady)
-        else Form.toggleImageButton(minusField, set = deleteReady, Some(resources.getString("Scheme is not empty")))
+        else Form.toggleImageButton(minusField, set = deleteReady, Some(Strings.schemeNotEmpty))
     }
 
     // Plus field status: enable if adding new scheme which name is OK, or
@@ -488,14 +485,12 @@ object EditSchemesController {
 
   /** Builds a dialog out of this controller. */
   def buildDialog(savings: Savings, edit: Option[Savings.Scheme]): Dialog[List[Savings.Event]] = {
-    val resources = I18N.getResources
-
     val dialog = new Dialog[List[Savings.Event]]()
-    val title = resources.getString("Edit schemes")
+    val title = Strings.editSchemes
     dialog.setTitle(title)
     dialog.getDialogPane.getButtonTypes.addAll(ButtonType.OK, ButtonType.CANCEL)
 
-    val loader = new FXMLLoader(getClass.getResource("/fxml/edit-schemes.fxml"), resources)
+    val loader = new FXMLLoader(getClass.getResource("/fxml/edit-schemes.fxml"), I18N.getResources)
     dialog.getDialogPane.setContent(loader.load())
     val controller = loader.getController[EditSchemesController]
     controller.initialize(savings, dialog, edit)

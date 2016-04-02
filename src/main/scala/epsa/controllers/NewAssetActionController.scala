@@ -1,11 +1,11 @@
 package epsa.controllers
 
 import epsa.I18N
+import epsa.I18N.Strings
 import epsa.model.Savings
 import epsa.util.Awaits
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
-import java.util.ResourceBundle
 import javafx.event.ActionEvent
 import javafx.collections.FXCollections
 import javafx.fxml.{FXML, FXMLLoader}
@@ -26,14 +26,10 @@ import suiryc.scala.javafx.stage.Stages
 import suiryc.scala.javafx.util.Callback
 
 // TODO: option of default day/month and number of years for frozen assets ?
-// TODO: warning on dst amount field if value differs from more than '1' (scaled) compared to src amount
 class NewAssetActionController {
 
   import epsa.Settings.{scaleAmount, scaleUnits}
   import NewAssetActionController._
-
-  @FXML
-  protected var resources: ResourceBundle = _
 
   @FXML
   protected var actionKindGroup: ToggleGroup = _
@@ -216,7 +212,7 @@ class NewAssetActionController {
     }
 
     // Setup source fund emptying button
-    srcEmptyButton.setTooltip(new Tooltip(resources.getString("Empty")))
+    srcEmptyButton.setTooltip(new Tooltip(Strings.empty))
     srcEmptyButton.setOnAction { (event: ActionEvent) =>
       onSrcEmpty()
     }
@@ -381,7 +377,7 @@ class NewAssetActionController {
   }
 
   private def onDstFund(): Unit = {
-    updateNAV()
+    updateNAV(updateSrc = false)
     // Trigger units/amount computation from source amount
     onSrcAmount()
     checkForm()
@@ -534,17 +530,15 @@ class NewAssetActionController {
     }
   }
 
-  private def updateNAV(): Unit = {
+  private def updateNAV(updateSrc: Boolean = true): Unit = {
     Option(operationDateField.getValue).foreach { operationDate =>
-      val labelDate = resources.getString("Date")
-
       def updateField(field: TextFieldWithButton, fund: Savings.Fund): Unit = {
         val navOpt = Awaits.readDataStoreNAV(Some(stage), fund.id, operationDate).getOrElse(None)
         navOpt match {
           case Some(nav) =>
             val text = nav.value.toString
             field.setText(text)
-            field.setTooltip(new Tooltip(s"$labelDate: ${nav.date}"))
+            field.setTooltip(new Tooltip(s"${Strings.date}: ${nav.date}"))
             field.setOnButtonAction { (event: ActionEvent) =>
               field.setText(text)
             }
@@ -560,7 +554,7 @@ class NewAssetActionController {
         }
       }
 
-      getSrcFund.foreach { schemeAndFund =>
+      if (updateSrc) getSrcFund.foreach { schemeAndFund =>
         updateField(srcNAVField, schemeAndFund.fund)
       }
       getDstFund.foreach { schemeAndFund =>
@@ -575,9 +569,9 @@ class NewAssetActionController {
     val opDateAnterior = opDateSelected && savings.latestAssetAction.exists(_.isAfter(operationDate))
     // Selecting a date of operation anterior to the latest asset action date is allowed even if discouraged
     val opDateOk = opDateSelected
-    val warningMsgOpt = savings.latestAssetAction.map(resources.getString("warning.anterior-operation-date").format(_))
+    val warningMsgOpt = savings.latestAssetAction.map(Strings.anteriorOpDate.format(_))
     Form.toggleStyles(operationDateField, None,
-      Form.ErrorStyle(!opDateSelected, mandatoryMsg),
+      Form.ErrorStyle(!opDateSelected, Strings.mandatoryField),
       Form.WarningStyle(opDateAnterior, warningMsgOpt.getOrElse(""))
     )
 
@@ -604,12 +598,12 @@ class NewAssetActionController {
     val srcUnitsIssue = {
       val srcUnitsValueIssue =
         if (srcUnitsValued) None
-        else Some(positiveValueMsg)
+        else Some(Strings.positiveValue)
       if (!isPayment && srcSelected && srcAvailabilitySelected) {
         srcAvailableAsset match {
           case Some(asset) =>
             if (srcUnitsValueIssue.nonEmpty) srcUnitsValueIssue
-            else if (srcAsset.units > asset.units) Some(valueLimitMsg.format(asset.units))
+            else if (srcAsset.units > asset.units) Some(Strings.valueLimit.format(asset.units))
             else None
 
           case None =>
@@ -620,19 +614,19 @@ class NewAssetActionController {
     val srcOk = srcSelected && srcAvailabilitySelected && !srcAvailabilityAnterior && srcNAVValued && srcUnitsIssue.isEmpty
     Form.toggleError(srcFundField, !srcSelected,
       if (srcSelected) None
-      else Some(mandatoryMsg)
+      else Some(Strings.mandatoryField)
     )
     Form.toggleStyles(srcAvailabilityField, None,
-      Form.ErrorStyle(!srcAvailabilitySelected, mandatoryMsg),
-      Form.ErrorStyle(srcAvailabilityAnterior, resources.getString("error.anterior-availability-date"))
+      Form.ErrorStyle(!srcAvailabilitySelected, Strings.mandatoryField),
+      Form.ErrorStyle(srcAvailabilityAnterior, Strings.anteriorAvailDate)
     )
     Form.toggleError(srcAvailabilityField2, !srcAvailabilitySelected,
       if (srcAvailabilitySelected) None
-      else Some(mandatoryMsg)
+      else Some(Strings.mandatoryField)
     )
     Form.toggleError(srcNAVField, !srcNAVValued,
       if (srcNAVValued) None
-      else Some(positiveValueMsg)
+      else Some(Strings.positiveValue)
     )
     srcUnitsField.setPromptText(srcUnitsPrompt.orNull)
     Form.toggleError(srcUnitsField, srcUnitsIssue.nonEmpty, srcUnitsIssue.orElse(srcUnitsPrompt))
@@ -656,20 +650,34 @@ class NewAssetActionController {
     val dstOk = dstSelected && dstAvailabilitySelected && !dstAvailabilityAnterior && dstNAVValued && dstUnitsValued
     Form.toggleError(dstFundField, !dstSelected,
       if (dstSelected) None
-      else Some(mandatoryMsg)
+      else Some(Strings.mandatoryField)
     )
     Form.toggleStyles(dstAvailabilityField, None,
-      Form.ErrorStyle(!dstAvailabilitySelected, mandatoryMsg),
-      Form.ErrorStyle(dstAvailabilityAnterior, resources.getString("error.anterior-availability-date"))
+      Form.ErrorStyle(!dstAvailabilitySelected, Strings.mandatoryField),
+      Form.ErrorStyle(dstAvailabilityAnterior, Strings.anteriorAvailDate)
     )
     Form.toggleError(dstNAVField, !dstNAVValued,
       if (dstNAVValued) None
-      else Some(positiveValueMsg)
+      else Some(Strings.positiveValue)
     )
     Form.toggleError(dstUnitsField, !dstUnitsValued,
       if (dstUnitsValued) None
-      else Some(positiveValueMsg)
+      else Some(Strings.positiveValue)
     )
+
+    lazy val srcAmount = getSrcAmount
+    lazy val dstAmount = getDstAmount
+    if (dstNeeded && dstNAVValued && (srcAmount > 0) && (dstAmount > 0)) {
+      val amountDelta = (dstAmount - srcAmount).abs
+      // Amount value step (due to units scale) is 'NAV * 10^-unitsScale'.
+      // The max delta (absolute) to reach any amount is then 'amountStep / 2'.
+      val allowedDelta = scaleAmount((dsnNAV / BigDecimal(s"1${"0" * epsa.Settings.unitsScale()}")) / 2)
+      val exceedsDelta = amountDelta > allowedDelta
+      Form.toggleWarning(dstAmountField, exceedsDelta,
+        if (!exceedsDelta) None
+        else Some(Strings.dstAmountDelta.format(amountDelta, allowedDelta))
+      )
+    }
 
     val event = if (opDateOk && srcOk && dstOk) Some {
       actionKind match {
@@ -741,6 +749,9 @@ class NewAssetActionController {
   private def getDstNAV: BigDecimal =
     getBigDecimal(dstNAVField.getText)
 
+  private def getDstAmount: BigDecimal =
+    getBigDecimal(dstAmountField.getText)
+
   private def getDstUnits: BigDecimal =
     getBigDecimal(dstUnitsField.getText)
 
@@ -768,22 +779,14 @@ object NewAssetActionController {
 
   private val dstUnitsAuto = Preference.from(s"$prefsKeyPrefix.dst-units-auto", true)
 
-  private lazy val mandatoryMsg = I18N.getResources.getString("Mandatory field")
-
-  private lazy val positiveValueMsg = I18N.getResources.getString("Positive value expected")
-
-  private lazy val valueLimitMsg = I18N.getResources.getString("Value exceeds available quantity")
-
   /** Builds a dialog out of this controller. */
   def buildDialog(mainController: MainController, savings: Savings, kind: AssetActionKind.Value, asset: Option[Savings.Asset]): Dialog[Option[Savings.Event]] = {
-    val resources = I18N.getResources
-
     val dialog = new Dialog[Option[Savings.Event]]()
-    val title = s"${resources.getString("Payment")} / ${resources.getString("Transfer")} / ${resources.getString("Refund")}"
+    val title = s"${Strings.payment} / ${Strings.transfer} / ${Strings.refund}"
     dialog.setTitle(title)
     dialog.getDialogPane.getButtonTypes.addAll(ButtonType.OK, ButtonType.CANCEL)
 
-    val loader = new FXMLLoader(getClass.getResource("/fxml/new-asset-action.fxml"), resources)
+    val loader = new FXMLLoader(getClass.getResource("/fxml/new-asset-action.fxml"), I18N.getResources)
     dialog.getDialogPane.setContent(loader.load())
     val controller = loader.getController[NewAssetActionController]
     controller.initialize(mainController, savings, dialog, kind, asset)

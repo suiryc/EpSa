@@ -1,6 +1,7 @@
 package epsa.controllers
 
 import epsa.I18N
+import epsa.I18N.Strings
 import epsa.charts.{ChartHandler, ChartSettings}
 import epsa.model.Savings
 import epsa.storage.DataStore
@@ -8,11 +9,11 @@ import epsa.tools.EsaliaInvestmentFundProber
 import epsa.util.Awaits
 import java.nio.file.Path
 import java.time.LocalDate
-import java.util.{ResourceBundle, UUID}
+import java.util.UUID
 import javafx.beans.property.SimpleObjectProperty
 import javafx.collections.FXCollections
 import javafx.event.ActionEvent
-import javafx.fxml.{FXMLLoader, FXML}
+import javafx.fxml.{FXML, FXMLLoader}
 import javafx.scene.{Parent, Scene}
 import javafx.scene.control._
 import javafx.scene.layout.AnchorPane
@@ -28,7 +29,9 @@ import suiryc.scala.javafx.scene.control.Dialogs
 import suiryc.scala.javafx.stage.{FileChoosers, Stages}
 import suiryc.scala.javafx.util.Callback
 
-// TODO - be notified (by main view) if funds are added/removed ?
+// TODO: be notified (by main view) if funds are added/removed ?
+// TODO: possibility to manually edit the value for a given date ?
+// TODO: also handle one 'standard' excel/libreoffice format ?
 class NetAssetValueHistoryController {
 
   import NetAssetValueHistoryController._
@@ -36,9 +39,6 @@ class NetAssetValueHistoryController {
   // Note: visible progress indicator seems to steal focus (or at least
   // prevent correct handling) from ComboBox if the latter is displayed
   // above the former. So have the ComboBox at the bottom.
-
-  @FXML
-  protected var resources: ResourceBundle = _
 
   @FXML
   protected var historyPane: AnchorPane = _
@@ -90,10 +90,10 @@ class NetAssetValueHistoryController {
   def onImport(event: ActionEvent): Unit = {
     Option(fundField.getValue).foreach { fund =>
       val fileChooser = new FileChooser()
-      fileChooser.setTitle(resources.getString("Import net asset value history"))
+      fileChooser.setTitle(Strings.importNAVHistory)
       fileChooser.getExtensionFilters.addAll(
-        new FileChooser.ExtensionFilter(resources.getString("Excel files"), "*.xls", "*.xlsx"),
-        new FileChooser.ExtensionFilter(resources.getString("All files"), "*.*")
+        new FileChooser.ExtensionFilter(Strings.excelFiles, "*.xls", "*.xlsx"),
+        new FileChooser.ExtensionFilter(Strings.allFiles, "*.*")
       )
       navHistoryImportPath.option.foreach { path =>
         FileChoosers.setInitialPath(fileChooser, path.toFile)
@@ -112,8 +112,8 @@ class NetAssetValueHistoryController {
             Dialogs.warning(
               owner = Some(stage),
               title = None,
-              headerText = Some(resources.getString("warning.unhandled-resource")),
-              contentText = Some(resources.getString("Unknown format"))
+              headerText = Some(Strings.unhandledResource),
+              contentText = Some(Strings.unknownFormat)
             )
         }
       }
@@ -125,8 +125,8 @@ class NetAssetValueHistoryController {
       val resp = Dialogs.confirmation(
         owner = Some(stage),
         title = None,
-        headerText = Some(resources.getString("confirmation.action")),
-        contentText = Some(resources.getString("Purge net asset value history"))
+        headerText = Some(Strings.confirmAction),
+        contentText = Some(Strings.purgeNAVHistory)
       )
 
       if (resp.contains(ButtonType.OK)) {
@@ -292,7 +292,7 @@ class NetAssetValueHistoryController {
     val chartHandler = new ChartHandler(
       fundName = fund.name,
       fundValues = actualValues,
-      settings = ChartSettings.hidden.copy(xLabel = labelDate, yLabel = labelNAV)
+      settings = ChartSettings.hidden.copy(xLabel = Strings.date, yLabel = Strings.nav)
     )
     val pane = chartHandler.chartPane
     chartPane = Some(pane)
@@ -339,7 +339,7 @@ class NetAssetValueHistoryController {
       AssetEntry(added.date, Seq(added.value))
     }
 
-    val loader = new FXMLLoader(getClass.getResource("/fxml/net-asset-value-history-changes.fxml"), resources)
+    val loader = new FXMLLoader(getClass.getResource("/fxml/net-asset-value-history-changes.fxml"), I18N.getResources)
     val root = loader.load[Parent]()
     val tabPane = root.lookup("#tabPane").asInstanceOf[TabPane]
     val fundLabel = root.lookup("#fundLabel").asInstanceOf[Label]
@@ -358,9 +358,9 @@ class NetAssetValueHistoryController {
     unchangedLabel.setText(result.fundChanges.unchanged.toString)
     if (updatedEntries.nonEmpty) {
       val headers = Seq(
-        resources.getString("Date"),
-        resources.getString("Old value"),
-        resources.getString("New value")
+        Strings.date,
+        Strings.oldValue,
+        Strings.newValue
       )
       setupTable(updatedTable, headers, updatedEntries)
     } else {
@@ -368,8 +368,8 @@ class NetAssetValueHistoryController {
     }
     if (addedEntries.nonEmpty) {
       val headers = Seq(
-        resources.getString("Date"),
-        resources.getString("NAV")
+        Strings.date,
+        Strings.nav
       )
       setupTable(addedTable, headers, addedEntries)
     } else {
@@ -399,20 +399,14 @@ object NetAssetValueHistoryController {
 
   protected val navHistoryImportPath = Preference.from("nav.history.import.path", null:Path)
 
-  def title = I18N.getResources.getString("Net asset value history")
-
-  def labelDate = I18N.getResources.getString("Date")
-
-  def labelNAV = I18N.getResources.getString("NAV")
+  def title = Strings.navHistory
 
   /** Builds a stage out of this controller. */
   def buildStage(mainController: MainController, savings: Savings, fundId: Option[UUID], window: Window): Dialog[Boolean] = {
-    val resources = I18N.getResources
-
     val dialog = new Dialog[Boolean]()
     dialog.getDialogPane.getButtonTypes.addAll(ButtonType.OK, ButtonType.CANCEL)
 
-    val loader = new FXMLLoader(getClass.getResource("/fxml/net-asset-value-history.fxml"), resources)
+    val loader = new FXMLLoader(getClass.getResource("/fxml/net-asset-value-history.fxml"), I18N.getResources)
     dialog.getDialogPane.setContent(loader.load())
     val controller = loader.getController[NetAssetValueHistoryController]
     controller.initialize(savings, fundId)

@@ -1,6 +1,6 @@
 package epsa.storage
 
-import epsa.I18N
+import epsa.I18N.Strings
 import epsa.model.Savings
 import java.nio.file.Files
 import java.nio.file.Path
@@ -123,12 +123,10 @@ object DataStore {
   def getRealDB: DBInfo =
     dbRealOpt match {
       case Some(v) => v
-      case None    => throw new Exception(I18N.getResources.getString("No data store selected"))
+      case None    => throw new Exception(Strings.noDataStoreSelected)
     }
 
   def open(owner: Option[Window], change: Boolean, save: Boolean): Option[Future[Unit]] = {
-    val resources = I18N.getResources
-
     // Close temporary database unless we are about to save
     if (!save) {
       closeTempDB()
@@ -136,9 +134,9 @@ object DataStore {
 
     if (change) {
       val fileChooser = new FileChooser()
-      fileChooser.setTitle(resources.getString("Select data store"))
+      fileChooser.setTitle(Strings.selectDataStore)
       fileChooser.getExtensionFilters.addAll(
-        new FileChooser.ExtensionFilter(resources.getString("Data store"), "*.mv.db")
+        new FileChooser.ExtensionFilter(Strings.dataStore, "*.mv.db")
       )
       FileChoosers.setInitialPath(fileChooser, defaultPath.toFile)
 
@@ -568,7 +566,7 @@ object DataStore {
    * database path.
    */
   def writeIssueMsg(real: Boolean = false): String =
-    issueMsg(I18N.getResources.getString("Could not write data store"), real)
+    issueMsg(Strings.dataStoreWriteError, real)
 
   /**
    * Formats reading issue message.
@@ -577,22 +575,22 @@ object DataStore {
    * in-memory one exists; so indicate its path in this case.
    */
   def readIssueMsg(real: Boolean = dbTempOpt.isEmpty && dbRealOpt.nonEmpty): String =
-    issueMsg(I18N.getResources.getString("Could not read data store"), real)
+    issueMsg(Strings.dataStoreReadError, real)
 
   /**
    * Formats cleanup message.
    *
    * Cleanup is based on real database.
    */
-  lazy val cleanupMsg: String =
-    issueMsg(I18N.getResources.getString("Cleaned up data store"), real = true)
+  def cleanupMsg: String =
+    issueMsg(Strings.dataStoreCleaned, real = true)
 
   /**
    * Formats cleanup issue message.
    *
    * Cleanup is based on real database.
    */
-  lazy val cleanupIssueMsg: String =
-    issueMsg(I18N.getResources.getString("Could not cleanup data store"), real = true)
+  def cleanupIssueMsg: String =
+    issueMsg(Strings.dataStoreCleanError, real = true)
 
 }
