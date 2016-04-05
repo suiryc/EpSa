@@ -36,7 +36,9 @@ import suiryc.scala.javafx.stage.{FileChoosers, Stages}
 import suiryc.scala.javafx.util.Callback
 import suiryc.scala.settings.Preference
 
-// TODO: display more information in assets table and details: gain/loss (amount/percentage)
+// TODO: display more information in assets table and details: gain/loss (amount/percentage, gross/net)
+// TODO: use nested columns for amounts (invested and gross - and net)
+// TODO: use nested columns for gain/loss (gross, gross percentage - and net, net percentage ?)
 // TODO: display more details for selected asset (e.g. values history graph)
 // TODO: ability to copy asset entry data in clipboard ? Or how to copy details ?
 // TODO: menu entries with latest datastore locations ?
