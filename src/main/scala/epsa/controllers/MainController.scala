@@ -22,6 +22,7 @@ import javafx.scene.{Parent, Scene}
 import javafx.scene.layout.{GridPane, Region}
 import javafx.scene.control._
 import javafx.scene.image.{Image, ImageView}
+import javafx.scene.input._
 import javafx.stage._
 import scala.collection.immutable.ListMap
 import scala.util.Success
@@ -38,7 +39,6 @@ import suiryc.scala.settings.Preference
 
 // TODO: display more information in assets table and details: gain/loss (amount/percentage, gross/net)
 // TODO: display more details for selected asset (e.g. values history graph)
-// TODO: ability to copy asset entry data in clipboard ? Or how to copy details ?
 // TODO: menu entries with latest datastore locations ?
 // TODO: menu entry and dialog to display/edit events history ?
 // TODO: when computing assets, order by scheme/fund/availability ?
@@ -79,6 +79,10 @@ class MainController extends Logging {
 
   @FXML
   protected var assetsTable: TableView[Savings.Asset] = _
+
+  private val clipboard = Clipboard.getSystemClipboard
+
+  private val CTRL_C = new KeyCodeCombination(KeyCode.C, KeyCombination.CONTROL_DOWN)
 
   private var actor: ActorRef = _
 
@@ -235,42 +239,40 @@ class MainController extends Logging {
     }
 
     assetsTable.getSelectionModel.selectedItemProperty.listen { asset0 =>
-      val state = stateProperty.get()
-      val savings = state.savingsUpd
-      val assetOpt = Option(asset0)
-      val currency = epsa.Settings.currency()
-      assetFields(ASSET_KEY_SCHEME).detailsValue.setText(assetOpt.map { asset =>
-        savings.getScheme(asset.schemeId).name
+      val assetDetailsOpt = Option(asset0).map(getAssetDetails)
+      assetFields(ASSET_KEY_SCHEME).detailsValue.setText(assetDetailsOpt.map { details =>
+        details.scheme.name
       }.orNull)
-      assetFields(ASSET_KEY_FUND).detailsValue.setText(assetOpt.map { asset =>
-        savings.getFund(asset.fundId).name
+      assetFields(ASSET_KEY_FUND).detailsValue.setText(assetDetailsOpt.map { details =>
+        details.fund.name
       }.orNull)
-      assetFields(ASSET_KEY_AVAILABILITY).detailsValue.setText(assetOpt.map { asset =>
-        Form.formatAvailability(asset.availability, date = None, long = true)
+      assetFields(ASSET_KEY_AVAILABILITY).detailsValue.setText(assetDetailsOpt.map { details =>
+        details.formatAvailability(long = true)
       }.orNull)
-      assetFields(ASSET_KEY_UNITS).detailsValue.setText(assetOpt.map { asset =>
-        asset.units.toString()
+      assetFields(ASSET_KEY_UNITS).detailsValue.setText(assetDetailsOpt.map { details =>
+        details.units.toString
       }.orNull)
-      assetFields(ASSET_KEY_VWAP).detailsValue.setText(assetOpt.map { asset =>
-        Form.formatAmount(asset.vwap, currency)
+      assetFields(ASSET_KEY_VWAP).detailsValue.setText(assetDetailsOpt.map { details =>
+        details.formatVWAP
       }.orNull)
-      assetFields(ASSET_KEY_DATE).detailsValue.setText(assetOpt.map { asset =>
-        state.assetsValue.get(asset.fundId).map(_.date.toString).getOrElse(Strings.na)
+      assetFields(ASSET_KEY_DATE).detailsValue.setText(assetDetailsOpt.map { details =>
+        details.formatDate
       }.orNull)
-      assetFields(ASSET_KEY_NAV).detailsValue.setText(assetOpt.map { asset =>
-        state.assetsValue.get(asset.fundId).map { nav =>
-          Form.formatAmount(nav.value, currency)
-        }.getOrElse(Strings.na)
+      assetFields(ASSET_KEY_NAV).detailsValue.setText(assetDetailsOpt.map { details =>
+        details.formatNAV
       }.orNull)
-      assetFields(ASSET_KEY_INVESTED_AMOUNT).detailsValue.setText(assetOpt.map { asset =>
-        Form.formatAmount(asset.investedAmount, currency)
+      assetFields(ASSET_KEY_INVESTED_AMOUNT).detailsValue.setText(assetDetailsOpt.map { details =>
+        details.formatInvestedAmount
       }.orNull)
-      assetFields(ASSET_KEY_GROSS_AMOUNT).detailsValue.setText(assetOpt.map { asset =>
-        state.assetsValue.get(asset.fundId).map { assetValue =>
-          Form.formatAmount(asset.amount(assetValue.value), currency)
-        }.getOrElse(Strings.na)
+      assetFields(ASSET_KEY_GROSS_AMOUNT).detailsValue.setText(assetDetailsOpt.map { details =>
+        details.formatGrossAmount
       }.orNull)
     }
+
+    // Handle 'Ctrl-c' to copy asset information.
+    assetsTable.addEventHandler(KeyEvent.KEY_PRESSED, { (event: KeyEvent) =>
+      if (CTRL_C.`match`(event)) Option(assetsTable.getSelectionModel.getSelectedItem).foreach(copyAssetToClipboard)
+    })
   }
 
   /** Restores (persisted) view. */
@@ -465,6 +467,48 @@ class MainController extends Logging {
     }
 
     row
+  }
+
+  /** Gets (computes) given asset details. */
+  private def getAssetDetails(asset: Savings.Asset): AssetDetails = {
+    val state = getState.get()
+    val savings = state.savingsUpd
+
+    AssetDetails(
+      savings.getScheme(asset.schemeId),
+      savings.getFund(asset.fundId),
+      asset.availability,
+      asset.units,
+      asset.vwap,
+      state.assetsValue.get(asset.fundId).map(_.date),
+      state.assetsValue.get(asset.fundId).map(_.value),
+      asset.investedAmount,
+      state.assetsValue.get(asset.fundId).map { assetValue =>
+        asset.amount(assetValue.value)
+      }
+    )
+  }
+
+  /** Copy asset details to clipboard. */
+  private def copyAssetToClipboard(asset: Savings.Asset): Unit = {
+    val details = getAssetDetails(asset)
+    val text = List(
+      (assetFields(ASSET_KEY_SCHEME), details.scheme.name),
+      (assetFields(ASSET_KEY_FUND), details.fund.name),
+      (assetFields(ASSET_KEY_AVAILABILITY), details.formatAvailability(long = true)),
+      (assetFields(ASSET_KEY_UNITS), details.units.toString),
+      (assetFields(ASSET_KEY_VWAP), details.formatVWAP),
+      (assetFields(ASSET_KEY_DATE), details.formatDate),
+      (assetFields(ASSET_KEY_NAV), details.formatNAV),
+      (assetFields(ASSET_KEY_INVESTED_AMOUNT), details.formatInvestedAmount),
+      (assetFields(ASSET_KEY_GROSS_AMOUNT), details.formatGrossAmount)
+    ).map { case (field, value) =>
+        s"${field.detailsLabel} $value"
+    }.mkString("\n")
+
+    val content = new ClipboardContent()
+    content.putString(text)
+    clipboard.setContent(content)
   }
 
   object ControllerActor {
@@ -885,6 +929,27 @@ object MainController {
   private val ASSET_KEY_INVESTED_AMOUNT = "investedAmount"
 
   private val ASSET_KEY_GROSS_AMOUNT = "grossAmount"
+
+  case class AssetDetails(scheme: Savings.Scheme, fund: Savings.Fund, availability: Option[LocalDate],
+                          units: BigDecimal, vwap: BigDecimal, date: Option[LocalDate], nav: Option[BigDecimal],
+                          investedAmount: BigDecimal, grossAmount: Option[BigDecimal])
+  {
+
+    private val currency = epsa.Settings.currency()
+
+    def formatAvailability(long: Boolean) = Form.formatAvailability(availability, date = None, long)
+
+    val formatVWAP = Form.formatAmount(vwap, currency)
+
+    val formatDate = date.map(_.toString).getOrElse(Strings.na)
+
+    val formatNAV = nav.map(Form.formatAmount(_, currency)).getOrElse(Strings.na)
+
+    val formatInvestedAmount = Form.formatAmount(investedAmount, currency)
+
+    val formatGrossAmount = grossAmount.map(Form.formatAmount(_, currency)).getOrElse(Strings.na)
+
+  }
 
   case class State(
     stage: Stage,
