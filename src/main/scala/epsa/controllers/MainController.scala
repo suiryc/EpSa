@@ -37,8 +37,6 @@ import suiryc.scala.javafx.util.Callback
 import suiryc.scala.settings.Preference
 
 // TODO: display more information in assets table and details: gain/loss (amount/percentage, gross/net)
-// TODO: use nested columns for amounts (invested and gross - and net)
-// TODO: use nested columns for gain/loss (gross, gross percentage - and net, net percentage ?)
 // TODO: display more details for selected asset (e.g. values history graph)
 // TODO: ability to copy asset entry data in clipboard ? Or how to copy details ?
 // TODO: menu entries with latest datastore locations ?
@@ -92,10 +90,10 @@ class MainController extends Logging {
     ASSET_KEY_AVAILABILITY    -> AssetField(Strings.availability, Strings.availabilityColon),
     ASSET_KEY_UNITS           -> AssetField(Strings.units, Strings.unitsColon),
     ASSET_KEY_VWAP            -> AssetField(Strings.vwap, Strings.vwapColon),
-    ASSET_KEY_INVESTED_AMOUNT -> AssetField(Strings.investedLFAmount, Strings.investedAmountColon),
     ASSET_KEY_DATE            -> AssetField(Strings.date, Strings.dateColon),
     ASSET_KEY_NAV             -> AssetField(Strings.nav, Strings.navColon),
-    ASSET_KEY_AMOUNT          -> AssetField(Strings.amount, Strings.amountColon)
+    ASSET_KEY_INVESTED_AMOUNT -> AssetField(Strings.invested, Strings.investedAmountColon),
+    ASSET_KEY_GROSS_AMOUNT    -> AssetField(Strings.gross, Strings.grossAmountColon)
   )
 
   private val columnScheme =
@@ -113,17 +111,22 @@ class MainController extends Logging {
   private val columnVWAP =
     new TableColumn[Savings.Asset, Option[BigDecimal]](assetFields(ASSET_KEY_VWAP).tableLabel)
 
-  private val columnInvestedAmount =
-    new TableColumn[Savings.Asset, Option[BigDecimal]](assetFields(ASSET_KEY_INVESTED_AMOUNT).tableLabel)
-
   private val columnDate =
     new TableColumn[Savings.Asset, Option[LocalDate]](assetFields(ASSET_KEY_DATE).tableLabel)
 
   private val columnNAV =
     new TableColumn[Savings.Asset, Option[BigDecimal]](assetFields(ASSET_KEY_NAV).tableLabel)
 
+  private val columnInvestedAmount =
+    new TableColumn[Savings.Asset, Option[BigDecimal]](assetFields(ASSET_KEY_INVESTED_AMOUNT).tableLabel)
+
+  private val columnGrossAmount =
+    new TableColumn[Savings.Asset, Option[BigDecimal]](assetFields(ASSET_KEY_GROSS_AMOUNT).tableLabel)
+
   private val columnAmount =
-    new TableColumn[Savings.Asset, Option[BigDecimal]](assetFields(ASSET_KEY_AMOUNT).tableLabel)
+    new TableColumn[Savings.Asset, Nothing](Strings.amount)
+
+  columnAmount.getColumns.addAll(columnInvestedAmount, columnGrossAmount)
 
   private val assetsColumns = List(
     ASSET_KEY_SCHEME          -> columnScheme,
@@ -131,10 +134,10 @@ class MainController extends Logging {
     ASSET_KEY_AVAILABILITY    -> columnAvailability,
     ASSET_KEY_UNITS           -> columnUnits,
     ASSET_KEY_VWAP            -> columnVWAP,
-    ASSET_KEY_INVESTED_AMOUNT -> columnInvestedAmount,
     ASSET_KEY_DATE            -> columnDate,
     ASSET_KEY_NAV             -> columnNAV,
-    ASSET_KEY_AMOUNT          -> columnAmount
+    ASSET_KEY_INVESTED_AMOUNT -> columnInvestedAmount,
+    ASSET_KEY_GROSS_AMOUNT    -> columnGrossAmount
   )
 
   def initialize(state: State): Unit = {
@@ -182,10 +185,6 @@ class MainController extends Logging {
       new SimpleObjectProperty(Some(data.getValue.vwap))
     })
     columnVWAP.setCellFactory(Callback { new AmountCell[Savings.Asset](epsa.Settings.currency(), Strings.na) })
-    columnInvestedAmount.setCellValueFactory(Callback { data =>
-      new SimpleObjectProperty(Some(data.getValue.investedAmount))
-    })
-    columnInvestedAmount.setCellFactory(Callback { new AmountCell[Savings.Asset](epsa.Settings.currency(), Strings.na) })
     columnDate.setCellValueFactory(Callback { data =>
       Bindings.createObjectBinding[Option[LocalDate]](
         Callable(stateProperty.get().assetsValue.get(data.getValue.fundId).map(_.date)),
@@ -200,7 +199,11 @@ class MainController extends Logging {
       )
     })
     columnNAV.setCellFactory(Callback { new AmountCell[Savings.Asset](epsa.Settings.currency(), Strings.na) })
-    columnAmount.setCellValueFactory(Callback { data =>
+    columnInvestedAmount.setCellValueFactory(Callback { data =>
+      new SimpleObjectProperty(Some(data.getValue.investedAmount))
+    })
+    columnInvestedAmount.setCellFactory(Callback { new AmountCell[Savings.Asset](epsa.Settings.currency(), Strings.na) })
+    columnGrossAmount.setCellValueFactory(Callback { data =>
       Bindings.createObjectBinding[Option[BigDecimal]](
         Callable {
           stateProperty.get().assetsValue.get(data.getValue.fundId).map { assetValue =>
@@ -210,7 +213,7 @@ class MainController extends Logging {
         stateProperty
       )
     })
-    columnAmount.setCellFactory(Callback { new AmountCell[Savings.Asset](epsa.Settings.currency(), Strings.na) })
+    columnGrossAmount.setCellFactory(Callback { new AmountCell[Savings.Asset](epsa.Settings.currency(), Strings.na) })
 
     // Note: Asset gives scheme/fund UUID. Since State is immutable (and is
     // changed when applying events in controller) we must delegate scheme/fund
@@ -251,9 +254,6 @@ class MainController extends Logging {
       assetFields(ASSET_KEY_VWAP).detailsValue.setText(assetOpt.map { asset =>
         Form.formatAmount(asset.vwap, currency)
       }.orNull)
-      assetFields(ASSET_KEY_INVESTED_AMOUNT).detailsValue.setText(assetOpt.map { asset =>
-        Form.formatAmount(asset.investedAmount, currency)
-      }.orNull)
       assetFields(ASSET_KEY_DATE).detailsValue.setText(assetOpt.map { asset =>
         state.assetsValue.get(asset.fundId).map(_.date.toString).getOrElse(Strings.na)
       }.orNull)
@@ -262,7 +262,10 @@ class MainController extends Logging {
           Form.formatAmount(nav.value, currency)
         }.getOrElse(Strings.na)
       }.orNull)
-      assetFields(ASSET_KEY_AMOUNT).detailsValue.setText(assetOpt.map { asset =>
+      assetFields(ASSET_KEY_INVESTED_AMOUNT).detailsValue.setText(assetOpt.map { asset =>
+        Form.formatAmount(asset.investedAmount, currency)
+      }.orNull)
+      assetFields(ASSET_KEY_GROSS_AMOUNT).detailsValue.setText(assetOpt.map { asset =>
         state.assetsValue.get(asset.fundId).map { assetValue =>
           Form.formatAmount(asset.amount(assetValue.value), currency)
         }.getOrElse(Strings.na)
@@ -875,13 +878,13 @@ object MainController {
 
   private val ASSET_KEY_VWAP = "vwap"
 
-  private val ASSET_KEY_INVESTED_AMOUNT = "investedAmount"
-
   private val ASSET_KEY_DATE = "date"
 
   private val ASSET_KEY_NAV = "nav"
 
-  private val ASSET_KEY_AMOUNT = "amount"
+  private val ASSET_KEY_INVESTED_AMOUNT = "investedAmount"
+
+  private val ASSET_KEY_GROSS_AMOUNT = "grossAmount"
 
   case class State(
     stage: Stage,
