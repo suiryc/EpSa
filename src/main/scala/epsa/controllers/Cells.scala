@@ -3,8 +3,8 @@ package epsa.controllers
 import epsa.model.Savings
 import epsa.util.JFXStyles
 import java.time.LocalDate
-import javafx.scene.control.ListCell
-import suiryc.scala.javafx.scene.control.{CellEx, CellWithSeparator, ListCellEx, TableCellEx}
+import javafx.scene.control.{Cell, ListCell}
+import suiryc.scala.javafx.scene.control.{CellWithSeparator, ListCellEx, TableCellEx}
 import suiryc.scala.util.I18NLocale
 
 class SchemeCell extends ListCellEx[Savings.Scheme] {
@@ -23,19 +23,11 @@ class AvailabilityListCell(baseOpt: Option[LocalDate]) extends ListCellEx[Option
   override def itemText(item: Option[LocalDate]) = Form.formatAvailability(item, baseOpt, long = false)
 }
 
-class AvailabilityTableCell[A] extends TableCellEx[A, Option[LocalDate]] {
-  override def itemText(item: Option[LocalDate]) = Form.formatAvailability(item, date = None, long = false)
-}
-
-class DateOptCell[A](na: String) extends TableCellEx[A, Option[LocalDate]] {
-  override def itemText(item: Option[LocalDate]) = item.map(_.toString).getOrElse(na)
-}
-
 class AmountCell[A](currency: String, na: String) extends TableCellEx[A, Option[BigDecimal]] {
   override def itemText(item: Option[BigDecimal]) = item.map(Form.formatAmount(_, currency)).getOrElse(na)
 }
 
-trait ColoredAmount extends CellEx[Option[BigDecimal]] {
+trait ColoredAmount extends Cell[Option[BigDecimal]] {
   override protected def updateItem(item: Option[BigDecimal], empty: Boolean) {
     super.updateItem(item, empty)
     (if (empty) None else item).find(_ != 0) match {

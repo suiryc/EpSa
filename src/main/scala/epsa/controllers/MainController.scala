@@ -13,7 +13,7 @@ import java.nio.file.Path
 import java.time.LocalDate
 import java.util.UUID
 import javafx.beans.binding.Bindings
-import javafx.beans.property.SimpleObjectProperty
+import javafx.beans.property.{SimpleObjectProperty, SimpleStringProperty}
 import javafx.collections.FXCollections
 import javafx.collections.transformation.SortedList
 import javafx.event.ActionEvent
@@ -78,7 +78,7 @@ class MainController extends Logging {
   protected var assetDetails: GridPane = _
 
   @FXML
-  protected var assetsTable: TableView[Savings.Asset] = _
+  protected var assetsTable: TableView[AssetDetails] = _
 
   private val clipboard = Clipboard.getSystemClipboard
 
@@ -102,42 +102,42 @@ class MainController extends Logging {
   )
 
   private val columnScheme =
-    new TableColumn[Savings.Asset, String](assetFields(ASSET_KEY_SCHEME).tableLabel)
+    new TableColumn[AssetDetails, String](assetFields(ASSET_KEY_SCHEME).tableLabel)
 
   private val columnFund =
-    new TableColumn[Savings.Asset, String](assetFields(ASSET_KEY_FUND).tableLabel)
+    new TableColumn[AssetDetails, String](assetFields(ASSET_KEY_FUND).tableLabel)
 
   private val columnAvailability =
-    new TableColumn[Savings.Asset, Option[LocalDate]](assetFields(ASSET_KEY_AVAILABILITY).tableLabel)
+    new TableColumn[AssetDetails, String](assetFields(ASSET_KEY_AVAILABILITY).tableLabel)
 
   private val columnUnits =
-    new TableColumn[Savings.Asset, BigDecimal](assetFields(ASSET_KEY_UNITS).tableLabel)
+    new TableColumn[AssetDetails, String](assetFields(ASSET_KEY_UNITS).tableLabel)
 
   private val columnVWAP =
-    new TableColumn[Savings.Asset, Option[BigDecimal]](assetFields(ASSET_KEY_VWAP).tableLabel)
+    new TableColumn[AssetDetails, String](assetFields(ASSET_KEY_VWAP).tableLabel)
 
   private val columnDate =
-    new TableColumn[Savings.Asset, Option[LocalDate]](assetFields(ASSET_KEY_DATE).tableLabel)
+    new TableColumn[AssetDetails, String](assetFields(ASSET_KEY_DATE).tableLabel)
 
   private val columnNAV =
-    new TableColumn[Savings.Asset, Option[BigDecimal]](assetFields(ASSET_KEY_NAV).tableLabel)
+    new TableColumn[AssetDetails, String](assetFields(ASSET_KEY_NAV).tableLabel)
 
   private val columnInvestedAmount =
-    new TableColumn[Savings.Asset, Option[BigDecimal]](assetFields(ASSET_KEY_INVESTED_AMOUNT).tableLabel)
+    new TableColumn[AssetDetails, String](assetFields(ASSET_KEY_INVESTED_AMOUNT).tableLabel)
 
   private val columnGrossAmount =
-    new TableColumn[Savings.Asset, Option[BigDecimal]](assetFields(ASSET_KEY_GROSS_AMOUNT).tableLabel)
+    new TableColumn[AssetDetails, String](assetFields(ASSET_KEY_GROSS_AMOUNT).tableLabel)
 
   private val columnAmount =
-    new TableColumn[Savings.Asset, Nothing](Strings.amount)
+    new TableColumn[AssetDetails, Nothing](Strings.amount)
 
   columnAmount.getColumns.addAll(columnInvestedAmount, columnGrossAmount)
 
   private val columnGrossGain =
-    new TableColumn[Savings.Asset, Option[BigDecimal]](assetFields(ASSET_KEY_GROSS_GAIN).tableLabel)
+    new TableColumn[AssetDetails, Option[BigDecimal]](assetFields(ASSET_KEY_GROSS_GAIN).tableLabel)
 
   private val columnGain =
-    new TableColumn[Savings.Asset, Nothing](Strings.gain)
+    new TableColumn[AssetDetails, Nothing](Strings.gain)
 
   columnGain.getColumns.addAll(columnGrossGain)
 
@@ -162,83 +162,47 @@ class MainController extends Logging {
       s"epsa-main@${System.currentTimeMillis}"
     )
 
-    // Note: scheme and fund columns cell value factory relies on the current
-    // Savings instance. We could try to define those in the actor, but table
-    // view handling makes it difficult or impossible to ensure all updated
-    // values (e.g. changed scheme/fund name) are applied.
-    // Instead, have the state a Property that triggers cell content updating
-    // when changed. Store it as the table user data since we don't use it for
-    // anything else while it needs to be shared between the controller and its
-    // actor.
-    // Note: handle unknown scheme/fund in updated Savings. It if happens,
-    // corresponding assets will disappear from the table right away (items
-    // updated after savings).
+    // Note: in previous versions of JavaFx (before 8u60), it could be difficult
+    // or impossible to ensure some changes (like scheme/fund name change) were
+    // applied. To circumvent this, a binding could be created from the state
+    // property (table user data) to execute a function which would retrieve
+    // table cells value.
+    // It should not be necessary anymore as we reload the stage when necessary
+    // (option changes) or can still ask to 'refresh' the table.
     val stateProperty = new SimpleObjectProperty[State](state)
     assetsTable.setTableMenuButtonVisible(true)
     assetsTable.setUserData(stateProperty)
     columnScheme.setCellValueFactory(Callback { data =>
-      Bindings.createStringBinding(
-        Callable(stateProperty.get().savingsUpd.findScheme(data.getValue.schemeId).map(_.name).orNull),
-        stateProperty
-      )
+      new SimpleStringProperty(data.getValue.scheme.name)
     })
     columnFund.setCellValueFactory(Callback { data =>
-      Bindings.createStringBinding(
-        Callable(stateProperty.get().savingsUpd.findFund(data.getValue.fundId).map(_.name).orNull),
-        stateProperty
-      )
+      new SimpleStringProperty(data.getValue.fund.name)
     })
     columnAvailability.setCellValueFactory(Callback { data =>
-      new SimpleObjectProperty(data.getValue.availability)
+      new SimpleStringProperty(data.getValue.formatAvailability(long = false))
     })
-    columnAvailability.setCellFactory(Callback { new AvailabilityTableCell[Savings.Asset] })
     columnUnits.setCellValueFactory(Callback { data =>
-      new SimpleObjectProperty(data.getValue.units)
+      new SimpleStringProperty(data.getValue.asset.units.toString)
     })
     columnVWAP.setCellValueFactory(Callback { data =>
-      new SimpleObjectProperty(Some(data.getValue.vwap))
+      new SimpleStringProperty(data.getValue.formatVWAP)
     })
-    columnVWAP.setCellFactory(Callback { new AmountCell[Savings.Asset](epsa.Settings.currency(), Strings.na) })
     columnDate.setCellValueFactory(Callback { data =>
-      Bindings.createObjectBinding[Option[LocalDate]](
-        Callable(stateProperty.get().assetsValue.get(data.getValue.fundId).map(_.date)),
-        stateProperty
-      )
+      new SimpleStringProperty(data.getValue.formatDate)
     })
-    columnDate.setCellFactory(Callback { new DateOptCell[Savings.Asset](Strings.na) })
     columnNAV.setCellValueFactory(Callback { data =>
-      Bindings.createObjectBinding[Option[BigDecimal]](
-        Callable(stateProperty.get().assetsValue.get(data.getValue.fundId).map(_.value)),
-        stateProperty
-      )
+      new SimpleStringProperty(data.getValue.formatNAV)
     })
-    columnNAV.setCellFactory(Callback { new AmountCell[Savings.Asset](epsa.Settings.currency(), Strings.na) })
     columnInvestedAmount.setCellValueFactory(Callback { data =>
-      new SimpleObjectProperty(Some(data.getValue.investedAmount))
+      new SimpleStringProperty(data.getValue.formatInvestedAmount)
     })
-    columnInvestedAmount.setCellFactory(Callback { new AmountCell[Savings.Asset](epsa.Settings.currency(), Strings.na) })
     columnGrossAmount.setCellValueFactory(Callback { data =>
-      Bindings.createObjectBinding[Option[BigDecimal]](
-        Callable {
-          stateProperty.get().assetsValue.get(data.getValue.fundId).map { assetValue =>
-            data.getValue.amount(assetValue.value)
-          }
-        },
-        stateProperty
-      )
+      new SimpleStringProperty(data.getValue.formatGrossAmount)
     })
-    columnGrossAmount.setCellFactory(Callback { new AmountCell[Savings.Asset](epsa.Settings.currency(), Strings.na) })
     columnGrossGain.setCellValueFactory(Callback { data =>
-      Bindings.createObjectBinding[Option[BigDecimal]](
-        Callable {
-          stateProperty.get().assetsValue.get(data.getValue.fundId).map { assetValue =>
-            data.getValue.amount(assetValue.value) - data.getValue.investedAmount
-          }
-        },
-        stateProperty
-      )
+      new SimpleObjectProperty(data.getValue.grossGain)
     })
-    columnGrossGain.setCellFactory(Callback { new AmountCell[Savings.Asset](epsa.Settings.currency(), Strings.na) with ColoredAmount })
+    columnGrossGain.setCellFactory(Callback { new AmountCell[AssetDetails](epsa.Settings.currency(), Strings.na) with ColoredAmount })
 
     // Note: Asset gives scheme/fund UUID. Since State is immutable (and is
     // changed when applying events in controller) we must delegate scheme/fund
@@ -259,8 +223,8 @@ class MainController extends Logging {
         GridPane.setRowIndex(value, idx)
     }
 
-    assetsTable.getSelectionModel.selectedItemProperty.listen { asset0 =>
-      val assetDetailsOpt = Option(asset0).map(getAssetDetails)
+    assetsTable.getSelectionModel.selectedItemProperty.listen { assetDetails =>
+      val assetDetailsOpt = Option(assetDetails)
       assetFields(ASSET_KEY_SCHEME).detailsValue.setText(assetDetailsOpt.map { details =>
         details.scheme.name
       }.orNull)
@@ -271,7 +235,7 @@ class MainController extends Logging {
         details.formatAvailability(long = true)
       }.orNull)
       assetFields(ASSET_KEY_UNITS).detailsValue.setText(assetDetailsOpt.map { details =>
-        details.units.toString
+        details.asset.units.toString
       }.orNull)
       assetFields(ASSET_KEY_VWAP).detailsValue.setText(assetDetailsOpt.map { details =>
         details.formatVWAP
@@ -304,7 +268,7 @@ class MainController extends Logging {
 
     // Handle 'Ctrl-c' to copy asset information.
     assetsTable.addEventHandler(KeyEvent.KEY_PRESSED, { (event: KeyEvent) =>
-      if (CTRL_C.`match`(event)) Option(assetsTable.getSelectionModel.getSelectedItem).foreach(copyAssetToClipboard)
+      if (CTRL_C.`match`(event)) Option(assetsTable.getSelectionModel.getSelectedItem).foreach(copyAssetDetailsToClipboard)
     })
   }
 
@@ -386,23 +350,23 @@ class MainController extends Logging {
   }
 
   def onEditSchemes(event: ActionEvent): Unit = {
-    actor ! OnEditSchemes(Option(assetsTable.getSelectionModel.getSelectedItem).map(_.schemeId))
+    actor ! OnEditSchemes(getSelectedAsset.map(_.schemeId))
   }
 
   def onEditFunds(event: ActionEvent): Unit = {
-    actor ! OnEditFunds(Option(assetsTable.getSelectionModel.getSelectedItem).map(_.fundId))
+    actor ! OnEditFunds(getSelectedAsset.map(_.fundId))
   }
 
   def onNewPayment(event: ActionEvent): Unit = {
-    actor ! OnNewAssetAction(AssetActionKind.Payment, Option(assetsTable.getSelectionModel.getSelectedItem))
+    actor ! OnNewAssetAction(AssetActionKind.Payment, getSelectedAsset)
   }
 
   def onNewTransfer(event: ActionEvent): Unit = {
-    actor ! OnNewAssetAction(AssetActionKind.Transfer, Option(assetsTable.getSelectionModel.getSelectedItem))
+    actor ! OnNewAssetAction(AssetActionKind.Transfer, getSelectedAsset)
   }
 
   def onNewRefund(event: ActionEvent): Unit = {
-    actor ! OnNewAssetAction(AssetActionKind.Refund, Option(assetsTable.getSelectionModel.getSelectedItem))
+    actor ! OnNewAssetAction(AssetActionKind.Refund, getSelectedAsset)
   }
 
   def onOptions(event: ActionEvent): Unit = {
@@ -422,7 +386,7 @@ class MainController extends Logging {
   }
 
   def onNetAssetValueHistory(event: ActionEvent): Unit = {
-    actor ! OnNetAssetValueHistory(Option(assetsTable.getSelectionModel.getSelectedItem).map(_.fundId))
+    actor ! OnNetAssetValueHistory(getSelectedAsset.map(_.fundId))
   }
 
   def onUpToDateAssets(event: ActionEvent): Unit = {
@@ -438,8 +402,8 @@ class MainController extends Logging {
    *
    * Binds menu context to edit asset scheme/fund.
    */
-  private def newAssetRow(): TableRow[Savings.Asset] = {
-    val row = new TableRow[Savings.Asset]()
+  private def newAssetRow(): TableRow[AssetDetails] = {
+    val row = new TableRow[AssetDetails]()
 
     // See: https://www.marshall.edu/genomicjava/2013/12/30/javafx-tableviews-with-contextmenus/
     val menu = new ContextMenu()
@@ -447,45 +411,45 @@ class MainController extends Logging {
     val editScheme = new MenuItem(Strings.editScheme,
       new ImageView(new Image("/images/fugue-icons/tables.png", 0.0, 0.0, true, false, false)))
     editScheme.setOnAction { (event: ActionEvent) =>
-      Option(row.getItem).foreach { asset =>
-        actor ! OnEditSchemes(Some(asset.schemeId))
+      Option(row.getItem).foreach { details =>
+        actor ! OnEditSchemes(Some(details.asset.schemeId))
       }
     }
     val editFund = new MenuItem(Strings.editFund,
       new ImageView(new Image("/images/fugue-icons/table.png", 0.0, 0.0, true, false, false)))
     editFund.setOnAction { (event: ActionEvent) =>
-      Option(row.getItem).foreach { asset =>
-        actor ! OnEditFunds(Some(asset.fundId))
+      Option(row.getItem).foreach { details =>
+        actor ! OnEditFunds(Some(details.asset.fundId))
       }
     }
 
     val newPayment = new MenuItem(Strings.newPayment,
       new ImageView(new Image("/images/fugue-icons/table-import.png", 0.0, 0.0, true, false, false)))
     newPayment.setOnAction { (event: ActionEvent) =>
-      Option(row.getItem).foreach { asset =>
-        actor ! OnNewAssetAction(AssetActionKind.Payment, Some(asset))
+      Option(row.getItem).foreach { details =>
+        actor ! OnNewAssetAction(AssetActionKind.Payment, Some(details.asset))
       }
     }
     val newArbitrage = new MenuItem(Strings.newTransfer,
       new ImageView(new Image("/images/fugue-icons/tables-relation.png", 0.0, 0.0, true, false, false)))
     newArbitrage.setOnAction { (event: ActionEvent) =>
-      Option(row.getItem).foreach { asset =>
-        actor ! OnNewAssetAction(AssetActionKind.Transfer, Some(asset))
+      Option(row.getItem).foreach { details =>
+        actor ! OnNewAssetAction(AssetActionKind.Transfer, Some(details.asset))
       }
     }
     val newRefund = new MenuItem(Strings.newRefund,
       new ImageView(new Image("/images/fugue-icons/table-export.png", 0.0, 0.0, true, false, false)))
     newRefund.setOnAction { (event: ActionEvent) =>
-      Option(row.getItem).foreach { asset =>
-        actor ! OnNewAssetAction(AssetActionKind.Refund, Some(asset))
+      Option(row.getItem).foreach { details =>
+        actor ! OnNewAssetAction(AssetActionKind.Refund, Some(details.asset))
       }
     }
 
     val navHistory = new MenuItem(NetAssetValueHistoryController.title,
       new ImageView(new Image("/images/fugue-icons/chart-up.png", 0.0, 0.0, true, false, false)))
     navHistory.setOnAction { (event: ActionEvent) =>
-      Option(row.getItem).foreach { asset =>
-        actor ! OnNetAssetValueHistory(Some(asset.fundId))
+      Option(row.getItem).foreach { details =>
+        actor ! OnNetAssetValueHistory(Some(details.asset.fundId))
       }
     }
 
@@ -502,37 +466,36 @@ class MainController extends Logging {
     row
   }
 
+  private def getSelectedAsset: Option[Savings.Asset] =
+    Option(assetsTable.getSelectionModel.getSelectedItem).map(_.asset)
+
   /** Gets (computes) given asset details. */
   private def getAssetDetails(asset: Savings.Asset): AssetDetails = {
     val state = getState.get()
     val savings = state.savingsUpd
 
     AssetDetails(
-      savings.getScheme(asset.schemeId),
-      savings.getFund(asset.fundId),
-      asset.availability,
-      asset.units,
-      asset.vwap,
-      state.assetsValue.get(asset.fundId).map(_.date),
-      state.assetsValue.get(asset.fundId).map(_.value),
-      asset.investedAmount,
-      state.assetsValue.get(asset.fundId).map { assetValue =>
+      asset = asset,
+      scheme = savings.getScheme(asset.schemeId),
+      fund = savings.getFund(asset.fundId),
+      date = state.assetsValue.get(asset.fundId).map(_.date),
+      nav = state.assetsValue.get(asset.fundId).map(_.value),
+      grossAmount = state.assetsValue.get(asset.fundId).map { assetValue =>
         asset.amount(assetValue.value)
       },
-      state.assetsValue.get(asset.fundId).map { assetValue =>
+      grossGain = state.assetsValue.get(asset.fundId).map { assetValue =>
         asset.amount(assetValue.value) - asset.investedAmount
       }
     )
   }
 
   /** Copy asset details to clipboard. */
-  private def copyAssetToClipboard(asset: Savings.Asset): Unit = {
-    val details = getAssetDetails(asset)
+  private def copyAssetDetailsToClipboard(details: AssetDetails): Unit = {
     val text = List(
       (assetFields(ASSET_KEY_SCHEME), details.scheme.name),
       (assetFields(ASSET_KEY_FUND), details.fund.name),
       (assetFields(ASSET_KEY_AVAILABILITY), details.formatAvailability(long = true)),
-      (assetFields(ASSET_KEY_UNITS), details.units.toString),
+      (assetFields(ASSET_KEY_UNITS), details.asset.units.toString),
       (assetFields(ASSET_KEY_VWAP), details.formatVWAP),
       (assetFields(ASSET_KEY_DATE), details.formatDate),
       (assetFields(ASSET_KEY_NAV), details.formatNAV),
@@ -601,9 +564,10 @@ class MainController extends Logging {
       val assets =
         if (!newState.viewUpToDateAssets) newSavings.assets
         else newSavings.computeAssets(LocalDate.now).assets
-      val sortedAssets = new SortedList(FXCollections.observableList(assets))
-      sortedAssets.comparatorProperty.bind(assetsTable.comparatorProperty)
-      assetsTable.setItems(sortedAssets)
+      val assetsDetails = assets.map(getAssetDetails)
+      val sortedAssetsDetails = new SortedList(FXCollections.observableList(assetsDetails))
+      sortedAssetsDetails.comparatorProperty.bind(assetsTable.comparatorProperty)
+      assetsTable.setItems(sortedAssetsDetails)
 
       fileCloseMenu.setDisable(DataStore.dbOpened.isEmpty)
       fileSaveMenu.setDisable(!dirty)
@@ -969,22 +933,22 @@ object MainController {
 
   private val ASSET_KEY_GROSS_GAIN = "grossGain"
 
-  case class AssetDetails(scheme: Savings.Scheme, fund: Savings.Fund, availability: Option[LocalDate],
-                          units: BigDecimal, vwap: BigDecimal, date: Option[LocalDate], nav: Option[BigDecimal],
-                          investedAmount: BigDecimal, grossAmount: Option[BigDecimal], grossGain: Option[BigDecimal])
+  case class AssetDetails(asset: Savings.Asset, scheme: Savings.Scheme, fund: Savings.Fund,
+                          date: Option[LocalDate], nav: Option[BigDecimal],
+                          grossAmount: Option[BigDecimal], grossGain: Option[BigDecimal])
   {
 
     private val currency = epsa.Settings.currency()
 
-    def formatAvailability(long: Boolean) = Form.formatAvailability(availability, date = None, long)
+    def formatAvailability(long: Boolean) = Form.formatAvailability(asset.availability, date = None, long)
 
-    val formatVWAP = Form.formatAmount(vwap, currency)
+    val formatVWAP = Form.formatAmount(asset.vwap, currency)
 
     val formatDate = date.map(_.toString).getOrElse(Strings.na)
 
     val formatNAV = nav.map(Form.formatAmount(_, currency)).getOrElse(Strings.na)
 
-    val formatInvestedAmount = Form.formatAmount(investedAmount, currency)
+    val formatInvestedAmount = Form.formatAmount(asset.investedAmount, currency)
 
     val formatGrossAmount = grossAmount.map(Form.formatAmount(_, currency)).getOrElse(Strings.na)
 
