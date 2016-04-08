@@ -3,7 +3,7 @@ package epsa.controllers
 import epsa.I18N
 import epsa.I18N.Strings
 import epsa.model.Savings
-import epsa.util.Awaits
+import epsa.util.{Awaits, JFXStyles}
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import javafx.event.ActionEvent
@@ -570,9 +570,9 @@ class NewAssetActionController {
     // Selecting a date of operation anterior to the latest asset action date is allowed even if discouraged
     val opDateOk = opDateSelected
     val warningMsgOpt = savings.latestAssetAction.map(Strings.anteriorOpDate.format(_))
-    Form.toggleStyles(operationDateField, None,
-      Form.ErrorStyle(!opDateSelected, Strings.mandatoryField),
-      Form.WarningStyle(opDateAnterior, warningMsgOpt.getOrElse(""))
+    JFXStyles.toggleStyles(operationDateField, None,
+      JFXStyles.ErrorStyle(!opDateSelected, Strings.mandatoryField),
+      JFXStyles.WarningStyle(opDateAnterior, warningMsgOpt.getOrElse(""))
     )
 
     val isPayment = actionKind == AssetActionKind.Payment
@@ -612,24 +612,24 @@ class NewAssetActionController {
       } else srcUnitsValueIssue
     }
     val srcOk = srcSelected && srcAvailabilitySelected && !srcAvailabilityAnterior && srcNAVValued && srcUnitsIssue.isEmpty
-    Form.toggleError(srcFundField, !srcSelected,
+    JFXStyles.toggleError(srcFundField, !srcSelected,
       if (srcSelected) None
       else Some(Strings.mandatoryField)
     )
-    Form.toggleStyles(srcAvailabilityField, None,
-      Form.ErrorStyle(!srcAvailabilitySelected, Strings.mandatoryField),
-      Form.ErrorStyle(srcAvailabilityAnterior, Strings.anteriorAvailDate)
+    JFXStyles.toggleStyles(srcAvailabilityField, None,
+      JFXStyles.ErrorStyle(!srcAvailabilitySelected, Strings.mandatoryField),
+      JFXStyles.ErrorStyle(srcAvailabilityAnterior, Strings.anteriorAvailDate)
     )
-    Form.toggleError(srcAvailabilityField2, !srcAvailabilitySelected,
+    JFXStyles.toggleError(srcAvailabilityField2, !srcAvailabilitySelected,
       if (srcAvailabilitySelected) None
       else Some(Strings.mandatoryField)
     )
-    Form.toggleError(srcNAVField, !srcNAVValued,
+    JFXStyles.toggleError(srcNAVField, !srcNAVValued,
       if (srcNAVValued) None
       else Some(Strings.positiveValue)
     )
     srcUnitsField.setPromptText(srcUnitsPrompt.orNull)
-    Form.toggleError(srcUnitsField, srcUnitsIssue.nonEmpty, srcUnitsIssue.orElse(srcUnitsPrompt))
+    JFXStyles.toggleError(srcUnitsField, srcUnitsIssue.nonEmpty, srcUnitsIssue.orElse(srcUnitsPrompt))
 
     val dstNeeded = isDstEnabled
     lazy val dstFund = getDstFund.orNull
@@ -648,19 +648,19 @@ class NewAssetActionController {
     val dstUnitsValued = !dstNeeded || (dstUnits > 0)
     lazy val dstAsset = Savings.AssetPart(dstFund.scheme.id, dstFund.fund.id, dstAvailability, dstUnits, getDstNAV)
     val dstOk = dstSelected && dstAvailabilitySelected && !dstAvailabilityAnterior && dstNAVValued && dstUnitsValued
-    Form.toggleError(dstFundField, !dstSelected,
+    JFXStyles.toggleError(dstFundField, !dstSelected,
       if (dstSelected) None
       else Some(Strings.mandatoryField)
     )
-    Form.toggleStyles(dstAvailabilityField, None,
-      Form.ErrorStyle(!dstAvailabilitySelected, Strings.mandatoryField),
-      Form.ErrorStyle(dstAvailabilityAnterior, Strings.anteriorAvailDate)
+    JFXStyles.toggleStyles(dstAvailabilityField, None,
+      JFXStyles.ErrorStyle(!dstAvailabilitySelected, Strings.mandatoryField),
+      JFXStyles.ErrorStyle(dstAvailabilityAnterior, Strings.anteriorAvailDate)
     )
-    Form.toggleError(dstNAVField, !dstNAVValued,
+    JFXStyles.toggleError(dstNAVField, !dstNAVValued,
       if (dstNAVValued) None
       else Some(Strings.positiveValue)
     )
-    Form.toggleError(dstUnitsField, !dstUnitsValued,
+    JFXStyles.toggleError(dstUnitsField, !dstUnitsValued,
       if (dstUnitsValued) None
       else Some(Strings.positiveValue)
     )
@@ -673,7 +673,7 @@ class NewAssetActionController {
       // The max delta (absolute) to reach any amount is then 'amountStep / 2'.
       val allowedDelta = scaleAmount((dsnNAV / BigDecimal(s"1${"0" * epsa.Settings.unitsScale()}")) / 2)
       val exceedsDelta = amountDelta > allowedDelta
-      Form.toggleWarning(dstAmountField, exceedsDelta,
+      JFXStyles.toggleWarning(dstAmountField, exceedsDelta,
         if (!exceedsDelta) None
         else Some(Strings.dstAmountDelta.format(amountDelta, allowedDelta))
       )

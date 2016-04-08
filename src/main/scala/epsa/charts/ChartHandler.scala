@@ -160,12 +160,13 @@ class ChartHandler(
   zoomZone.setDisable(true)
 
   /** Chart data label to display value. */
-  private val labelVL = new ChartDataLabel(settings.xLabel, settings.yLabel, settings.ySuffix)
-  labelVL.getStyleClass.addAll("default-color0", "chart-line-symbol", "chart-series-line")
-  labelVL.setStyle("-fx-font-size: 14; -fx-opacity: 0.6;")
-  labelVL.setMinSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE)
-  labelVL.setVisible(false)
-  labelVL.setDisable(true)
+  private val labelNAV = new ChartDataLabel(settings.xLabel, settings.yLabel, settings.ySuffix)
+  labelNAV.getStylesheets.add(getClass.getResource("/css/main.css").toExternalForm)
+  labelNAV.getStyleClass.addAll("default-color0", "chart-line-symbol", "chart-series-line")
+  labelNAV.setStyle("-fx-font-size: 14; -fx-opacity: 0.6;")
+  labelNAV.setMinSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE)
+  labelNAV.setVisible(false)
+  labelNAV.setDisable(true)
   /** Label listening subscription. */
   private var labelVLCancellable: List[Cancellable] = Nil
 
@@ -180,7 +181,7 @@ class ChartHandler(
   AnchorPane.setRightAnchor(chart, 0.0)
   AnchorPane.setBottomAnchor(chart, 0.0)
   AnchorPane.setLeftAnchor(chart, 0.0)
-  chartPane.getChildren.addAll(chart, zoomZone, verticalLineRef, horizontalLineRef, verticalLine, horizontalLine, labelVL)
+  chartPane.getChildren.addAll(chart, zoomZone, verticalLineRef, horizontalLineRef, verticalLine, horizontalLine, labelNAV)
   // Note: it is not a good idea to track mouse from chartBg, since
   // crossing any displayed element (e.g. grid) will trigger exited/entered.
   // Better track mouse on chart, and check whether it is over the graph.
@@ -292,14 +293,14 @@ class ChartHandler(
     hideZoomArea()
     labelVLCancellable.foreach(_.cancel())
     labelVLCancellable = Nil
-    labelVL.setVisible(false)
+    labelNAV.setVisible(false)
     horizontalLine.setVisible(false)
     verticalLine.setVisible(false)
     // Sometimes (exiting/leaving chart) we don't want to reset the reference value
     if (clearRef) {
       horizontalLineRef.setVisible(false)
       verticalLineRef.setVisible(false)
-      labelVL.setDataRef(None)
+      labelNAV.setDataRef(None)
     }
     // Reset previous position, so that it can be redrawn if we re-enter
     currentXPos = None
@@ -335,12 +336,12 @@ class ChartHandler(
    * Default position is where the middle of the label is the currently
    * displayed 'x' chart value.
    */
-  def setLabelX() = if (labelVL.isVisible) {
+  def setLabelX() = if (labelNAV.isVisible) {
     val bounds = getChartBackgroundBounds
 
     currentXPos.map(getXY(bounds, _)) match {
       case Some((x, _)) =>
-        labelVL.setTranslateX(x - labelVL.getWidth / 2)
+        labelNAV.setTranslateX(x - labelNAV.getWidth / 2)
 
       case None =>
       // No current position to set label on
@@ -353,12 +354,12 @@ class ChartHandler(
    * Default position is where the bottom of the label is above the currently
    * displayed 'y' chart value by 10 pixels.
    */
-  def setLabelY() = if (labelVL.isVisible) {
+  def setLabelY() = if (labelNAV.isVisible) {
     val bounds = getChartBackgroundBounds
 
     currentXPos.map(getXY(bounds, _)) match {
       case Some((_, y)) =>
-        labelVL.setTranslateY(y - labelVL.getHeight - 10)
+        labelNAV.setTranslateY(y - labelNAV.getHeight - 10)
 
       case None =>
       // No current position to set label on
@@ -371,45 +372,45 @@ class ChartHandler(
    * Makre sure it remains inside the chart background, and if possible does not
    * 'hide' the currently displayed chart data value.
    */
-  def checkLabelPosition() = if (labelVL.isVisible) {
+  def checkLabelPosition() = if (labelNAV.isVisible) {
     val bounds = getChartBackgroundBounds
 
-    if (labelVL.getLayoutX + labelVL.getTranslateX + labelVL.getWidth > bounds.getMaxX) {
+    if (labelNAV.getLayoutX + labelNAV.getTranslateX + labelNAV.getWidth > bounds.getMaxX) {
       // right end of label is going beyond chart
-      labelVL.setTranslateX(bounds.getMaxX - labelVL.getLayoutX - labelVL.getWidth)
-    } else if (labelVL.getLayoutX + labelVL.getTranslateX < bounds.getMinX) {
+      labelNAV.setTranslateX(bounds.getMaxX - labelNAV.getLayoutX - labelNAV.getWidth)
+    } else if (labelNAV.getLayoutX + labelNAV.getTranslateX < bounds.getMinX) {
       // left end of label is going beyond chart
-      labelVL.setTranslateX(bounds.getMinX - labelVL.getLayoutX)
+      labelNAV.setTranslateX(bounds.getMinX - labelNAV.getLayoutX)
     }
-    if (labelVL.getLayoutY + labelVL.getTranslateY + labelVL.getHeight > bounds.getMaxY) {
+    if (labelNAV.getLayoutY + labelNAV.getTranslateY + labelNAV.getHeight > bounds.getMaxY) {
       // bottom end of label is going beyond chart
-      labelVL.setTranslateY(bounds.getMaxY - labelVL.getLayoutY - labelVL.getHeight)
-    } else if (labelVL.getLayoutY + labelVL.getTranslateY < bounds.getMinY) {
+      labelNAV.setTranslateY(bounds.getMaxY - labelNAV.getLayoutY - labelNAV.getHeight)
+    } else if (labelNAV.getLayoutY + labelNAV.getTranslateY < bounds.getMinY) {
       // top end of label is going beyond chart
       currentXPos.map(getXY(bounds, _)) match {
         case Some((_, currentY)) =>
           // We don't want to go above the chart top, but would like not to
           // display the label in front of the chart point, unless that make
           // it go beyond the chart bottom.
-          if ((bounds.getMinY + labelVL.getHeight < currentY) || (currentY + 10 + labelVL.getHeight > bounds.getMaxY)) {
+          if ((bounds.getMinY + labelNAV.getHeight < currentY) || (currentY + 10 + labelNAV.getHeight > bounds.getMaxY)) {
             // We still remain above the displayed chart point, or would go
             // beyond the chart bottom by displaying the label underneath it.
             // So just go at the top of the chart.
-            labelVL.setTranslateY(bounds.getMinY - labelVL.getLayoutY)
+            labelNAV.setTranslateY(bounds.getMinY - labelNAV.getLayoutY)
           } else {
             // chart point will be under the label, move it underneath
-            labelVL.setTranslateY(currentY + 10)
+            labelNAV.setTranslateY(currentY + 10)
           }
 
         case None =>
-          labelVL.setTranslateY(bounds.getMinY - labelVL.getLayoutY)
+          labelNAV.setTranslateY(bounds.getMinY - labelNAV.getLayoutY)
       }
     }
   }
 
   /** Draws reference value lines. */
   private def drawReferenceLines(xPos: Option[String] = None): Unit = {
-    xPos.orElse(labelVL.getDataRef.map(_.x)).foreach { xPos =>
+    xPos.orElse(labelNAV.getDataRef.map(_.x)).foreach { xPos =>
       val bounds = getChartBackgroundBounds
       val (x, y) = getXY(bounds, xPos)
 
@@ -462,18 +463,18 @@ class ChartHandler(
 
       if (labelVLCancellable.isEmpty) {
         // Listen for position and dimension changes to check the label remains inside the chart
-        val s1 = labelVL.boundsInParentProperty.listen(checkLabelPosition())
+        val s1 = labelNAV.boundsInParentProperty.listen(checkLabelPosition())
         // Listen to width and height changes to place the label at the right position
-        val s2 = labelVL.widthProperty.listen(setLabelX())
-        val s3 = labelVL.heightProperty.listen(setLabelY())
+        val s2 = labelNAV.widthProperty.listen(setLabelX())
+        val s3 = labelNAV.heightProperty.listen(setLabelY())
         labelVLCancellable = List(s1, s2, s3)
       }
 
-      if (!labelVL.isVisible) {
-        labelVL.setVisible(true)
+      if (!labelNAV.isVisible) {
+        labelNAV.setVisible(true)
       }
 
-      labelVL.setData(ChartData(xPos, valuesMap(xPos)))
+      labelNAV.setData(ChartData(xPos, valuesMap(xPos)))
       setLabelX()
       setLabelY()
     }
@@ -529,7 +530,7 @@ class ChartHandler(
         val (x, y) = getXY(bounds, xPos)
 
         xZoomPos1 = Some(xPos)
-        labelVL.setDataRef(Some(ChartData(xPos, valuesMap(xPos))))
+        labelNAV.setDataRef(Some(ChartData(xPos, valuesMap(xPos))))
         drawReferenceLines(xZoomPos1)
 
         zoomZone.setX(getX(bounds, xPos))

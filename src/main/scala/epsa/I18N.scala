@@ -48,6 +48,8 @@ object I18N extends suiryc.scala.util.I18N("i18n.epsa") with I18NWithPreference 
     def investedAmountColon = getString("Invested amount:")
     def gross = getString("Gross")
     def grossAmountColon = getString("Gross amount:")
+    def gain = getString("Gain/Loss")
+    def grossGainColon = getString("Gross gain/loss:")
     def payment = getString("Payment")
     def transfer = getString("Transfer")
     def refund = getString("Refund")

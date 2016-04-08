@@ -1,7 +1,7 @@
 package epsa.charts
 
+import epsa.util.JFXStyles
 import javafx.scene.layout.VBox
-import javafx.scene.paint.Color
 import javafx.scene.text.{Text, TextFlow}
 
 /** Chart data. */
@@ -71,11 +71,11 @@ class ChartDataLabel(xLabel: String = "Date", yLabel: String = "NAV", ySuffix: S
       refTextValue.setText(f"$delta%+.2f%%")
       refTextDate.setText(s" (${refData.x})")
       if (delta > 0) {
-        refTextValue.setFill(Color.GREEN)
+        JFXStyles.togglePositive(refTextValue)
       } else if (delta < 0) {
-        refTextValue.setFill(Color.RED)
+        JFXStyles.toggleNegative(refTextValue)
       } else {
-        refTextValue.setFill(Color.BLACK)
+        JFXStyles.toggleNeutral(refTextValue)
       }
     }
   }

@@ -3,6 +3,7 @@ package epsa.controllers
 import epsa.I18N
 import epsa.I18N.Strings
 import epsa.model.Savings
+import epsa.util.JFXStyles
 import javafx.beans.property.SimpleBooleanProperty
 import javafx.collections.FXCollections
 import javafx.event.{ActionEvent, Event}
@@ -449,7 +450,7 @@ class EditSchemesController {
     val nameOk = !exists && name.nonEmpty
 
     // Apply name field status: set error style if name is not OK
-    Form.toggleError(nameField, !nameOk,
+    JFXStyles.toggleError(nameField, !nameOk,
       if (exists) Some(Strings.nameExists)
       else if (name.isEmpty) Some(Strings.nameEmpty)
       else None
@@ -459,12 +460,12 @@ class EditSchemesController {
     Option(schemesField.getSelectionModel.getSelectedItem) match {
       case None =>
         deleteReady = false
-        Form.toggleImageButton(minusField, set = deleteReady)
+        JFXStyles.toggleImageButton(minusField, set = deleteReady)
 
       case Some(scheme) =>
         deleteReady = canDeleteScheme(scheme)
-        if (deleteReady) Form.toggleImageButton(minusField, set = deleteReady)
-        else Form.toggleImageButton(minusField, set = deleteReady, Some(Strings.schemeNotEmpty))
+        if (deleteReady) JFXStyles.toggleImageButton(minusField, set = deleteReady)
+        else JFXStyles.toggleImageButton(minusField, set = deleteReady, Some(Strings.schemeNotEmpty))
     }
 
     // Plus field status: enable if adding new scheme which name is OK, or
@@ -472,11 +473,11 @@ class EditSchemesController {
     addReady =
       if (edit.isEmpty) nameOk
       else name.nonEmpty
-    Form.toggleImageButton(plusField, addReady)
+    JFXStyles.toggleImageButton(plusField, addReady)
 
     // Tick field status: enable if name and edition are OK
     applyReady = nameOk && editOk
-    Form.toggleImageButton(tickField, applyReady)
+    JFXStyles.toggleImageButton(tickField, applyReady)
   }
 
 }

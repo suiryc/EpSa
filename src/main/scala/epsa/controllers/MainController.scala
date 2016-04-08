@@ -7,7 +7,7 @@ import epsa.charts.ChartHandler
 import epsa.model.Savings
 import epsa.storage.DataStore
 import epsa.tools.EsaliaInvestmentFundProber
-import epsa.util.Awaits
+import epsa.util.{Awaits, JFXStyles}
 import grizzled.slf4j.Logging
 import java.nio.file.Path
 import java.time.LocalDate
@@ -97,7 +97,8 @@ class MainController extends Logging {
     ASSET_KEY_DATE            -> AssetField(Strings.date, Strings.dateColon),
     ASSET_KEY_NAV             -> AssetField(Strings.nav, Strings.navColon),
     ASSET_KEY_INVESTED_AMOUNT -> AssetField(Strings.invested, Strings.investedAmountColon),
-    ASSET_KEY_GROSS_AMOUNT    -> AssetField(Strings.gross, Strings.grossAmountColon)
+    ASSET_KEY_GROSS_AMOUNT    -> AssetField(Strings.gross, Strings.grossAmountColon),
+    ASSET_KEY_GROSS_GAIN      -> AssetField(Strings.gross, Strings.grossGainColon)
   )
 
   private val columnScheme =
@@ -132,6 +133,14 @@ class MainController extends Logging {
 
   columnAmount.getColumns.addAll(columnInvestedAmount, columnGrossAmount)
 
+  private val columnGrossGain =
+    new TableColumn[Savings.Asset, Option[BigDecimal]](assetFields(ASSET_KEY_GROSS_GAIN).tableLabel)
+
+  private val columnGain =
+    new TableColumn[Savings.Asset, Nothing](Strings.gain)
+
+  columnGain.getColumns.addAll(columnGrossGain)
+
   private val assetsColumns = List(
     ASSET_KEY_SCHEME          -> columnScheme,
     ASSET_KEY_FUND            -> columnFund,
@@ -141,7 +150,8 @@ class MainController extends Logging {
     ASSET_KEY_DATE            -> columnDate,
     ASSET_KEY_NAV             -> columnNAV,
     ASSET_KEY_INVESTED_AMOUNT -> columnInvestedAmount,
-    ASSET_KEY_GROSS_AMOUNT    -> columnGrossAmount
+    ASSET_KEY_GROSS_AMOUNT    -> columnGrossAmount,
+    ASSET_KEY_GROSS_GAIN      -> columnGrossGain
   )
 
   def initialize(state: State): Unit = {
@@ -218,6 +228,17 @@ class MainController extends Logging {
       )
     })
     columnGrossAmount.setCellFactory(Callback { new AmountCell[Savings.Asset](epsa.Settings.currency(), Strings.na) })
+    columnGrossGain.setCellValueFactory(Callback { data =>
+      Bindings.createObjectBinding[Option[BigDecimal]](
+        Callable {
+          stateProperty.get().assetsValue.get(data.getValue.fundId).map { assetValue =>
+            data.getValue.amount(assetValue.value) - data.getValue.investedAmount
+          }
+        },
+        stateProperty
+      )
+    })
+    columnGrossGain.setCellFactory(Callback { new AmountCell[Savings.Asset](epsa.Settings.currency(), Strings.na) with ColoredAmount })
 
     // Note: Asset gives scheme/fund UUID. Since State is immutable (and is
     // changed when applying events in controller) we must delegate scheme/fund
@@ -267,6 +288,18 @@ class MainController extends Logging {
       assetFields(ASSET_KEY_GROSS_AMOUNT).detailsValue.setText(assetDetailsOpt.map { details =>
         details.formatGrossAmount
       }.orNull)
+      val grossGainLabel = assetFields(ASSET_KEY_GROSS_GAIN).detailsValue
+      grossGainLabel.setText(assetDetailsOpt.map { details =>
+        details.formatGrossGain
+      }.orNull)
+      assetDetailsOpt.flatMap(_.grossGain).find(_ != 0) match {
+        case Some(v) =>
+          if (v > 0) JFXStyles.togglePositive(grossGainLabel)
+          else JFXStyles.toggleNegative(grossGainLabel)
+
+        case None =>
+          JFXStyles.toggleNeutral(grossGainLabel)
+      }
     }
 
     // Handle 'Ctrl-c' to copy asset information.
@@ -485,6 +518,9 @@ class MainController extends Logging {
       asset.investedAmount,
       state.assetsValue.get(asset.fundId).map { assetValue =>
         asset.amount(assetValue.value)
+      },
+      state.assetsValue.get(asset.fundId).map { assetValue =>
+        asset.amount(assetValue.value) - asset.investedAmount
       }
     )
   }
@@ -501,7 +537,8 @@ class MainController extends Logging {
       (assetFields(ASSET_KEY_DATE), details.formatDate),
       (assetFields(ASSET_KEY_NAV), details.formatNAV),
       (assetFields(ASSET_KEY_INVESTED_AMOUNT), details.formatInvestedAmount),
-      (assetFields(ASSET_KEY_GROSS_AMOUNT), details.formatGrossAmount)
+      (assetFields(ASSET_KEY_GROSS_AMOUNT), details.formatGrossAmount),
+      (assetFields(ASSET_KEY_GROSS_GAIN), details.formatGrossGain)
     ).map { case (field, value) =>
         s"${field.detailsLabel} $value"
     }.mkString("\n")
@@ -930,9 +967,11 @@ object MainController {
 
   private val ASSET_KEY_GROSS_AMOUNT = "grossAmount"
 
+  private val ASSET_KEY_GROSS_GAIN = "grossGain"
+
   case class AssetDetails(scheme: Savings.Scheme, fund: Savings.Fund, availability: Option[LocalDate],
                           units: BigDecimal, vwap: BigDecimal, date: Option[LocalDate], nav: Option[BigDecimal],
-                          investedAmount: BigDecimal, grossAmount: Option[BigDecimal])
+                          investedAmount: BigDecimal, grossAmount: Option[BigDecimal], grossGain: Option[BigDecimal])
   {
 
     private val currency = epsa.Settings.currency()
@@ -948,6 +987,8 @@ object MainController {
     val formatInvestedAmount = Form.formatAmount(investedAmount, currency)
 
     val formatGrossAmount = grossAmount.map(Form.formatAmount(_, currency)).getOrElse(Strings.na)
+
+    val formatGrossGain = grossGain.map(Form.formatAmount(_, currency)).getOrElse(Strings.na)
 
   }
 

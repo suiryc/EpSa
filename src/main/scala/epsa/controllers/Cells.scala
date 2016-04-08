@@ -1,9 +1,10 @@
 package epsa.controllers
 
 import epsa.model.Savings
+import epsa.util.JFXStyles
 import java.time.LocalDate
 import javafx.scene.control.ListCell
-import suiryc.scala.javafx.scene.control.{CellWithSeparator, ListCellEx, TableCellEx}
+import suiryc.scala.javafx.scene.control.{CellEx, CellWithSeparator, ListCellEx, TableCellEx}
 import suiryc.scala.util.I18NLocale
 
 class SchemeCell extends ListCellEx[Savings.Scheme] {
@@ -32,6 +33,20 @@ class DateOptCell[A](na: String) extends TableCellEx[A, Option[LocalDate]] {
 
 class AmountCell[A](currency: String, na: String) extends TableCellEx[A, Option[BigDecimal]] {
   override def itemText(item: Option[BigDecimal]) = item.map(Form.formatAmount(_, currency)).getOrElse(na)
+}
+
+trait ColoredAmount extends CellEx[Option[BigDecimal]] {
+  override protected def updateItem(item: Option[BigDecimal], empty: Boolean) {
+    super.updateItem(item, empty)
+    (if (empty) None else item).find(_ != 0) match {
+      case Some(v) =>
+        if (v > 0) JFXStyles.togglePositive(this)
+        else JFXStyles.toggleNegative(this)
+
+      case None =>
+        JFXStyles.toggleNeutral(this)
+    }
+  }
 }
 
 class I18NLocaleCell extends ListCellEx[I18NLocale] {
