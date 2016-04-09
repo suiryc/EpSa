@@ -22,6 +22,9 @@ object Settings {
   val unitsScale = Preference.from("units.scale", 4)
   val unitsRounding = Preference.from("units.rounding", BigDecimal.RoundingMode.HALF_EVEN)
 
+  val vwapScale = Preference.from("vwap.scale", 4)
+  val vwapRounding = Preference.from("vwap.rounding", BigDecimal.RoundingMode.HALF_EVEN)
+
   // Note: not really useful to let user change percents scale/rounding
   val percentsScale = 2
   val percentsRounding = BigDecimal.RoundingMode.HALF_EVEN
@@ -31,6 +34,9 @@ object Settings {
 
   def scaleUnits(v: BigDecimal): BigDecimal =
     v.setScale(unitsScale(), unitsRounding())
+
+  def scaleVWAP(v: BigDecimal): BigDecimal =
+    v.setScale(vwapScale(), vwapRounding())
 
   def scalePercents(v: BigDecimal): BigDecimal = {
     // Adapt scale according to value.

@@ -32,6 +32,12 @@ class OptionsController {
   @FXML
   protected var unitsRounding: ComboBox[BigDecimal.RoundingMode.Value] = _
 
+  @FXML
+  protected var vwapScale: Slider = _
+
+  @FXML
+  protected var vwapRounding: ComboBox[BigDecimal.RoundingMode.Value] = _
+
   def initialize(snapshot: SettingsSnapshot): Unit = {
     snapshot.add(
       SettingSnapshot(I18N.pref),
@@ -39,7 +45,9 @@ class OptionsController {
       SettingSnapshot(settings.amountScale),
       SettingSnapshot(settings.amountRounding),
       SettingSnapshot(settings.unitsScale),
-      SettingSnapshot(settings.unitsRounding)
+      SettingSnapshot(settings.unitsRounding),
+      SettingSnapshot(settings.vwapScale),
+      SettingSnapshot(settings.vwapRounding)
     )
 
     // Note: we need to tell the combobox how to display both the 'button' area
@@ -70,6 +78,10 @@ class OptionsController {
     unitsScale.setValue(settings.unitsScale())
     unitsRounding.setItems(FXCollections.observableList(BigDecimal.RoundingMode.values.toList))
     unitsRounding.getSelectionModel.select(settings.unitsRounding())
+
+    vwapScale.setValue(settings.vwapScale())
+    vwapRounding.setItems(FXCollections.observableList(BigDecimal.RoundingMode.values.toList))
+    vwapRounding.getSelectionModel.select(settings.vwapRounding())
   }
 
   protected def applyChanges(snapshot: SettingsSnapshot): (Boolean, Boolean) = {
@@ -90,6 +102,9 @@ class OptionsController {
 
     settings.unitsScale() = unitsScale.getValue.round.toInt
     settings.unitsRounding() = unitsRounding.getValue
+
+    settings.vwapScale() = vwapScale.getValue.round.toInt
+    settings.vwapRounding() = vwapRounding.getValue
 
     // Caller needs to reload (view) if something changed
     val reload = snapshot.changed()

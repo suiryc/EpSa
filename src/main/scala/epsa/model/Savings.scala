@@ -1,5 +1,6 @@
 package epsa.model
 
+import epsa.Settings.scaleVWAP
 import grizzled.slf4j.Logging
 import java.time.LocalDate
 import java.util.UUID
@@ -44,6 +45,7 @@ object Savings {
   }
 
   // TODO: optional comment on event ? (update serializer/deserializer and asset action window)
+  // TODO: optional comment on scheme/fund ?
 
   sealed trait Event
 
@@ -286,11 +288,10 @@ case class Savings(
 
   protected def makePayment(date: LocalDate, part: AssetPart, srcInvestedAmount: Option[BigDecimal] = None): Savings = {
     // Note: VWAP = invested amount / units
-    // TODO: apply scale on VWAP ?
     val savings = findAsset(date, part) match {
       case Some(currentAsset) =>
         val units = currentAsset.units + part.units
-        val vwap = (currentAsset.investedAmount + srcInvestedAmount.getOrElse(part.amount(part.value))) / units
+        val vwap = scaleVWAP((currentAsset.investedAmount + srcInvestedAmount.getOrElse(part.amount(part.value))) / units)
         // Note: keeping the given (and not existing) asset availability date
         // has the nice side effect of resetting it if the existing asset is
         // actually available for the given date.
@@ -298,7 +299,7 @@ case class Savings(
         updateAsset(date, asset)
 
       case None =>
-        val vwap = srcInvestedAmount.map(_ / part.units).getOrElse(part.value)
+        val vwap = scaleVWAP(srcInvestedAmount.map(_ / part.units).getOrElse(part.value))
         val asset = Asset(part.schemeId, part.fundId, part.availability, part.units, vwap)
         copy(assets = assets :+ asset)
     }
@@ -521,8 +522,7 @@ case class Savings(
         )
         val computedAsset = (previous :+ asset).foldLeft(asset0) { (computed, asset) =>
           val units = computed.units + asset.units
-          // TODO: apply scale on VWAP ?
-          val vwap = (computed.investedAmount + asset.investedAmount) / units
+          val vwap = scaleVWAP((computed.investedAmount + asset.investedAmount) / units)
           computed.copy(units = units, vwap = vwap)
         }
         computation.copy(computed = filtered :+ computedAsset)

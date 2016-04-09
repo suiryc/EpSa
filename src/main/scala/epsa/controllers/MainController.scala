@@ -1,8 +1,9 @@
 package epsa.controllers
 
 import akka.actor.{Actor, ActorRef, Props}
-import epsa.{I18N, Settings}
+import epsa.I18N
 import epsa.I18N.Strings
+import epsa.Settings.scalePercents
 import epsa.charts.ChartHandler
 import epsa.model.Savings
 import epsa.storage.DataStore
@@ -364,7 +365,7 @@ class MainController extends Logging {
         asset.amount(assetValue.value)
       },
       grossGain = grossGain,
-      grossGainPct = grossGain.map(v => Settings.scalePercents((v * 100) / asset.investedAmount))
+      grossGainPct = grossGain.map(v => scalePercents((v * 100) / asset.investedAmount))
     )
   }
 
