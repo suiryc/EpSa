@@ -3,24 +3,30 @@
   -fx-text-alignment: CENTER;
 }
 
-:value-positive {
-  /* 'fill' is for shapes like Text, 'text-fill' for nodes with text. */
-  -fx-fill: #008000;
+/* Set text color for 'positive' and 'negative' values.
+ * 'fill' is for shapes like Text, 'text-fill' for nodes with text.
+ * Take care of table cells specifically: by default text color becomes
+ * white when row is selected (and remain black if not selected or not
+ * focused).
+ */
+:value-positive,
+.table-row-cell:selected:focused .cell:value-positive
+{
+  -fx-fill: #009000;
   -fx-text-fill: -fx-fill;
 }
 
-/* Change color (to adapt to background) when table row is selected. */
-.table-row-cell:selected .cell:value-positive {
-  -fx-fill: #00E000;
+.table-view:focused .table-row-cell:selected .cell:value-positive {
+  -fx-fill: #40E040;
+}
+
+:value-negative,
+.table-row-cell:selected:focused .cell:value-negative
+{
+  -fx-fill: #E00000;
   -fx-text-fill: -fx-fill;
 }
 
-:value-negative {
-  -fx-fill: #FF0000;
-  -fx-text-fill: -fx-fill;
-}
-
-.table-row-cell:selected .cell:value-negative {
-  -fx-fill: #A00000;
-  -fx-text-fill: -fx-fill;
+.table-view:focused .table-row-cell:selected .cell:value-negative {
+  -fx-fill: #B00000;
 }
