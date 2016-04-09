@@ -27,7 +27,6 @@ import javafx.stage._
 import scala.collection.immutable.ListMap
 import scala.util.Success
 import suiryc.scala.RichOption._
-import suiryc.scala.concurrent.Callable
 import suiryc.scala.{javafx => jfx}
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.concurrent.JFXSystem
@@ -86,73 +85,17 @@ class MainController extends Logging {
 
   private var actor: ActorRef = _
 
-  // Note: declare the fields here so that changing language applies upon
-  // reloading view.
-  private val assetFields = ListMap(
-    ASSET_KEY_SCHEME          -> AssetField(Strings.scheme, Strings.schemeColon),
-    ASSET_KEY_FUND            -> AssetField(Strings.fund, Strings.fundColon),
-    ASSET_KEY_AVAILABILITY    -> AssetField(Strings.availability, Strings.availabilityColon),
-    ASSET_KEY_UNITS           -> AssetField(Strings.units, Strings.unitsColon),
-    ASSET_KEY_VWAP            -> AssetField(Strings.vwap, Strings.vwapColon),
-    ASSET_KEY_DATE            -> AssetField(Strings.date, Strings.dateColon),
-    ASSET_KEY_NAV             -> AssetField(Strings.nav, Strings.navColon),
-    ASSET_KEY_INVESTED_AMOUNT -> AssetField(Strings.invested, Strings.investedAmountColon),
-    ASSET_KEY_GROSS_AMOUNT    -> AssetField(Strings.gross, Strings.grossAmountColon),
-    ASSET_KEY_GROSS_GAIN      -> AssetField(Strings.gross, Strings.grossGainColon)
-  )
+  private val assetFields = AssetField.fields()
 
-  private val columnScheme =
-    new TableColumn[AssetDetails, String](assetFields(ASSET_KEY_SCHEME).tableLabel)
+  private val assetsColumns = assetFields.mapValues(_.column).toList
 
-  private val columnFund =
-    new TableColumn[AssetDetails, String](assetFields(ASSET_KEY_FUND).tableLabel)
+  private val columnAmount = new TableColumn[AssetDetails, Nothing](Strings.amount)
 
-  private val columnAvailability =
-    new TableColumn[AssetDetails, String](assetFields(ASSET_KEY_AVAILABILITY).tableLabel)
+  columnAmount.getColumns.addAll(assetFields(ASSET_KEY_INVESTED_AMOUNT).column, assetFields(ASSET_KEY_GROSS_AMOUNT).column)
 
-  private val columnUnits =
-    new TableColumn[AssetDetails, String](assetFields(ASSET_KEY_UNITS).tableLabel)
+  private val columnGain = new TableColumn[AssetDetails, Nothing](Strings.gain)
 
-  private val columnVWAP =
-    new TableColumn[AssetDetails, String](assetFields(ASSET_KEY_VWAP).tableLabel)
-
-  private val columnDate =
-    new TableColumn[AssetDetails, String](assetFields(ASSET_KEY_DATE).tableLabel)
-
-  private val columnNAV =
-    new TableColumn[AssetDetails, String](assetFields(ASSET_KEY_NAV).tableLabel)
-
-  private val columnInvestedAmount =
-    new TableColumn[AssetDetails, String](assetFields(ASSET_KEY_INVESTED_AMOUNT).tableLabel)
-
-  private val columnGrossAmount =
-    new TableColumn[AssetDetails, String](assetFields(ASSET_KEY_GROSS_AMOUNT).tableLabel)
-
-  private val columnAmount =
-    new TableColumn[AssetDetails, Nothing](Strings.amount)
-
-  columnAmount.getColumns.addAll(columnInvestedAmount, columnGrossAmount)
-
-  private val columnGrossGain =
-    new TableColumn[AssetDetails, Option[BigDecimal]](assetFields(ASSET_KEY_GROSS_GAIN).tableLabel)
-
-  private val columnGain =
-    new TableColumn[AssetDetails, Nothing](Strings.gain)
-
-  columnGain.getColumns.addAll(columnGrossGain)
-
-  private val assetsColumns = List(
-    ASSET_KEY_SCHEME          -> columnScheme,
-    ASSET_KEY_FUND            -> columnFund,
-    ASSET_KEY_AVAILABILITY    -> columnAvailability,
-    ASSET_KEY_UNITS           -> columnUnits,
-    ASSET_KEY_VWAP            -> columnVWAP,
-    ASSET_KEY_DATE            -> columnDate,
-    ASSET_KEY_NAV             -> columnNAV,
-    ASSET_KEY_INVESTED_AMOUNT -> columnInvestedAmount,
-    ASSET_KEY_GROSS_AMOUNT    -> columnGrossAmount,
-    ASSET_KEY_GROSS_GAIN      -> columnGrossGain
-  )
+  columnGain.getColumns.addAll(assetFields(ASSET_KEY_GROSS_GAIN).column)
 
   def initialize(state: State): Unit = {
     // Note: make the actor name unique (with timestamp) so that it can be
@@ -164,45 +107,14 @@ class MainController extends Logging {
 
     // Note: in previous versions of JavaFx (before 8u60), it could be difficult
     // or impossible to ensure some changes (like scheme/fund name change) were
-    // applied. To circumvent this, a binding could be created from the state
-    // property (table user data) to execute a function which would retrieve
-    // table cells value.
+    // applied in current table being displayed. To circumvent this, a binding
+    // could be created from the state property (table user data) to execute a
+    // function which would retrieve table cells value.
     // It should not be necessary anymore as we reload the stage when necessary
     // (option changes) or can still ask to 'refresh' the table.
     val stateProperty = new SimpleObjectProperty[State](state)
     assetsTable.setTableMenuButtonVisible(true)
     assetsTable.setUserData(stateProperty)
-    columnScheme.setCellValueFactory(Callback { data =>
-      new SimpleStringProperty(data.getValue.scheme.name)
-    })
-    columnFund.setCellValueFactory(Callback { data =>
-      new SimpleStringProperty(data.getValue.fund.name)
-    })
-    columnAvailability.setCellValueFactory(Callback { data =>
-      new SimpleStringProperty(data.getValue.formatAvailability(long = false))
-    })
-    columnUnits.setCellValueFactory(Callback { data =>
-      new SimpleStringProperty(data.getValue.asset.units.toString)
-    })
-    columnVWAP.setCellValueFactory(Callback { data =>
-      new SimpleStringProperty(data.getValue.formatVWAP)
-    })
-    columnDate.setCellValueFactory(Callback { data =>
-      new SimpleStringProperty(data.getValue.formatDate)
-    })
-    columnNAV.setCellValueFactory(Callback { data =>
-      new SimpleStringProperty(data.getValue.formatNAV)
-    })
-    columnInvestedAmount.setCellValueFactory(Callback { data =>
-      new SimpleStringProperty(data.getValue.formatInvestedAmount)
-    })
-    columnGrossAmount.setCellValueFactory(Callback { data =>
-      new SimpleStringProperty(data.getValue.formatGrossAmount)
-    })
-    columnGrossGain.setCellValueFactory(Callback { data =>
-      new SimpleObjectProperty(data.getValue.grossGain)
-    })
-    columnGrossGain.setCellFactory(Callback { new AmountCell[AssetDetails](epsa.Settings.currency(), Strings.na) with ColoredAmount })
 
     // Note: Asset gives scheme/fund UUID. Since State is immutable (and is
     // changed when applying events in controller) we must delegate scheme/fund
@@ -225,45 +137,7 @@ class MainController extends Logging {
 
     assetsTable.getSelectionModel.selectedItemProperty.listen { assetDetails =>
       val assetDetailsOpt = Option(assetDetails)
-      assetFields(ASSET_KEY_SCHEME).detailsValue.setText(assetDetailsOpt.map { details =>
-        details.scheme.name
-      }.orNull)
-      assetFields(ASSET_KEY_FUND).detailsValue.setText(assetDetailsOpt.map { details =>
-        details.fund.name
-      }.orNull)
-      assetFields(ASSET_KEY_AVAILABILITY).detailsValue.setText(assetDetailsOpt.map { details =>
-        details.formatAvailability(long = true)
-      }.orNull)
-      assetFields(ASSET_KEY_UNITS).detailsValue.setText(assetDetailsOpt.map { details =>
-        details.asset.units.toString
-      }.orNull)
-      assetFields(ASSET_KEY_VWAP).detailsValue.setText(assetDetailsOpt.map { details =>
-        details.formatVWAP
-      }.orNull)
-      assetFields(ASSET_KEY_DATE).detailsValue.setText(assetDetailsOpt.map { details =>
-        details.formatDate
-      }.orNull)
-      assetFields(ASSET_KEY_NAV).detailsValue.setText(assetDetailsOpt.map { details =>
-        details.formatNAV
-      }.orNull)
-      assetFields(ASSET_KEY_INVESTED_AMOUNT).detailsValue.setText(assetDetailsOpt.map { details =>
-        details.formatInvestedAmount
-      }.orNull)
-      assetFields(ASSET_KEY_GROSS_AMOUNT).detailsValue.setText(assetDetailsOpt.map { details =>
-        details.formatGrossAmount
-      }.orNull)
-      val grossGainLabel = assetFields(ASSET_KEY_GROSS_GAIN).detailsValue
-      grossGainLabel.setText(assetDetailsOpt.map { details =>
-        details.formatGrossGain
-      }.orNull)
-      assetDetailsOpt.flatMap(_.grossGain).find(_ != 0) match {
-        case Some(v) =>
-          if (v > 0) JFXStyles.togglePositive(grossGainLabel)
-          else JFXStyles.toggleNegative(grossGainLabel)
-
-        case None =>
-          JFXStyles.toggleNeutral(grossGainLabel)
-      }
+      assetFields.values.foreach(_.updateDetailsValue(assetDetailsOpt))
     }
 
     // Handle 'Ctrl-c' to copy asset information.
@@ -491,20 +365,9 @@ class MainController extends Logging {
 
   /** Copy asset details to clipboard. */
   private def copyAssetDetailsToClipboard(details: AssetDetails): Unit = {
-    val text = List(
-      (assetFields(ASSET_KEY_SCHEME), details.scheme.name),
-      (assetFields(ASSET_KEY_FUND), details.fund.name),
-      (assetFields(ASSET_KEY_AVAILABILITY), details.formatAvailability(long = true)),
-      (assetFields(ASSET_KEY_UNITS), details.asset.units.toString),
-      (assetFields(ASSET_KEY_VWAP), details.formatVWAP),
-      (assetFields(ASSET_KEY_DATE), details.formatDate),
-      (assetFields(ASSET_KEY_NAV), details.formatNAV),
-      (assetFields(ASSET_KEY_INVESTED_AMOUNT), details.formatInvestedAmount),
-      (assetFields(ASSET_KEY_GROSS_AMOUNT), details.formatGrossAmount),
-      (assetFields(ASSET_KEY_GROSS_GAIN), details.formatGrossGain)
-    ).map { case (field, value) =>
-        s"${field.detailsLabel} $value"
-    }.mkString("\n")
+    val text = assetFields.values.map { field =>
+      s"${field.detailsLabel} ${field.format(details, true)}"
+    }.mkString("", "\n", "\n")
 
     val content = new ClipboardContent()
     content.putString(text)
@@ -913,49 +776,6 @@ class MainController extends Logging {
 
 object MainController {
 
-  private val ASSET_KEY_SCHEME = "scheme"
-
-  private val ASSET_KEY_FUND = "fund"
-
-  private val ASSET_KEY_AVAILABILITY = "availability"
-
-  private val ASSET_KEY_UNITS = "units"
-
-  private val ASSET_KEY_VWAP = "vwap"
-
-  private val ASSET_KEY_DATE = "date"
-
-  private val ASSET_KEY_NAV = "nav"
-
-  private val ASSET_KEY_INVESTED_AMOUNT = "investedAmount"
-
-  private val ASSET_KEY_GROSS_AMOUNT = "grossAmount"
-
-  private val ASSET_KEY_GROSS_GAIN = "grossGain"
-
-  case class AssetDetails(asset: Savings.Asset, scheme: Savings.Scheme, fund: Savings.Fund,
-                          date: Option[LocalDate], nav: Option[BigDecimal],
-                          grossAmount: Option[BigDecimal], grossGain: Option[BigDecimal])
-  {
-
-    private val currency = epsa.Settings.currency()
-
-    def formatAvailability(long: Boolean) = Form.formatAvailability(asset.availability, date = None, long)
-
-    val formatVWAP = Form.formatAmount(asset.vwap, currency)
-
-    val formatDate = date.map(_.toString).getOrElse(Strings.na)
-
-    val formatNAV = nav.map(Form.formatAmount(_, currency)).getOrElse(Strings.na)
-
-    val formatInvestedAmount = Form.formatAmount(asset.investedAmount, currency)
-
-    val formatGrossAmount = grossAmount.map(Form.formatAmount(_, currency)).getOrElse(Strings.na)
-
-    val formatGrossGain = grossGain.map(Form.formatAmount(_, currency)).getOrElse(Strings.na)
-
-  }
-
   case class State(
     stage: Stage,
     savingsInit: Savings = Savings(),
@@ -1007,16 +827,129 @@ object MainController {
 
   case class OnUpToDateAssets(set: Boolean)
 
-  case class AssetField(tableLabel: String, detailsLabel: String) {
+  private val ASSET_KEY_SCHEME = "scheme"
+
+  private val ASSET_KEY_FUND = "fund"
+
+  private val ASSET_KEY_AVAILABILITY = "availability"
+
+  private val ASSET_KEY_UNITS = "units"
+
+  private val ASSET_KEY_VWAP = "vwap"
+
+  private val ASSET_KEY_DATE = "date"
+
+  private val ASSET_KEY_NAV = "nav"
+
+  private val ASSET_KEY_INVESTED_AMOUNT = "investedAmount"
+
+  private val ASSET_KEY_GROSS_AMOUNT = "grossAmount"
+
+  private val ASSET_KEY_GROSS_GAIN = "grossGain"
+
+  case class AssetDetails(asset: Savings.Asset, scheme: Savings.Scheme, fund: Savings.Fund,
+    date: Option[LocalDate], nav: Option[BigDecimal],
+    grossAmount: Option[BigDecimal], grossGain: Option[BigDecimal])
+  {
+
+    private val currency = epsa.Settings.currency()
+
+    def formatAvailability(long: Boolean) = Form.formatAvailability(asset.availability, date = None, long)
+    val formatVWAP = Form.formatAmount(asset.vwap, currency)
+    val formatDate = date.map(_.toString).getOrElse(Strings.na)
+    val formatNAV = nav.map(Form.formatAmount(_, currency)).getOrElse(Strings.na)
+    val formatInvestedAmount = Form.formatAmount(asset.investedAmount, currency)
+    val formatGrossAmount = grossAmount.map(Form.formatAmount(_, currency)).getOrElse(Strings.na)
+    val formatGrossGain = grossGain.map(Form.formatAmount(_, currency)).getOrElse(Strings.na)
+
+  }
+
+  /** Asset field settings. */
+  trait AssetField[A] {
+    /** Field name in table. */
+    val tableLabel: String
+    /** Field name in details pane. */
+    val detailsLabel: String
+    /** How to format field value. */
+    val format: (AssetDetails, Boolean) => String
+
+    /** The details pane label (where value is displayed). */
     val detailsValue = new Label
     detailsValue.setMinWidth(Region.USE_PREF_SIZE)
     detailsValue.setMinHeight(Region.USE_PREF_SIZE)
+
+    /** The table column. */
+    val column: TableColumn[AssetDetails, A]
+
+    def updateDetailsValue(assetDetailsOpt: Option[AssetDetails]): Unit =
+      detailsValue.setText(assetDetailsOpt.map(format(_, true)).orNull)
   }
 
-  case class AssetDetailsField(label: String) {
-    val value = new Label
-    value.setMinWidth(Region.USE_PREF_SIZE)
-    value.setMinHeight(Region.USE_PREF_SIZE)
+  /** Asset field with formatted text value to display. */
+  case class AssetTextField(tableLabel: String, detailsLabel: String,
+    format: (AssetDetails, Boolean) => String
+  ) extends AssetField[String] {
+    val column = new TableColumn[AssetDetails, String](tableLabel)
+    column.setCellValueFactory(Callback { data =>
+      new SimpleStringProperty(format(data.getValue, false))
+    })
+  }
+
+  /** Asset field with amount to display. */
+  case class AssetAmountField(tableLabel: String, detailsLabel: String,
+    format: (AssetDetails, Boolean) => String, value: (AssetDetails) => Option[BigDecimal]
+  ) extends AssetField[Option[BigDecimal]] {
+    val column = new TableColumn[AssetDetails, Option[BigDecimal]](tableLabel)
+    column.setCellValueFactory(Callback { data =>
+      new SimpleObjectProperty(value(data.getValue))
+    })
+    column.setCellFactory(Callback { new AmountCell[AssetDetails](epsa.Settings.currency(), Strings.na) with ColoredAmount })
+
+    override def updateDetailsValue(assetDetailsOpt: Option[AssetDetails]): Unit = {
+      super.updateDetailsValue(assetDetailsOpt)
+      assetDetailsOpt.flatMap(value).find(_ != 0) match {
+        case Some(v) =>
+          if (v > 0) JFXStyles.togglePositive(detailsValue)
+          else JFXStyles.toggleNegative(detailsValue)
+
+        case None =>
+          JFXStyles.toggleNeutral(detailsValue)
+      }
+    }
+  }
+
+  object AssetField {
+
+    // Asset fields.
+    // Note: declare the fields through a def so that changing language applies
+    // upon reloading view.
+    // Order here is the one the fields will appear in the asset details pane
+    // and table columns.
+    def fields() = ListMap(
+      ASSET_KEY_SCHEME          -> AssetTextField(Strings.scheme, Strings.schemeColon, AssetField.formatScheme),
+      ASSET_KEY_FUND            -> AssetTextField(Strings.fund, Strings.fundColon, AssetField.formatFund),
+      ASSET_KEY_AVAILABILITY    -> AssetTextField(Strings.availability, Strings.availabilityColon, AssetField.formatAvailability),
+      ASSET_KEY_UNITS           -> AssetTextField(Strings.units, Strings.unitsColon, AssetField.formatUnits),
+      ASSET_KEY_VWAP            -> AssetTextField(Strings.vwap, Strings.vwapColon, AssetField.formatVWAP),
+      ASSET_KEY_NAV             -> AssetTextField(Strings.nav, Strings.navColon, AssetField.formatNAV),
+      ASSET_KEY_DATE            -> AssetTextField(Strings.date, Strings.dateColon, AssetField.formatDate),
+      ASSET_KEY_INVESTED_AMOUNT -> AssetTextField(Strings.invested, Strings.investedAmountColon, AssetField.formatInvestedAmount),
+      ASSET_KEY_GROSS_AMOUNT    -> AssetTextField(Strings.gross, Strings.grossAmountColon, AssetField.formatGrossAmount),
+      ASSET_KEY_GROSS_GAIN      -> AssetAmountField(Strings.gross, Strings.grossGainColon, AssetField.formatGrossGain, AssetField.grossGain)
+    )
+
+    def formatScheme(details: AssetDetails, long: Boolean) = details.scheme.name
+    def formatFund(details: AssetDetails, long: Boolean) = details.fund.name
+    def formatAvailability(details: AssetDetails, long: Boolean) = details.formatAvailability(long)
+    def formatUnits(details: AssetDetails, long: Boolean) = details.asset.units.toString
+    def formatVWAP(details: AssetDetails, long: Boolean) = details.formatVWAP
+    def formatDate(details: AssetDetails, long: Boolean) = details.formatDate
+    def formatNAV(details: AssetDetails, long: Boolean) = details.formatNAV
+    def formatInvestedAmount(details: AssetDetails, long: Boolean) = details.formatInvestedAmount
+    def formatGrossAmount(details: AssetDetails, long: Boolean) = details.formatGrossAmount
+    def formatGrossGain(details: AssetDetails, long: Boolean) = details.formatGrossGain
+    def grossGain(details: AssetDetails) = details.grossGain
+
   }
 
   def build(state: State, needRestart: Boolean = false, applicationStart: Boolean = false): Unit = {
