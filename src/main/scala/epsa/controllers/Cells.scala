@@ -23,8 +23,8 @@ class AvailabilityListCell(baseOpt: Option[LocalDate]) extends ListCellEx[Option
   override def itemText(item: Option[LocalDate]) = Form.formatAvailability(item, baseOpt, long = false)
 }
 
-class AmountCell[A](currency: String, na: String) extends TableCellEx[A, Option[BigDecimal]] {
-  override def itemText(item: Option[BigDecimal]) = item.map(Form.formatAmount(_, currency)).getOrElse(na)
+class AmountCell[A](suffix: String, na: String) extends TableCellEx[A, Option[BigDecimal]] {
+  override def itemText(item: Option[BigDecimal]) = item.map(Form.formatAmount(_, suffix)).getOrElse(na)
 }
 
 trait ColoredAmount extends Cell[Option[BigDecimal]] {

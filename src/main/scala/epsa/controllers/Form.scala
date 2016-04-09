@@ -19,8 +19,8 @@ object Form {
       }
     }.getOrElse(Strings.available)
 
-  def formatAmount(amount: BigDecimal, currency: String): String =
-    s"$amount $currency"
+  def formatAmount(amount: BigDecimal, suffix: String): String =
+    s"$amount $suffix"
 
 }
 

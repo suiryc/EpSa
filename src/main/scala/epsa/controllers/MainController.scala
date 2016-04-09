@@ -1,7 +1,7 @@
 package epsa.controllers
 
 import akka.actor.{Actor, ActorRef, Props}
-import epsa.I18N
+import epsa.{I18N, Settings}
 import epsa.I18N.Strings
 import epsa.charts.ChartHandler
 import epsa.model.Savings
@@ -36,8 +36,8 @@ import suiryc.scala.javafx.stage.{FileChoosers, Stages}
 import suiryc.scala.javafx.util.Callback
 import suiryc.scala.settings.Preference
 
-// TODO: display more information in assets table and details: gain/loss (amount/percentage, gross/net)
-// TODO: display more details for selected asset (e.g. values history graph)
+// TODO: display more information in assets table and details: net gain/loss (amount/percentage)
+// TODO: change details pane position; set below table ? (then have NAV history graph on the right side of details)
 // TODO: menu entries with latest datastore locations ?
 // TODO: menu entry and dialog to display/edit events history ?
 // TODO: when computing assets, order by scheme/fund/availability ?
@@ -95,7 +95,7 @@ class MainController extends Logging {
 
   private val columnGain = new TableColumn[AssetDetails, Nothing](Strings.gain)
 
-  columnGain.getColumns.addAll(assetFields(ASSET_KEY_GROSS_GAIN).column)
+  columnGain.getColumns.addAll(assetFields(ASSET_KEY_GROSS_GAIN).column, assetFields(ASSET_KEY_GROSS_GAIN_PCT).column)
 
   def initialize(state: State): Unit = {
     // Note: make the actor name unique (with timestamp) so that it can be
@@ -348,6 +348,12 @@ class MainController extends Logging {
     val state = getState.get()
     val savings = state.savingsUpd
 
+    val grossGain = state.assetsValue.get(asset.fundId).map { assetValue =>
+      asset.amount(assetValue.value) - asset.investedAmount
+    }
+
+    // Note: it is expected that we have an asset because there is an invested
+    // amount. So there is no need to try to prevent division by 0.
     AssetDetails(
       asset = asset,
       scheme = savings.getScheme(asset.schemeId),
@@ -357,9 +363,8 @@ class MainController extends Logging {
       grossAmount = state.assetsValue.get(asset.fundId).map { assetValue =>
         asset.amount(assetValue.value)
       },
-      grossGain = state.assetsValue.get(asset.fundId).map { assetValue =>
-        asset.amount(assetValue.value) - asset.investedAmount
-      }
+      grossGain = grossGain,
+      grossGainPct = grossGain.map(v => Settings.scalePercents((v * 100) / asset.investedAmount))
     )
   }
 
@@ -847,9 +852,11 @@ object MainController {
 
   private val ASSET_KEY_GROSS_GAIN = "grossGain"
 
+  private val ASSET_KEY_GROSS_GAIN_PCT = "grossGainPct"
+
   case class AssetDetails(asset: Savings.Asset, scheme: Savings.Scheme, fund: Savings.Fund,
-    date: Option[LocalDate], nav: Option[BigDecimal],
-    grossAmount: Option[BigDecimal], grossGain: Option[BigDecimal])
+    date: Option[LocalDate], nav: Option[BigDecimal], grossAmount: Option[BigDecimal],
+    grossGain: Option[BigDecimal], grossGainPct: Option[BigDecimal])
   {
 
     private val currency = epsa.Settings.currency()
@@ -861,6 +868,7 @@ object MainController {
     val formatInvestedAmount = Form.formatAmount(asset.investedAmount, currency)
     val formatGrossAmount = grossAmount.map(Form.formatAmount(_, currency)).getOrElse(Strings.na)
     val formatGrossGain = grossGain.map(Form.formatAmount(_, currency)).getOrElse(Strings.na)
+    val formatGrossGainPct = grossGainPct.map(Form.formatAmount(_, "%")).getOrElse(Strings.na)
 
   }
 
@@ -897,13 +905,15 @@ object MainController {
 
   /** Asset field with amount to display. */
   case class AssetAmountField(tableLabel: String, detailsLabel: String,
-    format: (AssetDetails, Boolean) => String, value: (AssetDetails) => Option[BigDecimal]
+    format: (AssetDetails, Boolean) => String,
+    value: (AssetDetails) => Option[BigDecimal],
+    suffix: String
   ) extends AssetField[Option[BigDecimal]] {
     val column = new TableColumn[AssetDetails, Option[BigDecimal]](tableLabel)
     column.setCellValueFactory(Callback { data =>
       new SimpleObjectProperty(value(data.getValue))
     })
-    column.setCellFactory(Callback { new AmountCell[AssetDetails](epsa.Settings.currency(), Strings.na) with ColoredAmount })
+    column.setCellFactory(Callback { new AmountCell[AssetDetails](suffix, Strings.na) with ColoredAmount })
 
     override def updateDetailsValue(assetDetailsOpt: Option[AssetDetails]): Unit = {
       super.updateDetailsValue(assetDetailsOpt)
@@ -935,7 +945,8 @@ object MainController {
       ASSET_KEY_DATE            -> AssetTextField(Strings.date, Strings.dateColon, AssetField.formatDate),
       ASSET_KEY_INVESTED_AMOUNT -> AssetTextField(Strings.invested, Strings.investedAmountColon, AssetField.formatInvestedAmount),
       ASSET_KEY_GROSS_AMOUNT    -> AssetTextField(Strings.gross, Strings.grossAmountColon, AssetField.formatGrossAmount),
-      ASSET_KEY_GROSS_GAIN      -> AssetAmountField(Strings.gross, Strings.grossGainColon, AssetField.formatGrossGain, AssetField.grossGain)
+      ASSET_KEY_GROSS_GAIN      -> AssetAmountField(Strings.gross, Strings.grossGainColon, AssetField.formatGrossGain, AssetField.grossGain, epsa.Settings.currency()),
+      ASSET_KEY_GROSS_GAIN_PCT  -> AssetAmountField(Strings.grossPct, Strings.grossGainPctColon, AssetField.formatGrossGainPct, AssetField.grossGainPct, "%")
     )
 
     def formatScheme(details: AssetDetails, long: Boolean) = details.scheme.name
@@ -949,6 +960,8 @@ object MainController {
     def formatGrossAmount(details: AssetDetails, long: Boolean) = details.formatGrossAmount
     def formatGrossGain(details: AssetDetails, long: Boolean) = details.formatGrossGain
     def grossGain(details: AssetDetails) = details.grossGain
+    def formatGrossGainPct(details: AssetDetails, long: Boolean) = details.formatGrossGainPct
+    def grossGainPct(details: AssetDetails) = details.grossGainPct
 
   }
 
