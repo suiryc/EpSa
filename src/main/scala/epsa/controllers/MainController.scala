@@ -943,8 +943,8 @@ object MainController {
     // Order here is the one the fields will appear in the asset details pane
     // and table columns.
     def fields() = ListMap(
-      ASSET_KEY_SCHEME          -> AssetTextField(Strings.scheme, Strings.schemeColon, AssetField.formatScheme, AssetField.schemeComent),
-      ASSET_KEY_FUND            -> AssetTextField(Strings.fund, Strings.fundColon, AssetField.formatFund),
+      ASSET_KEY_SCHEME          -> AssetTextField(Strings.scheme, Strings.schemeColon, AssetField.formatScheme, AssetField.schemeComment),
+      ASSET_KEY_FUND            -> AssetTextField(Strings.fund, Strings.fundColon, AssetField.formatFund, AssetField.fundComment),
       ASSET_KEY_AVAILABILITY    -> AssetTextField(Strings.availability, Strings.availabilityColon, AssetField.formatAvailability),
       ASSET_KEY_UNITS           -> AssetTextField(Strings.units, Strings.unitsColon, AssetField.formatUnits),
       ASSET_KEY_VWAP            -> AssetTextField(Strings.vwap, Strings.vwapColon, AssetField.formatVWAP),
@@ -957,8 +957,9 @@ object MainController {
     )
 
     def formatScheme(details: AssetDetails, long: Boolean) = details.scheme.name
-    def schemeComent(details: AssetDetails) = details.scheme.comment
+    def schemeComment(details: AssetDetails) = details.scheme.comment
     def formatFund(details: AssetDetails, long: Boolean) = details.fund.name
+    def fundComment(details: AssetDetails) = details.fund.comment
     def formatAvailability(details: AssetDetails, long: Boolean) = details.formatAvailability(long)
     def formatUnits(details: AssetDetails, long: Boolean) = details.asset.units.toString
     def formatVWAP(details: AssetDetails, long: Boolean) = details.formatVWAP

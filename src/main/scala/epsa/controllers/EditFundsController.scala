@@ -36,6 +36,9 @@ class EditFundsController {
   protected var schemesField: ListView[SelectableScheme] = _
 
   @FXML
+  protected var commentField: TextArea = _
+
+  @FXML
   protected var plusField: ImageView = _
 
   @FXML
@@ -82,8 +85,9 @@ class EditFundsController {
     // Handle fund selection changes
     fundsField.getSelectionModel.selectedItemProperty.listen(onSelectedFund())
 
-    // Re-check form when fund name is changed
+    // Re-check form when fund name or comment is changed
     nameField.textProperty.listen(checkForm())
+    commentField.textProperty.listen(checkForm())
 
     // Initialize schemes list view
     // Use CheckBox ListCell elements to populate its content.
@@ -131,6 +135,7 @@ class EditFundsController {
     // Request confirmation if changes are pending
     def confirmationFilter(event: ActionEvent): Unit = {
       val name = nameField.getText.trim
+      val comment = Form.textOrNone(commentField.getText)
       // Changes are pending if not editing but name is not empty, or editing
       // and having changed anything.
       val dirty = edit match {
@@ -138,6 +143,7 @@ class EditFundsController {
           val oldSchemes = savings.schemes.filter(_.funds.contains(fund.id)).map(_.id).toSet
           val newSchemes = getSelectedSchemes.map(_.id).toSet
           (fund.name != name) ||
+            (fund.comment != comment) ||
             oldSchemes != newSchemes
 
         case None =>
@@ -159,11 +165,11 @@ class EditFundsController {
     buttonOk.addEventFilter(ActionEvent.ACTION, confirmationFilter _)
 
     // Filter keys pressed to trigger some actions if possible:
-    //   ENTER applies pending fund changes if any
+    //   ENTER applies pending fund changes if any (unless comment field has focus)
     //   DELETE/'-' applies selected fund deletion
     //   '+' applies selected fund adding/copy
     def keyFilter(event: KeyEvent): Unit = {
-      if (applyReady && (event.getCode == KeyCode.ENTER)) {
+      if (applyReady && (event.getCode == KeyCode.ENTER) && !commentField.isFocused) {
         onApply(event)
         event.consume()
       }
@@ -216,8 +222,9 @@ class EditFundsController {
         loop(1)
       }
       else nameField.getText.trim
+      val comment = Form.textOrNone(commentField.getText)
 
-      val event = savings.createFundEvent(name)
+      val event = savings.createFundEvent(name, comment)
       val newEvents = event ::
         getSelectedSchemes.map { scheme =>
           Savings.AssociateFund(scheme.id, event.fundId)
@@ -297,9 +304,10 @@ class EditFundsController {
     if (Events.isOnNode(event)) {
       edit.foreach { fund =>
         val name = nameField.getText.trim
+        val comment = Form.textOrNone(commentField.getText)
         val event1 =
-          if (name == fund.name) None
-          else Some(Savings.UpdateFund(fund.id, name))
+          if ((name == fund.name) && (comment == fund.comment)) None
+          else Some(Savings.UpdateFund(fund.id, name, comment))
 
         val oldSchemes = savings.schemes.filter(_.funds.contains(fund.id)).map(_.id).toSet
         val newSchemes = getSelectedSchemes.map(_.id).toSet
@@ -423,6 +431,7 @@ class EditFundsController {
    */
   private def updateEditFields(fund: Savings.Fund): Unit = {
     nameField.setText(fund.name)
+    commentField.setText(fund.comment.orNull)
     // Refresh ListView in order to re-create cells with appropriate content
     // (checkbox selection, etc).
     schemesField.refresh()
@@ -435,6 +444,7 @@ class EditFundsController {
    */
   private def resetEditFields(): Unit = {
     nameField.clear()
+    commentField.clear()
   }
 
   /**
@@ -444,11 +454,13 @@ class EditFundsController {
    */
   def checkForm(): Unit = {
     val name = nameField.getText.trim
+    val comment = Form.textOrNone(commentField.getText)
     // Edition is OK if either name or schemes are changed.
     val editOk = edit.exists { fund =>
       val oldSchemes = savings.schemes.filter(_.funds.contains(fund.id)).map(_.id).toSet
       val newSchemes = getSelectedSchemes.map(_.id).toSet
       (fund.name != name) ||
+        (fund.comment != comment) ||
         oldSchemes != newSchemes
     }
     val exists = savings.funds.exists(_.name.equalsIgnoreCase(name)) && !edit.exists(_.name.equalsIgnoreCase(name))

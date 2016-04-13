@@ -22,7 +22,12 @@ object Savings {
       (name, comment) compare (other.name, other.comment)
   }
 
-  case class Fund(id: UUID, name: String)
+  case class Fund(id: UUID, name: String, comment: Option[String]) {
+    // See: http://stackoverflow.com/a/19348339
+    import scala.math.Ordered.orderingToOrdered
+    def compareParams(other: Fund): Int =
+      (name, comment) compare (other.name, other.comment)
+  }
 
   trait AssetEntry {
     val schemeId: UUID
@@ -63,10 +68,10 @@ object Savings {
   case class DeleteScheme(schemeId: UUID)
     extends Event
 
-  case class CreateFund(fundId: UUID, name: String)
+  case class CreateFund(fundId: UUID, name: String, comment: Option[String])
     extends Event
 
-  case class UpdateFund(fundId: UUID, name: String)
+  case class UpdateFund(fundId: UUID, name: String, comment: Option[String])
     extends Event
 
   case class DeleteFund(fundId: UUID)
@@ -128,8 +133,8 @@ object Savings {
     implicit val createSchemeFormat = jsonFormat3(CreateScheme)
     implicit val updateSchemeFormat = jsonFormat3(UpdateScheme)
     implicit val deleteSchemeFormat = jsonFormat1(DeleteScheme)
-    implicit val createFundFormat = jsonFormat2(CreateFund)
-    implicit val updateFundFormat = jsonFormat2(UpdateFund)
+    implicit val createFundFormat = jsonFormat3(CreateFund)
+    implicit val updateFundFormat = jsonFormat3(UpdateFund)
     implicit val deleteFundFormat = jsonFormat1(DeleteFund)
     implicit val associateFundFormat = jsonFormat2(AssociateFund)
     implicit val dissociateFundFormat = jsonFormat2(DissociateFund)
@@ -233,8 +238,8 @@ case class Savings(
     case CreateScheme(id, name, comment)      => createScheme(id, name, comment)
     case UpdateScheme(id, name, comment)      => updateScheme(id, name, comment)
     case DeleteScheme(id)                     => deleteScheme(id)
-    case CreateFund(id, name)                 => createFund(id, name)
-    case UpdateFund(id, name)                 => updateFund(id, name)
+    case CreateFund(id, name, comment)        => createFund(id, name, comment)
+    case UpdateFund(id, name, comment)        => updateFund(id, name, comment)
     case DeleteFund(id)                       => deleteFund(id)
     case AssociateFund(schemeId, fundId)      => associateFund(schemeId, fundId)
     case DissociateFund(schemeId, fundId)     => dissociateFund(schemeId, fundId)
@@ -259,14 +264,14 @@ case class Savings(
     copy(schemes = schemes.filterNot(_.id == id))
   }
 
-  protected def createFund(id: UUID, name: String): Savings = {
-    copy(funds = funds :+ Fund(id, name))
+  protected def createFund(id: UUID, name: String, comment: Option[String]): Savings = {
+    copy(funds = funds :+ Fund(id, name, comment))
   }
 
-  protected def updateFund(id: UUID, name: String): Savings = {
+  protected def updateFund(id: UUID, name: String, comment: Option[String]): Savings = {
     val updated = funds.map { fund =>
       if (fund.id != id) fund
-      else fund.copy(name = name)
+      else fund.copy(name = name, comment = comment)
     }
     copy(funds = updated)
   }
@@ -377,9 +382,9 @@ case class Savings(
     CreateScheme(id, name, comment)
   }
 
-  def createFundEvent(name: String): CreateFund = {
+  def createFundEvent(name: String, comment: Option[String] = None): CreateFund = {
     val id = newId(funds.map(_.id))
-    CreateFund(id, name)
+    CreateFund(id, name, comment)
   }
 
   protected def newId(existing: List[UUID]): UUID = {
@@ -452,7 +457,7 @@ case class Savings(
     } ::: schemesCreatedOrdered.map { scheme =>
       Savings.CreateScheme(scheme.id, scheme.name, scheme.comment)
     } ::: fundsCreatedOrdered.map { fund =>
-      Savings.CreateFund(fund.id, fund.name)
+      Savings.CreateFund(fund.id, fund.name, fund.comment)
     } ::: schemesCreatedOrdered.flatMap { scheme =>
       scheme.funds.map { fundId =>
         Savings.AssociateFund(scheme.id, fundId)
@@ -483,8 +488,8 @@ case class Savings(
       }
     } ::: fundsRemainingOrdered.flatMap { newFund =>
       val oldFund = getFund(newFund.id)
-      if (newFund.name == oldFund.name) None
-      else Some(Savings.UpdateFund(newFund.id, newFund.name))
+      if (newFund.compareParams(oldFund) == 0) None
+      else Some(Savings.UpdateFund(newFund.id, newFund.name, newFund.comment))
       // Note: association/dissociation to old, new or remaining schemes have
       // been taken care of already.
     }

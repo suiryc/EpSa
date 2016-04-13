@@ -94,12 +94,33 @@ class SavingsSpec extends WordSpec with Matchers {
       fund.name shouldBe fundName
     }
 
+    "handle adding a fund with comment" in {
+      val fundName = "fund 1"
+      val fundComment = Some("some comment")
+      val event = savings0.createFundEvent(fundName, fundComment)
+      event.name shouldBe fundName
+      event.comment shouldBe fundComment
+
+      val savings = savings0.processEvent(event)
+      val fund = savings.funds.head
+      fund.name shouldBe fundName
+      fund.comment shouldBe fundComment
+    }
+
     "handle updating a fund name" in {
       val fund0 = savings1.funds.head
       val fundName = fund0.name + "-new"
-      val savings = savings1.processEvent(Savings.UpdateFund(fund0.id, fundName))
+      val savings = savings1.processEvent(Savings.UpdateFund(fund0.id, fundName, fund0.comment))
       val fund = savings.funds.head
       fund shouldBe fund0.copy(name = fundName)
+    }
+
+    "handle updating a fund comment" in {
+      val fund0 = savings1.funds.head
+      val fundComment = Some("New comment")
+      val savings = savings1.processEvent(Savings.UpdateFund(fund0.id, fund0.name, fundComment))
+      val fund = savings.funds.head
+      fund shouldBe fund0.copy(comment = fundComment)
     }
 
     "handle deleting a fund" in {
@@ -230,7 +251,8 @@ class SavingsSpec extends WordSpec with Matchers {
       checkFlattening(savings2, Savings.UpdateScheme(scheme.id, scheme.name + "-new", scheme.comment))
       checkFlattening(savings2, Savings.UpdateScheme(scheme.id, scheme.name, Some("New comment")))
       checkFlattening(savings2, createFund3)
-      checkFlattening(savings2, Savings.UpdateFund(fund1.id, fund1.name + "-new"))
+      checkFlattening(savings2, Savings.UpdateFund(fund1.id, fund1.name + "-new", fund1.comment))
+      checkFlattening(savings2, Savings.UpdateFund(fund1.id, fund1.name, Some("New comment")))
       // Note: this case actually triggers a warning because flattening first
       // dissociates fund (which is right) and thus resulting scheme differs
       // because *we* did not do it. In this case flattening keep the provided
@@ -264,7 +286,11 @@ class SavingsSpec extends WordSpec with Matchers {
         Nil
       )
       checkFlattening(savings2,
-        List(Savings.UpdateFund(fund1.id, fund1.name + "-new"), Savings.UpdateFund(fund1.id, fund1.name)),
+        List(Savings.UpdateFund(fund1.id, fund1.name + "-new", scheme.comment), Savings.UpdateFund(fund1.id, fund1.name, scheme.comment)),
+        Nil
+      )
+      checkFlattening(savings2,
+        List(Savings.UpdateFund(fund1.id, fund1.name, Some("New comment")), Savings.UpdateFund(fund1.id, fund1.name, scheme.comment)),
         Nil
       )
       checkFlattening(savings2,
@@ -293,7 +319,8 @@ class SavingsSpec extends WordSpec with Matchers {
     }
 
     "handle UpdateFund" in {
-      checkEventSerialization(Savings.UpdateFund(savings1.funds.head.id, "fund new name"))
+      checkEventSerialization(Savings.UpdateFund(savings1.funds.head.id, "fund new name", None))
+      checkEventSerialization(Savings.UpdateFund(savings1.funds.head.id, "fund new name", Some("fund new comment")))
     }
 
     "handle DeleteFund" in {
