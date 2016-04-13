@@ -6,6 +6,9 @@ import java.time.LocalDate
 
 object Form {
 
+  def textOrNone(v: String): Option[String] =
+    Option(v).map(_.trim).find(_.nonEmpty)
+
   def formatAvailability(availability: Option[LocalDate], date: Option[LocalDate], long: Boolean): String =
     availability.map { avail =>
       Savings.resolveAvailability(availability, date) match {

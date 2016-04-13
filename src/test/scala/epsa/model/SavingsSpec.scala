@@ -42,12 +42,34 @@ class SavingsSpec extends WordSpec with Matchers {
       scheme.funds shouldBe empty
     }
 
+    "handle adding a scheme with comment" in {
+      val schemeName = "scheme 1"
+      val schemeComment = Some("some comment")
+      val event = savings0.createSchemeEvent(schemeName, schemeComment)
+      event.name shouldBe schemeName
+      event.comment shouldBe schemeComment
+
+      val savings = savings0.processEvent(event)
+      val scheme = savings.schemes.head
+      scheme.name shouldBe schemeName
+      scheme.comment shouldBe schemeComment
+      scheme.funds shouldBe empty
+    }
+
     "handle updating a scheme name" in {
       val scheme0 = savings1.schemes.head
       val schemeName = scheme0.name + "-new"
-      val savings = savings1.processEvent(Savings.UpdateScheme(scheme0.id, schemeName))
+      val savings = savings1.processEvent(Savings.UpdateScheme(scheme0.id, schemeName, scheme0.comment))
       val scheme = savings.schemes.head
       scheme shouldBe scheme0.copy(name = schemeName)
+    }
+
+    "handle updating a scheme comment" in {
+      val scheme0 = savings1.schemes.head
+      val schemeComment = Some("New comment")
+      val savings = savings1.processEvent(Savings.UpdateScheme(scheme0.id, scheme0.name, schemeComment))
+      val scheme = savings.schemes.head
+      scheme shouldBe scheme0.copy(comment = schemeComment)
     }
 
     "handle deleting a scheme" in {
@@ -195,6 +217,61 @@ class SavingsSpec extends WordSpec with Matchers {
         Savings.Asset(scheme.id, fund.id, None, BigDecimal(6), 0)
       )
     }
+
+    "handle flattening events" in {
+      val scheme = savings2.schemes.head
+      val fund1 = savings2.funds.head
+      val fund2 = savings2.funds(1)
+      val createFund3 = savings2.createFundEvent("fund 3")
+      val createScheme2 = savings2.createSchemeEvent("scheme 2")
+
+      // Simple events should remain
+      checkFlattening(savings2, createScheme2)
+      checkFlattening(savings2, Savings.UpdateScheme(scheme.id, scheme.name + "-new", scheme.comment))
+      checkFlattening(savings2, Savings.UpdateScheme(scheme.id, scheme.name, Some("New comment")))
+      checkFlattening(savings2, createFund3)
+      checkFlattening(savings2, Savings.UpdateFund(fund1.id, fund1.name + "-new"))
+      // Note: this case actually triggers a warning because flattening first
+      // dissociates fund (which is right) and thus resulting scheme differs
+      // because *we* did not do it. In this case flattening keep the provided
+      // events as-is.
+      checkFlattening(savings2, Savings.DeleteFund(fund1.id))
+      checkFlattening(savings2, Savings.AssociateFund(scheme.id, createFund3.fundId))
+      checkFlattening(savings2, Savings.DissociateFund(scheme.id, fund1.id))
+
+      // Scheme deletion should trigger funds dissociation (because *we* did
+      // not do it).
+      checkFlattening(savings2,
+        List(Savings.DeleteScheme(scheme.id)),
+        List(Savings.DissociateFund(scheme.id, fund1.id), Savings.DissociateFund(scheme.id, fund2.id), Savings.DeleteScheme(scheme.id))
+      )
+
+      // Events cancelling each other should disappear
+      checkFlattening(savings2,
+        List(createScheme2, Savings.DeleteScheme(createScheme2.schemeId)),
+        Nil
+      )
+      checkFlattening(savings2,
+        List(Savings.UpdateScheme(scheme.id, scheme.name + "-new", scheme.comment), Savings.UpdateScheme(scheme.id, scheme.name, scheme.comment)),
+        Nil
+      )
+      checkFlattening(savings2,
+        List(Savings.UpdateScheme(scheme.id, scheme.name, Some("New comment")), Savings.UpdateScheme(scheme.id, scheme.name, scheme.comment)),
+        Nil
+      )
+      checkFlattening(savings2,
+        List(createFund3, Savings.DeleteFund(createFund3.fundId)),
+        Nil
+      )
+      checkFlattening(savings2,
+        List(Savings.UpdateFund(fund1.id, fund1.name + "-new"), Savings.UpdateFund(fund1.id, fund1.name)),
+        Nil
+      )
+      checkFlattening(savings2,
+        List(Savings.AssociateFund(scheme.id, createFund3.fundId), Savings.DissociateFund(scheme.id, createFund3.fundId)),
+        Nil
+      )
+    }
   }
 
   "Savings (de)serialization" should {
@@ -203,7 +280,8 @@ class SavingsSpec extends WordSpec with Matchers {
     }
 
     "handle UpdateScheme" in {
-      checkEventSerialization(Savings.UpdateScheme(savings1.schemes.head.id, "scheme new name"))
+      checkEventSerialization(Savings.UpdateScheme(savings1.schemes.head.id, "scheme new name", None))
+      checkEventSerialization(Savings.UpdateScheme(savings1.schemes.head.id, "scheme new name", Some("scheme new comment")))
     }
 
     "handle DeleteScheme" in {
@@ -312,6 +390,12 @@ class SavingsSpec extends WordSpec with Matchers {
       )
     }
   }
+
+  private def checkFlattening(savings: Savings, event: Savings.Event): Unit =
+    savings.flattenEvents(List(event)) shouldBe List(event)
+
+  private def checkFlattening(savings: Savings, process: List[Savings.Event], expected: List[Savings.Event]): Unit =
+    savings.flattenEvents(process) shouldBe expected
 
   private def checkAsset(date: LocalDate, savings: Savings, expectedAsset: Savings.Asset): Unit = {
     val foundAssetOpt = savings.findAsset(date, expectedAsset)

@@ -879,6 +879,8 @@ object MainController {
     val tableLabel: String
     /** Field name in details pane. */
     val detailsLabel: String
+    /** Field comment if any. */
+    val comment: (AssetDetails) => Option[String] = { _ => None }
     /** How to format field value. */
     val format: (AssetDetails, Boolean) => String
 
@@ -890,13 +892,17 @@ object MainController {
     /** The table column. */
     val column: TableColumn[AssetDetails, A]
 
-    def updateDetailsValue(assetDetailsOpt: Option[AssetDetails]): Unit =
+    def updateDetailsValue(assetDetailsOpt: Option[AssetDetails]): Unit = {
       detailsValue.setText(assetDetailsOpt.map(format(_, true)).orNull)
+      // TODO: visual hint there is a comment
+      detailsValue.setTooltip(assetDetailsOpt.flatMap(comment).map(new Tooltip(_)).orNull)
+    }
   }
 
   /** Asset field with formatted text value to display. */
   case class AssetTextField(tableLabel: String, detailsLabel: String,
-    format: (AssetDetails, Boolean) => String
+    format: (AssetDetails, Boolean) => String,
+    override val comment: (AssetDetails) => Option[String] = { _ => None }
   ) extends AssetField[String] {
     val column = new TableColumn[AssetDetails, String](tableLabel)
     column.setCellValueFactory(Callback { data =>
@@ -937,7 +943,7 @@ object MainController {
     // Order here is the one the fields will appear in the asset details pane
     // and table columns.
     def fields() = ListMap(
-      ASSET_KEY_SCHEME          -> AssetTextField(Strings.scheme, Strings.schemeColon, AssetField.formatScheme),
+      ASSET_KEY_SCHEME          -> AssetTextField(Strings.scheme, Strings.schemeColon, AssetField.formatScheme, AssetField.schemeComent),
       ASSET_KEY_FUND            -> AssetTextField(Strings.fund, Strings.fundColon, AssetField.formatFund),
       ASSET_KEY_AVAILABILITY    -> AssetTextField(Strings.availability, Strings.availabilityColon, AssetField.formatAvailability),
       ASSET_KEY_UNITS           -> AssetTextField(Strings.units, Strings.unitsColon, AssetField.formatUnits),
@@ -951,6 +957,7 @@ object MainController {
     )
 
     def formatScheme(details: AssetDetails, long: Boolean) = details.scheme.name
+    def schemeComent(details: AssetDetails) = details.scheme.comment
     def formatFund(details: AssetDetails, long: Boolean) = details.fund.name
     def formatAvailability(details: AssetDetails, long: Boolean) = details.formatAvailability(long)
     def formatUnits(details: AssetDetails, long: Boolean) = details.asset.units.toString

@@ -15,7 +15,12 @@ object Savings {
     availability.filter(_.compareTo(date) > 0)
   }
 
-  case class Scheme(id: UUID, name: String, funds: List[UUID])
+  case class Scheme(id: UUID, name: String, comment: Option[String], funds: List[UUID]) {
+    // See: http://stackoverflow.com/a/19348339
+    import scala.math.Ordered.orderingToOrdered
+    def compareParams(other: Scheme): Int =
+      (name, comment) compare (other.name, other.comment)
+  }
 
   case class Fund(id: UUID, name: String)
 
@@ -49,10 +54,10 @@ object Savings {
 
   sealed trait Event
 
-  case class CreateScheme(schemeId: UUID, name: String)
+  case class CreateScheme(schemeId: UUID, name: String, comment: Option[String])
     extends Event
 
-  case class UpdateScheme(schemeId: UUID, name: String)
+  case class UpdateScheme(schemeId: UUID, name: String, comment: Option[String])
     extends Event
 
   case class DeleteScheme(schemeId: UUID)
@@ -120,8 +125,8 @@ object Savings {
       }
     }
 
-    implicit val createSchemeFormat = jsonFormat2(CreateScheme)
-    implicit val updateSchemeFormat = jsonFormat2(UpdateScheme)
+    implicit val createSchemeFormat = jsonFormat3(CreateScheme)
+    implicit val updateSchemeFormat = jsonFormat3(UpdateScheme)
     implicit val deleteSchemeFormat = jsonFormat1(DeleteScheme)
     implicit val createFundFormat = jsonFormat2(CreateFund)
     implicit val updateFundFormat = jsonFormat2(UpdateFund)
@@ -225,8 +230,8 @@ case class Savings(
     processEvents(events:_*)
 
   def processEvent(event: Event): Savings = event match {
-    case CreateScheme(id, name)               => createScheme(id, name)
-    case UpdateScheme(id, name)               => updateScheme(id, name)
+    case CreateScheme(id, name, comment)      => createScheme(id, name, comment)
+    case UpdateScheme(id, name, comment)      => updateScheme(id, name, comment)
     case DeleteScheme(id)                     => deleteScheme(id)
     case CreateFund(id, name)                 => createFund(id, name)
     case UpdateFund(id, name)                 => updateFund(id, name)
@@ -238,14 +243,14 @@ case class Savings(
     case MakeRefund(date, part)               => computeAssets(date).makeRefund(date, part)
   }
 
-  protected def createScheme(id: UUID, name: String): Savings = {
-    copy(schemes = schemes :+ Scheme(id, name, Nil))
+  protected def createScheme(id: UUID, name: String, comment: Option[String]): Savings = {
+    copy(schemes = schemes :+ Scheme(id, name, comment, Nil))
   }
 
-  protected def updateScheme(id: UUID, name: String): Savings = {
+  protected def updateScheme(id: UUID, name: String, comment: Option[String]): Savings = {
     val updated = schemes.map { scheme =>
       if (scheme.id != id) scheme
-      else scheme.copy(name = name)
+      else scheme.copy(name = name, comment = comment)
     }
     copy(schemes = updated)
   }
@@ -367,9 +372,9 @@ case class Savings(
         (asset.fundId == fundId)
     }
 
-  def createSchemeEvent(name: String): CreateScheme = {
+  def createSchemeEvent(name: String, comment: Option[String] = None): CreateScheme = {
     val id = newId(schemes.map(_.id))
-    CreateScheme(id, name)
+    CreateScheme(id, name, comment)
   }
 
   def createFundEvent(name: String): CreateFund = {
@@ -445,7 +450,7 @@ case class Savings(
         Savings.DissociateFund(scheme.id, fundId)
       } :+ Savings.DeleteFund(fundId)
     } ::: schemesCreatedOrdered.map { scheme =>
-      Savings.CreateScheme(scheme.id, scheme.name)
+      Savings.CreateScheme(scheme.id, scheme.name, scheme.comment)
     } ::: fundsCreatedOrdered.map { fund =>
       Savings.CreateFund(fund.id, fund.name)
     } ::: schemesCreatedOrdered.flatMap { scheme =>
@@ -461,8 +466,8 @@ case class Savings(
     } ::: schemesRemainingOrdered.flatMap { newScheme =>
       val oldScheme = getScheme(newScheme.id)
       val event1 =
-        if (newScheme.name == oldScheme.name) None
-        else Some(Savings.UpdateScheme(newScheme.id, newScheme.name))
+        if (newScheme.compareParams(oldScheme) == 0) None
+        else Some(Savings.UpdateScheme(newScheme.id, newScheme.name, newScheme.comment))
 
       // Note: don't forget to ignore created/deleted funds (already taken care of)
       val oldFunds = oldScheme.funds.toSet

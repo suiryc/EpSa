@@ -36,6 +36,9 @@ class EditSchemesController {
   protected var fundsField: ListView[SelectableFund] = _
 
   @FXML
+  protected var commentField: TextArea = _
+
+  @FXML
   protected var plusField: ImageView = _
 
   @FXML
@@ -82,8 +85,9 @@ class EditSchemesController {
     // Handle scheme selection changes
     schemesField.getSelectionModel.selectedItemProperty.listen(onSelectedScheme())
 
-    // Re-check form when scheme name is changed
+    // Re-check form when scheme name or comment is changed
     nameField.textProperty.listen(checkForm())
+    commentField.textProperty.listen(checkForm())
 
     // Initialize funds list view
     // Use CheckBox ListCell elements to populate its content.
@@ -131,12 +135,14 @@ class EditSchemesController {
     // Request confirmation if changes are pending
     def confirmationFilter(event: ActionEvent): Unit = {
       val name = nameField.getText.trim
+      val comment = Form.textOrNone(commentField.getText)
       // Changes are pending if not editing but name is not empty, or editing
       // and having changed anything.
       val dirty = edit match {
         case Some(scheme) =>
           val newFunds = getSelectedFunds.map(_.id).toSet
           (scheme.name != name) ||
+            (scheme.comment != comment) ||
             scheme.funds.toSet != newFunds
 
         case None =>
@@ -158,11 +164,11 @@ class EditSchemesController {
     buttonOk.addEventFilter(ActionEvent.ACTION, confirmationFilter _)
 
     // Filter keys pressed to trigger some actions if possible:
-    //   ENTER applies pending scheme changes if any
+    //   ENTER applies pending scheme changes if any (unless comment field has focus)
     //   DELETE/'-' applies selected scheme deletion
     //   '+' applies selected scheme adding/copy
     def keyFilter(event: KeyEvent): Unit = {
-      if (applyReady && (event.getCode == KeyCode.ENTER)) {
+      if (applyReady && (event.getCode == KeyCode.ENTER) && !commentField.isFocused) {
         onApply(event)
         event.consume()
       }
@@ -215,8 +221,9 @@ class EditSchemesController {
         loop(1)
       }
       else nameField.getText.trim
+      val comment = Form.textOrNone(commentField.getText)
 
-      val event = savings.createSchemeEvent(name)
+      val event = savings.createSchemeEvent(name, comment)
       val newEvents = event ::
         getSelectedFunds.map { fund =>
           Savings.AssociateFund(event.schemeId, fund.id)
@@ -293,9 +300,10 @@ class EditSchemesController {
     if (Events.isOnNode(event)) {
       edit.foreach { scheme =>
         val name = nameField.getText.trim
+        val comment = Form.textOrNone(commentField.getText)
         val event1 =
-          if (name == scheme.name) None
-          else Some(Savings.UpdateScheme(scheme.id, name))
+          if ((name == scheme.name) && (comment == scheme.comment)) None
+          else Some(Savings.UpdateScheme(scheme.id, name, comment))
 
         val oldFunds = scheme.funds.toSet
         val newFunds = getSelectedFunds.map(_.id).toSet
@@ -418,6 +426,7 @@ class EditSchemesController {
    */
   private def updateEditFields(scheme: Savings.Scheme): Unit = {
     nameField.setText(scheme.name)
+    commentField.setText(scheme.comment.orNull)
     // Refresh ListView in order to re-create cells with appropriate content
     // (checkbox selection, etc).
     fundsField.refresh()
@@ -430,6 +439,7 @@ class EditSchemesController {
    */
   private def resetEditFields(): Unit = {
     nameField.clear()
+    commentField.clear()
   }
 
   /**
@@ -439,10 +449,12 @@ class EditSchemesController {
    */
   private def checkForm(): Unit = {
     val name = nameField.getText.trim
+    val comment = Form.textOrNone(commentField.getText)
     // Edition is OK if either name or funds are changed.
     val editOk = edit.exists { scheme =>
       val newFunds = getSelectedFunds.map(_.id).toSet
       (scheme.name != name) ||
+        (scheme.comment != comment) ||
         scheme.funds.toSet != newFunds
     }
     val exists = savings.schemes.exists(_.name.equalsIgnoreCase(name)) && !edit.exists(_.name.equalsIgnoreCase(name))
