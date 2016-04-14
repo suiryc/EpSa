@@ -888,14 +888,23 @@ object MainController {
     val detailsValue = new Label
     detailsValue.setMinWidth(Region.USE_PREF_SIZE)
     detailsValue.setMinHeight(Region.USE_PREF_SIZE)
+    // Display graphic on the right side
+    detailsValue.setContentDisplay(ContentDisplay.RIGHT)
 
     /** The table column. */
     val column: TableColumn[AssetDetails, A]
 
     def updateDetailsValue(assetDetailsOpt: Option[AssetDetails]): Unit = {
       detailsValue.setText(assetDetailsOpt.map(format(_, true)).orNull)
-      // TODO: visual hint there is a comment
-      detailsValue.setTooltip(assetDetailsOpt.flatMap(comment).map(new Tooltip(_)).orNull)
+      assetDetailsOpt.flatMap(comment) match {
+        case Some(text) =>
+          detailsValue.setTooltip(new Tooltip(text))
+          detailsValue.setGraphic(AssetField.tooltipHint)
+
+        case None =>
+          detailsValue.setTooltip(null)
+          detailsValue.setGraphic(null)
+      }
     }
   }
 
@@ -971,6 +980,11 @@ object MainController {
     def grossGain(details: AssetDetails) = details.grossGain
     def formatGrossGainPct(details: AssetDetails, long: Boolean) = details.formatGrossGainPct
     def grossGainPct(details: AssetDetails) = details.grossGainPct
+
+    // Note: there need to be distinct ImageView instances to display an image
+    // more than once.
+    private val tooltipHintImg = new Image("/images/fugue-icons/question-balloon.png", 0.0, 0.0, true, false, false)
+    def tooltipHint = new ImageView(tooltipHintImg)
 
   }
 
