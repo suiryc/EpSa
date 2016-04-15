@@ -41,6 +41,7 @@ import suiryc.scala.settings.Preference
 // TODO: change details pane position; set below table ? (then have NAV history graph on the right side of details)
 // TODO: menu entries with latest datastore locations ?
 // TODO: menu entry and dialog to display/edit events history ?
+// TODO: menu entry and dialog to display assets history; textual with comments, and graphic view of account gross amount (with 'link' to textual history)
 // TODO: when computing assets, order by scheme/fund/availability ?
 // TODO: manage encryption of datastore ?
 //         -> possible to read/write
@@ -584,25 +585,25 @@ class MainController extends Logging {
             Savings.AssociateFund(s1.schemeId, f2.fundId),
             Savings.AssociateFund(s2.schemeId, f2.fundId),
             Savings.MakePayment(LocalDate.now.minusMonths(24),
-              Savings.AssetPart(s1.schemeId, f1.fundId, Some(LocalDate.now.minusMonths(12)), 10.0, 1.0)),
+              Savings.AssetPart(s1.schemeId, f1.fundId, Some(LocalDate.now.minusMonths(12)), 10.0, 1.0), None),
             Savings.MakePayment(LocalDate.now.minusMonths(24),
-              Savings.AssetPart(s1.schemeId, f1.fundId, Some(LocalDate.now.minusMonths(12)), 10.0, 2.0)),
+              Savings.AssetPart(s1.schemeId, f1.fundId, Some(LocalDate.now.minusMonths(12)), 10.0, 2.0), None),
             Savings.MakePayment(LocalDate.now.minusMonths(24),
-              Savings.AssetPart(s1.schemeId, f2.fundId, Some(LocalDate.now.minusMonths(12)), 5.0, 1.0)),
+              Savings.AssetPart(s1.schemeId, f2.fundId, Some(LocalDate.now.minusMonths(12)), 5.0, 1.0), None),
             Savings.MakePayment(LocalDate.now.minusMonths(24),
-              Savings.AssetPart(s1.schemeId, f1.fundId, Some(LocalDate.now.minusMonths(1)), 15.0, 2.0)),
+              Savings.AssetPart(s1.schemeId, f1.fundId, Some(LocalDate.now.minusMonths(1)), 15.0, 2.0), None),
             Savings.MakePayment(LocalDate.now.minusMonths(24),
-              Savings.AssetPart(s1.schemeId, f2.fundId, Some(LocalDate.now.plusMonths(12)), 15.0, 1.0)),
+              Savings.AssetPart(s1.schemeId, f2.fundId, Some(LocalDate.now.plusMonths(12)), 15.0, 1.0), None),
             Savings.MakeRefund(LocalDate.now.minusMonths(12),
-              Savings.AssetPart(s1.schemeId, f1.fundId, Some(LocalDate.now.minusMonths(1)), 10.0, 2.0)),
+              Savings.AssetPart(s1.schemeId, f1.fundId, Some(LocalDate.now.minusMonths(1)), 10.0, 2.0), None),
             Savings.MakeRefund(LocalDate.now.minusMonths(1),
-              Savings.AssetPart(s1.schemeId, f1.fundId, None, 10.0, 2.5)),
+              Savings.AssetPart(s1.schemeId, f1.fundId, None, 10.0, 2.5), None),
             Savings.MakeTransfer(LocalDate.now.minusMonths(1),
-              Savings.AssetPart(s1.schemeId, f1.fundId, None, 10.0, 0.5), Savings.AssetPart(s1.schemeId, f2.fundId, None, 5.0, 1.0)),
+              Savings.AssetPart(s1.schemeId, f1.fundId, None, 10.0, 0.5), Savings.AssetPart(s1.schemeId, f2.fundId, None, 5.0, 1.0), None),
             Savings.MakePayment(LocalDate.now.minusMonths(1),
-              Savings.AssetPart(s2.schemeId, f2.fundId, Some(LocalDate.now.minusMonths(1)), 10.0, 1.0)),
+              Savings.AssetPart(s2.schemeId, f2.fundId, Some(LocalDate.now.minusMonths(1)), 10.0, 1.0), None),
             Savings.MakePayment(LocalDate.now.minusMonths(1),
-              Savings.AssetPart(s2.schemeId, f2.fundId, Some(LocalDate.now), 10.0, 1.0))
+              Savings.AssetPart(s2.schemeId, f2.fundId, Some(LocalDate.now), 10.0, 1.0), None)
           ))
 
         case 2 =>
@@ -612,9 +613,9 @@ class MainController extends Logging {
           processEvents(state, List(s1, f1,
             Savings.AssociateFund(s1.schemeId, f1.fundId),
             Savings.MakePayment(LocalDate.now.minusMonths(24),
-              Savings.AssetPart(s1.schemeId, f1.fundId, Some(LocalDate.now.minusMonths(12)), 5.0, 1.0)),
+              Savings.AssetPart(s1.schemeId, f1.fundId, Some(LocalDate.now.minusMonths(12)), 5.0, 1.0), None),
             Savings.MakePayment(LocalDate.now.minusMonths(12),
-              Savings.AssetPart(s1.schemeId, f1.fundId, None, 5.0, 1.0))
+              Savings.AssetPart(s1.schemeId, f1.fundId, None, 5.0, 1.0), None)
           ))
 
         case 3 =>
@@ -626,9 +627,9 @@ class MainController extends Logging {
             Savings.AssociateFund(s1.schemeId, f1.fundId),
             Savings.AssociateFund(s1.schemeId, f2.fundId),
             Savings.MakePayment(LocalDate.now.minusMonths(24),
-              Savings.AssetPart(s1.schemeId, f1.fundId, Some(LocalDate.now.minusMonths(12)), 10.0, 1.0)),
+              Savings.AssetPart(s1.schemeId, f1.fundId, Some(LocalDate.now.minusMonths(12)), 10.0, 1.0), None),
             Savings.MakeTransfer(LocalDate.now.minusMonths(12),
-              Savings.AssetPart(s1.schemeId, f1.fundId, None, 5.0, 1.0), Savings.AssetPart(s1.schemeId, f2.fundId, None, 5.0, 1.0))
+              Savings.AssetPart(s1.schemeId, f1.fundId, None, 5.0, 1.0), Savings.AssetPart(s1.schemeId, f2.fundId, None, 5.0, 1.0), None)
           ))
       }
     }

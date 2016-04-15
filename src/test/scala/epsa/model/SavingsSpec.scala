@@ -154,11 +154,11 @@ class SavingsSpec extends WordSpec with Matchers {
       val fund = savings2.funds.head
       val date = LocalDate.now.minusDays(10)
       val savings = savings2.processEvents(
-        Savings.MakePayment(date.plusDays(1), Savings.AssetPart(scheme.id, fund.id, None, BigDecimal(1), BigDecimal(1))),
-        Savings.MakePayment(date.plusDays(2), Savings.AssetPart(scheme.id, fund.id, Some(date.plusDays(10)), BigDecimal(2), BigDecimal(2))),
-        Savings.MakePayment(date.plusDays(3), Savings.AssetPart(scheme.id, fund.id, Some(date.plusDays(10)), BigDecimal(3), BigDecimal(3))),
-        Savings.MakePayment(date.plusDays(4), Savings.AssetPart(scheme.id, fund.id, Some(date.plusDays(11)), BigDecimal(4), BigDecimal(4))),
-        Savings.MakePayment(date.plusDays(5), Savings.AssetPart(scheme.id, fund.id, None, BigDecimal(5), BigDecimal(5)))
+        Savings.MakePayment(date.plusDays(1), Savings.AssetPart(scheme.id, fund.id, None, BigDecimal(1), BigDecimal(1)), None),
+        Savings.MakePayment(date.plusDays(2), Savings.AssetPart(scheme.id, fund.id, Some(date.plusDays(10)), BigDecimal(2), BigDecimal(2)), None),
+        Savings.MakePayment(date.plusDays(3), Savings.AssetPart(scheme.id, fund.id, Some(date.plusDays(10)), BigDecimal(3), BigDecimal(3)), None),
+        Savings.MakePayment(date.plusDays(4), Savings.AssetPart(scheme.id, fund.id, Some(date.plusDays(11)), BigDecimal(4), BigDecimal(4)), None),
+        Savings.MakePayment(date.plusDays(5), Savings.AssetPart(scheme.id, fund.id, None, BigDecimal(5), BigDecimal(5)), None)
       )
       savings.latestAssetAction shouldBe Some(date.plusDays(5))
       checkSavings(date, savings,
@@ -173,12 +173,12 @@ class SavingsSpec extends WordSpec with Matchers {
       val fund = savings2.funds.head
       val date = LocalDate.now.minusDays(10)
       val savings = savings2.processEvents(
-        Savings.MakePayment(date.plusDays(1), Savings.AssetPart(scheme.id, fund.id, None, BigDecimal(10), BigDecimal(10))),
-        Savings.MakePayment(date.plusDays(2), Savings.AssetPart(scheme.id, fund.id, Some(date.plusDays(10)), BigDecimal(10), BigDecimal(10))),
-        Savings.MakePayment(date.plusDays(3), Savings.AssetPart(scheme.id, fund.id, Some(date.plusDays(11)), BigDecimal(10), BigDecimal(10))),
-        Savings.MakeRefund(date.plusDays(4), Savings.AssetPart(scheme.id, fund.id, None, BigDecimal(1), BigDecimal(1))),
-        Savings.MakeRefund(date.plusDays(5), Savings.AssetPart(scheme.id, fund.id, Some(date.plusDays(10)), BigDecimal(10), BigDecimal(10))),
-        Savings.MakeRefund(date.plusDays(6), Savings.AssetPart(scheme.id, fund.id, Some(date.plusDays(11)), BigDecimal(2), BigDecimal(2)))
+        Savings.MakePayment(date.plusDays(1), Savings.AssetPart(scheme.id, fund.id, None, BigDecimal(10), BigDecimal(10)), None),
+        Savings.MakePayment(date.plusDays(2), Savings.AssetPart(scheme.id, fund.id, Some(date.plusDays(10)), BigDecimal(10), BigDecimal(10)), None),
+        Savings.MakePayment(date.plusDays(3), Savings.AssetPart(scheme.id, fund.id, Some(date.plusDays(11)), BigDecimal(10), BigDecimal(10)), None),
+        Savings.MakeRefund(date.plusDays(4), Savings.AssetPart(scheme.id, fund.id, None, BigDecimal(1), BigDecimal(1)), None),
+        Savings.MakeRefund(date.plusDays(5), Savings.AssetPart(scheme.id, fund.id, Some(date.plusDays(10)), BigDecimal(10), BigDecimal(10)), None),
+        Savings.MakeRefund(date.plusDays(6), Savings.AssetPart(scheme.id, fund.id, Some(date.plusDays(11)), BigDecimal(2), BigDecimal(2)), None)
       )
       savings.latestAssetAction shouldBe Some(date.plusDays(6))
       checkSavings(date, savings,
@@ -193,14 +193,14 @@ class SavingsSpec extends WordSpec with Matchers {
       val fund2 = savings2.funds(1)
       val date = LocalDate.now.minusDays(10)
       val savings = savings2.processEvents(
-        Savings.MakePayment(date.plusDays(1), Savings.AssetPart(scheme.id, fund1.id, None, BigDecimal(10), BigDecimal(10))),
-        Savings.MakePayment(date.plusDays(2), Savings.AssetPart(scheme.id, fund1.id, Some(date.plusDays(10)), BigDecimal(10), BigDecimal(10))),
+        Savings.MakePayment(date.plusDays(1), Savings.AssetPart(scheme.id, fund1.id, None, BigDecimal(10), BigDecimal(10)), None),
+        Savings.MakePayment(date.plusDays(2), Savings.AssetPart(scheme.id, fund1.id, Some(date.plusDays(10)), BigDecimal(10), BigDecimal(10)), None),
         Savings.MakeTransfer(date.plusDays(3), Savings.AssetPart(scheme.id, fund1.id, None, BigDecimal(1), BigDecimal(10)),
-          Savings.AssetPart(scheme.id, fund2.id, None, BigDecimal(2), BigDecimal(5))),
+          Savings.AssetPart(scheme.id, fund2.id, None, BigDecimal(2), BigDecimal(5)), None),
         Savings.MakeTransfer(date.plusDays(4), Savings.AssetPart(scheme.id, fund1.id, None, BigDecimal(2), BigDecimal(10)),
-          Savings.AssetPart(scheme.id, fund2.id, None, BigDecimal(10), BigDecimal(2))),
+          Savings.AssetPart(scheme.id, fund2.id, None, BigDecimal(10), BigDecimal(2)), None),
         Savings.MakeTransfer(date.plusDays(5), Savings.AssetPart(scheme.id, fund1.id, Some(date.plusDays(10)), BigDecimal(3), BigDecimal(10)),
-          Savings.AssetPart(scheme.id, fund2.id, Some(date.plusDays(10)), BigDecimal(10), BigDecimal(3)))
+          Savings.AssetPart(scheme.id, fund2.id, Some(date.plusDays(10)), BigDecimal(10), BigDecimal(3)), None)
       )
       savings.latestAssetAction shouldBe Some(date.plusDays(5))
       checkSavings(date, savings,
@@ -216,9 +216,9 @@ class SavingsSpec extends WordSpec with Matchers {
       val fund = savings2.funds.head
       val date = LocalDate.now.minusDays(10)
       val savings = savings2.processEvents(
-        Savings.MakePayment(date.plusDays(1), Savings.AssetPart(scheme.id, fund.id, None, BigDecimal(1), BigDecimal(1))),
-        Savings.MakePayment(date.plusDays(2), Savings.AssetPart(scheme.id, fund.id, Some(date.plusDays(10)), BigDecimal(2), BigDecimal(2))),
-        Savings.MakePayment(date.plusDays(3), Savings.AssetPart(scheme.id, fund.id, Some(date.plusDays(11)), BigDecimal(3), BigDecimal(3)))
+        Savings.MakePayment(date.plusDays(1), Savings.AssetPart(scheme.id, fund.id, None, BigDecimal(1), BigDecimal(1)), None),
+        Savings.MakePayment(date.plusDays(2), Savings.AssetPart(scheme.id, fund.id, Some(date.plusDays(10)), BigDecimal(2), BigDecimal(2)), None),
+        Savings.MakePayment(date.plusDays(3), Savings.AssetPart(scheme.id, fund.id, Some(date.plusDays(11)), BigDecimal(3), BigDecimal(3)), None)
       )
       checkSavings(date, savings,
         Savings.Asset(scheme.id, fund.id, None, BigDecimal(1), 0),
@@ -337,12 +337,16 @@ class SavingsSpec extends WordSpec with Matchers {
 
     "handle MakePayment" in {
       checkEventSerialization(Savings.MakePayment(LocalDate.now,
-        Savings.AssetPart(savings1.schemes.head.id, savings1.funds.head.id, Some(LocalDate.now), BigDecimal(10), BigDecimal(10))))
+        Savings.AssetPart(savings1.schemes.head.id, savings1.funds.head.id, Some(LocalDate.now), BigDecimal(10), BigDecimal(10)), None))
+      checkEventSerialization(Savings.MakePayment(LocalDate.now,
+        Savings.AssetPart(savings1.schemes.head.id, savings1.funds.head.id, Some(LocalDate.now), BigDecimal(10), BigDecimal(10)), Some("comment")))
     }
 
     "handle MakeRefund" in {
       checkEventSerialization(Savings.MakeRefund(LocalDate.now,
-        Savings.AssetPart(savings1.schemes.head.id, savings1.funds.head.id, Some(LocalDate.now), BigDecimal(10), BigDecimal(10))))
+        Savings.AssetPart(savings1.schemes.head.id, savings1.funds.head.id, Some(LocalDate.now), BigDecimal(10), BigDecimal(10)), None))
+      checkEventSerialization(Savings.MakeRefund(LocalDate.now,
+        Savings.AssetPart(savings1.schemes.head.id, savings1.funds.head.id, Some(LocalDate.now), BigDecimal(10), BigDecimal(10)), Some("comment")))
     }
 
     "handle MakeTransfer" in {
@@ -350,7 +354,12 @@ class SavingsSpec extends WordSpec with Matchers {
       val fund = savings1.funds.head
       checkEventSerialization(Savings.MakeTransfer(LocalDate.now,
         Savings.AssetPart(scheme.id, fund.id, Some(LocalDate.now), BigDecimal(10), BigDecimal(10)),
-        Savings.AssetPart(fund.id, scheme.id, None, BigDecimal(1), BigDecimal(1))))
+        Savings.AssetPart(fund.id, scheme.id, None, BigDecimal(1), BigDecimal(1)),
+        None))
+      checkEventSerialization(Savings.MakeTransfer(LocalDate.now,
+        Savings.AssetPart(scheme.id, fund.id, Some(LocalDate.now), BigDecimal(10), BigDecimal(10)),
+        Savings.AssetPart(fund.id, scheme.id, None, BigDecimal(1), BigDecimal(1)),
+        Some("comment")))
     }
   }
 
@@ -363,7 +372,7 @@ class SavingsSpec extends WordSpec with Matchers {
 
       // Invest 1 unit at price 6; VWAP = 1*6 / 1 = 6
       val savings2_1 = savings2.processEvent(
-        Savings.MakePayment(date.plusDays(1), Savings.AssetPart(scheme.id, fund1.id, None, BigDecimal(1), BigDecimal(6)))
+        Savings.MakePayment(date.plusDays(1), Savings.AssetPart(scheme.id, fund1.id, None, BigDecimal(1), BigDecimal(6)), None)
       )
       checkSavings(date, savings2_1,
         Savings.Asset(scheme.id, fund1.id, None, BigDecimal(1), BigDecimal(6))
@@ -371,7 +380,7 @@ class SavingsSpec extends WordSpec with Matchers {
 
       // Invest 2 units at price 3; VWAP = (1*6 + 2*3) / (1 + 2) = 4
       val savings2_2 = savings2_1.processEvent(
-        Savings.MakePayment(date.plusDays(1), Savings.AssetPart(scheme.id, fund1.id, None, BigDecimal(2), BigDecimal(3)))
+        Savings.MakePayment(date.plusDays(1), Savings.AssetPart(scheme.id, fund1.id, None, BigDecimal(2), BigDecimal(3)), None)
       )
       checkSavings(date, savings2_2,
         Savings.Asset(scheme.id, fund1.id, None, BigDecimal(3), BigDecimal(4))
@@ -379,7 +388,7 @@ class SavingsSpec extends WordSpec with Matchers {
 
       // VWAP remains unchanged upon refund
       val savings2_3 = savings2_2.processEvent(
-        Savings.MakeRefund(date.plusDays(1), Savings.AssetPart(scheme.id, fund1.id, None, BigDecimal(1), BigDecimal(100)))
+        Savings.MakeRefund(date.plusDays(1), Savings.AssetPart(scheme.id, fund1.id, None, BigDecimal(1), BigDecimal(100)), None)
       )
       checkSavings(date, savings2_3,
         Savings.Asset(scheme.id, fund1.id, None, BigDecimal(2), BigDecimal(4))
@@ -387,7 +396,7 @@ class SavingsSpec extends WordSpec with Matchers {
 
       // Invest 2 units at price 2; (once all available) VWAP = (2*4 + 2*2) / (2 + 2) = 3
       val savings2_4 = savings2_3.processEvent(
-        Savings.MakePayment(date.plusDays(1), Savings.AssetPart(scheme.id, fund1.id, Some(date.plusDays(10)), BigDecimal(2), BigDecimal(2)))
+        Savings.MakePayment(date.plusDays(1), Savings.AssetPart(scheme.id, fund1.id, Some(date.plusDays(10)), BigDecimal(2), BigDecimal(2)), None)
       )
       checkSavings(date, savings2_4,
         Savings.Asset(scheme.id, fund1.id, None, BigDecimal(2), BigDecimal(4)),
@@ -400,7 +409,7 @@ class SavingsSpec extends WordSpec with Matchers {
       // Transfer 2 units at price 2 (with VWAP = 4) to 4 units at price 1; dstVWAP = (2 * 4) / 4 = 2
       val savings2_5 = savings2_4.processEvent(
         Savings.MakeTransfer(date.plusDays(1), Savings.AssetPart(scheme.id, fund1.id, None, BigDecimal(2), BigDecimal(2)),
-          Savings.AssetPart(scheme.id, fund2.id, None, BigDecimal(4), BigDecimal(1)))
+          Savings.AssetPart(scheme.id, fund2.id, None, BigDecimal(4), BigDecimal(1)), None)
       )
       checkSavings(date, savings2_5,
         Savings.Asset(scheme.id, fund1.id, Some(date.plusDays(10)), BigDecimal(2), BigDecimal(2)),
@@ -410,7 +419,7 @@ class SavingsSpec extends WordSpec with Matchers {
       // Transfer 2 units at price 4 (with VWAP = 2) to 8 units at price 1; dstVWAP = (4 * 2 + 2 * 2) / (4 + 8) = 1
       val savings2_6 = savings2_5.processEvent(
         Savings.MakeTransfer(date.plusDays(1), Savings.AssetPart(scheme.id, fund1.id, Some(date.plusDays(10)), BigDecimal(2), BigDecimal(4)),
-          Savings.AssetPart(scheme.id, fund2.id, None, BigDecimal(8), BigDecimal(1)))
+          Savings.AssetPart(scheme.id, fund2.id, None, BigDecimal(8), BigDecimal(1)), None)
       )
       checkSavings(date, savings2_6,
         Savings.Asset(scheme.id, fund2.id, None, BigDecimal(12), BigDecimal(1))

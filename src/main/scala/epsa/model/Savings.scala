@@ -54,9 +54,6 @@ object Savings {
     def amount(value: BigDecimal) = scaleAmount(units * value)
   }
 
-  // TODO: optional comment on event ? (update serializer/deserializer and asset action window)
-  // TODO: optional comment on scheme/fund ?
-
   sealed trait Event
 
   case class CreateScheme(schemeId: UUID, name: String, comment: Option[String])
@@ -83,13 +80,13 @@ object Savings {
   case class DissociateFund(schemeId: UUID, fundId: UUID)
     extends Event
 
-  case class MakePayment(date: LocalDate, part: AssetPart)
+  case class MakePayment(date: LocalDate, part: AssetPart, comment: Option[String])
     extends Event
 
-  case class MakeTransfer(date: LocalDate, partSrc: AssetPart, partDst: AssetPart)
+  case class MakeTransfer(date: LocalDate, partSrc: AssetPart, partDst: AssetPart, comment: Option[String])
     extends Event
 
-  case class MakeRefund(date: LocalDate, part: AssetPart)
+  case class MakeRefund(date: LocalDate, part: AssetPart, comment: Option[String])
     extends Event
 
   object JsonProtocol extends DefaultJsonProtocol {
@@ -139,9 +136,9 @@ object Savings {
     implicit val associateFundFormat = jsonFormat2(AssociateFund)
     implicit val dissociateFundFormat = jsonFormat2(DissociateFund)
     implicit val assetPartFormat = jsonFormat5(AssetPart)
-    implicit val makePaymentFormat = jsonFormat2(MakePayment)
-    implicit val makeTransferFormat = jsonFormat3(MakeTransfer)
-    implicit val makeRefundFormat = jsonFormat2(MakeRefund)
+    implicit val makePaymentFormat = jsonFormat3(MakePayment)
+    implicit val makeTransferFormat = jsonFormat4(MakeTransfer)
+    implicit val makeRefundFormat = jsonFormat3(MakeRefund)
 
     implicit object EventJsonFormat extends RootJsonFormat[Event] with BasicFormats {
 
@@ -235,17 +232,17 @@ case class Savings(
     processEvents(events:_*)
 
   def processEvent(event: Event): Savings = event match {
-    case CreateScheme(id, name, comment)      => createScheme(id, name, comment)
-    case UpdateScheme(id, name, comment)      => updateScheme(id, name, comment)
-    case DeleteScheme(id)                     => deleteScheme(id)
-    case CreateFund(id, name, comment)        => createFund(id, name, comment)
-    case UpdateFund(id, name, comment)        => updateFund(id, name, comment)
-    case DeleteFund(id)                       => deleteFund(id)
-    case AssociateFund(schemeId, fundId)      => associateFund(schemeId, fundId)
-    case DissociateFund(schemeId, fundId)     => dissociateFund(schemeId, fundId)
-    case MakePayment(date, part)              => computeAssets(date).makePayment(date, part)
-    case MakeTransfer(date, partSrc, partDst) => computeAssets(date).makeTransfer(date, partSrc, partDst)
-    case MakeRefund(date, part)               => computeAssets(date).makeRefund(date, part)
+    case CreateScheme(id, name, comment)               => createScheme(id, name, comment)
+    case UpdateScheme(id, name, comment)               => updateScheme(id, name, comment)
+    case DeleteScheme(id)                              => deleteScheme(id)
+    case CreateFund(id, name, comment)                 => createFund(id, name, comment)
+    case UpdateFund(id, name, comment)                 => updateFund(id, name, comment)
+    case DeleteFund(id)                                => deleteFund(id)
+    case AssociateFund(schemeId, fundId)               => associateFund(schemeId, fundId)
+    case DissociateFund(schemeId, fundId)              => dissociateFund(schemeId, fundId)
+    case MakePayment(date, part, comment)              => computeAssets(date).makePayment(date, part, comment)
+    case MakeTransfer(date, partSrc, partDst, comment) => computeAssets(date).makeTransfer(date, partSrc, partDst, comment)
+    case MakeRefund(date, part, comment)               => computeAssets(date).makeRefund(date, part, comment)
   }
 
   protected def createScheme(id: UUID, name: String, comment: Option[String]): Savings = {
@@ -296,7 +293,7 @@ case class Savings(
     copy(schemes = updated)
   }
 
-  protected def makePayment(date: LocalDate, part: AssetPart, srcInvestedAmount: Option[BigDecimal] = None): Savings = {
+  protected def makePayment(date: LocalDate, part: AssetPart, comment: Option[String], srcInvestedAmount: Option[BigDecimal] = None): Savings = {
     // Note: VWAP = invested amount / units
     val savings = findAsset(date, part) match {
       case Some(currentAsset) =>
@@ -317,14 +314,14 @@ case class Savings(
     savings.copy(latestAssetAction = Some(date))
   }
 
-  protected def makeTransfer(date: LocalDate, partSrc: AssetPart, partDst: AssetPart): Savings = {
+  protected def makeTransfer(date: LocalDate, partSrc: AssetPart, partDst: AssetPart, comment: Option[String]): Savings = {
     val srcAsset = findAsset(date, partSrc).get
     // Note: invested amount = units * VWAP
     val srcInvestedAmount = partSrc.amount(srcAsset.vwap)
-    makeRefund(date, partSrc, Some(srcAsset)).makePayment(date, partDst, Some(srcInvestedAmount))
+    makeRefund(date, partSrc, comment, Some(srcAsset)).makePayment(date, partDst, comment, Some(srcInvestedAmount))
   }
 
-  protected def makeRefund(date: LocalDate, part: AssetPart, srcAsset: Option[Savings.Asset] = None): Savings = {
+  protected def makeRefund(date: LocalDate, part: AssetPart, comment: Option[String], srcAsset: Option[Savings.Asset] = None): Savings = {
     val currentAsset = srcAsset.orElse(findAsset(date, part)).get
     val units = currentAsset.units - part.units
     val vwap = currentAsset.vwap

@@ -91,6 +91,9 @@ class NewAssetActionController {
   @FXML
   protected var dstUnitsAutoButton: ToggleButton = _
 
+  @FXML
+  protected var commentField: TextArea = _
+
   protected var buttonOk: Node = _
 
   private var mainController: MainController = _
@@ -680,10 +683,11 @@ class NewAssetActionController {
     }
 
     val event = if (opDateOk && srcOk && dstOk) Some {
+      val comment = Option(commentField.getText).map(_.trim).find(_.nonEmpty)
       actionKind match {
-        case AssetActionKind.Payment  => Savings.MakePayment(operationDate, srcAsset)
-        case AssetActionKind.Transfer => Savings.MakeTransfer(operationDate, srcAsset, dstAsset)
-        case AssetActionKind.Refund   => Savings.MakeRefund(operationDate, srcAsset)
+        case AssetActionKind.Payment  => Savings.MakePayment(operationDate, srcAsset, comment)
+        case AssetActionKind.Transfer => Savings.MakeTransfer(operationDate, srcAsset, dstAsset, comment)
+        case AssetActionKind.Refund   => Savings.MakeRefund(operationDate, srcAsset, comment)
       }
     } else None
 
