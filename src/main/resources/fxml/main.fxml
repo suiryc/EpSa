@@ -162,7 +162,14 @@
             </Menu>
             <Menu mnemonicParsing="false" text="%Tools">
                <items>
-                  <MenuItem mnemonicParsing="false" onAction="#onCleanupDataStore" text="%Cleanup data store" />
+                  <MenuItem mnemonicParsing="false" onAction="#onCleanupDataStore" text="%Cleanup data store">
+                     <graphic>
+                        <ImageView pickOnBounds="true" preserveRatio="true">
+                           <image>
+                              <Image url="@../images/fugue-icons/broom.png" />
+                           </image>
+                        </ImageView>
+                     </graphic></MenuItem>
                   <SeparatorMenuItem mnemonicParsing="false" />
                   <MenuItem mnemonicParsing="false" onAction="#onTest" text="Test 1" />
                   <MenuItem mnemonicParsing="false" onAction="#onTest" text="Test 2" />

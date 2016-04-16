@@ -13,7 +13,7 @@ import javafx.geometry.Insets
 import javafx.scene.Node
 import javafx.scene.control._
 import javafx.scene.layout.{GridPane, Region}
-import javafx.stage.{Modality, Stage}
+import javafx.stage.{Modality, Stage, Window}
 import javafx.util.converter.LocalDateStringConverter
 import scala.collection.JavaConversions._
 import suiryc.scala.javafx.stage.Stages.StageLocation
@@ -286,6 +286,14 @@ class NewAssetActionController {
 
   private def onToggleKind(): Unit = {
     actionKind = getToggleKind(actionKindGroup.getSelectedToggle)
+
+    val (icon, title) = actionKind match {
+      case AssetActionKind.Payment  => (Images.iconTableImport, Strings.payment)
+      case AssetActionKind.Transfer => (Images.iconTablesRelation, Strings.transfer)
+      case AssetActionKind.Refund   => (Images.iconTableExport, Strings.refund)
+    }
+    stage.getIcons.setAll(icon)
+    stage.setTitle(title)
 
     val disableDst = !isDstEnabled
     dstFundField.setDisable(disableDst)
@@ -784,10 +792,13 @@ object NewAssetActionController {
   private val dstUnitsAuto = Preference.from(s"$prefsKeyPrefix.dst-units-auto", true)
 
   /** Builds a dialog out of this controller. */
-  def buildDialog(mainController: MainController, savings: Savings, kind: AssetActionKind.Value, asset: Option[Savings.Asset]): Dialog[Option[Savings.Event]] = {
+  def buildDialog(owner: Option[Window], mainController: MainController, savings: Savings,
+    kind: AssetActionKind.Value, asset: Option[Savings.Asset]): Dialog[Option[Savings.Event]] =
+  {
     val dialog = new Dialog[Option[Savings.Event]]()
-    val title = s"${Strings.payment} / ${Strings.transfer} / ${Strings.refund}"
-    dialog.setTitle(title)
+    // Note: initializing owner resets dialog icon, so set the icon afterwards
+    owner.foreach(dialog.initOwner)
+    // Icon and title are changed according to chosen asset action
     dialog.getDialogPane.getButtonTypes.addAll(ButtonType.OK, ButtonType.CANCEL)
 
     val loader = new FXMLLoader(getClass.getResource("/fxml/new-asset-action.fxml"), I18N.getResources)

@@ -134,6 +134,8 @@ object DataStore {
 
     if (change) {
       val fileChooser = new FileChooser()
+      // Note: there is no way to set the fileChooser icon other than have it
+      // inherit from its owner.
       fileChooser.setTitle(Strings.selectDataStore)
       fileChooser.getExtensionFilters.addAll(
         new FileChooser.ExtensionFilter(Strings.dataStore, "*.mv.db")

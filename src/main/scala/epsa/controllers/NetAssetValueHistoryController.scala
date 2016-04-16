@@ -407,14 +407,14 @@ object NetAssetValueHistoryController {
   /** Builds a stage out of this controller. */
   def buildStage(mainController: MainController, savings: Savings, fundId: Option[UUID], window: Window): Dialog[Boolean] = {
     val dialog = new Dialog[Boolean]()
+    Stages.getStage(dialog).getIcons.setAll(Images.iconChartUp)
+    dialog.setTitle(title)
     dialog.getDialogPane.getButtonTypes.addAll(ButtonType.OK, ButtonType.CANCEL)
 
     val loader = new FXMLLoader(getClass.getResource("/fxml/net-asset-value-history.fxml"), I18N.getResources)
     dialog.getDialogPane.setContent(loader.load())
     val controller = loader.getController[NetAssetValueHistoryController]
     controller.initialize(savings, fundId)
-
-    dialog.setTitle(title)
 
     dialog.setResultConverter(Callback { resultConverter(mainController, window, controller) _ })
     Stages.trackMinimumDimensions(Stages.getStage(dialog))

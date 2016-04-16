@@ -22,7 +22,7 @@ import javafx.fxml.{FXML, FXMLLoader}
 import javafx.scene.{Parent, Scene}
 import javafx.scene.layout.{GridPane, Region}
 import javafx.scene.control._
-import javafx.scene.image.{Image, ImageView}
+import javafx.scene.image.ImageView
 import javafx.scene.input._
 import javafx.stage._
 import scala.collection.immutable.ListMap
@@ -54,11 +54,13 @@ class MainController extends Logging {
   import Preference._
   import Stages.StageLocation
 
-  private val stageLocation = Preference.from("stage.main.location", null:StageLocation)
+  private val prefsKeyPrefix = "stage.main"
 
-  private val splitPaneDividerPositions = Preference.from("stage.main.splitPane.dividerPositions", null:String)
+  private val stageLocation = Preference.from(s"$prefsKeyPrefix.location", null:StageLocation)
 
-  private val assetsColumnsPref = Preference.from("stage.main.assets.columns", null:String)
+  private val splitPaneDividerPositions = Preference.from(s"$prefsKeyPrefix.splitPane.dividerPositions", null:String)
+
+  private val assetsColumnsPref = Preference.from(s"$prefsKeyPrefix.assets.columns", null:String)
 
   @FXML
   protected var fileCloseMenu: MenuItem = _
@@ -283,16 +285,15 @@ class MainController extends Logging {
 
     // See: https://www.marshall.edu/genomicjava/2013/12/30/javafx-tableviews-with-contextmenus/
     val menu = new ContextMenu()
-    // Note: Image(url, requestedWidth, requestedHeight, preserveRatio, smooth, backgroundLoading)
     val editScheme = new MenuItem(Strings.editScheme,
-      new ImageView(new Image("/images/fugue-icons/tables.png", 0.0, 0.0, true, false, false)))
+      new ImageView(Images.iconTables))
     editScheme.setOnAction { (event: ActionEvent) =>
       Option(row.getItem).foreach { details =>
         actor ! OnEditSchemes(Some(details.asset.schemeId))
       }
     }
     val editFund = new MenuItem(Strings.editFund,
-      new ImageView(new Image("/images/fugue-icons/table.png", 0.0, 0.0, true, false, false)))
+      new ImageView(Images.iconTable))
     editFund.setOnAction { (event: ActionEvent) =>
       Option(row.getItem).foreach { details =>
         actor ! OnEditFunds(Some(details.asset.fundId))
@@ -300,21 +301,21 @@ class MainController extends Logging {
     }
 
     val newPayment = new MenuItem(Strings.newPayment,
-      new ImageView(new Image("/images/fugue-icons/table-import.png", 0.0, 0.0, true, false, false)))
+      new ImageView(Images.iconTableImport))
     newPayment.setOnAction { (event: ActionEvent) =>
       Option(row.getItem).foreach { details =>
         actor ! OnNewAssetAction(AssetActionKind.Payment, Some(details.asset))
       }
     }
     val newArbitrage = new MenuItem(Strings.newTransfer,
-      new ImageView(new Image("/images/fugue-icons/tables-relation.png", 0.0, 0.0, true, false, false)))
+      new ImageView(Images.iconTablesRelation))
     newArbitrage.setOnAction { (event: ActionEvent) =>
       Option(row.getItem).foreach { details =>
         actor ! OnNewAssetAction(AssetActionKind.Transfer, Some(details.asset))
       }
     }
     val newRefund = new MenuItem(Strings.newRefund,
-      new ImageView(new Image("/images/fugue-icons/table-export.png", 0.0, 0.0, true, false, false)))
+      new ImageView(Images.iconTableExport))
     newRefund.setOnAction { (event: ActionEvent) =>
       Option(row.getItem).foreach { details =>
         actor ! OnNewAssetAction(AssetActionKind.Refund, Some(details.asset))
@@ -322,7 +323,7 @@ class MainController extends Logging {
     }
 
     val navHistory = new MenuItem(NetAssetValueHistoryController.title,
-      new ImageView(new Image("/images/fugue-icons/chart-up.png", 0.0, 0.0, true, false, false)))
+      new ImageView(Images.iconChartUp))
     navHistory.setOnAction { (event: ActionEvent) =>
       Option(row.getItem).foreach { details =>
         actor ! OnNetAssetValueHistory(Some(details.asset.fundId))
@@ -510,36 +511,32 @@ class MainController extends Logging {
     }
 
     def onEditSchemes(state: State, edit: Option[Savings.Scheme]): Unit = {
-      val dialog = EditSchemesController.buildDialog(state.savingsUpd, edit)
+      val dialog = EditSchemesController.buildDialog(Some(state.window), state.savingsUpd, edit)
       dialog.initModality(Modality.WINDOW_MODAL)
-      dialog.initOwner(state.window)
       dialog.setResizable(true)
       val events = dialog.showAndWait().orElse(Nil)
       processEvents(state, events)
     }
 
     def onEditFunds(state: State, edit: Option[Savings.Fund]): Unit = {
-      val dialog = EditFundsController.buildDialog(state.savingsUpd, edit)
+      val dialog = EditFundsController.buildDialog(Some(state.window), state.savingsUpd, edit)
       dialog.initModality(Modality.WINDOW_MODAL)
-      dialog.initOwner(state.window)
       dialog.setResizable(true)
       val events = dialog.showAndWait().orElse(Nil)
       processEvents(state, events)
     }
 
     def onNewAssetAction(state: State, kind: AssetActionKind.Value, asset: Option[Savings.Asset]): Unit = {
-      val dialog = NewAssetActionController.buildDialog(MainController.this, state.savingsUpd, kind, asset)
+      val dialog = NewAssetActionController.buildDialog(Some(state.window), MainController.this, state.savingsUpd, kind, asset)
       dialog.initModality(Modality.WINDOW_MODAL)
-      dialog.initOwner(state.window)
       dialog.setResizable(true)
       val event = dialog.showAndWait().orElse(None)
       processEvents(state, event.toList)
     }
 
     def onOptions(state: State): Unit = {
-      val dialog = OptionsController.buildDialog()
+      val dialog = OptionsController.buildDialog(Some(state.window))
       dialog.initModality(Modality.WINDOW_MODAL)
-      dialog.initOwner(state.window)
       dialog.setResizable(true)
       val (reload, needRestart) = dialog.showAndWait().orElse((false, false))
       if (reload) {
@@ -720,9 +717,7 @@ class MainController extends Logging {
         // If saving failed (user was notified), consume event to get back to
         // confirmation dialog.
         val buttonSave = alert.getDialogPane.lookupButton(buttonSaveType)
-        // Note: Image(url, requestedWidth, requestedHeight, preserveRatio, smooth, backgroundLoading)
-        val image = new Image("/images/fugue-icons/disk.png", 0.0, 0.0, true, false, false)
-        buttonSave.asInstanceOf[Button].setGraphic(new ImageView(image))
+        buttonSave.asInstanceOf[Button].setGraphic(new ImageView(Images.iconDisk))
         buttonSave.addEventFilter(ActionEvent.ACTION, { (event: ActionEvent) =>
           if (!save(state, Some(Stages.getStage(alert)))) event.consume()
         })
@@ -984,13 +979,13 @@ object MainController {
 
     // Note: there need to be distinct ImageView instances to display an image
     // more than once.
-    private val tooltipHintImg = new Image("/images/fugue-icons/question-balloon.png", 0.0, 0.0, true, false, false)
-    def tooltipHint = new ImageView(tooltipHintImg)
+    def tooltipHint = new ImageView(Images.iconQuestionBalloon)
 
   }
 
   def build(state: State, needRestart: Boolean = false, applicationStart: Boolean = false): Unit = {
     val stage = state.stage
+    stage.getIcons.add(Images.iconPiggyBank)
 
     val loader = new FXMLLoader(getClass.getResource("/fxml/main.fxml"), I18N.getResources)
     val root = loader.load[Parent]()

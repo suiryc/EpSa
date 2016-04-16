@@ -3,8 +3,9 @@ package epsa.controllers
 import epsa.I18N
 import epsa.I18N.Strings
 import javafx.collections.FXCollections
-import javafx.fxml.{FXMLLoader, FXML}
-import javafx.scene.control.{Slider, ButtonType, ComboBox, Dialog}
+import javafx.fxml.{FXML, FXMLLoader}
+import javafx.scene.control.{ButtonType, ComboBox, Dialog, Slider}
+import javafx.stage.Window
 import suiryc.scala.javafx.stage.Stages
 import suiryc.scala.javafx.util.Callback
 import suiryc.scala.settings.{SettingSnapshot, SettingsSnapshot}
@@ -121,8 +122,11 @@ object OptionsController {
 
   private val settings = epsa.Settings
 
-  def buildDialog(): Dialog[(Boolean, Boolean)] = {
+  def buildDialog(owner: Option[Window]): Dialog[(Boolean, Boolean)] = {
     val dialog = new Dialog[(Boolean, Boolean)]()
+    // Note: initializing owner resets dialog icon, so set the icon afterwards
+    owner.foreach(dialog.initOwner)
+    Stages.getStage(dialog).getIcons.setAll(Images.iconGear)
     dialog.setTitle(Strings.options)
     dialog.getDialogPane.getButtonTypes.addAll(ButtonType.OK, ButtonType.CANCEL)
 

@@ -12,6 +12,7 @@ import javafx.scene.Node
 import javafx.scene.control._
 import javafx.scene.image.ImageView
 import javafx.scene.input.{KeyCode, KeyEvent, MouseEvent}
+import javafx.stage.Window
 import scala.collection.JavaConversions._
 import suiryc.scala.RichOption._
 import suiryc.scala.javafx.beans.value.RichObservableValue._
@@ -503,9 +504,12 @@ class EditFundsController {
 object EditFundsController {
 
   /** Builds a dialog out of this controller. */
-  def buildDialog(savings: Savings, edit: Option[Savings.Fund]): Dialog[List[Savings.Event]] = {
+  def buildDialog(owner: Option[Window], savings: Savings, edit: Option[Savings.Fund]): Dialog[List[Savings.Event]] = {
     val dialog = new Dialog[List[Savings.Event]]()
     val title = Strings.editFunds
+    // Note: initializing owner resets dialog icon, so set the icon afterwards
+    owner.foreach(dialog.initOwner)
+    Stages.getStage(dialog).getIcons.setAll(Images.iconTable)
     dialog.setTitle(title)
     dialog.getDialogPane.getButtonTypes.addAll(ButtonType.OK, ButtonType.CANCEL)
 
