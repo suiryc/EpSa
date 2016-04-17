@@ -383,6 +383,11 @@ object DataStore {
 
     override protected val entries = TableQuery[Entries]
 
+    def hasEvents(): Future[Boolean] =
+      getDBRead.flatMap { db =>
+        db.run(entries.size.result)
+      }.map(_ > 0)
+
     def readEvents(): Future[Seq[Savings.Event]] =
       getDBRead.flatMap { db =>
         db.run(entries.sortBy(_.id).map(_.event).result)

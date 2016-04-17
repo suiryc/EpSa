@@ -56,6 +56,11 @@ object Savings {
 
   sealed trait Event
 
+  sealed trait AssetEvent extends Event {
+    val date: LocalDate
+    val comment: Option[String]
+  }
+
   case class CreateScheme(schemeId: UUID, name: String, comment: Option[String])
     extends Event
 
@@ -81,13 +86,13 @@ object Savings {
     extends Event
 
   case class MakePayment(date: LocalDate, part: AssetPart, comment: Option[String])
-    extends Event
+    extends AssetEvent
 
   case class MakeTransfer(date: LocalDate, partSrc: AssetPart, partDst: AssetPart, comment: Option[String])
-    extends Event
+    extends AssetEvent
 
   case class MakeRefund(date: LocalDate, part: AssetPart, comment: Option[String])
-    extends Event
+    extends AssetEvent
 
   object JsonProtocol extends DefaultJsonProtocol {
 

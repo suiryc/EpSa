@@ -35,6 +35,9 @@ object Awaits {
       })
     }
 
+  def hasDataStoreEvents(owner: Option[Window]): Try[Boolean] =
+    orError(DataStore.EventSource.hasEvents(), owner, DataStore.readIssueMsg())
+
   def readDataStoreEvents(owner: Option[Window]): Try[Seq[Savings.Event]] =
     orError(DataStore.EventSource.readEvents(), owner, DataStore.readIssueMsg())
 

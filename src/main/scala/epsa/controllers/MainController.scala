@@ -37,6 +37,7 @@ import suiryc.scala.javafx.stage.{FileChoosers, Stages}
 import suiryc.scala.javafx.util.Callback
 import suiryc.scala.settings.Preference
 
+// TODO: use 'information-balloon' for comments tooltips ?
 // TODO: display more information in assets table and details: net gain/loss (amount/percentage)
 // TODO: change details pane position; set below table ? (then have NAV history graph on the right side of details)
 // TODO: menu entries with latest datastore locations ?
@@ -51,16 +52,6 @@ class MainController extends Logging {
 
   import epsa.Settings.prefs
   import MainController._
-  import Preference._
-  import Stages.StageLocation
-
-  private val prefsKeyPrefix = "stage.main"
-
-  private val stageLocation = Preference.from(s"$prefsKeyPrefix.location", null:StageLocation)
-
-  private val splitPaneDividerPositions = Preference.from(s"$prefsKeyPrefix.splitPane.dividerPositions", null:String)
-
-  private val assetsColumnsPref = Preference.from(s"$prefsKeyPrefix.assets.columns", null:String)
 
   @FXML
   protected var fileCloseMenu: MenuItem = _
@@ -73,6 +64,9 @@ class MainController extends Logging {
 
   @FXML
   protected var viewNetAssetValueHistoryMenu: MenuItem = _
+
+  @FXML
+  protected var viewAccountHistoryMenu: MenuItem = _
 
   @FXML
   protected var splitPane: SplitPane = _
@@ -267,6 +261,10 @@ class MainController extends Logging {
     actor ! OnNetAssetValueHistory(getSelectedAsset.map(_.fundId))
   }
 
+  def onAccountHistory(event: ActionEvent): Unit = {
+    actor ! OnAccountHistory
+  }
+
   def onUpToDateAssets(event: ActionEvent): Unit = {
     actor ! OnUpToDateAssets(event.getSource.asInstanceOf[CheckMenuItem].isSelected)
   }
@@ -408,6 +406,7 @@ class MainController extends Logging {
       case OnFundGraph       => onFundGraph(state)
       case OnCleanupDataStore => onCleanupDataStore(state)
       case OnNetAssetValueHistory(fundId) => onNetAssetValueHistory(state, fundId)
+      case OnAccountHistory  => onAccountHistory(state)
       case OnUpToDateAssets(set) => onUpToDateAssets(state, set)
     }
 
@@ -444,6 +443,7 @@ class MainController extends Logging {
       fileSaveMenu.setDisable(!dirty)
       editUndoMenu.setDisable(!dirty)
       viewNetAssetValueHistoryMenu.setDisable(newState.savingsUpd.funds.isEmpty)
+      viewAccountHistoryMenu.setDisable(!Awaits.hasDataStoreEvents(Some(state.window)).getOrElse(false) && newState.eventsUpd.isEmpty)
 
       val title = DataStore.dbOpened.map { name =>
         s"[$name${if (dirty) " *" else ""}] - "
@@ -686,6 +686,13 @@ class MainController extends Logging {
       dialog.show()
     }
 
+    def onAccountHistory(state: State): Unit = {
+      val stage = AccountHistoryController.buildDialog(state)
+      stage.initModality(Modality.NONE)
+      stage.setResizable(true)
+      stage.show()
+    }
+
     def onUpToDateAssets(state: State, set: Boolean): Unit = {
       applyState(state.copy(viewUpToDateAssets = set))
     }
@@ -778,6 +785,18 @@ class MainController extends Logging {
 
 object MainController {
 
+  import epsa.Settings.prefs
+  import Preference._
+  import Stages.StageLocation
+
+  private val prefsKeyPrefix = "stage.main"
+
+  private val stageLocation = Preference.from(s"$prefsKeyPrefix.location", null:StageLocation)
+
+  private val splitPaneDividerPositions = Preference.from(s"$prefsKeyPrefix.splitPane.dividerPositions", null:String)
+
+  private val assetsColumnsPref = Preference.from(s"$prefsKeyPrefix.assets.columns", null:String)
+
   case class State(
     stage: Stage,
     savingsInit: Savings = Savings(),
@@ -826,6 +845,8 @@ object MainController {
   case object OnCleanupDataStore
 
   case class OnNetAssetValueHistory(fundId: Option[UUID])
+
+  case object OnAccountHistory
 
   case class OnUpToDateAssets(set: Boolean)
 

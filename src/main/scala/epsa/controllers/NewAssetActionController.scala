@@ -357,7 +357,7 @@ class NewAssetActionController {
     checkForm()
   }
 
-  def onSrcAmount(): Unit = {
+  private def onSrcAmount(): Unit = {
     val value = getSrcAmount
     if ((value > 0) && isDstEnabled && dstUnitsAutoButton.isSelected) {
       val dstNAV = getDstNAV

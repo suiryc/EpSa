@@ -30,3 +30,26 @@
 .table-view:focused .table-row-cell:selected .cell:value-negative {
   -fx-fill: #B00000;
 }
+
+/* Use table-row-cell style on tree-table-row-cell. */
+.tree-table-row-cell {
+  -fx-background: -fx-control-inner-background;
+  -fx-background-color: -fx-table-cell-border-color, -fx-background;
+  -fx-background-insets: 0, 0 0 1 0;
+  -fx-padding: 0;
+  -fx-text-fill: -fx-text-background-color;
+}
+
+.tree-table-row-cell:odd {
+  -fx-background: -fx-control-inner-background-alt;
+}
+
+.tree-table-row-cell:focused:selected {
+  -fx-background: -fx-selection-bar-non-focused;
+  -fx-table-cell-border-color: derive(-fx-selection-bar-non-focused, 20%);
+}
+
+.tree-table-view:focused .tree-table-row-cell:selected {
+  -fx-background: -fx-selection-bar;
+  -fx-table-cell-border-color: derive(-fx-selection-bar, 20%);
+}
