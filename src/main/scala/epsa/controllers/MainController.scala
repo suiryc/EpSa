@@ -37,12 +37,9 @@ import suiryc.scala.javafx.stage.{FileChoosers, Stages}
 import suiryc.scala.javafx.util.Callback
 import suiryc.scala.settings.Preference
 
-// TODO: use 'information-balloon' for comments tooltips ?
 // TODO: display more information in assets table and details: net gain/loss (amount/percentage)
 // TODO: change details pane position; set below table ? (then have NAV history graph on the right side of details)
 // TODO: menu entries with latest datastore locations ?
-// TODO: menu entry and dialog to display/edit events history ?
-// TODO: menu entry and dialog to display assets history; textual with comments, and graphic view of account gross amount (with 'link' to textual history)
 // TODO: when computing assets, order by scheme/fund/availability ?
 // TODO: manage encryption of datastore ?
 //         -> possible to read/write
@@ -1000,7 +997,7 @@ object MainController {
 
     // Note: there need to be distinct ImageView instances to display an image
     // more than once.
-    def tooltipHint = new ImageView(Images.iconQuestionBalloon)
+    def tooltipHint = new ImageView(Images.iconInformationBalloon)
 
   }
 

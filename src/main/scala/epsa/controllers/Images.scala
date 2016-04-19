@@ -36,7 +36,7 @@ object Images {
   lazy val iconClockHistory =
     new Image("/images/fugue-icons/clock-history.png", 0.0, 0.0, true, false, false)
 
-  lazy val iconQuestionBalloon =
-    new Image("/images/fugue-icons/question-balloon.png", 0.0, 0.0, true, false, false)
+  lazy val iconInformationBalloon =
+    new Image("/images/fugue-icons/information-balloon.png", 0.0, 0.0, true, false, false)
 
 }
