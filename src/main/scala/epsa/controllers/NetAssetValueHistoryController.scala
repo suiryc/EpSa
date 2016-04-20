@@ -5,7 +5,7 @@ import epsa.I18N.Strings
 import epsa.charts.{ChartHandler, ChartSettings}
 import epsa.model.Savings
 import epsa.storage.DataStore
-import epsa.tools.{EsaliaInvestmentFundProber, SpreadsheetInvestmentFundProber}
+import epsa.tools.{BNPParibasInvestmentFundProber, EsaliaInvestmentFundProber, SpreadsheetInvestmentFundProber}
 import epsa.util.Awaits
 import java.nio.file.Path
 import java.time.LocalDate
@@ -60,7 +60,11 @@ class NetAssetValueHistoryController {
 
   private var chartPane: Option[AnchorPane] = None
 
-  private val probers = List(EsaliaInvestmentFundProber, SpreadsheetInvestmentFundProber)
+  private val probers = List(
+    EsaliaInvestmentFundProber,
+    BNPParibasInvestmentFundProber,
+    SpreadsheetInvestmentFundProber
+  )
 
   def initialize(savings: Savings, fundIdOpt: Option[UUID]): Unit = {
     // Note: we need to tell the combobox how to display both the 'button' area

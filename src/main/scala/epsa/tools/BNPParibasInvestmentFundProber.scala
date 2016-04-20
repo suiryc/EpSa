@@ -2,9 +2,9 @@ package epsa.tools
 
 import epsa.model.Savings
 import java.nio.file.Path
-import java.time.LocalDate
+import java.time.{LocalDate, ZoneId}
 import java.time.format.DateTimeFormatter
-import org.apache.poi.ss.usermodel.WorkbookFactory
+import org.apache.poi.ss.usermodel.{Cell, WorkbookFactory}
 import suiryc.scala.io.PathsEx
 
 /**
@@ -29,40 +29,53 @@ object BNPParibasInvestmentFundProber extends InvestmentFundProber {
   }
 
   private def probeExcel(path: Path): Option[Savings.AssetValueHistory] = {
+    // Rows 0 to 14 contain general information or nothing
+    // Row 7 contains the investment fund name
+    // Row 14 indicates which data are listed: cell 0 shall contain the date
+    // and cell 1 the value at the given date
+    // Rows 15 and beyond contain dated values
+    val nameRowIdx = 7
+    val labelsRowIdx = 14
+    val dataRowIdx = labelsRowIdx + 1
+    val dateCellIdx = 0
+    val valueCellIdx = 1
     Some(WorkbookFactory.create(path.toFile)).filter { book =>
       // There should only be one sheet
       book.getNumberOfSheets == 1
     }.map { book =>
       book.getSheetAt(0)
     }.filter { sheet =>
-      // Rows 0 to 5 contain general information
-      // Rows 6 and beyond contain dated values
-      sheet.getSheetName.startsWith("Historique des valeurs liquida") &&
-        (sheet.getFirstRowNum == 0) && (sheet.getLastRowNum >= 6)
+      (sheet.getSheetName == "Sheet0") &&
+        (sheet.getFirstRowNum == 0) && (sheet.getLastRowNum >= dataRowIdx)
     }.flatMap { sheet =>
-      // Row 1 contains the investment fund name
-      // Row 5 indicates which data are listed: cell 4 shall contain the date
-      // and cell 5 the value at the given date
-      val dateCellIdx = 4
-      val valueCellIdx = 5
-      val row1 = sheet.getRow(1)
-      val row5 = sheet.getRow(5)
+      val nameRow = sheet.getRow(nameRowIdx)
+      val labelsRow = sheet.getRow(labelsRowIdx)
 
-      if ((row1.getFirstCellNum == 0) && (row1.getLastCellNum >= 1) &&
-        (row1.getCell(0).getStringCellValue == "Nom du fonds") &&
-        (row5.getFirstCellNum == 0) && (row5.getLastCellNum >= 5) &&
-        (row5.getCell(dateCellIdx).getStringCellValue == "Date VL") &&
-        (row5.getCell(valueCellIdx).getStringCellValue == "VL"))
+      if ((nameRow.getFirstCellNum == 0) && (nameRow.getLastCellNum >= 1) &&
+        (nameRow.getCell(0).getStringCellValue == "Nom") &&
+        (labelsRow.getFirstCellNum == 0) && (labelsRow.getLastCellNum >= math.max(dateCellIdx, valueCellIdx)) &&
+        (labelsRow.getCell(dateCellIdx).getStringCellValue == "Date") &&
+        (labelsRow.getCell(valueCellIdx).getStringCellValue == "Dernière VL"))
       {
         val dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
-        val name = row1.getCell(1).getStringCellValue
-        val values = (6 to sheet.getLastRowNum).toList.map { rowIdx =>
-          val row = sheet.getRow(rowIdx)
+        val name = nameRow.getCell(1).getStringCellValue
+        // Table is ended by an empty row (while last row contains a warning comment)
+        val values = (dataRowIdx to sheet.getLastRowNum).toStream.map(sheet.getRow).takeWhile { row =>
+          row.getCell(dateCellIdx).getCellType != Cell.CELL_TYPE_BLANK
+        }.map { row =>
+          val date = try {
+            // Try as a date
+            row.getCell(dateCellIdx).getDateCellValue.toInstant.atZone(ZoneId.systemDefault).toLocalDate
+          } catch {
+            case _: Exception =>
+              // Fallback to test parsing
+              LocalDate.parse(row.getCell(dateCellIdx).getStringCellValue, dateFormatter)
+          }
           Savings.AssetValue(
-            date = LocalDate.parse(row.getCell(dateCellIdx).getStringCellValue, dateFormatter),
+            date = date,
             value = row.getCell(valueCellIdx).getNumericCellValue
           )
-        }
+        }.toList
         Some(Savings.AssetValueHistory(Some(name), values))
       } else {
         None
