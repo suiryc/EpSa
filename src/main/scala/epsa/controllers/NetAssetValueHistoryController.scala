@@ -109,7 +109,7 @@ class NetAssetValueHistoryController {
             navHistoryImportPath() = selectedFile.toPath
 
             // And import history
-            importHistory(fund, hist.values.sortBy(_.date))
+            importHistory(fund, hist)
 
           case None =>
             Dialogs.warning(
@@ -250,11 +250,12 @@ class NetAssetValueHistoryController {
       successAction = displayChart(fund, _: Seq[Savings.AssetValue])
     )
 
-  case class ImportResult(current: Seq[Savings.AssetValue], fundChanges: HistoryChanges)
+  case class ImportResult(name: Option[String], current: Seq[Savings.AssetValue], fundChanges: HistoryChanges)
 
-  private def importHistory(fund: Savings.Fund, values: Seq[Savings.AssetValue]): Unit = {
+  private def importHistory(fund: Savings.Fund, history: Savings.AssetValueHistory): Unit = {
     import epsa.Main.Akka.dispatcher
 
+    val values = history.values.sortBy(_.date)
     val action = DataStore.AssetHistory.readValues(fund.id).map { current =>
       // Compute import changes (imported values relatively to updated history)
       val updated = updatedHistory(fund, current)
@@ -262,7 +263,7 @@ class NetAssetValueHistoryController {
       // Compute fund changes (all changes relatively to initial history)
       val fundChanges = mergeHistory(updatedHistory(fund, Seq.empty), values)
       changes += fund -> Some(fundChanges)
-      ImportResult(updated, importChanges)
+      ImportResult(history.name, updated, importChanges)
     }
 
     def showResult(result: ImportResult): Unit = {
@@ -355,7 +356,7 @@ class NetAssetValueHistoryController {
     val addedTable = root.lookup("#addedTable").asInstanceOf[TableView[AssetEntry]]
     val unchangedLabel = root.lookup("#unchangedLabel").asInstanceOf[Label]
 
-    fundLabel.setText(fund.name)
+    fundLabel.setText(fund.name + result.name.map(name => s"\n($name)").getOrElse(""))
     updatedLabel.setText(updatedEntries.size.toString)
     addedLabel.setText(addedEntries.size.toString)
     unchangedLabel.setText(result.fundChanges.unchanged.toString)
