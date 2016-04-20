@@ -19,7 +19,7 @@ import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.javafx.event.EventHandler._
 import suiryc.scala.javafx.event.Events
-import suiryc.scala.javafx.scene.control.{CheckBoxListCellEx, Dialogs}
+import suiryc.scala.javafx.scene.control.CheckBoxListCellEx
 import suiryc.scala.javafx.stage.Stages
 import suiryc.scala.javafx.util.Callback
 
@@ -133,8 +133,10 @@ class EditSchemesController {
     // Select initial scheme if any
     edit0.foreach(schemesField.getSelectionModel.select)
 
-    // Request confirmation if changes are pending
-    def confirmationFilter(event: ActionEvent): Unit = {
+    // Request confirmation if changes are pending.
+    // We need to handle both 'OK' button and dialog window closing request
+    // with non-applied changes.
+    def confirmationFilter[A <: Event](close: Boolean)(event: A): Unit = {
       val name = nameField.getText.trim
       val comment = Form.textOrNone(commentField.getText)
       // Changes are pending if not editing but name is not empty, or editing
@@ -150,19 +152,13 @@ class EditSchemesController {
           name.nonEmpty
       }
 
-      if (dirty) {
-        val resp = Dialogs.confirmation(
-          owner = Some(Stages.getStage(dialog)),
-          title = None,
-          headerText = Some(Strings.pendingChanges)
-        )
-
-        if (!resp.contains(ButtonType.OK)) {
-          event.consume()
-        }
-      }
+      val canClose =
+        if (dirty) Form.confirmDiscardPendingChanges(Stages.getStage(dialog), event)
+        else true
+      if (close && canClose) dialog.close()
     }
-    buttonOk.addEventFilter(ActionEvent.ACTION, confirmationFilter _)
+    buttonOk.addEventFilter(ActionEvent.ACTION, confirmationFilter[ActionEvent](close = false) _)
+    window.setOnCloseRequest(confirmationFilter(close = true) _)
 
     // Filter keys pressed to trigger some actions if possible:
     //   ENTER applies pending scheme changes if any (unless comment field has focus)

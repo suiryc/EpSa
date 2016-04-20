@@ -3,6 +3,10 @@ package epsa.controllers
 import epsa.I18N.Strings
 import epsa.model.Savings
 import java.time.LocalDate
+import javafx.event.Event
+import javafx.scene.control.ButtonType
+import javafx.stage.Window
+import suiryc.scala.javafx.scene.control.Dialogs
 
 object Form {
 
@@ -25,6 +29,28 @@ object Form {
   def formatAmount(amount: BigDecimal, suffix: String): String =
     s"$amount $suffix"
 
+  /**
+   * Asks user confirmation to discard pending changes.
+   *
+   * If user does not confirm, the event is consumed.
+   *
+   * @param owner the dialog owner window
+   * @param event the event that triggered the confirmation
+   * @return whether user confirmed discarding pending changes
+   */
+  def confirmDiscardPendingChanges(owner: Window, event: Event): Boolean = {
+    val resp = Dialogs.confirmation(
+      owner = Some(owner),
+      title = None,
+      headerText = Some(Strings.pendingChanges)
+    )
+
+    if (!resp.contains(ButtonType.OK)) {
+      event.consume()
+      false
+    }
+    else true
+  }
 }
 
 object AssetActionKind extends Enumeration {

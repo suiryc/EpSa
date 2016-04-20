@@ -17,7 +17,7 @@ import javafx.fxml.{FXML, FXMLLoader}
 import javafx.scene.{Parent, Scene}
 import javafx.scene.control._
 import javafx.scene.layout.AnchorPane
-import javafx.stage.{FileChooser, Stage, StageStyle, Window}
+import javafx.stage._
 import scala.collection.JavaConversions._
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -25,6 +25,7 @@ import scala.util.{Failure, Success}
 import suiryc.scala.concurrent.RichFuture._
 import suiryc.scala.math.Ordering._
 import suiryc.scala.settings.Preference
+import suiryc.scala.javafx.event.EventHandler._
 import suiryc.scala.javafx.scene.control.Dialogs
 import suiryc.scala.javafx.stage.{FileChoosers, Stages}
 import suiryc.scala.javafx.util.Callback
@@ -86,6 +87,17 @@ class NetAssetValueHistoryController {
       fundField.getSelectionModel.select(fund)
       loadHistory(fund)
     }
+  }
+
+  def onCloseRequest(dialog: Dialog[_])(event: WindowEvent): Unit = {
+    // Default dialog window closing request is handled to close the dialog
+    // when applicable.
+    // We do override this behaviour and need to close the dialog ourselves
+    // if applicable.
+    val canClose =
+      if (changes.nonEmpty) Form.confirmDiscardPendingChanges(stage, event)
+      else true
+    if (canClose) dialog.close()
   }
 
   def onFund(event: ActionEvent): Unit = {
@@ -420,6 +432,9 @@ object NetAssetValueHistoryController {
     dialog.getDialogPane.setContent(loader.load())
     val controller = loader.getController[NetAssetValueHistoryController]
     controller.initialize(savings, fundId)
+
+    // Delegate closing request to controller
+    Stages.getStage(dialog).setOnCloseRequest(controller.onCloseRequest(dialog) _)
 
     dialog.setResultConverter(Callback { resultConverter(mainController, window, controller) _ })
     Stages.trackMinimumDimensions(Stages.getStage(dialog))
