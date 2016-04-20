@@ -36,6 +36,7 @@ import suiryc.scala.javafx.scene.control.{Dialogs, TableViews}
 import suiryc.scala.javafx.stage.{FileChoosers, Stages}
 import suiryc.scala.javafx.util.Callback
 import suiryc.scala.settings.Preference
+import suiryc.scala.util.Comparators
 
 // TODO: display more information in assets table and details: net gain/loss (amount/percentage)
 // TODO: change details pane position; set below table ? (then have NAV history graph on the right side of details)
@@ -943,7 +944,22 @@ object MainController {
     column.setCellValueFactory(Callback { data =>
       new SimpleObjectProperty(value(data.getValue))
     })
+    column.setCellFactory(Callback { new AmountCell[AssetDetails](suffix, Strings.na) })
+    column.setComparator(AssetField.bigDecimalComparator)
+  }
+
+  /** Asset field with (colored) amount to display. */
+  case class AssetColoredAmountField(tableLabel: String, detailsLabel: String,
+    format: (AssetDetails, Boolean) => String,
+    value: (AssetDetails) => Option[BigDecimal],
+    suffix: String
+  ) extends AssetField[Option[BigDecimal]] {
+    val column = new TableColumn[AssetDetails, Option[BigDecimal]](tableLabel)
+    column.setCellValueFactory(Callback { data =>
+      new SimpleObjectProperty(value(data.getValue))
+    })
     column.setCellFactory(Callback { new AmountCell[AssetDetails](suffix, Strings.na) with ColoredAmount })
+    column.setComparator(AssetField.bigDecimalComparator)
 
     override def updateDetailsValue(assetDetailsOpt: Option[AssetDetails]): Unit = {
       super.updateDetailsValue(assetDetailsOpt)
@@ -969,15 +985,17 @@ object MainController {
       ASSET_KEY_SCHEME          -> AssetTextField(Strings.scheme, Strings.schemeColon, AssetField.formatScheme, AssetField.schemeComment),
       ASSET_KEY_FUND            -> AssetTextField(Strings.fund, Strings.fundColon, AssetField.formatFund, AssetField.fundComment),
       ASSET_KEY_AVAILABILITY    -> AssetTextField(Strings.availability, Strings.availabilityColon, AssetField.formatAvailability),
-      ASSET_KEY_UNITS           -> AssetTextField(Strings.units, Strings.unitsColon, AssetField.formatUnits),
-      ASSET_KEY_VWAP            -> AssetTextField(Strings.vwap, Strings.vwapColon, AssetField.formatVWAP),
-      ASSET_KEY_NAV             -> AssetTextField(Strings.nav, Strings.navColon, AssetField.formatNAV),
+      ASSET_KEY_UNITS           -> AssetAmountField(Strings.units, Strings.unitsColon, AssetField.formatUnits, AssetField.units, null),
+      ASSET_KEY_VWAP            -> AssetAmountField(Strings.vwap, Strings.vwapColon, AssetField.formatVWAP, AssetField.vwap, epsa.Settings.currency()),
+      ASSET_KEY_NAV             -> AssetAmountField(Strings.nav, Strings.navColon, AssetField.formatNAV, AssetField.nav, epsa.Settings.currency()),
       ASSET_KEY_DATE            -> AssetTextField(Strings.date, Strings.dateColon, AssetField.formatDate),
-      ASSET_KEY_INVESTED_AMOUNT -> AssetTextField(Strings.invested, Strings.investedAmountColon, AssetField.formatInvestedAmount),
-      ASSET_KEY_GROSS_AMOUNT    -> AssetTextField(Strings.gross, Strings.grossAmountColon, AssetField.formatGrossAmount),
-      ASSET_KEY_GROSS_GAIN      -> AssetAmountField(Strings.gross, Strings.grossGainColon, AssetField.formatGrossGain, AssetField.grossGain, epsa.Settings.currency()),
-      ASSET_KEY_GROSS_GAIN_PCT  -> AssetAmountField(Strings.grossPct, Strings.grossGainPctColon, AssetField.formatGrossGainPct, AssetField.grossGainPct, "%")
+      ASSET_KEY_INVESTED_AMOUNT -> AssetAmountField(Strings.invested, Strings.investedAmountColon, AssetField.formatInvestedAmount, AssetField.investedAmount, epsa.Settings.currency()),
+      ASSET_KEY_GROSS_AMOUNT    -> AssetAmountField(Strings.gross, Strings.grossAmountColon, AssetField.formatGrossAmount, AssetField.grossAmount, epsa.Settings.currency()),
+      ASSET_KEY_GROSS_GAIN      -> AssetColoredAmountField(Strings.gross, Strings.grossGainColon, AssetField.formatGrossGain, AssetField.grossGain, epsa.Settings.currency()),
+      ASSET_KEY_GROSS_GAIN_PCT  -> AssetColoredAmountField(Strings.grossPct, Strings.grossGainPctColon, AssetField.formatGrossGainPct, AssetField.grossGainPct, "%")
     )
+
+    val bigDecimalComparator = Comparators.optionComparator[BigDecimal]
 
     def formatScheme(details: AssetDetails, long: Boolean) = details.scheme.name
     def schemeComment(details: AssetDetails) = details.scheme.comment
@@ -985,11 +1003,16 @@ object MainController {
     def fundComment(details: AssetDetails) = details.fund.comment
     def formatAvailability(details: AssetDetails, long: Boolean) = details.formatAvailability(long)
     def formatUnits(details: AssetDetails, long: Boolean) = details.asset.units.toString
+    def units(details: AssetDetails) = Some(details.asset.units)
     def formatVWAP(details: AssetDetails, long: Boolean) = details.formatVWAP
+    def vwap(details: AssetDetails) = Some(details.asset.vwap)
     def formatDate(details: AssetDetails, long: Boolean) = details.formatDate
     def formatNAV(details: AssetDetails, long: Boolean) = details.formatNAV
+    def nav(details: AssetDetails) = details.nav
     def formatInvestedAmount(details: AssetDetails, long: Boolean) = details.formatInvestedAmount
+    def investedAmount(details: AssetDetails) = Some(details.asset.investedAmount)
     def formatGrossAmount(details: AssetDetails, long: Boolean) = details.formatGrossAmount
+    def grossAmount(details: AssetDetails) = details.grossAmount
     def formatGrossGain(details: AssetDetails, long: Boolean) = details.formatGrossGain
     def grossGain(details: AssetDetails) = details.grossGain
     def formatGrossGainPct(details: AssetDetails, long: Boolean) = details.formatGrossGainPct

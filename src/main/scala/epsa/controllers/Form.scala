@@ -27,7 +27,9 @@ object Form {
     }.getOrElse(Strings.available)
 
   def formatAmount(amount: BigDecimal, suffix: String): String =
-    s"$amount $suffix"
+    Option(suffix).find(!_.isEmpty).map { _ =>
+      s"$amount $suffix"
+    }.getOrElse(amount.toString)
 
   /**
    * Asks user confirmation to discard pending changes.
