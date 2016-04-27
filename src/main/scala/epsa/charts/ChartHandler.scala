@@ -3,15 +3,18 @@ package epsa.charts
 import epsa.model.Savings
 import java.time.format.DateTimeFormatter
 import javafx.geometry.Bounds
-import javafx.scene.Node
-import javafx.scene.chart.{CategoryAxis, LineChart, NumberAxis, XYChart}
+import javafx.scene.chart.{LineChart, NumberAxis, XYChart}
+import javafx.scene.control.ScrollPane
 import javafx.scene.input.{MouseEvent, ScrollEvent}
 import javafx.scene.layout.{AnchorPane, Region}
 import javafx.scene.paint.Color
 import javafx.scene.shape.{Line, Rectangle}
+import scala.concurrent.duration._
 import suiryc.scala.concurrent.Cancellable
 import suiryc.scala.javafx.beans.value.RichObservableValue._
+import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.javafx.event.EventHandler._
+import suiryc.scala.javafx.geometry.BoundsEx
 
 case class ChartSettings(
   title: String = "Net asset value history",
@@ -35,9 +38,6 @@ object ChartSettings {
     )
 }
 
-// TODO - easy/easier way to move in values list (partial view) ?
-//   zooming and having first/last value in kept list is sometimes difficult
-
 /**
  * Handles chart for a given investment fund.
  *
@@ -52,10 +52,29 @@ class ChartHandler(
   settings: ChartSettings = ChartSettings()
 ) {
 
+  // Note: using a CategoryAxis has many drawbacks.
+  // First, it does not properly handle disparities in time scale (dates that
+  // are not evenly placed). Then each 'category' is represented by a 'tick'
+  // which populates chart with too many nodes when there are a lot (thousands)
+  // of NAVs to show: this takes time to draw (clearly visible even if once
+  // when generating the chart while caching is used), which happens when
+  // first displaying the chart but also resizing it.
+  // The 'easy' solution is to use a 'NumberAxis' with some tweaks (tick label
+  // formatter, manual ranging, conversions between Number and LocalDate).
+  // Another solution would be to implement a whole new 'DateAxis', which would
+  // at least allow to handle ticks more finely.
+  // TODO: implement a LocalDateAxis ? (see NumberAxis source code
+  //   and https://pixelduke.wordpress.com/2013/09/06/dateaxis-for-javafx/
+  //   and http://myjavafx.blogspot.fr/2013/09/javafx-charts-display-date-values-on.html
+  //   and https://apache.googlesource.com/incubator-geode/+/sga2/jvsdfx-mm/src/main/java/com/pivotal/javafx/scene/chart/DateAxis.java)
+  private val xAxisWrapper = new LocalDateAxisWrapper(settings)
+  import xAxisWrapper.{dateToNumber, numberToDate}
   /** Chart 'x' axis. */
-  private val xAxis = new CategoryAxis()
-  if (settings.showXLabel) {
-    xAxis.setLabel(settings.xLabel)
+  private val xAxis = xAxisWrapper.axis
+
+  // Resize chart when necessary
+  xAxis.widthProperty.listen { _ =>
+    resizeChart()
   }
 
   /** Date format for 'x' axis. */
@@ -71,11 +90,11 @@ class ChartHandler(
   yAxis.setAutoRanging(true)
 
   /** Chart series. */
-  private val series = new XYChart.Series[String, Number]()
+  private val series = new XYChart.Series[Number, Number]()
   series.setName(fundName)
   /** Investment fund asset values to display in chart. */
   private val valuesList = fundValues.map { v =>
-    (v.date.format(dateFormatter), v.value)
+    (dateToNumber(v.date), v.value)
   }
   /** Number of investment fund asset values. */
   private val valuesCount = valuesList.length
@@ -88,14 +107,20 @@ class ChartHandler(
   /** Minimum number of values to display. That is, we cannot zoom more than that. */
   private val minValues = 20
   /** Currently displayed 'x' data value. */
-  private var currentXPos: Option[String] = None
+  private var currentXPos: Option[Long] = None
   /** Zoom 'x' first selected value. */
-  private var xZoomPos1: Option[String] = None
+  private var xZoomPos1: Option[Long] = None
   /** Zoom 'x' second selected value. */
-  private var xZoomPos2: Option[String] = None
+  private var xZoomPos2: Option[Long] = None
 
   /** The chart. */
-  private val chart = new LineChart[String, Number](xAxis, yAxis)
+  private val chart = new LineChart[Number, Number](xAxis, yAxis)
+  // Note: in charts, each drawn element is actually a child Node. When there
+  // are too many, interacting with the chart becomes slower (due to styling
+  // being applied etc).
+  // Activating caching helps having better performances by only rendering
+  // those elements as bitmaps, at the price of higher memory usage.
+  chart.setCache(true)
   // We don't really need animation
   chart.setAnimated(false)
   chart.getStylesheets.add(getClass.getResource("/css/chart-investment-fund.css").toExternalForm)
@@ -160,7 +185,12 @@ class ChartHandler(
   zoomZone.setDisable(true)
 
   /** Chart data label to display value. */
-  private val labelNAV = new ChartDataLabel(settings.xLabel, settings.yLabel, settings.ySuffix)
+  private val labelNAV = new ChartDataLabel[Long](
+    xLabel = settings.xLabel,
+    xFormatter = v => numberToDate(v).format(dateFormatter),
+    yLabel = settings.yLabel,
+    ySuffix = settings.ySuffix
+  )
   labelNAV.getStylesheets.add(getClass.getResource("/css/main.css").toExternalForm)
   labelNAV.getStyleClass.addAll("default-color0", "chart-line-symbol", "chart-series-line")
   labelNAV.setStyle("-fx-font-size: 14; -fx-opacity: 0.6;")
@@ -170,18 +200,27 @@ class ChartHandler(
   /** Label listening subscription. */
   private var labelVLCancellable: List[Cancellable] = Nil
 
-  // Limit initial view to last 100 values
-  xDropLeft = math.max(0, valuesCount - 100)
-  ensureMinValues()
-  setData()
-
   /** Chart pane. */
-  val chartPane = new AnchorPane()
+  val anchorPane = new AnchorPane()
+  val chartPane = new ScrollPane()
+  // Don't display vertical scrollbar (we resize to fit parent)
+  chartPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER)
+  // Note: scrollpane content is sometimes not resized below a 'random' value
+  // when resizing down (but still triggered in multiple steps by certain
+  // actions on the nodes later) even when 'fitting to width/height'.
+  // However forcing the content size to match the viewport appears to do
+  // the trick.
+  chartPane.viewportBoundsProperty.listen { bounds =>
+    anchorPane.setPrefHeight(bounds.getHeight)
+    anchorPane.setMinHeight(bounds.getHeight)
+    anchorPane.setMaxHeight(bounds.getHeight)
+  }
+  chartPane.setContent(anchorPane)
   AnchorPane.setTopAnchor(chart, 0.0)
   AnchorPane.setRightAnchor(chart, 0.0)
   AnchorPane.setBottomAnchor(chart, 0.0)
   AnchorPane.setLeftAnchor(chart, 0.0)
-  chartPane.getChildren.addAll(chart, zoomZone, verticalLineRef, horizontalLineRef, verticalLine, horizontalLine, labelNAV)
+  anchorPane.getChildren.addAll(chart, zoomZone, verticalLineRef, horizontalLineRef, verticalLine, horizontalLine, labelNAV)
   // Note: it is not a good idea to track mouse from chartBg, since
   // crossing any displayed element (e.g. grid) will trigger exited/entered.
   // Better track mouse on chart, and check whether it is over the graph.
@@ -191,29 +230,59 @@ class ChartHandler(
   chart.setOnMousePressed(onMousePressed _)
   chart.setOnMouseReleased(onMouseReleased _)
   chart.setOnMouseDragged(onMouseDragged _)
+  // TODO: still allow 'zooming' by limiting elements shown ? (then hint of actual min/max of whole series)
+  // TODO: if so, make sure to scroll to correct position after zooming
+  // TODO: or allow zooming by changing distance between successive dates ? (and rely on scrollpane for user to navigate in series)
   chart.setOnScroll(onScroll _)
 
-  /** Gets 'node' bounds relatively to 'root' node. */
-  private def getBounds(node: Node, root: Node): Bounds = {
-    @scala.annotation.tailrec
-    def loop(bounds: Option[Bounds], node: Node): Bounds = {
-      val boundsActual = bounds.getOrElse(node.getBoundsInLocal)
-      Option(node.getParent).filterNot(_ eq root) match {
-        case Some(parent) => loop(Some(node.localToParent(boundsActual)), parent)
-        case None => boundsActual
-      }
-    }
-
-    loop(None, node)
+  /** Chart background viewed bounds. */
+  private var chartBgViewedBounds: Option[Bounds] = None
+  // Listen to chart background changes to invalidate cached bounds value.
+  chartPane.viewportBoundsProperty.listen {
+    chartBgViewedBounds = None
+    resizeChart()
+  }
+  chartPane.hvalueProperty.listen {
+    chartBgViewedBounds = None
+  }
+  chartPane.vvalueProperty.listen {
+    chartBgViewedBounds = None
   }
 
-  /** Gets, aned caches, chart background bounds. */
+  ensureMinValues()
+  setData()
+
+  // Display the latest NAV at first
+  // Note: since scrollpane content (the chart) will change a bit later, we set
+  // the H value now, which will be changed when content changes (new value will
+  // be proportional to content size change) which is when we reset it to the
+  // max again. Cancel our listener shortly after setting it in case the content
+  // is smaller than parent (in which case the H value won't change).
+  chartPane.setHvalue(chartPane.getHmax)
+  val cancellable = chartPane.hvalueProperty.listen2 { (cancellable, v) =>
+    chartPane.setHvalue(chartPane.getHmax)
+    cancellable.cancel()
+  }
+  epsa.Main.Akka.system.scheduler.scheduleOnce(500.milliseconds) {
+    cancellable.cancel()
+  }(epsa.Main.Akka.dispatcher)
+
+  /** Gets, and caches, chart background bounds. */
   private def getChartBackgroundBounds: Bounds = {
     if (chartBgBounds.isEmpty) {
-      chartBgBounds = Some(getBounds(chartBg, chartPane))
+      chartBgBounds = Some(BoundsEx.getBounds(chartBg, anchorPane))
     }
 
     chartBgBounds.get
+  }
+
+  /** Gets, and caches, chart background viewed bounds. */
+  private def getChartBackgroundViewedBounds: Bounds = {
+    if (chartBgViewedBounds.isEmpty) {
+      chartBgViewedBounds = Some(BoundsEx.getViewedBounds(chartPane))
+    }
+
+    chartBgViewedBounds.get
   }
 
   /** Calls given function if mouse is inside chart background. */
@@ -236,9 +305,9 @@ class ChartHandler(
     withMouseInChartBackground(event.getX, event.getY)(f)
 
   /** Gets index of a given 'x' value. */
-  private def getValueIndex(x: String): Int = {
+  private def getValueIndex(x: Long): Int = {
     @scala.annotation.tailrec
-    def loop(values: Seq[(String, BigDecimal)], idx: Int): Int = values.headOption match {
+    def loop(values: Seq[(Long, BigDecimal)], idx: Int): Int = values.headOption match {
       case Some((valueX, _)) =>
         if (valueX == x) {
           idx
@@ -253,6 +322,38 @@ class ChartHandler(
     loop(valuesList, 0)
   }
 
+  /** Resize chart if necessary. */
+  private def resizeChart() = {
+    import scala.collection.JavaConversions._
+    // Compare x axis width to actual data range and resize chart (actually
+    // the parent anchor pane) if necessary. Also take into account elements
+    // around the chart (like y axis, padding etc).
+    val viewedBounds = getChartBackgroundViewedBounds
+    val data = series.getData.map(v => math.round(v.getXValue.doubleValue))
+    val range = data.max - data.min
+    val widthParent = anchorPane.getWidth
+    val width = xAxis.getWidth
+    val widthExtra = widthParent - width
+    val widthExpected = math.max(viewedBounds.getWidth - widthExtra, range)
+    if ((widthParent > 0) && (width > 0) && (width != widthExpected)) {
+      val newWidth = widthExpected + widthExtra
+      // Notes:
+      // Only changing width right now is often ineffective (not applied until
+      // something happens inside the pane ?).
+      // Not setting min/max and pref also sometimes triggers glitches.
+      // Delegating width changes in 'runLater' also trigger glitches (there is
+      // some lag between successive resizing actions and actual resizing).
+      // Changing width (min/pref/max) right now and requesting layout in
+      // 'runLater' appears to solve most glitches (at least on Windows).
+      anchorPane.setPrefWidth(newWidth)
+      anchorPane.setMinWidth(newWidth)
+      anchorPane.setMaxWidth(newWidth)
+      JFXSystem.runLater {
+        anchorPane.requestLayout()
+      }
+    }
+  }
+
   /**
    * Populates the chart series with appropriate data.
    *
@@ -261,7 +362,7 @@ class ChartHandler(
    */
   private def setData(): Unit = {
     val data = valuesList.drop(xDropLeft).dropRight(xDropRight).map { case (valueX, valueY) =>
-      new XYChart.Data[String, Number](valueX, valueY)
+      new XYChart.Data[Number, Number](valueX, valueY)
     }
 
     // Since we are about to change the chart data, hide lines
@@ -271,6 +372,9 @@ class ChartHandler(
     // See: http://stackoverflow.com/a/30396889
     series.getData.clear()
     series.getData.setAll(data : _*)
+
+    xAxisWrapper.updateTicks(series)
+    resizeChart()
   }
 
   /** Hides zoom 'highlight' area. */
@@ -307,19 +411,34 @@ class ChartHandler(
   }
 
   /** Gets chart 'x' value for given position. */
-  private def getX(bounds: Bounds, x: Double): Option[String] =
-  // Note: x is relative to the chart, while xAxis works
-  // relatively to the background. So adjust.
-    Option(xAxis.getValueForDisplay(x - bounds.getMinX))
+  private def getX(bounds: Bounds, x: Double): Option[Long] = {
+    // Note: x is relative to the chart, while xAxis works
+    // relatively to the background. So adjust.
+    val v = dateToNumber(numberToDate(xAxis.getValueForDisplay(x - bounds.getMinX)))
+
+    // Get nearest 'x' value
+    @scala.annotation.tailrec
+    def loop(values: Seq[(Long, BigDecimal)], nearestX: Long): Option[Long] = values.headOption match {
+      case Some((valueX, _)) =>
+        val nearest = if (nearestX > 0) math.abs(v - nearestX) else Long.MaxValue
+        val delta = math.abs(v - valueX)
+        if (delta < nearest) loop(values.tail, valueX)
+        else Some(nearestX)
+
+      case None => None
+    }
+
+    loop(valuesList, -1)
+  }
 
   /** Gets 'x' position for given chart value. */
-  private def getX(bounds: Bounds, xPos: String): Double =
+  private def getX(bounds: Bounds, xPos: Long): Double =
   // Note: x is relative to the chart, while xAxis works
   // relatively to the background. So adjust.
     bounds.getMinX + xAxis.getDisplayPosition(xPos)
 
   /** Gets 'x' and 'y' position for given chart value. */
-  def getXY(bounds: Bounds, xPos: String): (Double, Double) = {
+  def getXY(bounds: Bounds, xPos: Long): (Double, Double) = {
     val x = getX(bounds, xPos)
     val y = bounds.getMinY + yAxis.getDisplayPosition(valuesMap(xPos))
     (x, y)
@@ -369,47 +488,63 @@ class ChartHandler(
   /**
    * Checks label position.
    *
-   * Makre sure it remains inside the chart background, and if possible does not
+   * Make sure it remains inside the chart background, and if possible does not
    * 'hide' the currently displayed chart data value.
    */
   def checkLabelPosition() = if (labelNAV.isVisible) {
     val bounds = getChartBackgroundBounds
 
-    if (labelNAV.getLayoutX + labelNAV.getTranslateX + labelNAV.getWidth > bounds.getMaxX) {
-      // right end of label is going beyond chart
-      labelNAV.setTranslateX(bounds.getMaxX - labelNAV.getLayoutX - labelNAV.getWidth)
-    } else if (labelNAV.getLayoutX + labelNAV.getTranslateX < bounds.getMinX) {
-      // left end of label is going beyond chart
-      labelNAV.setTranslateX(bounds.getMinX - labelNAV.getLayoutX)
+    // Note: we need to check the size of the label fits the bounds, otherwise
+    // we may trigger stack overflows.
+    if (labelNAV.getWidth < bounds.getWidth) {
+      val viewedBounds = getChartBackgroundViewedBounds
+      if (labelNAV.getLayoutX + labelNAV.getTranslateX + labelNAV.getWidth > bounds.getMaxX) {
+        // right end of label is going beyond chart
+        labelNAV.setTranslateX(bounds.getMaxX - labelNAV.getLayoutX - labelNAV.getWidth)
+      } else if (labelNAV.getLayoutX + labelNAV.getTranslateX < bounds.getMinX) {
+        // left end of label is going beyond chart
+        labelNAV.setTranslateX(bounds.getMinX - labelNAV.getLayoutX)
+      }
+      else if (labelNAV.getWidth < viewedBounds.getWidth) {
+        if (labelNAV.getLayoutX + labelNAV.getTranslateX + labelNAV.getWidth > viewedBounds.getMaxX) {
+          // right end of label is going beyond scroll view
+          labelNAV.setTranslateX(viewedBounds.getMaxX - labelNAV.getLayoutX - labelNAV.getWidth)
+        } else if (labelNAV.getLayoutX + labelNAV.getTranslateX < viewedBounds.getMinX) {
+          // left end of label is going beyond scroll view
+          labelNAV.setTranslateX(viewedBounds.getMinX - labelNAV.getLayoutX)
+        }
+      }
     }
-    if (labelNAV.getLayoutY + labelNAV.getTranslateY + labelNAV.getHeight > bounds.getMaxY) {
-      // bottom end of label is going beyond chart
-      labelNAV.setTranslateY(bounds.getMaxY - labelNAV.getLayoutY - labelNAV.getHeight)
-    } else if (labelNAV.getLayoutY + labelNAV.getTranslateY < bounds.getMinY) {
-      // top end of label is going beyond chart
-      currentXPos.map(getXY(bounds, _)) match {
-        case Some((_, currentY)) =>
-          // We don't want to go above the chart top, but would like not to
-          // display the label in front of the chart point, unless that make
-          // it go beyond the chart bottom.
-          if ((bounds.getMinY + labelNAV.getHeight < currentY) || (currentY + 10 + labelNAV.getHeight > bounds.getMaxY)) {
-            // We still remain above the displayed chart point, or would go
-            // beyond the chart bottom by displaying the label underneath it.
-            // So just go at the top of the chart.
-            labelNAV.setTranslateY(bounds.getMinY - labelNAV.getLayoutY)
-          } else {
-            // chart point will be under the label, move it underneath
-            labelNAV.setTranslateY(currentY + 10)
-          }
+    if (labelNAV.getHeight < bounds.getHeight) {
+      if (labelNAV.getLayoutY + labelNAV.getTranslateY + labelNAV.getHeight > bounds.getMaxY) {
+        // bottom end of label is going beyond chart
+        labelNAV.setTranslateY(bounds.getMaxY - labelNAV.getLayoutY - labelNAV.getHeight)
+      } else if (labelNAV.getLayoutY + labelNAV.getTranslateY < bounds.getMinY) {
+        // top end of label is going beyond chart
+        currentXPos.map(getXY(bounds, _)) match {
+          case Some((_, currentY)) =>
+            // We don't want to go above the chart top, but would like not to
+            // display the label in front of the chart point, unless that make
+            // it go beyond the chart bottom.
+            if ((bounds.getMinY + labelNAV.getHeight < currentY) || (currentY + 10 + labelNAV.getHeight > bounds.getMaxY)) {
+              // We still remain above the displayed chart point, or would go
+              // beyond the chart bottom by displaying the label underneath it.
+              // So just go at the top of the chart.
+              labelNAV.setTranslateY(bounds.getMinY - labelNAV.getLayoutY)
+            } else {
+              // chart point will be under the label, move it underneath
+              labelNAV.setTranslateY(currentY + 10)
+            }
 
-        case None =>
-          labelNAV.setTranslateY(bounds.getMinY - labelNAV.getLayoutY)
+          case None =>
+            labelNAV.setTranslateY(bounds.getMinY - labelNAV.getLayoutY)
+        }
       }
     }
   }
 
   /** Draws reference value lines. */
-  private def drawReferenceLines(xPos: Option[String] = None): Unit = {
+  private def drawReferenceLines(xPos: Option[Long] = None): Unit = {
     xPos.orElse(labelNAV.getDataRef.map(_.x)).foreach { xPos =>
       val bounds = getChartBackgroundBounds
       val (x, y) = getXY(bounds, xPos)
@@ -432,7 +567,7 @@ class ChartHandler(
    *
    * Also updates zoom 'highlight' zone and label.
    */
-  private def drawLines(event: MouseEvent, xPos: Option[String] = None): Unit = {
+  private def drawLines(event: MouseEvent, xPos: Option[Long] = None): Unit = {
     val bounds = getChartBackgroundBounds
 
     xPos.orElse(getX(bounds, event.getX)).foreach { xPos =>
@@ -474,7 +609,7 @@ class ChartHandler(
         labelNAV.setVisible(true)
       }
 
-      labelNAV.setData(ChartData(xPos, valuesMap(xPos)))
+      labelNAV.setData(ChartData[Long](xPos, valuesMap(xPos)))
       setLabelX()
       setLabelY()
     }
@@ -483,10 +618,10 @@ class ChartHandler(
   /**
    * onMouseEntered listener.
    *
-   * Draws lines.
+   * Behaviour shared with onMouseMoved.
    */
   private def onMouseEntered(event: MouseEvent): Unit = {
-    drawLines(event)
+    onMouseMoved(event)
   }
 
   /**
@@ -570,7 +705,7 @@ class ChartHandler(
    * Displays selected range values if different from previous one.
    */
   private def onMouseReleased(event: MouseEvent): Unit = {
-    def getDrops(xZoomPos1: String, xZoomPos2: String): Option[(Int, Int)] = {
+    def getDrops(xZoomPos1: Long, xZoomPos2: Long): Option[(Int, Int)] = {
       val (xZoomFrom, xZoomTo) = if (xZoomPos1 < xZoomPos2) {
         (xZoomPos1, xZoomPos2)
       } else {
@@ -578,7 +713,7 @@ class ChartHandler(
       }
 
       @scala.annotation.tailrec
-      def loop(values: Seq[(String, BigDecimal)], idx: Int, xDropLeft: Option[Int]): Option[(Int, Int)] = {
+      def loop(values: Seq[(Long, BigDecimal)], idx: Int, xDropLeft: Option[Int]): Option[(Int, Int)] = {
         values.headOption match {
           case Some((valueX, _)) =>
             xDropLeft match {

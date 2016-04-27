@@ -5,7 +5,7 @@ import javafx.scene.layout.VBox
 import javafx.scene.text.{Text, TextFlow}
 
 /** Chart data. */
-case class ChartData(x: String, y: BigDecimal)
+case class ChartData[A](x: A, y: BigDecimal)
 
 /**
  * Chart data 'label'.
@@ -14,10 +14,15 @@ case class ChartData(x: String, y: BigDecimal)
  * optional text flow (to apply different styles) for an optional reference
  * data.
  */
-class ChartDataLabel(xLabel: String = "Date", yLabel: String = "NAV", ySuffix: String = epsa.Settings.defaultCurrency) extends VBox {
+class ChartDataLabel[A](
+  xLabel: String = "Date",
+  xFormatter: A => String = (v: A) => v.toString,
+  yLabel: String = "NAV",
+  ySuffix: String = epsa.Settings.defaultCurrency
+) extends VBox {
 
   /** Reference data. */
-  private var refData: Option[ChartData] = None
+  private var refData: Option[ChartData[A]] = None
 
   /** Text of current data. */
   private val dataText = new Text()
@@ -35,7 +40,7 @@ class ChartDataLabel(xLabel: String = "Date", yLabel: String = "NAV", ySuffix: S
   // And add the data text to our children
   getChildren.addAll(dataText)
 
-  def getDataRef: Option[ChartData] =
+  def getDataRef: Option[ChartData[A]] =
     refData
 
   /**
@@ -43,7 +48,7 @@ class ChartDataLabel(xLabel: String = "Date", yLabel: String = "NAV", ySuffix: S
    *
    * Takes care of adding/removing the reference data text flow when necessary.
    */
-  def setDataRef(data: Option[ChartData]): Unit = {
+  def setDataRef(data: Option[ChartData[A]]): Unit = {
     if (refData.isDefined && data.isEmpty) {
       getChildren.setAll(dataText)
     } else if (refData.isEmpty && data.isDefined) {
@@ -60,8 +65,8 @@ class ChartDataLabel(xLabel: String = "Date", yLabel: String = "NAV", ySuffix: S
    * If reference is present, variation value is colored accordingly: red if
    * current data is lower, green if greater, black if equal.
    */
-  def setData(data: ChartData): Unit = {
-    dataText.setText(s"$xLabel: ${data.x}\n$yLabel: ${data.y}$ySuffix")
+  def setData(data: ChartData[A]): Unit = {
+    dataText.setText(s"$xLabel: ${xFormatter(data.x)}\n$yLabel: ${data.y}$ySuffix")
     refData.foreach { refData =>
       val delta: BigDecimal = if (refData.y.compare(java.math.BigDecimal.ZERO) != 0) {
         (data.y - refData.y) * 100 / refData.y
@@ -69,7 +74,7 @@ class ChartDataLabel(xLabel: String = "Date", yLabel: String = "NAV", ySuffix: S
         0
       }
       refTextValue.setText(f"$delta%+.2f%%")
-      refTextDate.setText(s" (${refData.x})")
+      refTextDate.setText(s" (${xFormatter(refData.x)})")
       if (delta > 0) {
         JFXStyles.togglePositive(refTextValue)
       } else if (delta < 0) {

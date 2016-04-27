@@ -14,7 +14,7 @@ import javafx.beans.property.SimpleObjectProperty
 import javafx.collections.FXCollections
 import javafx.event.ActionEvent
 import javafx.fxml.{FXML, FXMLLoader}
-import javafx.scene.{Parent, Scene}
+import javafx.scene.{Node, Parent, Scene}
 import javafx.scene.control._
 import javafx.scene.layout.AnchorPane
 import javafx.stage._
@@ -59,7 +59,7 @@ class NetAssetValueHistoryController {
 
   private var changes = Map[Savings.Fund, Option[Seq[Savings.AssetValue]]]()
 
-  private var chartPane: Option[AnchorPane] = None
+  private var chartPane: Option[Node] = None
 
   private val probers = List(
     EsaliaInvestmentFundProber,
