@@ -523,9 +523,6 @@ object DataStore {
             // delete. If needed, we could still check we really have entries
             // with 'db.run(entries.length.result)'.
 
-            // No need to keep previous actions since we delete everything
-            tmp.resetActions(this)
-
             // We register action only if there was data to begin with, which
             // is not the case if there is no real db (yet) or real db had no
             // data for this fund.
