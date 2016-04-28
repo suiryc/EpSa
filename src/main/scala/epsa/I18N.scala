@@ -26,6 +26,8 @@ object I18N extends suiryc.scala.util.I18N("i18n.epsa") with I18NWithPreference 
     def purgeNAVHistory = getString("Purge net asset value history")
     def options = getString("Options")
     def selectDataStore = getString("Select data store")
+    def exportRawAccountHistory = getString("Export raw account history")
+    def importRawAccountHistory = getString("Import raw account history")
 
     // Labels, ...
     def na = getString("n/a")
@@ -61,6 +63,7 @@ object I18N extends suiryc.scala.util.I18N("i18n.epsa") with I18NWithPreference 
     def spreadsheets = getString("Spreadsheets")
     def dataStore = getString("Data store")
     def event = getString("Event")
+    def jsonFiles = getString("JSON files")
 
     // Messages (information, warning, error), ...
     def assetEventPaymentMain = getString("asset.event.payment.main")
@@ -95,6 +98,8 @@ object I18N extends suiryc.scala.util.I18N("i18n.epsa") with I18NWithPreference 
     def dataStoreReadError = getString("Could not read data store")
     def dataStoreCleaned = getString("Cleaned up data store")
     def dataStoreCleanError = getString("Could not cleanup data store")
+    def fileReadError = getString("Could not read file")
+    def fileWriteError = getString("Could not write file")
   }
 
 }

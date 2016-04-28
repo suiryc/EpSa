@@ -171,6 +171,25 @@
             </Menu>
             <Menu mnemonicParsing="false" text="%Tools">
                <items>
+                  <MenuItem fx:id="toolsExportRawAccountHistoryMenu" mnemonicParsing="false" onAction="#onExportRawAccountHistory" text="%Export raw account history">
+                     <graphic>
+                        <ImageView pickOnBounds="true" preserveRatio="true">
+                           <image>
+                              <Image url="@../images/fugue-icons/script-export.png" />
+                           </image>
+                        </ImageView>
+                     </graphic>
+                  </MenuItem>
+                  <MenuItem mnemonicParsing="false" onAction="#onImportRawAccountHistory" text="%Import raw account history">
+                     <graphic>
+                        <ImageView pickOnBounds="true" preserveRatio="true">
+                           <image>
+                              <Image url="@../images/fugue-icons/script-import.png" />
+                           </image>
+                        </ImageView>
+                     </graphic>
+                  </MenuItem>
+                  <SeparatorMenuItem mnemonicParsing="false" />
                   <MenuItem mnemonicParsing="false" onAction="#onCleanupDataStore" text="%Cleanup data store">
                      <graphic>
                         <ImageView pickOnBounds="true" preserveRatio="true">

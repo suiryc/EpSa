@@ -26,7 +26,6 @@ import suiryc.scala.javafx.util.Callback
 import suiryc.scala.settings.Preference
 
 // TODO: build and display history graph (gross amount, with 'links' to textual history)
-// TODO: way to read/write RAW history events (all, not only asset events) ?
 class AccountHistoryController extends Logging {
 
   import AccountHistoryController._

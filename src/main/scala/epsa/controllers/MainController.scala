@@ -10,6 +10,7 @@ import epsa.storage.DataStore
 import epsa.tools.EsaliaInvestmentFundProber
 import epsa.util.{Awaits, JFXStyles}
 import grizzled.slf4j.Logging
+import java.io.PrintWriter
 import java.nio.file.Path
 import java.time.LocalDate
 import java.util.UUID
@@ -65,6 +66,9 @@ class MainController extends Logging {
 
   @FXML
   protected var viewAccountHistoryMenu: MenuItem = _
+
+  @FXML
+  protected var toolsExportRawAccountHistoryMenu: MenuItem = _
 
   @FXML
   protected var splitPane: SplitPane = _
@@ -243,18 +247,6 @@ class MainController extends Logging {
     actor ! OnOptions
   }
 
-  def onTest(event: ActionEvent): Unit = {
-    actor ! OnTest(event.getSource.asInstanceOf[MenuItem].getText.substring(5).toInt)
-  }
-
-  def onFundGraph(event: ActionEvent): Unit = {
-    actor ! OnFundGraph
-  }
-
-  def onCleanupDataStore(event: ActionEvent = null): Unit = {
-    actor ! OnCleanupDataStore
-  }
-
   def onNetAssetValueHistory(event: ActionEvent): Unit = {
     actor ! OnNetAssetValueHistory(getSelectedAsset.map(_.fundId))
   }
@@ -265,6 +257,26 @@ class MainController extends Logging {
 
   def onUpToDateAssets(event: ActionEvent): Unit = {
     actor ! OnUpToDateAssets(event.getSource.asInstanceOf[CheckMenuItem].isSelected)
+  }
+
+  def onExportRawAccountHistory(event: ActionEvent = null): Unit = {
+    actor ! OnExportRawAccountHistory
+  }
+
+  def onImportRawAccountHistory(event: ActionEvent = null): Unit = {
+    actor ! OnImportRawAccountHistory
+  }
+
+  def onCleanupDataStore(event: ActionEvent = null): Unit = {
+    actor ! OnCleanupDataStore
+  }
+
+  def onTest(event: ActionEvent): Unit = {
+    actor ! OnTest(event.getSource.asInstanceOf[MenuItem].getText.substring(5).toInt)
+  }
+
+  def onFundGraph(event: ActionEvent): Unit = {
+    actor ! OnFundGraph
   }
 
   private def getState: SimpleObjectProperty[State] = {
@@ -400,12 +412,14 @@ class MainController extends Logging {
       case OnEditFunds(id)   => onEditFunds(state, id.map(state.savingsUpd.getFund))
       case OnNewAssetAction(kind, asset) => onNewAssetAction(state, kind, asset)
       case OnOptions         => onOptions(state)
-      case OnTest(n)         => onTest(state, n)
-      case OnFundGraph       => onFundGraph(state)
-      case OnCleanupDataStore => onCleanupDataStore(state)
       case OnNetAssetValueHistory(fundId) => onNetAssetValueHistory(state, fundId)
       case OnAccountHistory  => onAccountHistory(state)
       case OnUpToDateAssets(set) => onUpToDateAssets(state, set)
+      case OnExportRawAccountHistory => onExportRawAccountHistory(state)
+      case OnImportRawAccountHistory => onImportRawAccountHistory(state)
+      case OnCleanupDataStore => onCleanupDataStore(state)
+      case OnTest(n)         => onTest(state, n)
+      case OnFundGraph       => onFundGraph(state)
     }
 
     def processEvents(state: State, events: List[Savings.Event], updateAssetsValue: Boolean = false): Unit = {
@@ -441,7 +455,9 @@ class MainController extends Logging {
       fileSaveMenu.setDisable(!dirty)
       editUndoMenu.setDisable(!dirty)
       viewNetAssetValueHistoryMenu.setDisable(newState.savingsUpd.funds.isEmpty)
-      viewAccountHistoryMenu.setDisable(!Awaits.hasDataStoreEvents(Some(state.window)).getOrElse(false) && newState.eventsUpd.isEmpty)
+      val hasHistory = Awaits.hasDataStoreEvents(Some(state.window)).getOrElse(false) || newState.eventsUpd.nonEmpty
+      viewAccountHistoryMenu.setDisable(!hasHistory)
+      toolsExportRawAccountHistoryMenu.setDisable(!hasHistory)
 
       val title = DataStore.dbOpened.map { name =>
         s"[$name${if (dirty) " *" else ""}] - "
@@ -504,7 +520,7 @@ class MainController extends Logging {
 
       if (resp.contains(ButtonType.OK)) {
         DataStore.undoChanges()
-        applyState(state.reset)
+        applyState(state.resetPendingChanges)
       }
     }
 
@@ -545,6 +561,136 @@ class MainController extends Logging {
         context.stop(self)
         MainController.build(state, needRestart, applicationStart = false)
       }
+    }
+
+    def onNetAssetValueHistory(state: State, fundId: Option[UUID]): Unit = {
+      val dialog = NetAssetValueHistoryController.buildStage(MainController.this, state.savingsUpd, fundId, state.window)
+      // Notes:
+      // Don't set as modal, since we wish to display the window while still
+      // interacting with the main stage.
+      // Don't set owner, otherwise the new windows remains in front of its
+      // owner.
+      dialog.initModality(Modality.NONE)
+      dialog.setResizable(true)
+      dialog.show()
+    }
+
+    def onAccountHistory(state: State): Unit = {
+      val stage = AccountHistoryController.buildDialog(state)
+      stage.initModality(Modality.NONE)
+      stage.setResizable(true)
+      stage.show()
+    }
+
+    def onUpToDateAssets(state: State, set: Boolean): Unit = {
+      applyState(state.copy(viewUpToDateAssets = set))
+    }
+
+    def onExportRawAccountHistory(state: State): Unit = {
+      val events = Awaits.readDataStoreEvents(Some(state.window)).getOrElse(Nil) ++ state.eventsUpd
+      import spray.json._
+      import Savings.JsonProtocol._
+      val eventsJson = events.map(_.toJson)
+      val historyJson = JsObject(
+        "history" -> JsArray(eventsJson:_*)
+      )
+      val history = historyJson.prettyPrint
+
+      val fileChooser = new FileChooser()
+      fileChooser.setTitle(Strings.exportRawAccountHistory)
+      fileChooser.getExtensionFilters.addAll(
+        new FileChooser.ExtensionFilter(Strings.jsonFiles, "*.json")
+      )
+      accountHistoryPath.option.foreach { path =>
+        FileChoosers.setInitialPath(fileChooser, path.toFile)
+      }
+      val selectedFile = fileChooser.showSaveDialog(state.window)
+      Option(selectedFile).foreach { file =>
+        try {
+          val writer = new PrintWriter(file, "UTF-8")
+          writer.write(history)
+          writer.close()
+          accountHistoryPath() = selectedFile.toPath
+          if (writer.checkError) {
+            Dialogs.error(
+              owner = Some(state.window),
+              title = Some(Strings.exportRawAccountHistory),
+              headerText = Some(Strings.fileWriteError),
+              contentText = None,
+              ex = None
+            )
+          }
+        } catch {
+          case ex: Exception =>
+            Dialogs.error(
+              owner = Some(state.window),
+              title = Some(Strings.exportRawAccountHistory),
+              headerText = Some(Strings.fileWriteError),
+              contentText = None,
+              ex = Some(ex)
+            )
+        }
+      }
+    }
+
+    def onImportRawAccountHistory(state: State): Unit = {
+      val pendingChanges = state.hasPendingChanges
+      val doImport = if (!toolsExportRawAccountHistoryMenu.isDisable || pendingChanges) {
+        // If there is history to export, or pending changes, ask confirmation as we will replace history/changes
+        val resp = Dialogs.confirmation(
+          owner = Some(state.window),
+          title = Some(Strings.importRawAccountHistory),
+          headerText = if (pendingChanges) Some(Strings.irreversibleAction) else Some(Strings.confirmAction),
+          contentText = Some(Strings.importRawAccountHistory)
+        )
+
+        resp.contains(ButtonType.OK)
+      } else true
+
+      if (doImport) {
+        val fileChooser = new FileChooser()
+        fileChooser.setTitle(Strings.importRawAccountHistory)
+        fileChooser.getExtensionFilters.addAll(
+          new FileChooser.ExtensionFilter(Strings.jsonFiles, "*.json")
+        )
+        accountHistoryPath.option.foreach { path =>
+          FileChoosers.setInitialPath(fileChooser, path.toFile)
+        }
+        val selectedFile = fileChooser.showOpenDialog(state.window)
+        Option(selectedFile).flatMap { file =>
+          // We could try to use typesafe Config (HOCON), which would allow to
+          // handle variables for shared values. But it does not handle decimal
+          // values as BigDecimal so we could lose some precision.
+          try {
+            import scala.io.Source
+            import spray.json._
+            import Savings.JsonProtocol._
+            val history = Source.fromFile(file, "UTF-8").mkString.parseJson.asJsObject.fields("history").asInstanceOf[JsArray]
+            val events = history.elements.toList.map(_.convertTo[Savings.Event])
+            Some(events)
+          } catch {
+            case ex: Exception =>
+              Dialogs.error(
+                owner = Some(state.window),
+                title = Some(Strings.importRawAccountHistory),
+                headerText = Some(Strings.fileReadError),
+                contentText = None,
+                ex = Some(ex)
+              )
+              None
+          }
+        }.foreach { events =>
+          accountHistoryPath() = selectedFile.toPath
+          // Close data store (to start from zero) and apply events as pending changes
+          DataStore.close()
+          processEvents(state.zero, events)
+        }
+      }
+    }
+
+    def onCleanupDataStore(state: State): Unit = {
+      Awaits.cleanupDataStore(Some(state.window), state.savingsUpd.funds.map(_.id))
+      refresh(state)
     }
 
     def onTest(state: State, n: Int): Unit = {
@@ -667,34 +813,6 @@ class MainController extends Logging {
       }
     }
 
-    def onCleanupDataStore(state: State): Unit = {
-      Awaits.cleanupDataStore(Some(state.window), state.savingsUpd.funds.map(_.id))
-      refresh(state)
-    }
-
-    def onNetAssetValueHistory(state: State, fundId: Option[UUID]): Unit = {
-      val dialog = NetAssetValueHistoryController.buildStage(MainController.this, state.savingsUpd, fundId, state.window)
-      // Notes:
-      // Don't set as modal, since we wish to display the window while still
-      // interacting with the main stage.
-      // Don't set owner, otherwise the new windows remains in front of its
-      // owner.
-      dialog.initModality(Modality.NONE)
-      dialog.setResizable(true)
-      dialog.show()
-    }
-
-    def onAccountHistory(state: State): Unit = {
-      val stage = AccountHistoryController.buildDialog(state)
-      stage.initModality(Modality.NONE)
-      stage.setResizable(true)
-      stage.show()
-    }
-
-    def onUpToDateAssets(state: State, set: Boolean): Unit = {
-      applyState(state.copy(viewUpToDateAssets = set))
-    }
-
     private def applyState(state: State, updateAssetsValue: Boolean = false): Unit = {
       // Cheap trick to fill fields with Savings data
       processEvents(state, Nil, updateAssetsValue)
@@ -795,6 +913,8 @@ object MainController {
 
   private val assetsColumnsPref = Preference.from(s"$prefsKeyPrefix.assets.columns", null:String)
 
+  private val accountHistoryPath = Preference.from("account.history.path", null:Path)
+
   case class State(
     stage: Stage,
     savingsInit: Savings = Savings(),
@@ -809,8 +929,18 @@ object MainController {
     def hasPendingChanges: Boolean =
       eventsUpd.nonEmpty || DataStore.hasPendingChanges
 
-    def reset: State =
+    /** Resets pending changes. */
+    def resetPendingChanges: State =
       copy(eventsUpd = Nil, savingsUpd = savingsInit)
+
+    /** Resets state to zero. */
+    def zero: State =
+      copy(
+        savingsInit = Savings(),
+        eventsUpd = Nil,
+        savingsUpd = Savings(),
+        assetsValue = Map.empty
+      )
 
   }
 
@@ -836,17 +966,21 @@ object MainController {
 
   case object OnOptions
 
-  case class OnTest(n: Int)
-
-  case object OnFundGraph
-
-  case object OnCleanupDataStore
-
   case class OnNetAssetValueHistory(fundId: Option[UUID])
 
   case object OnAccountHistory
 
   case class OnUpToDateAssets(set: Boolean)
+
+  case object OnExportRawAccountHistory
+
+  case object OnImportRawAccountHistory
+
+  case object OnCleanupDataStore
+
+  case class OnTest(n: Int)
+
+  case object OnFundGraph
 
   private val ASSET_KEY_SCHEME = "scheme"
 
