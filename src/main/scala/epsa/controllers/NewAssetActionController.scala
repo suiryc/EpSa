@@ -582,6 +582,9 @@ class NewAssetActionController {
       }
       getDstFund.foreach { schemeAndFund =>
         updateField(dstNAVField, schemeAndFund.fund)
+        // Manually trigger src amount callback in order to recompute dst
+        // units if necessary.
+        if (updateSrc) onSrcAmount()
       }
     }
   }
