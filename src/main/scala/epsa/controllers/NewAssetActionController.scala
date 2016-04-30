@@ -555,6 +555,7 @@ class NewAssetActionController {
             }
             // Bind so that changing value allows to reset it
             field.buttonDisableProperty.bind(field.textField.textProperty.isEqualTo(text))
+            field.textField.setEditable(nav.date != operationDate)
 
           case None =>
             field.setText(null)
@@ -562,6 +563,7 @@ class NewAssetActionController {
             field.buttonDisableProperty.unbind()
             field.setOnButtonAction(null)
             field.setButtonDisable(true)
+            field.textField.setEditable(true)
         }
       }
 
