@@ -177,7 +177,7 @@ class NewAssetActionController {
         new DateCell {
           override def updateItem(item: LocalDate, empty: Boolean): Unit = {
             super.updateItem(item, empty)
-            Option(operationDateField.getValue).foreach { operationDate =>
+            getOperationDate.foreach { operationDate =>
               val unavailable = !empty && item.isBefore(operationDate)
               setDisable(unavailable)
               // Note: ideally we would like to set a tooltip explaining why a
@@ -346,8 +346,9 @@ class NewAssetActionController {
   private def onSrcAvailability(): Unit = breakRecursion {
     if (!dstAvailabilityChosen && isDstEnabled) {
       // Note: don't forget to use actual availability based on operation date
-      val availability = Savings.resolveAvailability(getSrcAvailability, Option(operationDateField.getValue))
-      dstAvailabilityField.setValue(availability.orNull)
+      val operationDate = getOperationDate
+      val availability = Savings.resolveAvailability(getSrcAvailability, operationDate)
+      dstAvailabilityField.setValue(availability.orElse(operationDate).orNull)
     }
     checkForm()
   }
@@ -375,7 +376,7 @@ class NewAssetActionController {
 
   private def onSrcEmpty(): Unit = {
     for {
-      operationDate <- Option(operationDateField.getValue)
+      operationDate <- getOperationDate
       schemeAndFund <- getSrcFund
     } {
       val srcAvailability = getSrcAvailability
@@ -518,7 +519,7 @@ class NewAssetActionController {
   }
 
   private def updateSrcAvailability(): Unit = {
-    Option(operationDateField.getValue) match {
+    getOperationDate match {
       case Some(date) =>
         // Note: changing the combobox format appears to be taken into account
         // right away (unlike TableView). Probably because the concerned content
@@ -542,7 +543,7 @@ class NewAssetActionController {
   }
 
   private def updateNAV(updateSrc: Boolean = true): Unit = {
-    Option(operationDateField.getValue).foreach { operationDate =>
+    getOperationDate.foreach { operationDate =>
       def updateField(field: TextFieldWithButton, fund: Savings.Fund): Unit = {
         val navOpt = Awaits.readDataStoreNAV(Some(stage), fund.id, operationDate).getOrElse(None)
         navOpt match {
@@ -731,6 +732,9 @@ class NewAssetActionController {
 
   private def isDstEnabled: Boolean =
     actionKind == AssetActionKind.Transfer
+
+  private def getOperationDate: Option[LocalDate] =
+    Option(operationDateField.getValue)
 
   private def getSrcFund: Option[SchemeAndFund] =
     Option(srcFundField.getValue).flatten
