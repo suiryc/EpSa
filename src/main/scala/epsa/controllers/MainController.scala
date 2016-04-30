@@ -517,7 +517,7 @@ class MainController extends Logging {
 
       if (resp.contains(ButtonType.OK)) {
         DataStore.undoChanges()
-        applyState(state.resetPendingChanges)
+        applyState(state.resetPendingChanges, updateAssetsValue = true)
       }
     }
 
