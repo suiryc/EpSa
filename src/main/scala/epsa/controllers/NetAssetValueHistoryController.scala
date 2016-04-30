@@ -25,8 +25,10 @@ import scala.util.{Failure, Success}
 import suiryc.scala.concurrent.RichFuture._
 import suiryc.scala.math.Ordering._
 import suiryc.scala.settings.Preference
+import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.event.EventHandler._
 import suiryc.scala.javafx.scene.control.Dialogs
+import suiryc.scala.javafx.stage.Stages.StageLocation
 import suiryc.scala.javafx.stage.{FileChoosers, Stages}
 import suiryc.scala.javafx.util.Callback
 
@@ -89,6 +91,21 @@ class NetAssetValueHistoryController {
     }
   }
 
+  /** Restores (persisted) view. */
+  private def restoreView(): Unit = {
+    // Restore stage location
+    Option(stageLocation()).foreach { loc =>
+      Stages.setLocation(stage, loc, setSize = true)
+    }
+  }
+
+  /** Persists view (stage location, ...). */
+  private def persistView(): Unit = {
+    // Persist stage location
+    // Note: if iconified, resets it
+    stageLocation() = Stages.getLocation(stage).orNull
+  }
+
   def onCloseRequest(dialog: Dialog[_])(event: WindowEvent): Unit = {
     // Default dialog window closing request is handled to close the dialog
     // when applicable.
@@ -97,7 +114,10 @@ class NetAssetValueHistoryController {
     val canClose =
       if (changes.nonEmpty) Form.confirmDiscardPendingChanges(stage, event)
       else true
-    if (canClose) dialog.close()
+    if (canClose) {
+      persistView()
+      dialog.close()
+    }
   }
 
   def onFund(event: ActionEvent): Unit = {
@@ -417,7 +437,9 @@ object NetAssetValueHistoryController {
   import epsa.Settings.prefs
   import Preference._
 
-  protected val navHistoryImportPath = Preference.from("nav.history.import.path", null:Path)
+  private val stageLocation = Preference.from("stage.nav.history.location", null:StageLocation)
+
+  private val navHistoryImportPath = Preference.from("nav.history.import.path", null:Path)
 
   def title = Strings.navHistory
 
@@ -435,6 +457,12 @@ object NetAssetValueHistoryController {
 
     // Delegate closing request to controller
     Stages.getStage(dialog).setOnCloseRequest(controller.onCloseRequest(dialog) _)
+
+    // Wait for dialog to be shown before restoring the view
+    dialog.showingProperty().listen2 { cancellable =>
+      cancellable.cancel()
+      controller.restoreView()
+    }
 
     dialog.setResultConverter(Callback { resultConverter(mainController, window, controller) _ })
     Stages.trackMinimumDimensions(Stages.getStage(dialog))
