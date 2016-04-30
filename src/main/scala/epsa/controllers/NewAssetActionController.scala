@@ -558,6 +558,7 @@ class NewAssetActionController {
         navOpt match {
           case Some(nav) =>
             val text = nav.value.toString
+            field.setUserData(nav)
             field.setText(text)
             field.setTooltip(new Tooltip(s"${Strings.date}: ${nav.date}"))
             field.setOnButtonAction { (event: ActionEvent) =>
@@ -568,6 +569,7 @@ class NewAssetActionController {
             field.textField.setEditable(nav.date != operationDate)
 
           case None =>
+            field.setUserData(null)
             field.setText(null)
             field.setTooltip(null)
             field.buttonDisableProperty.unbind()
@@ -589,7 +591,7 @@ class NewAssetActionController {
     }
   }
 
-  private def checkForm(): Option[Savings.Event] = {
+  private def checkForm(): Option[Savings.AssetEvent] = {
     val operationDate = operationDateField.getValue
     val opDateSelected = Option(operationDate).isDefined
     val opDateAnterior = opDateSelected && savings.latestAssetAction.exists(_.isAfter(operationDate))
@@ -833,17 +835,36 @@ object NewAssetActionController {
       controller.restoreView()
     }
 
-    dialog.setResultConverter(Callback { resultConverter(controller) _ })
+    dialog.setResultConverter(Callback { resultConverter(owner, controller) _ })
     Stages.trackMinimumDimensions(Stages.getStage(dialog))
 
     dialog
   }
 
-  private def resultConverter(controller: NewAssetActionController)(buttonType: ButtonType): Option[Savings.Event] = {
+  private def resultConverter(owner: Option[Window], controller: NewAssetActionController)(buttonType: ButtonType): Option[Savings.AssetEvent] = {
     if (buttonType != ButtonType.OK) None
     else {
       dstUnitsAuto() = controller.dstUnitsAutoButton.isSelected
-      controller.checkForm()
+      val eventOpt = controller.checkForm()
+      eventOpt.foreach { event =>
+        for {
+          (schemeAndFundOpt, field, value) <- List(
+            (controller.getSrcFund, controller.srcNAVField, controller.getSrcNAV),
+            (controller.getDstFund, controller.dstNAVField, controller.getDstNAV)
+          )
+          schemeAndFund <- schemeAndFundOpt
+          // Note: use fake NAV when none was found (either because there is no
+          // NAV history yet, or operation date predates current history).
+          nav <-
+            if (field.isDisabled) None
+            else Option(field.getUserData.asInstanceOf[Savings.AssetValue]).orElse(Some(Savings.AssetValue(LocalDate.ofEpochDay(0), 0)))
+        } {
+          if ((event.date != nav.date) && (value != nav.value)) {
+            Awaits.saveDataStoreNAV(owner, schemeAndFund.fund.id, Savings.AssetValue(event.date, value))
+          }
+        }
+      }
+      eventOpt
     }
   }
 

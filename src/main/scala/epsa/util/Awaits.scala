@@ -57,6 +57,9 @@ object Awaits {
   def readDataStoreNAV(owner: Option[Window], fundId: UUID, date: LocalDate, exactDate: Boolean = false): Try[Option[Savings.AssetValue]] =
     orError(DataStore.AssetHistory.readValue(fundId, date, exactDate), owner, DataStore.readIssueMsg())
 
+  def saveDataStoreNAV(owner: Option[Window], fundId: UUID, nav: Savings.AssetValue): Try[Unit] =
+    orError(DataStore.AssetHistory.writeValues(fundId, nav), owner, DataStore.writeIssueMsg())
+
   def cleanupDataStore(owner: Option[Window], fundIds: List[UUID]): Unit = {
     orError(DataStore.AssetHistory.cleanup(fundIds), owner, DataStore.cleanupIssueMsg) match {
       case Success(v) =>
