@@ -344,12 +344,7 @@ class NewAssetActionController {
   // did select a value (in which case we don't auto-set it anymore).
   // Also breaks recursion triggered from changing action kind.
   private def onSrcAvailability(): Unit = breakRecursion {
-    if (!dstAvailabilityChosen && isDstEnabled) {
-      // Note: don't forget to use actual availability based on operation date
-      val operationDate = getOperationDate
-      val availability = Savings.resolveAvailability(getSrcAvailability, operationDate)
-      dstAvailabilityField.setValue(availability.orElse(operationDate).orNull)
-    }
+    updateDstAvailability()
     checkForm()
   }
 
@@ -536,9 +531,23 @@ class NewAssetActionController {
           }
         }.getOrElse(Nil)
         srcAvailabilityField2.setItems(FXCollections.observableList(availabilities))
+        if (availabilities.size == 1) {
+          srcAvailabilityField2.getSelectionModel.select(availabilities.head)
+          // Manually update dst availability (overrides recursion prevention)
+          updateDstAvailability()
+        }
 
       case None =>
         srcAvailabilityField2.setDisable(true)
+    }
+  }
+
+  private def updateDstAvailability(): Unit = {
+    if (!dstAvailabilityChosen && isDstEnabled) {
+      // Note: don't forget to use actual availability based on operation date
+      val operationDate = getOperationDate
+      val availability = Savings.resolveAvailability(getSrcAvailability, operationDate)
+      dstAvailabilityField.setValue(availability.orElse(operationDate).orNull)
     }
   }
 
