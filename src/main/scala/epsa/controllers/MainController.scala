@@ -542,7 +542,10 @@ class MainController extends Logging {
       dialog.initModality(Modality.WINDOW_MODAL)
       dialog.setResizable(true)
       val event = dialog.showAndWait().orElse(None)
-      processEvents(state, event.toList)
+      if (event.isDefined) {
+        // Refresh NAVs as there may be new assets
+        processEvents(state, event.toList, updateAssetsValue = true)
+      }
     }
 
     def onOptions(state: State): Unit = {
