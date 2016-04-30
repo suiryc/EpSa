@@ -500,54 +500,56 @@ class ChartHandler(
    */
   def checkLabelPosition() = if (labelNAV.isVisible) {
     val bounds = getChartBackgroundBounds
+    val viewedBounds = getChartBackgroundViewedBounds
 
-    // Note: we need to check the size of the label fits the bounds, otherwise
-    // we may trigger stack overflows.
-    if (labelNAV.getWidth < bounds.getWidth) {
-      val viewedBounds = getChartBackgroundViewedBounds
-      if (labelNAV.getLayoutX + labelNAV.getTranslateX + labelNAV.getWidth > bounds.getMaxX) {
-        // right end of label is going beyond chart
-        labelNAV.setTranslateX(bounds.getMaxX - labelNAV.getLayoutX - labelNAV.getWidth)
-      } else if (labelNAV.getLayoutX + labelNAV.getTranslateX < bounds.getMinX) {
-        // left end of label is going beyond chart
-        labelNAV.setTranslateX(bounds.getMinX - labelNAV.getLayoutX)
-      }
-      else if (labelNAV.getWidth < viewedBounds.getWidth) {
-        if (labelNAV.getLayoutX + labelNAV.getTranslateX + labelNAV.getWidth > viewedBounds.getMaxX) {
-          // right end of label is going beyond scroll view
-          labelNAV.setTranslateX(viewedBounds.getMaxX - labelNAV.getLayoutX - labelNAV.getWidth)
-        } else if (labelNAV.getLayoutX + labelNAV.getTranslateX < viewedBounds.getMinX) {
-          // left end of label is going beyond scroll view
-          labelNAV.setTranslateX(viewedBounds.getMinX - labelNAV.getLayoutX)
-        }
+    // Note: (x,y) position is relative to top/left
+    val x = labelNAV.getTranslateX
+    val maxX = bounds.getMaxX - labelNAV.getLayoutX - labelNAV.getWidth
+    val maxX2 = viewedBounds.getMaxX - labelNAV.getLayoutX - labelNAV.getWidth
+    val minX = bounds.getMinX - labelNAV.getLayoutX
+    val minX2 = viewedBounds.getMinX - labelNAV.getLayoutX
+    val y = labelNAV.getTranslateY
+    val maxY = bounds.getMaxY - labelNAV.getLayoutY - labelNAV.getHeight
+    val minY = bounds.getMinY - labelNAV.getLayoutY
+
+    def xOk(x: Double) =
+      (labelNAV.getLayoutX + x >= math.max(bounds.getMinX, viewedBounds.getMinX)) &&
+        (labelNAV.getLayoutX + x + labelNAV.getWidth <= math.min(bounds.getMaxX, viewedBounds.getMaxX))
+
+    def yOk(y: Double) =
+      (labelNAV.getLayoutY + y >= math.max(bounds.getMinY, viewedBounds.getMinY)) &&
+        (labelNAV.getLayoutY + y + labelNAV.getHeight <= math.min(bounds.getMaxY, viewedBounds.getMaxY))
+
+    // Note: we need to check all (but at least one) value we would set is ok
+    // in order to prevent stack overflows (which could happen if chart or view
+    // size is smaller than label).
+    if (x < minX) labelNAV.setTranslateX(minX)
+    if ((x > maxX) && xOk(maxX)) labelNAV.setTranslateX(maxX)
+    if ((x > maxX2) && xOk(maxX2)) labelNAV.setTranslateX(maxX2)
+    if ((x < minX2) && xOk(minX2)) labelNAV.setTranslateX(minX2)
+
+    if (y < minY) {
+      // top end of label is going beyond chart
+      currentXPos.map(getXY(bounds, _)) match {
+        case Some((_, currentY)) =>
+          // We don't want to go above the chart top, but would like not to
+          // display the label in front of the chart point, unless that make
+          // it go beyond the chart bottom.
+          if ((bounds.getMinY + labelNAV.getHeight < currentY) || (currentY + 10 + labelNAV.getHeight > bounds.getMaxY) || !yOk(currentY + 10)) {
+            // We still remain above the displayed chart point, or would go
+            // beyond the chart bottom by displaying the label underneath it.
+            // So just go at the top of the chart.
+            labelNAV.setTranslateY(minY)
+          } else {
+            // chart point will be under the label, move it underneath
+            labelNAV.setTranslateY(currentY + 10)
+          }
+
+        case None =>
+          labelNAV.setTranslateY(minY)
       }
     }
-    if (labelNAV.getHeight < bounds.getHeight) {
-      if (labelNAV.getLayoutY + labelNAV.getTranslateY + labelNAV.getHeight > bounds.getMaxY) {
-        // bottom end of label is going beyond chart
-        labelNAV.setTranslateY(bounds.getMaxY - labelNAV.getLayoutY - labelNAV.getHeight)
-      } else if (labelNAV.getLayoutY + labelNAV.getTranslateY < bounds.getMinY) {
-        // top end of label is going beyond chart
-        currentXPos.map(getXY(bounds, _)) match {
-          case Some((_, currentY)) =>
-            // We don't want to go above the chart top, but would like not to
-            // display the label in front of the chart point, unless that make
-            // it go beyond the chart bottom.
-            if ((bounds.getMinY + labelNAV.getHeight < currentY) || (currentY + 10 + labelNAV.getHeight > bounds.getMaxY)) {
-              // We still remain above the displayed chart point, or would go
-              // beyond the chart bottom by displaying the label underneath it.
-              // So just go at the top of the chart.
-              labelNAV.setTranslateY(bounds.getMinY - labelNAV.getLayoutY)
-            } else {
-              // chart point will be under the label, move it underneath
-              labelNAV.setTranslateY(currentY + 10)
-            }
-
-          case None =>
-            labelNAV.setTranslateY(bounds.getMinY - labelNAV.getLayoutY)
-        }
-      }
-    }
+    if ((y > maxY) && yOk(maxY)) labelNAV.setTranslateY(maxY)
   }
 
   /** Draws reference value lines. */
