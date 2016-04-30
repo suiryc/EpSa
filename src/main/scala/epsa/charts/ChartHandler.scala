@@ -335,7 +335,9 @@ class ChartHandler(
     // around the chart (like y axis, padding etc).
     val viewedBounds = getChartBackgroundViewedBounds
     val data = series.getData.map(v => math.round(v.getXValue.doubleValue))
-    val range = data.max - data.min
+    val range =
+      if (data.isEmpty) 0
+      else data.max - data.min
     val widthParent = anchorPane.getWidth
     val width = xAxis.getWidth
     val widthExtra = widthParent - width

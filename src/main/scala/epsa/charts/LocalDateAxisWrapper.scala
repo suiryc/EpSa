@@ -26,14 +26,20 @@ class LocalDateAxisWrapper(settings: ChartSettings) {
   axis.setAutoRanging(false)
 
   def updateTicks(series: XYChart.Series[Number, Number]): Unit = {
-    import scala.collection.JavaConversions._
-    val values = series.getData.map(v => math.round(v.getXValue.doubleValue))
-    val min = values.min
-    val max = values.max
-    axis.setLowerBound(min.doubleValue)
-    axis.setUpperBound(max.doubleValue)
-    // TODO: change tick label format/rotation if needed
-    axis.setTickUnit(7 * 5)
+    val data = series.getData
+    if (!data.isEmpty) {
+      import scala.collection.JavaConversions._
+      val values = data.map(v => math.round(v.getXValue.doubleValue))
+      val min = values.min
+      val max = values.max
+      axis.setLowerBound(min.doubleValue)
+      axis.setUpperBound(max.doubleValue)
+      // TODO: change tick label format/rotation if needed
+      axis.setTickUnit(7 * 5)
+    } else {
+      axis.setLowerBound(0)
+      axis.setUpperBound(0)
+    }
   }
 
   def dateToNumber(v: LocalDate): Long = v.toEpochDay
