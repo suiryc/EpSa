@@ -425,17 +425,18 @@ class ChartHandler(
 
     // Get nearest 'x' value
     @scala.annotation.tailrec
-    def loop(values: Seq[(Long, BigDecimal)], nearestX: Long): Option[Long] = values.headOption match {
+    def loop(values: Seq[(Long, BigDecimal)], nearestX: Long): Long = values.headOption match {
       case Some((valueX, _)) =>
-        val nearest = if (nearestX > 0) math.abs(v - nearestX) else Long.MaxValue
+        val nearest = if (nearestX >= 0) math.abs(v - nearestX) else Long.MaxValue
         val delta = math.abs(v - valueX)
         if (delta < nearest) loop(values.tail, valueX)
-        else Some(nearestX)
+        else nearestX
 
-      case None => None
+      case None => nearestX
     }
 
-    loop(valuesList, -1)
+    val found = loop(valuesList, -1)
+    if (found >= 0) Some(found) else None
   }
 
   /** Gets 'x' position for given chart value. */
