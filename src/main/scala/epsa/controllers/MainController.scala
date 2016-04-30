@@ -800,8 +800,8 @@ class MainController extends Logging {
           fundPath() = selectedFile.toPath
           // Then build and display chart
           val chartHandler = new ChartHandler(
-            fundName = hist.name.orNull,
-            fundValues = hist.values
+            seriesName = hist.name.orNull,
+            seriesValues = hist.values
           )
           val chartPane = chartHandler.chartPane
           chartPane.setPrefSize(640, 480)

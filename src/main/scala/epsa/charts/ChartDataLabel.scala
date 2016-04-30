@@ -15,10 +15,10 @@ case class ChartData[A](x: A, y: BigDecimal)
  * data.
  */
 class ChartDataLabel[A](
-  xLabel: String = "Date",
-  xFormatter: A => String = (v: A) => v.toString,
-  yLabel: String = "NAV",
-  ySuffix: String = epsa.Settings.defaultCurrency
+  xLabel: String,
+  xFormatter: A => String,
+  yLabel: String,
+  ySuffix: String
 ) extends VBox {
 
   /** Reference data. */

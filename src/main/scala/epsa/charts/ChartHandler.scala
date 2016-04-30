@@ -1,6 +1,6 @@
 package epsa.charts
 
-import epsa.model.Savings
+import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import javafx.geometry.Bounds
 import javafx.scene.chart.{LineChart, NumberAxis, XYChart}
@@ -15,6 +15,11 @@ import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.javafx.event.EventHandler._
 import suiryc.scala.javafx.geometry.BoundsEx
+
+trait ChartSeriesData {
+  val date: LocalDate
+  val value: BigDecimal
+}
 
 case class ChartSettings(
   title: String = "Net asset value history",
@@ -47,8 +52,8 @@ object ChartSettings {
  *   - draw visible lines to spot chart data value
  */
 class ChartHandler(
-  fundName: String,
-  fundValues: Seq[Savings.AssetValue],
+  seriesName: String,
+  seriesValues: Seq[ChartSeriesData],
   settings: ChartSettings = ChartSettings()
 ) {
 
@@ -91,9 +96,9 @@ class ChartHandler(
 
   /** Chart series. */
   private val series = new XYChart.Series[Number, Number]()
-  series.setName(fundName)
+  series.setName(seriesName)
   /** Investment fund asset values to display in chart. */
-  private val valuesList = fundValues.map { v =>
+  private val valuesList = seriesValues.map { v =>
     (dateToNumber(v.date), v.value)
   }
   /** Number of investment fund asset values. */

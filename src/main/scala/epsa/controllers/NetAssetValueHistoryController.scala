@@ -310,8 +310,8 @@ class NetAssetValueHistoryController {
     purgeButton.setDisable(actualValues.isEmpty)
 
     val chartHandler = new ChartHandler(
-      fundName = fund.name,
-      fundValues = actualValues,
+      seriesName = fund.name,
+      seriesValues = actualValues,
       settings = ChartSettings.hidden.copy(xLabel = Strings.date, yLabel = Strings.nav)
     )
     val pane = chartHandler.chartPane

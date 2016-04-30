@@ -1,6 +1,7 @@
 package epsa.model
 
 import epsa.Settings.scaleVWAP
+import epsa.charts.ChartSeriesData
 import grizzled.slf4j.Logging
 import java.time.LocalDate
 import java.util.UUID
@@ -45,6 +46,7 @@ object Savings {
 
   /** Asset value: holds asset value at a given date. */
   case class AssetValue(date: LocalDate, value: BigDecimal)
+    extends ChartSeriesData
 
   case class AssetValueHistory(name: Option[String], values: List[Savings.AssetValue] = Nil)
 
