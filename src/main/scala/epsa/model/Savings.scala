@@ -2,9 +2,11 @@ package epsa.model
 
 import epsa.Settings.scaleVWAP
 import epsa.charts.ChartSeriesData
+import epsa.util.Awaits
 import grizzled.slf4j.Logging
 import java.time.LocalDate
 import java.util.UUID
+import javafx.stage.Window
 import spray.json._
 
 object Savings {
@@ -547,5 +549,11 @@ case class Savings(
     val computedAssets = assets.foldLeft(AssetComputation())(process).computed
     copy(assets = computedAssets)
   }
+
+  def getNAVs(owner: Option[Window], date: LocalDate, exactDate: Boolean = false): Map[UUID, Savings.AssetValue] =
+    assets.map(_.fundId).distinct.flatMap { fundId =>
+      val nav = Awaits.readDataStoreNAV(owner, fundId, date, exactDate).getOrElse(None)
+      nav.map(fundId -> _)
+    }.toMap
 
 }

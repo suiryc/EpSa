@@ -429,12 +429,9 @@ class MainController extends Logging {
       }
       val newEvents = state.eventsUpd ::: events
       val newSavings = state.savingsUpd.processEvents(events)
-      val newAssetsValue = if (updateAssetsValue) {
-        newSavings.assets.map(_.fundId).distinct.flatMap { fundId =>
-          val nav = Awaits.readDataStoreNAV(Some(state.window), fundId, LocalDate.now).getOrElse(None)
-          nav.map(fundId -> _)
-        }.toMap
-      } else state.assetsValue
+      val newAssetsValue =
+        if (!updateAssetsValue) state.assetsValue
+        else newSavings.getNAVs(Some(state.window), LocalDate.now)
       val newState = state.copy(eventsUpd = newEvents, savingsUpd = newSavings, assetsValue = newAssetsValue)
       val dirty = newState.hasPendingChanges
 
