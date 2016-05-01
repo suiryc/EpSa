@@ -703,10 +703,10 @@ class MainController extends Logging {
       }
 
       def getSchemeName(events: Savings.Event*): String =
-        getName("Scheme", 1, savings.processEvents(events:_*).schemes.map(_.name.toLowerCase).toSet)
+        getName("Scheme", 1, savings.processEvents(events).schemes.map(_.name.toLowerCase).toSet)
 
       def getFundName(events: Savings.Event*): String =
-        getName("Fund", 1, savings.processEvents(events:_*).funds.map(_.name.toLowerCase).toSet)
+        getName("Fund", 1, savings.processEvents(events).funds.map(_.name.toLowerCase).toSet)
 
       n match {
         case 1 =>
@@ -855,7 +855,7 @@ class MainController extends Logging {
 
       def read() = Awaits.readDataStoreEvents(owner) match {
         case Success(events) =>
-          val savingsInit = Savings().processEvents(events:_*)
+          val savingsInit = Savings().processEvents(events)
           val newState = State(
             stage = state.stage,
             savingsInit = savingsInit,

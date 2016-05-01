@@ -47,7 +47,7 @@ class TestDataStore extends Application {
         case read =>
           println(s"EventSource.readEvents => $read")
           read.toOption.foreach { events =>
-            println(Savings().processEvents(events:_*))
+            println(Savings().processEvents(events))
           }
       }
 

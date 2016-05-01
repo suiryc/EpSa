@@ -13,6 +13,16 @@ object Savings {
 
   import epsa.Settings._
 
+  /**
+   * Resolves availability date against a target date.
+   *
+   * Availability date remains if given date predates it. Otherwise availability
+   * is considered immediate.
+   *
+   * @param availability availability date to resolve
+   * @param date0 target date to resolve availability against; use None for current date
+   * @return resolved availability, which is either given one, or None (for immediate availability)
+   */
   def resolveAvailability(availability: Option[LocalDate], date0: Option[LocalDate]): Option[LocalDate] = {
     val date = date0.getOrElse(LocalDate.now)
     availability.filter(_.compareTo(date) > 0)
@@ -232,13 +242,13 @@ case class Savings(
       savings.processEvent(event)
     }
 
-  def processEvents(events: Savings.Event*): Savings =
+  def processEvents(events: Seq[Savings.Event]): Savings =
     events.foldLeft(this) { (savings, event) =>
       savings.processEvent(event)
     }
 
-  def processEvents(events: List[Savings.Event]): Savings =
-    processEvents(events:_*)
+  def processEvents(events: Savings.Event*)(implicit d: DummyImplicit): Savings =
+    processEvents(events)
 
   def processEvent(event: Event): Savings = event match {
     case CreateScheme(id, name, comment)               => createScheme(id, name, comment)
@@ -550,6 +560,14 @@ case class Savings(
     copy(assets = computedAssets)
   }
 
+  /**
+   * Gets NAVs for given date.
+   *
+   * @param owner parent window if any (to display error dialog if necessary)
+   * @param date date to get NAVs on
+   * @param exactDate whether we want NAVs for the exact date, or if nearest predating date is OK too
+   * @return NAVs
+   */
   def getNAVs(owner: Option[Window], date: LocalDate, exactDate: Boolean = false): Map[UUID, Savings.AssetValue] =
     assets.map(_.fundId).distinct.flatMap { fundId =>
       val nav = Awaits.readDataStoreNAV(owner, fundId, date, exactDate).getOrElse(None)

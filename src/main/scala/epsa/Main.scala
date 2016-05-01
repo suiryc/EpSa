@@ -45,7 +45,7 @@ class Main extends Application {
     I18N.loadLocale()
 
     def startController(events: Seq[Savings.Event] = Nil): Unit = {
-      val savingsInit = Savings().processEvents(events:_*)
+      val savingsInit = Savings().processEvents(events)
       val state = MainController.State(
         stage = stage,
         savingsInit = savingsInit,

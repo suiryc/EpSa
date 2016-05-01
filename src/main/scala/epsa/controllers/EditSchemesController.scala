@@ -380,19 +380,16 @@ class EditSchemesController {
    * Updates current list of events to take into account: flattens them to
    * filter unnecessary ones.
    */
-  private def applyEvents(newEvents: Savings.Event*): Unit = {
+  private def applyEvents(newEvents: Seq[Savings.Event]): Unit = {
     edit = None
     resetEditFields()
-    savings = savings.processEvents(newEvents:_*)
+    savings = savings.processEvents(newEvents)
     events = savings0.flattenEvents(events ++ newEvents)
     buttonOk.setDisable(events.isEmpty)
     updateSchemes()
     // Note: we may delete associated funds, so refresh the list view too.
     updateFunds()
   }
-
-  private def applyEvents(newEvents: List[Savings.Event]): Unit =
-    applyEvents(newEvents:_*)
 
   /**
    * Whether a scheme can be deleted.
