@@ -427,6 +427,49 @@ class SavingsSpec extends WordSpec with Matchers {
     }
   }
 
+  "Savings" should {
+    "have Event sorting" in {
+      val date0 = LocalDate.now.minusDays(60)
+      val g1e1 = savings0.createSchemeEvent("scheme 1")
+      val g1e2 = savings0.createFundEvent("fund 1")
+      val schemeId = g1e1.schemeId
+      val fundId = g1e2.fundId
+      val g1e3 = Savings.AssociateFund(schemeId, fundId)
+      val g2e1 = Savings.MakePayment(date0.plusDays(20), Savings.AssetPart(schemeId, fundId, None, 11, 11), None)
+      val g2e2 = Savings.MakePayment(date0.plusDays(20), Savings.AssetPart(schemeId, fundId, None, 12, 12), None)
+      val g2e3 = Savings.MakePayment(date0.plusDays(10), Savings.AssetPart(schemeId, fundId, None, 13, 13), None)
+      val g2e4 = Savings.MakePayment(date0.plusDays(20), Savings.AssetPart(schemeId, fundId, None, 14, 14), None)
+      val g2e5 = Savings.MakePayment(date0.plusDays(15), Savings.AssetPart(schemeId, fundId, None, 15, 15), None)
+      val g3e1 = savings0.createSchemeEvent("scheme 2")
+      val g4e1 = Savings.MakePayment(date0.plusDays(20), Savings.AssetPart(schemeId, fundId, None, 16, 16), None)
+      val g4e2 = Savings.MakePayment(date0.plusDays(21), Savings.AssetPart(schemeId, fundId, None, 17, 17), None)
+      val g4e1mg2 = Savings.MakePayment(date0.plusDays(15), Savings.AssetPart(schemeId, fundId, None, 18, 18), None)
+      val g4e2mg2 = Savings.MakePayment(date0.plusDays(10), Savings.AssetPart(schemeId, fundId, None, 19, 19), None)
+      val g5e1 = savings0.createFundEvent("fund 2")
+      val g6e1mg2 = Savings.MakePayment(date0.plusDays(5), Savings.AssetPart(schemeId, fundId, None, 20, 20), None)
+      val g6e2mg2 = Savings.MakePayment(date0.plusDays(16), Savings.AssetPart(schemeId, fundId, None, 21, 21), None)
+
+      val events = List[Savings.Event](
+        g1e1, g1e2, g1e3,
+        g2e1, g2e2, g2e3, g2e4, g2e5,
+        g3e1,
+        g4e1, g4e2, g4e1mg2, g4e2mg2,
+        g5e1,
+        g6e1mg2, g6e2mg2
+      )
+      val eventsExpected = List[Savings.Event](
+        g1e1, g1e2, g1e3,
+        g6e1mg2, g2e3, g4e2mg2, g2e5, g4e1mg2, g6e2mg2, g2e1, g2e2, g2e4,
+        g3e1,
+        g4e1, g4e2,
+        g5e1
+      )
+      val eventsSorted = Savings.sortEvents(events)
+      eventsSorted should not be events
+      eventsSorted shouldBe eventsExpected
+    }
+  }
+
   private def checkFlattening(savings: Savings, event: Savings.Event): Unit =
     savings.flattenEvents(List(event)) shouldBe List(event)
 

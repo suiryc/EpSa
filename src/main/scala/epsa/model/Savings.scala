@@ -8,6 +8,7 @@ import java.time.LocalDate
 import java.util.UUID
 import javafx.stage.Window
 import spray.json._
+import suiryc.scala.math.Ordered._
 
 object Savings {
 
@@ -25,7 +26,79 @@ object Savings {
    */
   def resolveAvailability(availability: Option[LocalDate], date0: Option[LocalDate]): Option[LocalDate] = {
     val date = date0.getOrElse(LocalDate.now)
-    availability.filter(_.compareTo(date) > 0)
+    availability.filter(_ > date)
+  }
+
+  /**
+   * Sorts events.
+   *
+   * Regroups asset events by date when necessary.
+   *
+   * @param events events to sort
+   * @return sorted events
+   */
+  def sortEvents(events: Seq[Event]): Seq[Event] = {
+    case class DateRange(min: LocalDate, max: LocalDate)
+    case class SortingEvents(prefix: Seq[Event], assetEvents: Seq[AssetEvent]) {
+      lazy val dateRange: Option[DateRange] = {
+        val eventsDates = assetEvents.map(_.date)
+        if (eventsDates.isEmpty) None
+        else Some(DateRange(eventsDates.min, eventsDates.max))
+      }
+    }
+
+    // Splits events into consecutive groups of pure Events and AssetEvents
+    @scala.annotation.tailrec
+    def split(events: Seq[Event], sortings: Seq[SortingEvents]): Seq[SortingEvents] = {
+      if (events.isEmpty) sortings
+      else {
+        val (prefix, suffix0) = events.span(!_.isInstanceOf[AssetEvent])
+        val (assetEvents0, suffix) = suffix0.span(_.isInstanceOf[AssetEvent])
+        val assetEvents = assetEvents0.asInstanceOf[Seq[AssetEvent]]
+        split(suffix, sortings :+ SortingEvents(prefix, assetEvents))
+      }
+    }
+
+    // Rejoins groups of consecutive Events and AssetEvents
+    def join(sortings: Seq[SortingEvents]): Seq[Event] =
+      sortings.flatMap { v =>
+        v.prefix ++ v.assetEvents
+      }
+
+    // Move AssetEvents from one group to another if necessary, that is if the
+    // source group contains dates predating maximal date of destination group.
+    def extract(to: SortingEvents, from: SortingEvents): (SortingEvents, SortingEvents) =
+      to.dateRange match {
+        case Some(dateRange) if from.dateRange.exists(_.min < dateRange.max) =>
+          val (extracted, remaining) = from.assetEvents.partition(_.date < dateRange.max)
+          (to.copy(assetEvents = to.assetEvents ++ extracted), from.copy(assetEvents = remaining))
+
+        case _ =>
+          (to, from)
+      }
+
+    // Sorts events: loop over each group, and integrate AssetEvents of
+    // remaining groups if necessary.
+    // As the final step in each group, sort AssetEvents by date.
+    @scala.annotation.tailrec
+    def sort(sortings: Seq[SortingEvents], sorted: Seq[SortingEvents]): Seq[SortingEvents] =
+      sortings.headOption match {
+        case Some(sorting) =>
+          val (sorting2, sortings2) = sortings.tail.foldLeft(sorting, Seq.empty[SortingEvents]) {
+            case ((accSorting, accSortings), from) =>
+              val (accSorting2, from2) = extract(accSorting, from)
+              (accSorting2, accSortings :+ from2)
+          }
+          val sorting3 = sorting2.copy(assetEvents = sorting2.assetEvents.sortBy(_.date))
+          sort(sortings2, sorted :+ sorting3)
+
+        case None =>
+          sorted
+      }
+
+    val sortings = split(events, Nil)
+    val sorted = sort(sortings, Nil)
+    join(sorted)
   }
 
   case class Scheme(id: UUID, name: String, comment: Option[String], funds: List[UUID]) {
