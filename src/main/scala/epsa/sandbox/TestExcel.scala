@@ -1,6 +1,7 @@
 package epsa.sandbox
 
-import epsa.charts.ChartHandler
+import epsa.I18N.Strings
+import epsa.charts.{ChartHandler, ChartSettings}
 import epsa.model.Savings
 import epsa.tools.EsaliaInvestmentFundProber
 import java.nio.file.Path
@@ -67,7 +68,15 @@ class TestExcel extends Application {
         // Save path in preferences
         fundPath() = selectedFile.toPath
         // Then build and display chart
-        val chartHandler = new ChartHandler(hist.name.orNull, hist.values)
+        val chartHandler = new ChartHandler(
+          seriesName = hist.name.orNull,
+          seriesValues = hist.values,
+          settings = ChartSettings.hidden.copy(
+            xLabel = Strings.date,
+            yLabel = Strings.nav,
+            ySuffix = epsa.Settings.defaultCurrency
+          )
+        )
         val chartPane = chartHandler.chartPane
         chartPane.setPrefSize(640, 480)
         val scene = new Scene(chartPane)

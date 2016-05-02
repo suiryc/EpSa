@@ -4,7 +4,7 @@ import akka.actor.{Actor, ActorRef, Props}
 import epsa.I18N
 import epsa.I18N.Strings
 import epsa.Settings.scalePercents
-import epsa.charts.ChartHandler
+import epsa.charts.{ChartHandler, ChartSettings}
 import epsa.model.Savings
 import epsa.storage.DataStore
 import epsa.tools.EsaliaInvestmentFundProber
@@ -801,7 +801,12 @@ class MainController extends Logging {
           // Then build and display chart
           val chartHandler = new ChartHandler(
             seriesName = hist.name.orNull,
-            seriesValues = hist.values
+            seriesValues = hist.values,
+            settings = ChartSettings.hidden.copy(
+              xLabel = Strings.date,
+              yLabel = Strings.nav,
+              ySuffix = epsa.Settings.defaultCurrency
+            )
           )
           val chartPane = chartHandler.chartPane
           chartPane.setPrefSize(640, 480)

@@ -332,7 +332,11 @@ class NetAssetValueHistoryController {
     val chartHandler = new ChartHandler(
       seriesName = fund.name,
       seriesValues = actualValues,
-      settings = ChartSettings.hidden.copy(xLabel = Strings.date, yLabel = Strings.nav)
+      settings = ChartSettings.hidden.copy(
+        xLabel = Strings.date,
+        yLabel = Strings.nav,
+        ySuffix = epsa.Settings.defaultCurrency
+      )
     )
     val pane = chartHandler.chartPane
     chartPane = Some(pane)

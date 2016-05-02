@@ -22,23 +22,27 @@ trait ChartSeriesData {
 }
 
 case class ChartSettings(
-  title: String = "Net asset value history",
-  showTitle: Boolean = true,
-  xLabel: String = "Date",
-  showXLabel: Boolean = true,
-  yLabel: String = "NAV",
-  showYLabel: Boolean = true,
-  ySuffix: String = epsa.Settings.defaultCurrency,
-  legendVisible: Boolean = true
+  title: String,
+  showTitle: Boolean,
+  xLabel: String,
+  showXLabel: Boolean,
+  yLabel: String,
+  showYLabel: Boolean,
+  ySuffix: String,
+  legendVisible: Boolean
 )
 
 object ChartSettings {
 
   val hidden: ChartSettings =
     ChartSettings(
+      title = "",
       showTitle = false,
+      xLabel = "",
       showXLabel = false,
+      yLabel = "",
       showYLabel = false,
+      ySuffix = "",
       legendVisible = false
     )
 }
@@ -54,7 +58,7 @@ object ChartSettings {
 class ChartHandler(
   seriesName: String,
   seriesValues: Seq[ChartSeriesData],
-  settings: ChartSettings = ChartSettings()
+  settings: ChartSettings
 ) {
 
   // Note: using a CategoryAxis has many drawbacks.
