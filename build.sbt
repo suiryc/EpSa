@@ -3,7 +3,6 @@ import Keys._
 
 lazy val versions = Map[String, String](
   "akka"         -> "2.4.2",
-  "akka-http"    -> "2.0.3",
   "epsa"         -> "1.0-SNAPSHOT",
   "grizzled"     -> "1.0.2",
   "h2"           -> "1.4.191",
@@ -42,10 +41,6 @@ lazy val epsa = project.in(file(".")).
       "ch.qos.logback"        %  "logback-classic"                   % versions("logback"),
       "com.h2database"        %  "h2"                                % versions("h2"),
       "com.typesafe.akka"     %% "akka-actor"                        % versions("akka"),
-      "com.typesafe.akka"     %% "akka-stream-experimental"          % versions("akka-http"),
-      "com.typesafe.akka"     %% "akka-http-core-experimental"       % versions("akka-http"),
-      "com.typesafe.akka"     %% "akka-http-experimental"            % versions("akka-http"),
-      "com.typesafe.akka"     %% "akka-http-spray-json-experimental" % versions("akka-http"),
       "com.typesafe.akka"     %% "akka-slf4j"                        % versions("akka"),
       "com.typesafe.slick"    %% "slick"                             % versions("slick"),
       "io.spray"              %% "spray-json"                        % versions("spray-json"),
