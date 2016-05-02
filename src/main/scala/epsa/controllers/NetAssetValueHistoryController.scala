@@ -34,6 +34,7 @@ import suiryc.scala.javafx.util.Callback
 
 // TODO: be notified (by main view) if funds are added/removed ?
 // TODO: possibility to manually edit the value for a given date ?
+// TODO: button next to operation date to set it to latest asset action date ?
 class NetAssetValueHistoryController {
 
   import NetAssetValueHistoryController._
