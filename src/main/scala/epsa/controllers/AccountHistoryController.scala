@@ -1,37 +1,51 @@
 package epsa.controllers
 
+import akka.actor.Cancellable
 import epsa.I18N
 import epsa.I18N.Strings
+import epsa.charts.{ChartHandler, ChartSeriesData, ChartSettings}
 import epsa.controllers.MainController.State
 import epsa.model.Savings
 import epsa.util.Awaits
 import grizzled.slf4j.Logging
 import java.time.LocalDate
+import java.util.UUID
 import javafx.beans.binding.Bindings
 import javafx.beans.property.{SimpleObjectProperty, SimpleStringProperty}
 import javafx.fxml.{FXML, FXMLLoader}
 import javafx.scene.Scene
 import javafx.scene.control._
 import javafx.scene.image.ImageView
+import javafx.scene.layout.AnchorPane
 import javafx.stage.{Stage, WindowEvent}
+import scala.concurrent.Future
+import scala.concurrent.duration._
 import suiryc.scala.concurrent.Callable
 import suiryc.scala.{javafx => jfx}
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.javafx.event.EventHandler._
-import suiryc.scala.javafx.scene.control.TableViews
+import suiryc.scala.javafx.scene.control.{Dialogs, TableViews}
 import suiryc.scala.javafx.stage.Stages
 import suiryc.scala.javafx.stage.Stages.StageLocation
 import suiryc.scala.javafx.util.Callback
+import suiryc.scala.math.Ordered._
+import suiryc.scala.math.Ordering._
 import suiryc.scala.settings.Preference
 
-// TODO: build and display history graph (gross amount, with 'links' to textual history)
+// TODO: display details of account at selected (or hovered ?) date in chart
 class AccountHistoryController extends Logging {
 
   import AccountHistoryController._
 
   @FXML
   protected var splitPane: SplitPane = _
+
+  @FXML
+  protected var historyPane: AnchorPane = _
+
+  @FXML
+  protected var progressIndicator: ProgressIndicator = _
 
   @FXML
   protected var historyTable: TreeTableView[AssetEventItem] = _
@@ -51,10 +65,20 @@ class AccountHistoryController extends Logging {
 
   def initialize(stage: Stage, state: State): Unit = {
     import scala.collection.JavaConversions._
+    import epsa.Main.Akka.dispatcher
     this.stage = stage
 
-    val events = Awaits.readDataStoreEvents(Some(stage)).getOrElse(Nil) ++ state.eventsUpd
+    val events0 = Awaits.readDataStoreEvents(Some(stage)).getOrElse(Nil) ++ state.eventsUpd
+    val events = Savings.sortEvents(events0)
     val assetEvents = events.filter(_.isInstanceOf[Savings.AssetEvent]).asInstanceOf[Seq[Savings.AssetEvent]]
+
+    // Prepare to display progress indicator (if action takes too long)
+    val showIndicator = epsa.Main.Akka.system.scheduler.scheduleOnce(500.milliseconds) {
+      progressIndicator.setVisible(true)
+    }
+    Future {
+      buildHistory(state, events, assetEvents, showIndicator)
+    }
 
     columnEventDate.setCellValueFactory(Callback { data =>
       new SimpleStringProperty(data.getValue.valueProperty().get().date.map(_.toString).orNull)
@@ -135,7 +159,6 @@ class AccountHistoryController extends Logging {
     // On Linux, we must wait a bit after changing stage size before setting
     // divider positions, otherwise the value gets altered a bit by stage
     // resizing ...
-    import scala.concurrent.duration._
     if (!jfx.isLinux) restoreDividerPositions()
     else JFXSystem.scheduleOnce(200.millis)(restoreDividerPositions())
   }
@@ -155,6 +178,219 @@ class AccountHistoryController extends Logging {
 
   def onCloseRequest(event: WindowEvent): Unit = {
     persistView()
+  }
+
+  case class History(data: List[HistoryData] = Nil, eventItems: Map[LocalDate, List[AssetEventItem]] = Map.empty, issues: List[String] = Nil) {
+    def addData(more: HistoryData) = copy(data :+ more)
+    def addEvent(eventItem: AssetEventItem): History = {
+      val date = eventItem.date.get
+      val items = eventItems.get(date) match {
+        case Some(v) => v :+ eventItem
+        case None    => List(eventItem)
+      }
+      copy(eventItems = eventItems + (date -> items))
+    }
+    def addIssue(issue: String) = copy(issues = issues :+ issue)
+  }
+
+  case class HistoryData(date: LocalDate, investedAmount: BigDecimal = BigDecimal(0), grossAmount: BigDecimal = BigDecimal(0)) {
+    def addInvestedAmount(v: BigDecimal) = copy(investedAmount = investedAmount + v)
+    def addGrossAmount(v: BigDecimal) = copy(grossAmount = grossAmount + v)
+  }
+
+  private def buildHistory(state: State, events: Seq[Savings.Event], assetEvents: Seq[Savings.AssetEvent], showIndicator: Cancellable): Unit = {
+    // Cached data store NAVs, and index in sequence (for more efficient search)
+    var assetsNAVs = Map[UUID, Seq[Savings.AssetValue]]()
+    var assetsNAVIdxs = Map[UUID, Int]()
+    // Known NAV dates from data store
+    val assetsNAVDates = assetsNAVs.values.flatten.map(_.date).toList.toSet
+    // Known NAVs through account history events.
+    // This can complete data store NAVs, especially for old (now deleted) funds.
+    val eventsNAVs = assetEvents.flatMap {
+      case e: Savings.MakePayment =>
+        List(e.part.fundId -> Savings.AssetValue(e.date, e.part.value))
+
+      case e: Savings.MakeTransfer =>
+        List(e.partSrc.fundId -> Savings.AssetValue(e.date, e.partSrc.value),
+          e.partDst.fundId -> Savings.AssetValue(e.date, e.partDst.value))
+
+      case e: Savings.MakeRefund =>
+        List(e.part.fundId -> Savings.AssetValue(e.date, e.part.value))
+    }.groupBy(_._1).mapValues { v =>
+      v.map(_._2).sortBy(_.date)
+    }
+    // Known NAV dates from account history events
+    val eventsNAVDates = eventsNAVs.values.flatten.map(_.date).toList.toSet
+    // All known NAV dates (data store + history), for which we may have a chart series data
+    val dates = eventsNAVDates ++ assetsNAVDates
+    // The oldest date we can display in account history
+    val firstDate = dates.toList.sorted.headOption
+
+    // Reads NAV history from data store, and cache it
+    def getAssetHistory(fundId: UUID): Seq[Savings.AssetValue] =
+      assetsNAVs.get(fundId) match {
+        case Some(navs) =>
+          navs
+
+        case None =>
+          val navs = Awaits.readDataStoreNAVs(Some(stage), fundId).getOrElse(Seq.empty)
+          assetsNAVs += (fundId -> navs)
+          navs
+      }
+
+    // Whether a date is 'valid', that is can have its own series data in the
+    // history chart. Only dates for which we have a NAV (exact date matching)
+    // are eligible: there is no meaning to display data for other dates since
+    // they would have the same value than the nearest predating eligible one.
+    def validDate(date: LocalDate, navs: Map[UUID, Savings.AssetValue]): Boolean =
+      (eventsNAVDates ++ navs.values.map(_.date)).contains(date)
+
+    // Gets a fund NAV for a given date in data store.
+    def assetNAV(fundId: UUID, date: LocalDate): Option[Savings.AssetValue] = {
+      // Notes:
+      // We need to find the NAV by date. We know data store gives fund NAVs in
+      // order.
+      // The easiest way is to query the data store. But it takes too long when
+      // building history (thousands of queries). So we cache the whole NAV
+      // histories  and search in it.
+      // The easy way is to take fund NAVs predating the target date, and keep
+      // the last one ('takeWhile' followed by 'takeRight(1)', which is faster
+      // than 'reverse').
+      // The fastest way is to loop over NAVs until we find a matching NAV, and
+      // remember the found index to start over from there for the next search
+      // (which requires events to be ordered).
+      // The latter is >2x faster (e.g. ~40ms vs ~100ms on first run) to >10x
+      // faster (e.g. ~3ms vs ~40ms on best run) than the former when searching
+      // NAVs for 4000 successive days (~12 years of history) when fund has
+      // 2200 NAVs over that period.
+      @scala.annotation.tailrec
+      def loop(navs: Seq[Savings.AssetValue], idx: Int, acc: Option[Savings.AssetValue]): (Int, Option[Savings.AssetValue]) =
+        navs.headOption match {
+          case Some(nav) =>
+            if (nav.date > date) (math.max(0, idx - 1), acc)
+            else loop(navs.tail, idx + 1, Some(nav))
+
+          case None =>
+            (math.max(0, idx - 1), acc)
+        }
+
+      val navs = getAssetHistory(fundId)
+      val idx = assetsNAVIdxs.getOrElse(fundId, 0)
+      val (idx2, v) = loop(navs.drop(idx), 0, None)
+      assetsNAVIdxs += fundId -> (idx + idx2)
+      v
+    }
+
+    // Gets all assets NAVs for a given date.
+    def assetsNAV(savings: Savings, date: LocalDate): Map[UUID, Savings.AssetValue] =
+      savings.assets.map(_.fundId).distinct.flatMap { fundId =>
+        assetNAV(fundId, date).map(fundId -> _)
+      }.toMap
+
+    // Gets a fund NAV at given date, from history events and data store NAV history.
+    def getNAV(fundId: UUID, date: LocalDate, navs: Map[UUID, Savings.AssetValue]): Option[Savings.AssetValue] =
+      (eventsNAVs.getOrElse(fundId, Nil) ++ navs.get(fundId)).filter { nav =>
+        nav.date <= date
+      }.sortBy(date.toEpochDay - _.date.toEpochDay).headOption
+
+    // Updates history for given date.
+    // If date is valid, gets NAVs and return history updated with computed
+    // history data. Otherwise returns input history.
+    def atDate(history: History, savings: Savings, date: LocalDate): History = {
+      val navs = assetsNAV(savings, date)
+      if (validDate(date, navs)) {
+        val (history2, historyData) = savings.assets.foldLeft(history, HistoryData(date)) { case ((acc1, acc2), asset) =>
+          getNAV(asset.fundId, date, navs) match {
+            case Some(nav) =>
+              (acc1,
+                acc2.addInvestedAmount(asset.investedAmount).addGrossAmount(asset.amount(nav.value)))
+
+            case None =>
+              // $1=fund $2=date
+              (acc1.addIssue(Strings.accountHistoryIssuesNAV.format(savings.getFund(asset.fundId), date)),
+                acc2.addInvestedAmount(asset.investedAmount))
+          }
+        }
+        history2.addData(historyData)
+      } else history
+    }
+
+    // Updates history for given dates range.
+    def atDates(history: History, savings: Savings, since: Option[LocalDate], to: LocalDate): History = {
+      val from = since.orElse(firstDate).getOrElse(to)
+      Stream.from(0).map { i =>
+        from.plusDays(i)
+      }.takeWhile { date =>
+        date <= to
+      }.toList.foldLeft(history) { (acc, date) =>
+        atDate(acc, savings, date)
+      }
+    }
+
+    // Computes history data from history events.
+    @scala.annotation.tailrec
+    def loop(savings: Savings, events: Seq[Savings.Event], since: Option[LocalDate], history: History): History =
+      events.headOption match {
+        case Some(event: Savings.AssetEvent) =>
+          // Update history since last asset event
+          val history2 = atDates(history.addEvent(getEventItems(savings, event).head), savings, since, event.date.minusDays(1))
+          // Filter event date from history: there may more than one event on
+          // the same date, only the latest computed one matters
+          val history3 = history2.copy(data = history2.data.filterNot(_.date == event.date))
+          // Apply current asset event in history
+          val savings2 = savings.processEvent(event)
+          val history4 = atDate(history3, savings2, event.date)
+          loop(savings2, events.tail, Some(event.date.plusDays(1)), history4)
+
+        case Some(event) =>
+          loop(savings.processEvent(event), events.tail, since, history)
+
+        case None =>
+          atDates(history, savings, since, LocalDate.now)
+      }
+
+    val history = loop(Savings(), events, None, History())
+    // Display warning if necessary
+    if (history.issues.nonEmpty) {
+      Dialogs.warning(
+        owner = Some(stage),
+        title = Some(title),
+        headerText = Some(Strings.accountHistoryIssues),
+        contentText = Some(history.issues.mkString("\n"))
+      )
+    }
+
+    // TODO: handle more than one series in chart (invested + gross)
+    // TODO: link (with Node and callback) chart positions to related history events (chart -> history or bidirectional ?)
+    val grossHistory = history.data.map { data =>
+      new ChartSeriesData {
+        val date = data.date
+        val value = data.grossAmount
+      }
+    }
+    val chartHandler = new ChartHandler(
+      seriesName = title,
+      seriesValues = grossHistory,
+      settings = ChartSettings.hidden.copy(
+        xLabel = Strings.date,
+        // TODO: i18n "gross amount" ?
+        yLabel = Strings.gross,
+        ySuffix = epsa.Settings.defaultCurrency
+      )
+    )
+    val pane = chartHandler.chartPane
+    AnchorPane.setTopAnchor(pane, 0.0)
+    AnchorPane.setRightAnchor(pane, 0.0)
+    AnchorPane.setBottomAnchor(pane, 0.0)
+    AnchorPane.setLeftAnchor(pane, 0.0)
+
+    // It is better to add chart in scene through JavaFX thread
+    JFXSystem.runLater{
+      // Hide indicator and display chart
+      showIndicator.cancel()
+      progressIndicator.setVisible(false)
+      historyPane.getChildren.add(pane)
+    }
   }
 
   private def getEventItems(savings: Savings, event: Savings.AssetEvent): List[AssetEventItem] = event match {
@@ -208,6 +444,8 @@ object AccountHistoryController {
 
   private val historyColumnsPref = Preference.from(s"$prefsKeyPrefix.history.columns", null:String)
 
+  def title = Strings.accountHistory
+
   case class AssetEventItem(date: Option[LocalDate], desc: String, comment: Option[String])
 
   object AssetEventItem {
@@ -224,7 +462,7 @@ object AccountHistoryController {
   def buildDialog(state: State): Stage = {
     val stage = new Stage()
     stage.getIcons.setAll(Images.iconClockHistory)
-    stage.setTitle(Strings.accountHistory)
+    stage.setTitle(title)
 
     val loader = new FXMLLoader(getClass.getResource("/fxml/account-history.fxml"), I18N.getResources)
     stage.setScene(new Scene(loader.load()))
