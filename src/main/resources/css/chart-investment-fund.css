@@ -1,4 +1,55 @@
+/* Reduce chart line width to 1 pixel. */
 .custom-chart .chart-series-line {
-    -fx-stroke-width: 1px;
-    -fx-effect: null;
+  -fx-stroke-width: 1px;
+  -fx-effect: null;
+}
+
+/* JavaFX 8 comes with dashed chart grid lines.
+ * The performance becomes poor when chart size is large (e.g. due to zooming),
+ * so draw plain lines instead.
+ */
+.custom-chart .chart-vertical-grid-lines,
+.custom-chart .chart-horizontal-grid-lines
+{
+  -fx-stroke-dash-array: null;
+}
+
+/* The node displaying currently hovered series data in the chart. */
+.custom-chart .chart-data-hover {
+  /* Properties copied from 'chart-line-symbol', with smaller inset/padding. */
+  -fx-background-color: CHART_COLOR_1, white;
+  -fx-background-insets: 0, 1;
+  -fx-background-radius: 5px;
+  -fx-padding: 1px 3px 1px 3px;
+
+  /* Properties copied from 'chart-series-line', with tighter stroke width. */
+  -fx-stroke: CHART_COLOR_1;
+  -fx-stroke-width: 1px;
+
+  /* Custom properties. */
+  -fx-font-size: 14;
+  -fx-opacity: 0.6;
+}
+
+/* The lines pointing to the currently hovered data point. */
+.custom-chart .chart-vertical-current-line,
+.custom-chart .chart-horizontal-current-line
+{
+  -fx-stroke: #606060;
+  -fx-stroke-dash-array: 5 5;
+  -fx-stroke-width: 1px;
+}
+
+/* The lines pointing to the reference data point. */
+.custom-chart .chart-vertical-reference-line,
+.custom-chart .chart-horizontal-reference-line
+{
+  -fx-stroke: #A0A0A0;
+  -fx-stroke-dash-array: 5 5;
+  -fx-stroke-width: 1px;
+}
+
+.chart-zoom-zone {
+  -fx-fill: #000000;
+  -fx-opacity: 0.2;
 }

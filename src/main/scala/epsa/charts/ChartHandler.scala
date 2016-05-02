@@ -7,14 +7,17 @@ import javafx.scene.chart.{LineChart, NumberAxis, XYChart}
 import javafx.scene.control.ScrollPane
 import javafx.scene.input.{MouseEvent, ScrollEvent}
 import javafx.scene.layout.{AnchorPane, Region}
-import javafx.scene.paint.Color
 import javafx.scene.shape.{Line, Rectangle}
+import scala.collection.JavaConversions._
 import scala.concurrent.duration._
 import suiryc.scala.concurrent.Cancellable
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.javafx.event.EventHandler._
 import suiryc.scala.javafx.geometry.BoundsEx
+import suiryc.scala.math.BigDecimals._
+
+// TODO: visual hint about current zoom factor + 'button' to reset to 1 ?
 
 trait ChartSeriesData {
   val date: LocalDate
@@ -105,18 +108,21 @@ class ChartHandler(
   private val valuesList = seriesValues.map { v =>
     (dateToNumber(v.date), v.value)
   }
-  /** Number of investment fund asset values. */
-  private val valuesCount = valuesList.length
   /** Investment fund asset values map. */
   private val valuesMap = valuesList.toMap
-  /** How many values to drop on the left side to populate chart. */
-  private var xDropLeft = 0
-  /** How many values to drop on the right side to populate chart. */
-  private var xDropRight = 0
-  /** Minimum number of values to display. That is, we cannot zoom more than that. */
-  private val minValues = 20
   /** Currently displayed 'x' data value. */
   private var currentXPos: Option[Long] = None
+  /** Zoom factor. */
+  private var xZoom: BigDecimal = BigDecimal(1)
+  /** Minimal zoom factor. */
+  private val xZoomMin: BigDecimal = BigDecimal(1) / 16
+  /** Maximal zoom factor. */
+  // Note: with 'high' zooming (8 being high already), rendering (or even
+  // simple interaction) becomes really slow. This is partly due to chart grid
+  // lines being dashed (default in JavaFX 8). So to keep decent performance
+  // at zoom level 8, we override the CSS to use plain grid lines. The slow
+  // interaction is still visible but more bearable.
+  private val xZoomMax: BigDecimal = BigDecimal(8)
   /** Zoom 'x' first selected value. */
   private var xZoomPos1: Option[Long] = None
   /** Zoom 'x' second selected value. */
@@ -129,11 +135,12 @@ class ChartHandler(
   // being applied etc).
   // Activating caching helps having better performances by only rendering
   // those elements as bitmaps, at the price of higher memory usage.
+  // Note: caching only the chart appears to give a performance gain
+  // equivalent to caching all children (some of which are re-created when
+  // populating the chart anyway).
   chart.setCache(true)
   // We don't really need animation
   chart.setAnimated(false)
-  chart.getStylesheets.add(getClass.getResource("/css/chart-investment-fund.css").toExternalForm)
-  chart.getStyleClass.add("custom-chart")
   if (settings.showTitle) {
     chart.setTitle(settings.title)
   }
@@ -159,7 +166,7 @@ class ChartHandler(
 
   /** Vertical line to spot currently display 'x' data value. */
   private val verticalLine = new Line(0, 0, 0, 0)
-  verticalLine.setStrokeWidth(0.5)
+  verticalLine.getStyleClass.add("chart-vertical-current-line")
   verticalLine.setVisible(false)
   // Note: it is important to disable the line, otherwise it will somehow
   // steal mouse pointer and trigger spurious onMouseExited/onMouseEntered
@@ -168,28 +175,25 @@ class ChartHandler(
 
   /** Horizontal line to spot currently display 'y' data value. */
   private val horizontalLine = new Line(0, 0, 0, 0)
-  horizontalLine.setStrokeWidth(0.5)
+  horizontalLine.getStyleClass.add("chart-horizontal-current-line")
   horizontalLine.setVisible(false)
   horizontalLine.setDisable(true)
 
   /** Vertical line to spot previously selected 'x' data value. */
   private val verticalLineRef = new Line(0, 0, 0, 0)
-  verticalLineRef.setStroke(Color.GREY)
-  verticalLineRef.setStrokeWidth(0.5)
+  verticalLineRef.getStyleClass.add("chart-vertical-reference-line")
   verticalLineRef.setVisible(false)
   verticalLineRef.setDisable(true)
 
   /** Horizontal line to spot previously selected 'y' data value. */
   private val horizontalLineRef = new Line(0, 0, 0, 0)
-  horizontalLineRef.setStroke(Color.GREY)
-  horizontalLineRef.setStrokeWidth(0.5)
+  horizontalLineRef.getStyleClass.add("chart-horizontal-reference-line")
   horizontalLineRef.setVisible(false)
   horizontalLineRef.setDisable(true)
 
   /** Zoom zone 'highlight' (actually darkens selected zone). */
   private val zoomZone = new Rectangle()
-  zoomZone.setFill(Color.BLACK)
-  zoomZone.setStyle("-fx-opacity: 0.2;")
+  zoomZone.getStyleClass.add("chart-zoom-zone")
   zoomZone.setVisible(false)
   zoomZone.setDisable(true)
 
@@ -201,8 +205,7 @@ class ChartHandler(
     ySuffix = settings.ySuffix
   )
   labelNAV.getStylesheets.add(getClass.getResource("/css/main.css").toExternalForm)
-  labelNAV.getStyleClass.addAll("default-color0", "chart-line-symbol", "chart-series-line")
-  labelNAV.setStyle("-fx-font-size: 14; -fx-opacity: 0.6;")
+  labelNAV.getStyleClass.add("chart-data-hover")
   labelNAV.setMinSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE)
   labelNAV.setVisible(false)
   labelNAV.setDisable(true)
@@ -211,6 +214,8 @@ class ChartHandler(
 
   /** Chart pane. */
   val anchorPane = new AnchorPane()
+  anchorPane.getStylesheets.add(getClass.getResource("/css/chart-investment-fund.css").toExternalForm)
+  anchorPane.getStyleClass.add("custom-chart")
   val chartPane = new ScrollPane()
   // Don't display vertical scrollbar (we resize to fit parent)
   chartPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER)
@@ -239,9 +244,6 @@ class ChartHandler(
   chart.setOnMousePressed(onMousePressed _)
   chart.setOnMouseReleased(onMouseReleased _)
   chart.setOnMouseDragged(onMouseDragged _)
-  // TODO: still allow 'zooming' by limiting elements shown ? (then hint of actual min/max of whole series)
-  // TODO: if so, make sure to scroll to correct position after zooming
-  // TODO: or allow zooming by changing distance between successive dates ? (and rely on scrollpane for user to navigate in series)
   chart.setOnScroll(onScroll _)
 
   /** Chart background viewed bounds. */
@@ -258,8 +260,7 @@ class ChartHandler(
     chartBgViewedBounds = None
   }
 
-  ensureMinValues()
-  setData()
+  refreshView(resetData = true)
 
   // Display the latest NAV at first
   // Note: since scrollpane content (the chart) will change a bit later, we set
@@ -313,27 +314,8 @@ class ChartHandler(
   private def withMouseInChartBackground[A](event: ScrollEvent)(f: Bounds => A): Option[A] =
     withMouseInChartBackground(event.getX, event.getY)(f)
 
-  /** Gets index of a given 'x' value. */
-  private def getValueIndex(x: Long): Int = {
-    @scala.annotation.tailrec
-    def loop(values: Seq[(Long, BigDecimal)], idx: Int): Int = values.headOption match {
-      case Some((valueX, _)) =>
-        if (valueX == x) {
-          idx
-        } else {
-          loop(values.tail, idx + 1)
-        }
-
-      case None =>
-        -1
-    }
-
-    loop(valuesList, 0)
-  }
-
-  /** Resize chart if necessary. */
-  private def resizeChart() = {
-    import scala.collection.JavaConversions._
+  /** Resizes chart if necessary. */
+  private def resizeChart(xViewOffset: Option[Long] = None) = {
     // Compare x axis width to actual data range and resize chart (actually
     // the parent anchor pane) if necessary. Also take into account elements
     // around the chart (like y axis, padding etc).
@@ -342,10 +324,11 @@ class ChartHandler(
     val range =
       if (data.isEmpty) 0
       else data.max - data.min
+    val zoomedRange = xZoom * range
     val widthParent = anchorPane.getWidth
     val width = xAxis.getWidth
     val widthExtra = widthParent - width
-    val widthExpected = math.max(viewedBounds.getWidth - widthExtra, range)
+    val widthExpected = math.max(viewedBounds.getWidth - widthExtra, round(zoomedRange))
     if ((widthParent > 0) && (width > 0) && (width != widthExpected)) {
       val newWidth = widthExpected + widthExtra
       // Notes:
@@ -359,6 +342,26 @@ class ChartHandler(
       anchorPane.setPrefWidth(newWidth)
       anchorPane.setMinWidth(newWidth)
       anchorPane.setMaxWidth(newWidth)
+      chartBgViewedBounds = None
+      xViewOffset.foreach { offset =>
+        // Notes:
+        // Once chart has been fully resized inside scrollpane (and scrollbar
+        // ready) we wish to scroll to the specified position.
+        // Listening to xAxis width or hvalue changes does not do the trick:
+        // either everything has not been resized yet, or xAxis 'value to position'
+        // function does not return valid values yet.
+        // Waiting for xAxis.scale (which is used in xAxis 'value to position'
+        // function) appears to do the trick (at least on Windows).
+        xAxis.scaleProperty.listen2 { cancellable =>
+          cancellable.cancel()
+          // Note: since computed offset may be lower than chart minimum value,
+          // make sure the requested offset (which takes into account nodes at
+          // the left of the chart) is at least 0.
+          val hoffset = math.max(0, getX(getChartBackgroundBounds, offset))
+          val hvalue = BoundsEx.computeHValue(chartPane, hoffset)
+          chartPane.setHvalue(hvalue)
+        }
+      }
       JFXSystem.runLater {
         anchorPane.requestLayout()
       }
@@ -366,26 +369,28 @@ class ChartHandler(
   }
 
   /**
-   * Populates the chart series with appropriate data.
+   * Refreshes chart.
    *
-   * Drops some data left and right (according to currently selected zone
-   * if any).
+   * Populates chart series with data when required.
+   * Updates ticks and resizes chart if necessary.
    */
-  private def setData(): Unit = {
-    val data = valuesList.drop(xDropLeft).dropRight(xDropRight).map { case (valueX, valueY) =>
-      new XYChart.Data[Number, Number](valueX, valueY)
-    }
-
+  private def refreshView(resetData: Boolean, xViewOffset: Option[Long] = None): Unit = {
     // Since we are about to change the chart data, hide lines
     hideLines(clearRef = true)
 
-    // Note: clearing series data while chart is animated triggers an Exception
-    // See: http://stackoverflow.com/a/30396889
-    series.getData.clear()
-    series.getData.setAll(data : _*)
+    if (resetData) {
+      val data = valuesList.map { case (valueX, valueY) =>
+        new XYChart.Data[Number, Number](valueX, valueY)
+      }
 
-    xAxisWrapper.updateTicks(series)
-    resizeChart()
+      // Note: clearing series data while chart is animated triggers an Exception
+      // See: http://stackoverflow.com/a/30396889
+      series.getData.clear()
+      series.getData.setAll(data: _*)
+    }
+
+    xAxisWrapper.updateTicks(series, xZoom)
+    resizeChart(xViewOffset)
   }
 
   /** Hides zoom 'highlight' area. */
@@ -420,6 +425,33 @@ class ChartHandler(
     // Reset previous position, so that it can be redrawn if we re-enter
     currentXPos = None
   }
+
+  /**
+   * Computes value to center on a pixel.
+   *
+   * See 'Coordinate System' section in JavaFX Node JavaDoc.<br>
+   * The center of a pixel is at 0.5 past its index; e.g. top-left pixel center
+   * is at x=0.5 and y=0.5 (and not x=0 y=0).
+   * This function helps to get the center of pixel provided its index. This
+   * is useful to draw sharp 1-pixel wide lines, otherwise antialiasing is used
+   * to draw it 2-pixels wide.
+   *
+   * @param v pixel x or y index
+   * @return pixel center
+   */
+  private def pixelCenter(v: Double): Double =
+  // Note: add a small delta before flooring to try to prevent going to
+  // previous pixel due to 'double' rounding errors.
+    math.floor(v + 0.0001) + 0.5
+
+  /**
+   * Computes pixel (left/top) edge.
+   *
+   * @param v pixel x or y edge
+   * @return pixel edge
+   */
+  private def pixelEdge(v: Double): Double =
+    pixelCenter(v) - 0.5
 
   /** Gets chart 'x' value for given position. */
   private def getX(bounds: Bounds, x: Double): Option[Long] = {
@@ -557,22 +589,30 @@ class ChartHandler(
     if ((y > maxY) && yOk(maxY)) labelNAV.setTranslateY(maxY)
   }
 
+  private def drawLines(vertical: Line, horizontal: Line, xPos: Long): (Double, Double) = {
+    val bounds = getChartBackgroundBounds
+    val (x, y) = getXY(bounds, xPos)
+
+    // Note: when using non-plain (e.g. dashed) line style, it is visually
+    // nicer to draw from axis (left or bottom) to line point (right or top).
+    vertical.setStartX(pixelCenter(x))
+    vertical.setEndX(pixelCenter(x))
+    vertical.setStartY(pixelCenter(bounds.getMaxY))
+    vertical.setEndY(pixelCenter(y))
+    vertical.setVisible(true)
+    horizontal.setStartX(pixelCenter(bounds.getMinX))
+    horizontal.setEndX(pixelCenter(x))
+    horizontal.setStartY(pixelCenter(y))
+    horizontal.setEndY(pixelCenter(y))
+    horizontal.setVisible(true)
+
+    (x, y)
+  }
+
   /** Draws reference value lines. */
   private def drawReferenceLines(xPos: Option[Long] = None): Unit = {
     xPos.orElse(labelNAV.getDataRef.map(_.x)).foreach { xPos =>
-      val bounds = getChartBackgroundBounds
-      val (x, y) = getXY(bounds, xPos)
-
-      verticalLineRef.setStartX(x)
-      verticalLineRef.setEndX(x)
-      verticalLineRef.setStartY(y)
-      verticalLineRef.setEndY(bounds.getMaxY)
-      verticalLineRef.setVisible(true)
-      horizontalLineRef.setStartX(bounds.getMinX)
-      horizontalLineRef.setEndX(x)
-      horizontalLineRef.setStartY(y)
-      horizontalLineRef.setEndY(y)
-      horizontalLineRef.setVisible(true)
+      drawLines(verticalLineRef, horizontalLineRef, xPos)
     }
   }
 
@@ -585,30 +625,23 @@ class ChartHandler(
     val bounds = getChartBackgroundBounds
 
     xPos.orElse(getX(bounds, event.getX)).foreach { xPos =>
-      val (x, y) = getXY(bounds, xPos)
+      val (x, _) = drawLines(verticalLine, horizontalLine, xPos)
 
       xZoomPos1.foreach { xPos1 =>
         val x1 = getX(bounds, xPos1)
+        // For rectangles, position shall start on pixel edge.
+        // Provided x and x1 (reference and current data positions), the
+        // rectangle width shall be computed taking into account the actual
+        // pixels center on which lines are drawn.
         if (xPos >= xPos1) {
-          zoomZone.setX(x1)
-          zoomZone.setWidth(x - x1)
+          zoomZone.setX(pixelEdge(x1))
+          zoomZone.setWidth(pixelCenter(x) - pixelCenter(x1) + 1)
         } else {
           // going left: needs to change x position
-          zoomZone.setX(x)
-          zoomZone.setWidth(x1 - x)
+          zoomZone.setX(pixelEdge(x))
+          zoomZone.setWidth(pixelCenter(x1) - pixelCenter(x) + 1)
         }
       }
-
-      verticalLine.setStartX(x)
-      verticalLine.setEndX(x)
-      verticalLine.setStartY(y)
-      verticalLine.setEndY(bounds.getMaxY)
-      verticalLine.setVisible(true)
-      horizontalLine.setStartX(bounds.getMinX)
-      horizontalLine.setEndX(x)
-      horizontalLine.setStartY(y)
-      horizontalLine.setEndY(y)
-      horizontalLine.setVisible(true)
 
       if (labelVLCancellable.isEmpty) {
         // Listen for position and dimension changes to check the label remains inside the chart
@@ -676,13 +709,11 @@ class ChartHandler(
   private def onMousePressed(event: MouseEvent): Unit = {
     withMouseInChartBackground(event) { bounds =>
       getX(bounds, event.getX).foreach { xPos =>
-        val (x, y) = getXY(bounds, xPos)
-
         xZoomPos1 = Some(xPos)
         labelNAV.setDataRef(Some(ChartData(xPos, valuesMap(xPos))))
         drawReferenceLines(xZoomPos1)
 
-        zoomZone.setX(getX(bounds, xPos))
+        zoomZone.setX(pixelEdge(getX(bounds, xPos)))
         zoomZone.setWidth(0)
         zoomZone.setY(bounds.getMinY)
         zoomZone.setHeight(bounds.getMaxY - bounds.getMinY)
@@ -692,85 +723,44 @@ class ChartHandler(
   }
 
   /**
-   * Ensures we keep the minimum number of values to display.
-   *
-   * If necessary, lower the number of dropped values left and right.
-   */
-  private def ensureMinValues(): Unit = {
-    @scala.annotation.tailrec
-    def loop(left: Boolean) {
-      if (valuesCount - xDropLeft - xDropRight < minValues) {
-        if ((left || (xDropRight == 0)) && (xDropLeft > 0)) {
-          xDropLeft -= 1
-          loop(left = false)
-        } else if (xDropRight > 0) {
-          xDropRight -= 1
-          loop(left = true)
-        }
-      }
-    }
-    loop(left = true)
-  }
-
-  /**
    * onMouseReleased listener.
    *
    * Determines zoom range from first and second selected 'x' values.
    * Displays selected range values if different from previous one.
    */
   private def onMouseReleased(event: MouseEvent): Unit = {
-    def getDrops(xZoomPos1: Long, xZoomPos2: Long): Option[(Int, Int)] = {
-      val (xZoomFrom, xZoomTo) = if (xZoomPos1 < xZoomPos2) {
-        (xZoomPos1, xZoomPos2)
-      } else {
-        (xZoomPos2, xZoomPos1)
-      }
-
-      @scala.annotation.tailrec
-      def loop(values: Seq[(Long, BigDecimal)], idx: Int, xDropLeft: Option[Int]): Option[(Int, Int)] = {
-        values.headOption match {
-          case Some((valueX, _)) =>
-            xDropLeft match {
-              case None =>
-                if (xZoomFrom == valueX) {
-                  loop(values.tail, idx + 1, Some(idx))
-                } else {
-                  loop(values.tail, idx + 1, None)
-                }
-
-              case Some(left) =>
-                if (xZoomTo == valueX) {
-                  Some(left, values.tail.length - 1)
-                } else {
-                  loop(values.tail, idx + 1, xDropLeft)
-                }
-            }
-
-          case None =>
-            xDropLeft.map(left => (left, 0))
-        }
-      }
-
-      loop(valuesList, 0, None)
-    }
-
     for {
       pos1 <- xZoomPos1
       pos2 <- xZoomPos2
     } {
-      if (pos1 != pos2) {
-        getDrops(pos1, pos2).foreach { case (dropLeft, dropRight) =>
-          if (((dropLeft != xDropLeft) || (dropRight != xDropRight)) &&
-            (valuesCount - xDropLeft - xDropRight > minValues))
-          {
-            xDropLeft = dropLeft
-            xDropRight = dropRight
-            ensureMinValues()
-            setData()
-          }
-          // else: either we selected the same zone, or we cannot zoom anymore
-        }
+      hideLines(clearRef = true)
+
+      val range = math.abs(pos2 - pos1)
+      val zoom = if (range > 0) {
+        val viewedBounds = getChartBackgroundViewedBounds
+        val zoom0 = BigDecimal(math.round(viewedBounds.getWidth)) / range
+        if (zoom0 > xZoomMax) xZoomMax
+        else zoom0
+      } else xZoom
+
+      if (zoom != xZoom) {
+        val viewedBounds = getChartBackgroundViewedBounds
+        xZoom = zoom
+        // When target zoom is higher than maximum zoom, selected range (once
+        // zoomed) is smaller than view. So compute the actual left data index
+        // that makes the selected range centered.
+        // If target zoom is lower than maximum zoom, the computed left index
+        // matches the lower end of the selected range.
+        //
+        // number of visible data = viewWidth / zoom
+        // center of zoom area = (pos1 + pos2) / 2
+        // data on the left of the view = center - half visible data
+        //  = (pos1 + pos2) / 2 - (viewWidth / zoom) / 2
+        //  = (pos1 + pos2 - viewWidth / zoom) / 2
+        val offset = round((pos1 + pos2 - viewedBounds.getWidth / xZoom) / 2)
+        refreshView(resetData = false, xViewOffset = Some(offset))
       }
+      // else: either we selected the same zone, or we cannot zoom anymore
     }
 
     hideZoomArea()
@@ -786,33 +776,42 @@ class ChartHandler(
     val deltaY = (event.getDeltaY / event.getMultiplierY).toInt
     if (deltaY != 0) withMouseInChartBackground(event) { bounds =>
       getX(bounds, event.getX).foreach { xPos =>
-        val zoomCenterIdx = getValueIndex(xPos)
-        val redraw = if (deltaY > 0) {
-          // Zoom in
-          // Note: keep at least minValues values on screen
-          if (valuesCount - xDropLeft - xDropRight > minValues) {
-            xDropLeft = math.min(math.max(0, zoomCenterIdx - minValues / 2), zoomCenterIdx - (zoomCenterIdx - xDropLeft) / (2 * deltaY))
-            xDropRight = valuesCount - math.max(math.min(valuesCount, zoomCenterIdx + minValues / 2), zoomCenterIdx + (valuesCount - xDropRight - zoomCenterIdx) / (2 * deltaY))
+        val zoom0 =
+          if (deltaY > 0) xZoom * (2 * deltaY)
+          else xZoom / (-2 * deltaY)
 
-            ensureMinValues()
+        // Note: actual minimal zoom depends on data dates range and viewed bounds
+        val viewedBounds = getChartBackgroundViewedBounds
+        val data = series.getData.map(v => math.round(v.getXValue.doubleValue))
+        val range =
+          if (data.isEmpty) 0
+          else data.max - data.min
+        val widthParent = anchorPane.getWidth
+        val width = xAxis.getWidth
+        val widthExtra = widthParent - width
+        val widthMin = viewedBounds.getWidth - widthExtra
+        val actualZoomMin = BigDecimal(widthMin) / range
 
-            true
-          } else {
-            false
-          }
-        } else {
-          // Zoom out
-          if ((xDropLeft > 0) || (xDropRight > 0)) {
-            xDropLeft = math.max(0, zoomCenterIdx - (zoomCenterIdx - xDropLeft) * (-3 * deltaY) / 2)
-            xDropRight = valuesCount - math.min(valuesCount, zoomCenterIdx + (valuesCount - xDropRight - zoomCenterIdx) * (-3 * deltaY) / 2)
-            true
-          } else {
-            false
-          }
+        // Stay within zoom limits
+        @scala.annotation.tailrec
+        def getZoom(zoom: BigDecimal): BigDecimal = {
+          if (zoom > xZoomMax) xZoomMax
+          else if ((zoom * 2 < actualZoomMin) && (actualZoomMin < xZoomMax)) getZoom(zoom * 2)
+          else if (zoom < xZoomMin) xZoomMin
+          else zoom
         }
 
-        if (redraw) {
-          setData()
+        val zoom = getZoom(zoom0)
+        if (zoom != xZoom) {
+          xZoom = zoom
+          // Note: we want to keep the zoom 'center' (mouse position) where it is.
+          // xOffset = distance between view (left) bound and mouse position
+          // xPosMin = first 'x' value to show in chart view
+          // (xPos - xPosMin) * zoom = xOffset
+          // => xPosMin = xPos - xOffset / zoom
+          val xOffset = event.getX - viewedBounds.getMinX
+          val xPosMin = round(xPos - xOffset / zoom)
+          refreshView(resetData = false, xViewOffset = Some(xPosMin))
         }
       }
     }
