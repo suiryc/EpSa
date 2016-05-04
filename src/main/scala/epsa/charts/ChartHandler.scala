@@ -4,7 +4,7 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import javafx.geometry.Bounds
 import javafx.scene.chart.{LineChart, NumberAxis, XYChart}
-import javafx.scene.control.ScrollPane
+import javafx.scene.control.{ScrollPane, Tooltip}
 import javafx.scene.input.{MouseEvent, ScrollEvent}
 import javafx.scene.layout.{AnchorPane, Region}
 import javafx.scene.shape.{Line, Rectangle}
@@ -24,6 +24,29 @@ trait ChartSeriesData {
   val value: BigDecimal
 }
 
+object ChartSeriesData {
+  def apply(date0: LocalDate, value0: BigDecimal): ChartSeriesData =
+    new ChartSeriesData {
+      override val date = date0
+      override val value = value0
+    }
+}
+
+trait ChartMark {
+  val date: LocalDate
+  val comment: Option[String]
+}
+
+object ChartMarkEvent extends Enumeration {
+  val Entered = Value
+  val Exited = Value
+}
+
+case class ChartMeta[A <: ChartMark](
+  marks: Map[LocalDate, A] = Map.empty[LocalDate, A],
+  handler: (A, ChartMarkEvent.Value) => Unit = { (_: A, _: ChartMarkEvent.Value) => }
+)
+
 case class ChartSettings(
   title: String,
   showTitle: Boolean,
@@ -36,7 +59,6 @@ case class ChartSettings(
 )
 
 object ChartSettings {
-
   val hidden: ChartSettings =
     ChartSettings(
       title = "",
@@ -58,9 +80,10 @@ object ChartSettings {
  *   - displaying chart data value in label
  *   - draw visible lines to spot chart data value
  */
-class ChartHandler(
+class ChartHandler[A <: ChartMark](
   seriesName: String,
   seriesValues: Seq[ChartSeriesData],
+  meta: ChartMeta[A] = ChartMeta[A](),
   settings: ChartSettings
 ) {
 
@@ -87,6 +110,11 @@ class ChartHandler(
   // Resize chart when necessary
   xAxis.widthProperty.listen { _ =>
     resizeChart()
+  }
+  // We want to redraw marks after zoom has been applied. Listening on x axis
+  // scale changes appear to do the trick.
+  xAxis.scaleProperty.listen { _ =>
+    if (meta.marks.nonEmpty) drawMarks()
   }
 
   /** Date format for 'x' axis. */
@@ -162,6 +190,8 @@ class ChartHandler(
     // expected, probably due to relying on the bounds value known right
     // before resizing.
     drawReferenceLines()
+    // Also redraw markers.
+    if (meta.marks.nonEmpty) drawMarks()
   }
 
   /** Vertical line to spot currently display 'x' data value. */
@@ -365,6 +395,70 @@ class ChartHandler(
       JFXSystem.runLater {
         anchorPane.requestLayout()
       }
+    }
+  }
+
+  /** (Re-)Draws chart marks if any. */
+  private def drawMarks(): Unit = {
+    // Notes: removing/adding markers in 'runLater' triggers glitches when
+    // resizing chart width (not all nodes are removed at the end, action
+    // is often triggered with some delay which gets lengthier the more
+    // events there are to process).
+    // Doing it right now still has the glitch that the marker (SVG
+    // path) 'disappears' while chart is resized.
+
+    // First remove current markers
+    val remove = anchorPane.getChildren.filter { child =>
+      val styleClasses = child.getStyleClass
+      styleClasses.contains("chart-marker") || styleClasses.contains("chart-marker-line")
+    }
+    anchorPane.getChildren.removeAll(remove)
+
+    val bounds = getChartBackgroundBounds
+    val add = meta.marks.values.flatMap { mark =>
+      val xPos = xAxisWrapper.dateToNumber(mark.date)
+      val (x, y) = getXY(bounds, xPos)
+
+      // Note: when using non-plain (e.g. dashed) line style, it is visually
+      // nicer to draw from chart border (top) to line point (bottom).
+      val vertical = new Line()
+      vertical.getStyleClass.add("chart-marker-line")
+      vertical.setStartX(pixelCenter(x))
+      vertical.setEndX(pixelCenter(x))
+      vertical.setStartY(pixelCenter(bounds.getMinY))
+      vertical.setEndY(pixelCenter(y))
+      vertical.setVisible(true)
+      vertical.setDisable(true)
+
+      val markRegion = new Region
+      markRegion.setFocusTraversable(false)
+      markRegion.getStyleClass.setAll("chart-marker")
+      markRegion.setMaxWidth(Region.USE_PREF_SIZE)
+      markRegion.setMaxHeight(Region.USE_PREF_SIZE)
+      // Note: set layout because 'translate' is used in CSS to center shape.
+      // Setting it on pixel edge since it is a 'box'. (even though CSS may
+      // have to offset by 0.5 if region width is an even number).
+      markRegion.setLayoutX(pixelEdge(x))
+
+      mark.comment.foreach { comment =>
+        Tooltip.install(markRegion, new Tooltip(comment))
+      }
+
+      markRegion.setOnMouseEntered { (_: MouseEvent) =>
+        meta.handler(mark, ChartMarkEvent.Entered)
+      }
+      markRegion.setOnMouseExited { (_: MouseEvent) =>
+        meta.handler(mark, ChartMarkEvent.Exited)
+      }
+
+      List(vertical, markRegion)
+    }
+    anchorPane.getChildren.addAll(add)
+
+    // Requesting layout (in 'runLater') triggers marker drawing (which
+    // otherwise sometimes is done next time something happens in pane).
+    JFXSystem.runLater {
+      anchorPane.requestLayout()
     }
   }
 

@@ -53,3 +53,53 @@
   -fx-fill: #000000;
   -fx-opacity: 0.2;
 }
+
+/* The marker lines pointing to chart data. */
+.custom-chart .chart-marker-line {
+  -fx-opacity: 0.15;
+  -fx-stroke: CHART_COLOR_1;
+  -fx-stroke-dash-array: 5 5;
+  -fx-stroke-width: 1px;
+}
+
+/* The chart markers. */
+.custom-chart .chart-marker {
+  -fx-background-color: CHART_COLOR_1;
+  /* Use original shape size */
+  -fx-scale-shape: false;
+  /* Use 1/32 scale.
+   * Original is drawn inside a 512x512 square, although path width is usually
+   * smaller. Shape should then be inside a 16x16 square.
+   * For easier handling, force region size to expected 16x16, and center shape
+   * in it.
+   */
+  -fx-scale-x: 0.03125;
+  -fx-scale-y: 0.03125;
+  -fx-pref-width: 16px;
+  -fx-pref-height: 16px;
+  -fx-position-shape: true;
+  /* Move shape to the left by half its width, and offset by 0.5 (because width
+   * is an even number) so that it is centered on the series data it points to.
+   */
+  -fx-translate-x: -7.5px;
+  /* Add some space between marker and chart top. */
+  -fx-translate-y: 2;
+  /* SVG 'map-marker-1' icon from 'simpleicon.com'
+   * See: http://simpleicon.com/map-marker-1.html
+   * Other candidates:
+   *   http://simpleicon.com/map-marker-14.html
+   *   http://simpleicon.com/map-marker-13.html
+   *   http://simpleicon.com/map_marker.html
+   */
+  -fx-shape: "M256,0C167.641,0,96,71.625,96,160c0,24.75,5.625,48.219,15.672,69.125C112.234,230.313,256,512,256,512l142.594-279.375
+    C409.719,210.844,416,186.156,416,160C416,71.625,344.375,0,256,0z M256,256c-53.016,0-96-43-96-96s42.984-96,96-96
+    c53,0,96,43,96,96S309,256,256,256z";
+}
+
+.custom-chart .chart {
+  /* Adapt chart padding. Original padding is 5px.
+   * Add some more space at the top (for markers), and remove it at bottom and
+   * left (which has already enough space separation it from the border.
+   */
+  -fx-padding: 10px 5px 0px 0px;
+}
