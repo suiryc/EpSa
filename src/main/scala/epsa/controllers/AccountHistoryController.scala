@@ -1,6 +1,7 @@
 package epsa.controllers
 
 import akka.actor.Cancellable
+import com.sun.javafx.scene.control.skin.{TreeTableViewSkin, VirtualFlow}
 import epsa.I18N
 import epsa.I18N.Strings
 import epsa.charts._
@@ -212,9 +213,20 @@ class AccountHistoryController extends Logging {
   private def onMarkEvent(mark: HistoryMark, event: ChartMarkEvent.Value): Unit = {
     // Do some animation (highlighting) when getting on the marker.
     if (event == ChartMarkEvent.Entered) {
-      val rows = historyTable.getRoot.getChildren.filter { item =>
+      val items = historyTable.getRoot.getChildren.filter { item =>
         mark.items.contains(item.getValue)
-      }.toList.flatMap(_.getValue.row)
+      }.toList
+      val rows = items.flatMap(_.getValue.row)
+
+      // Make sure the table entry is visible.
+      // Get the VirtualFlow in the table skin (should be the first child,
+      // accessible once table is shown), and ask to show the minimum entry
+      // index associated to the marker.
+      historyTable.getSkin.asInstanceOf[TreeTableViewSkin[_]].getChildren.find(_.isInstanceOf[VirtualFlow[_]]).foreach {
+        case flow: VirtualFlow[_] =>
+          val indices = items.map(historyTable.getRow).filter(_ >= 0)
+          if (indices.nonEmpty) flow.show(indices.min)
+      }
 
       def toggleAnimationHighlight(set: Boolean): Unit =
         rows.foreach { row =>
