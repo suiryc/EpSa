@@ -244,7 +244,7 @@ class ChartHandler[A <: ChartMark](
 
   /** Chart pane. */
   val anchorPane = new AnchorPane()
-  anchorPane.getStylesheets.add(getClass.getResource("/css/chart-investment-fund.css").toExternalForm)
+  anchorPane.getStylesheets.add(getClass.getResource("/css/chart.css").toExternalForm)
   anchorPane.getStyleClass.add("custom-chart")
   val chartPane = new ScrollPane()
   // Don't display vertical scrollbar (we resize to fit parent)
