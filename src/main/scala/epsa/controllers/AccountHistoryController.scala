@@ -131,7 +131,7 @@ class AccountHistoryController extends Logging {
     events.foldLeft(Savings()) { (savings, event) =>
       event match {
         case event: Savings.AssetEvent =>
-          val eventItems = getEventItems(state.savingsUpd, event)
+          val eventItems = getEventItems(savings, event)
           val treeItem = new TreeItem[AssetEventItem](eventItems.head)
           eventItems.tail.foreach { eventItem =>
             treeItem.getChildren.add(new TreeItem[AssetEventItem](eventItem))
