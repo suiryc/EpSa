@@ -44,12 +44,23 @@
   -fx-background: -fx-control-inner-background-alt;
 }
 
-.tree-table-row-cell:focused:selected {
+/* Row selected. */
+.tree-table-row-cell:selected {
   -fx-background: -fx-selection-bar-non-focused;
   -fx-table-cell-border-color: derive(-fx-selection-bar-non-focused, 20%);
 }
 
+/* Focus on table, row selected. */
 .tree-table-view:focused .tree-table-row-cell:selected {
   -fx-background: -fx-selection-bar;
   -fx-table-cell-border-color: derive(-fx-selection-bar, 20%);
+}
+
+/* Animation highlighting. */
+.tree-table-view:focused .tree-table-row-cell:animation-highlight,
+.tree-table-view:focused .tree-table-row-cell:selected:animation-highlight,
+.tree-table-row-cell:animation-highlight
+{
+  -fx-background: orange;
+  -fx-table-cell-border-color: derive(-fx-background, 20%);
 }

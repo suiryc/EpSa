@@ -11,6 +11,8 @@ object JFXStyles {
 
   private val errorClass = PseudoClass.getPseudoClass("error")
 
+  private val animationHighlightClass = PseudoClass.getPseudoClass("animation-highlight")
+
   private val positiveClass = PseudoClass.getPseudoClass("value-positive")
 
   private val negativeClass = PseudoClass.getPseudoClass("value-negative")
@@ -40,6 +42,10 @@ object JFXStyles {
   def toggleError(node: Control, set: Boolean, msgOpt: Option[String] = None): Unit = {
     setPseudoClass(node, errorClass, set)
     node.setTooltip(msgOpt.map(new Tooltip(_)).orNull)
+  }
+
+  def toggleAnimationHighlight(node: Control, set: Boolean): Unit = {
+    setPseudoClass(node, animationHighlightClass, set)
   }
 
   def togglePositive(node: Node): Unit = {

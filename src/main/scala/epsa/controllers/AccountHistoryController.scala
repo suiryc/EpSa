@@ -3,21 +3,25 @@ package epsa.controllers
 import akka.actor.Cancellable
 import epsa.I18N
 import epsa.I18N.Strings
-import epsa.charts.{ChartHandler, ChartSeriesData, ChartSettings}
+import epsa.charts._
 import epsa.controllers.MainController.State
 import epsa.model.Savings
-import epsa.util.Awaits
+import epsa.util.{Awaits, JFXStyles}
 import grizzled.slf4j.Logging
 import java.time.LocalDate
 import java.util.UUID
+import javafx.animation.{KeyFrame, Timeline}
 import javafx.beans.binding.Bindings
 import javafx.beans.property.{SimpleObjectProperty, SimpleStringProperty}
+import javafx.event.ActionEvent
 import javafx.fxml.{FXML, FXMLLoader}
 import javafx.scene.Scene
 import javafx.scene.control._
 import javafx.scene.image.ImageView
 import javafx.scene.layout.AnchorPane
 import javafx.stage.{Stage, WindowEvent}
+import javafx.util.{Duration => jfxDuration}
+import scala.collection.JavaConversions._
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import suiryc.scala.concurrent.Callable
@@ -59,25 +63,23 @@ class AccountHistoryController extends Logging {
     "desc" -> columnEventDesc
   )
 
-  val currency = epsa.Settings.currency()
+  private var animationHighlighter: Option[AnimationHighlighter] = None
+
+  private val currency = epsa.Settings.currency()
 
   private var stage: Stage = _
 
   def initialize(stage: Stage, state: State): Unit = {
-    import scala.collection.JavaConversions._
     import epsa.Main.Akka.dispatcher
     this.stage = stage
 
+    // Sort events
     val events0 = Awaits.readDataStoreEvents(Some(stage)).getOrElse(Nil) ++ state.eventsUpd
     val events = Savings.sortEvents(events0)
-    val assetEvents = events.filter(_.isInstanceOf[Savings.AssetEvent]).asInstanceOf[Seq[Savings.AssetEvent]]
 
     // Prepare to display progress indicator (if action takes too long)
     val showIndicator = epsa.Main.Akka.system.scheduler.scheduleOnce(500.milliseconds) {
       progressIndicator.setVisible(true)
-    }
-    Future {
-      buildHistory(state, events, assetEvents, showIndicator)
     }
 
     columnEventDate.setCellValueFactory(Callback { data =>
@@ -108,19 +110,42 @@ class AccountHistoryController extends Logging {
       }:TreeTableCell[AssetEventItem, AssetEventItem]
     })
 
-    historyTable.getColumns.addAll(columnEventDate, columnEventDesc)
-    val items = assetEvents.map { event =>
-      val eventItems = getEventItems(state.savingsUpd, event)
-      val root = new TreeItem[AssetEventItem](eventItems.head)
-      eventItems.tail.foreach { eventItem =>
-        root.getChildren.add(new TreeItem[AssetEventItem](eventItem))
+    // Keep link between top-level items (history entries) and associated row.
+    historyTable.setRowFactory(Callback {
+      val row = new TreeTableRow[AssetEventItem]()
+      row.itemProperty.listen { (_, oldItem, newItem) =>
+        Option(oldItem).foreach(_.row = None)
+        Option(newItem).foreach(_.row = Some(row))
       }
-      root
-    }
+      row
+    })
+
+    historyTable.getColumns.addAll(columnEventDate, columnEventDesc)
+
+    // Replay events to get history entries (main level and details).
     val root = new TreeItem[AssetEventItem]()
-    root.getChildren.addAll(items)
+    events.foldLeft(Savings()) { (savings, event) =>
+      event match {
+        case event: Savings.AssetEvent =>
+          val eventItems = getEventItems(state.savingsUpd, event)
+          val treeItem = new TreeItem[AssetEventItem](eventItems.head)
+          eventItems.tail.foreach { eventItem =>
+            treeItem.getChildren.add(new TreeItem[AssetEventItem](eventItem))
+          }
+          root.getChildren.add(treeItem)
+          savings.processEvent(event)
+
+        case _ =>
+          savings.processEvent(event)
+      }
+    }
     historyTable.setRoot(root)
     historyTable.setShowRoot(false)
+
+    // Now build (async) the account history chart.
+    Future {
+      buildHistory(state, events, showIndicator)
+    }
   }
 
   /** Restores (persisted) view. */
@@ -180,25 +205,29 @@ class AccountHistoryController extends Logging {
     persistView()
   }
 
-  case class History(data: List[HistoryData] = Nil, eventItems: Map[LocalDate, List[AssetEventItem]] = Map.empty, issues: List[String] = Nil) {
-    def addData(more: HistoryData) = copy(data :+ more)
-    def addEvent(eventItem: AssetEventItem): History = {
-      val date = eventItem.date.get
-      val items = eventItems.get(date) match {
-        case Some(v) => v :+ eventItem
-        case None    => List(eventItem)
-      }
-      copy(eventItems = eventItems + (date -> items))
+  private def onMarkEvent(mark: HistoryMark, event: ChartMarkEvent.Value): Unit = {
+    // Do some animation (highlighting) when getting on the marker.
+    if (event == ChartMarkEvent.Entered) {
+      val rows = historyTable.getRoot.getChildren.filter { item =>
+        mark.items.contains(item.getValue)
+      }.toList.flatMap(_.getValue.row)
+
+      def toggleAnimationHighlight(set: Boolean): Unit =
+        rows.foreach { row =>
+          JFXStyles.toggleAnimationHighlight(row, set = set)
+        }
+
+      animationHighlighter.foreach(_.stop())
+      val timeline = new Timeline(
+        new KeyFrame(jfxDuration.seconds(0.5), { _: ActionEvent => toggleAnimationHighlight(set = true) }),
+        new KeyFrame(jfxDuration.seconds(1.0), { _: ActionEvent => toggleAnimationHighlight(set = false) })
+      )
+      timeline.setCycleCount(3)
+      animationHighlighter = Some(AnimationHighlighter(rows, timeline, () => toggleAnimationHighlight(set = false)))
     }
-    def addIssue(issue: String) = copy(issues = issues :+ issue)
   }
 
-  case class HistoryData(date: LocalDate, investedAmount: BigDecimal = BigDecimal(0), grossAmount: BigDecimal = BigDecimal(0)) {
-    def addInvestedAmount(v: BigDecimal) = copy(investedAmount = investedAmount + v)
-    def addGrossAmount(v: BigDecimal) = copy(grossAmount = grossAmount + v)
-  }
-
-  private def buildHistory(state: State, events: Seq[Savings.Event], assetEvents: Seq[Savings.AssetEvent], showIndicator: Cancellable): Unit = {
+  private def buildHistory(state: State, events: Seq[Savings.Event], showIndicator: Cancellable): Unit = {
     // Cached data store NAVs, and index in sequence (for more efficient search)
     var assetsNAVs = Map[UUID, Seq[Savings.AssetValue]]()
     var assetsNAVIdxs = Map[UUID, Int]()
@@ -206,6 +235,7 @@ class AccountHistoryController extends Logging {
     val assetsNAVDates = assetsNAVs.values.flatten.map(_.date).toList.toSet
     // Known NAVs through account history events.
     // This can complete data store NAVs, especially for old (now deleted) funds.
+    val assetEvents = events.filter(_.isInstanceOf[Savings.AssetEvent]).asInstanceOf[Seq[Savings.AssetEvent]]
     val eventsNAVs = assetEvents.flatMap {
       case e: Savings.MakePayment =>
         List(e.part.fundId -> Savings.AssetValue(e.date, e.part.value))
@@ -333,7 +363,7 @@ class AccountHistoryController extends Logging {
       events.headOption match {
         case Some(event: Savings.AssetEvent) =>
           // Update history since last asset event
-          val history2 = atDates(history.addEvent(getEventItems(savings, event).head), savings, since, event.date.minusDays(1))
+          val history2 = atDates(history, savings, since, event.date.minusDays(1))
           // Filter event date from history: there may more than one event on
           // the same date, only the latest computed one matters
           val history3 = history2.copy(data = history2.data.filterNot(_.date == event.date))
@@ -360,17 +390,19 @@ class AccountHistoryController extends Logging {
       )
     }
 
-    // TODO: handle more than one series in chart (invested + gross)
-    // TODO: link (with Node and callback) chart positions to related history events (chart -> history or bidirectional ?)
+    // TODO: handle more than one series in chart (invested + gross) ?
+    // TODO: link history entry (when selected) to show (if not in view) and hint (blink ?) marker in chart ?
     val grossHistory = history.data.map { data =>
-      new ChartSeriesData {
-        val date = data.date
-        val value = data.grossAmount
-      }
+      ChartSeriesData(data.date, data.grossAmount)
     }
+    val marks = historyTable.getRoot.getChildren.toList.map(_.getValue).groupBy(_.date.get).map { case (date, items) =>
+      date -> HistoryMark(date, items)
+    }
+    val meta = ChartMeta(marks, onMarkEvent _)
     val chartHandler = new ChartHandler(
       seriesName = title,
       seriesValues = grossHistory,
+      meta = meta,
       settings = ChartSettings.hidden.copy(
         xLabel = Strings.date,
         // TODO: i18n "gross amount" ?
@@ -446,7 +478,9 @@ object AccountHistoryController {
 
   def title = Strings.accountHistory
 
-  case class AssetEventItem(date: Option[LocalDate], desc: String, comment: Option[String])
+  case class AssetEventItem(date: Option[LocalDate], desc: String, comment: Option[String]) {
+    var row: Option[TreeTableRow[AssetEventItem]] = None
+  }
 
   object AssetEventItem {
 
@@ -456,6 +490,28 @@ object AccountHistoryController {
     def apply(desc: String): AssetEventItem =
       AssetEventItem(None, desc, None)
 
+  }
+
+  case class History(data: List[HistoryData] = Nil, issues: List[String] = Nil) {
+    def addData(more: HistoryData) = copy(data :+ more)
+    def addIssue(issue: String) = copy(issues = issues :+ issue)
+  }
+
+  case class HistoryData(date: LocalDate, investedAmount: BigDecimal = BigDecimal(0), grossAmount: BigDecimal = BigDecimal(0)) {
+    def addInvestedAmount(v: BigDecimal) = copy(investedAmount = investedAmount + v)
+    def addGrossAmount(v: BigDecimal) = copy(grossAmount = grossAmount + v)
+  }
+
+  case class HistoryMark(date: LocalDate, items: List[AssetEventItem]) extends ChartMark {
+    override val comment = Some(items.map(_.desc).mkString("\n"))
+  }
+
+  case class AnimationHighlighter(rows: List[TreeTableRow[AssetEventItem]], timeline: Timeline, onStop: () => Unit) {
+    timeline.play()
+    def stop(): Unit = {
+      timeline.stop()
+      onStop()
+    }
   }
 
   /** Builds a dialog out of this controller. */
