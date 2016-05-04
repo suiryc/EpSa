@@ -114,7 +114,11 @@ class AccountHistoryController extends Logging {
     historyTable.setRowFactory(Callback {
       val row = new TreeTableRow[AssetEventItem]()
       row.itemProperty.listen { (_, oldItem, newItem) =>
-        Option(oldItem).foreach(_.row = None)
+        // Beware to check that the old item was still using our row before
+        // resetting as sometimes it was already changed: upon sorting by
+        // column(s), items are usually swapped, meaning we see item A being
+        // replaced by B in one row then B being replaced by A in another row.
+        Option(oldItem).filter(_.row.contains(row)).foreach(_.row = None)
         Option(newItem).foreach(_.row = Some(row))
       }
       row
