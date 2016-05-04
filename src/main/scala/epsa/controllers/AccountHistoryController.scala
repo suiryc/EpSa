@@ -1,7 +1,7 @@
 package epsa.controllers
 
 import akka.actor.Cancellable
-import com.sun.javafx.scene.control.skin.{TreeTableViewSkin, VirtualFlow}
+import com.sun.javafx.scene.control.skin.{TreeTableViewSkin, VirtualFlow, VirtualScrollBar}
 import epsa.I18N
 import epsa.I18N.Strings
 import epsa.charts._
@@ -12,20 +12,19 @@ import grizzled.slf4j.Logging
 import java.time.LocalDate
 import java.util.UUID
 import javafx.animation.{KeyFrame, Timeline}
-import javafx.beans.binding.Bindings
 import javafx.beans.property.{SimpleObjectProperty, SimpleStringProperty}
 import javafx.event.ActionEvent
 import javafx.fxml.{FXML, FXMLLoader}
 import javafx.scene.Scene
 import javafx.scene.control._
 import javafx.scene.image.ImageView
-import javafx.scene.layout.AnchorPane
+import javafx.scene.layout.{AnchorPane, Region}
 import javafx.stage.{Stage, WindowEvent}
 import javafx.util.{Duration => jfxDuration}
 import scala.collection.JavaConversions._
 import scala.concurrent.Future
 import scala.concurrent.duration._
-import suiryc.scala.concurrent.Callable
+import suiryc.scala.javafx.beans.value.RichObservableValue
 import suiryc.scala.{javafx => jfx}
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.concurrent.JFXSystem
@@ -167,12 +166,38 @@ class AccountHistoryController extends Logging {
     // view, so a solution is to create a binding through which we set the
     // 'event description' column (preferred) width according to the width
     // of other elements:
-    // column2Width = tableWidth - tablePadding - column1Width
-    val padding2Width = Bindings.createDoubleBinding(Callable {
-      val insets = historyTable.paddingProperty.get
-      insets.getLeft + insets.getRight
-    }, historyTable.paddingProperty)
-    columnEventDesc.prefWidthProperty.bind(historyTable.widthProperty.subtract(padding2Width).subtract(columnEventDate.widthProperty))
+    //  column2Width = tableWidth - tablePadding - column1Width
+    // However the vertical scrollbar which may appear is not taken into
+    // account in table width. It is in the "clipped-container" that is a
+    // Region of the viewed content:
+    //  column2Width = containerWidth - column1Width
+    //
+    // The table width is changed before the container one, which triggers
+    // glitches when resizing down using the second formula: the horizontal
+    // scrollbar appears (and disappears upon interaction or resizing up).
+    // Requesting layout (in 'runLater') makes it disappear right away.
+    // But listening to table width too (which is changed first) and keeping
+    // the minimum width between 'tableWidth - tablePadding - scrollBarWidth'
+    // and 'containerWidth' prevents the horizontal scrollbar from appearing.
+    val clippedContainer = historyTable.lookup(".clipped-container").asInstanceOf[Region]
+    val scrollBar = historyTable.lookupAll(".scroll-bar").collect {
+      case scrollBar: VirtualScrollBar if scrollBar.getPseudoClassStates.map(_.getPseudoClassName).contains("vertical") => scrollBar
+    }.head
+
+    def updateColumnWidth(): Unit = {
+      val insets = historyTable.getPadding
+      val padding = insets.getLeft + insets.getRight
+      val scrollbarWidth =
+        if (!scrollBar.isVisible) 0
+        else scrollBar.getWidth
+      val width = math.min(historyTable.getWidth - padding - scrollbarWidth, clippedContainer.getWidth) - columnEventDate.getWidth
+      columnEventDesc.setPrefWidth(width)
+    }
+
+    RichObservableValue.listen[AnyRef](
+      List(historyTable.widthProperty, clippedContainer.widthProperty, columnEventDate.widthProperty),
+      updateColumnWidth()
+    )
 
     def restoreDividerPositions(): Unit = {
       // Restore SplitPane divider positions
