@@ -105,8 +105,6 @@ class NewAssetActionController {
 
   private lazy val srcFundGridPane = srcEmptyButton.getParent.asInstanceOf[GridPane]
 
-  private lazy val columnConstraints = srcFundGridPane.getColumnConstraints.get(GridPane.getColumnIndex(srcEmptyButton))
-
   private lazy val toggleButtons = List(paymentButton, transferButton, refundButton)
 
   private var savings: Savings = _
@@ -724,12 +722,7 @@ class NewAssetActionController {
     srcNAVButton.setDisable(!srcSelected)
     if (isPayment) {
       srcEmptyButton.setVisible(false)
-      // Set column preferred width to zero, which visually renders as if there
-      // was not such column.
-      columnConstraints.setPrefWidth(0.0)
     } else {
-      // Reset column preferred width before displaying its content.
-      columnConstraints.setPrefWidth(Region.USE_COMPUTED_SIZE)
       srcEmptyButton.setVisible(true)
       srcEmptyButton.setDisable(!opDateSelected || !srcSelected || !srcAvailabilitySelected)
     }
