@@ -19,7 +19,6 @@ object I18N extends suiryc.scala.util.I18N("i18n.epsa") with I18NWithPreference 
     def newPayment = getString("New payment")
     def newTransfer = getString("New transfer")
     def newRefund = getString("New refund")
-    def empty = getString("Empty")
     def navHistory = getString("Net asset value history")
     def accountHistory = getString("Account history")
     def importNAVHistory = getString("Import net asset value history")

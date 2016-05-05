@@ -47,6 +47,9 @@ class NewAssetActionController {
   protected var operationDateField: DatePicker = _
 
   @FXML
+  protected var latestDateButton: Button = _
+
+  @FXML
   protected var srcFundField: ComboBox[Option[SchemeAndFund]] = _
 
   @FXML
@@ -200,6 +203,7 @@ class NewAssetActionController {
       // 4 on each side to get a square to display our square icon inside.
       field.setPadding(new Insets(4))
     }
+    latestDateButton.setPadding(new Insets(4))
 
     // Setup NAV history buttons
     for (field <- List(srcNAVButton, dstNAVButton)) {
@@ -212,12 +216,6 @@ class NewAssetActionController {
           onNAVHistory(schemeAndFund.fund)
         }
       }
-    }
-
-    // Setup source fund emptying button
-    srcEmptyButton.setTooltip(new Tooltip(Strings.empty))
-    srcEmptyButton.setOnAction { (event: ActionEvent) =>
-      onSrcEmpty()
     }
 
     // Setup src/dst NAV/amount/units field listeners
@@ -330,6 +328,12 @@ class NewAssetActionController {
     checkForm()
   }
 
+  def onLatestDate(event: ActionEvent): Unit = {
+    savings.latestAssetAction.foreach { date =>
+      operationDateField.setValue(date)
+    }
+  }
+
   // Breaks recursion triggered from changing action kind.
   private def onSrcFund(): Unit = breakRecursion {
     val srcAvailabilityExact = actionKind != AssetActionKind.Payment
@@ -370,7 +374,7 @@ class NewAssetActionController {
     checkForm()
   }
 
-  private def onSrcEmpty(): Unit = {
+  def onSrcEmpty(event: ActionEvent): Unit = {
     for {
       operationDate <- getOperationDate
       schemeAndFund <- getSrcFund
