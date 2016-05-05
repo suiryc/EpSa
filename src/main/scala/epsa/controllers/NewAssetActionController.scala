@@ -281,6 +281,7 @@ class NewAssetActionController {
   }
 
   def onCloseRequest(event: DialogEvent): Unit = {
+    dstUnitsAuto() = dstUnitsAutoButton.isSelected
     persistView()
   }
 
@@ -844,7 +845,6 @@ object NewAssetActionController {
   private def resultConverter(owner: Option[Window], controller: NewAssetActionController)(buttonType: ButtonType): Option[Savings.AssetEvent] = {
     if (buttonType != ButtonType.OK) None
     else {
-      dstUnitsAuto() = controller.dstUnitsAutoButton.isSelected
       val eventOpt = controller.checkForm()
       eventOpt.foreach { event =>
         for {
