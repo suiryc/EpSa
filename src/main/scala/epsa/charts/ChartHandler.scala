@@ -326,7 +326,7 @@ class ChartHandler[A <: ChartMark](
   }
 
   /** Calls given function if mouse is inside chart background. */
-  private def withMouseInChartBackground[A](x: Double, y: Double)(f: Bounds => A): Option[A] = {
+  private def withMouseInChartBackground[B](x: Double, y: Double)(f: Bounds => B): Option[B] = {
     val bounds = getChartBackgroundBounds
 
     if (bounds.contains(x, y)) {
@@ -337,11 +337,11 @@ class ChartHandler[A <: ChartMark](
   }
 
   /** Calls given function if mouse is inside chart background. */
-  private def withMouseInChartBackground[A](event: MouseEvent)(f: Bounds => A): Option[A] =
+  private def withMouseInChartBackground[B](event: MouseEvent)(f: Bounds => B): Option[B] =
     withMouseInChartBackground(event.getX, event.getY)(f)
 
   /** Calls given function if mouse is inside chart background. */
-  private def withMouseInChartBackground[A](event: ScrollEvent)(f: Bounds => A): Option[A] =
+  private def withMouseInChartBackground[B](event: ScrollEvent)(f: Bounds => B): Option[B] =
     withMouseInChartBackground(event.getX, event.getY)(f)
 
   /** Resizes chart if necessary. */

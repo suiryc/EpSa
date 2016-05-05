@@ -12,7 +12,7 @@ import javafx.fxml.{FXML, FXMLLoader}
 import javafx.geometry.Insets
 import javafx.scene.Node
 import javafx.scene.control._
-import javafx.scene.layout.{GridPane, Region}
+import javafx.scene.layout.GridPane
 import javafx.stage.{Modality, Stage, Window}
 import javafx.util.converter.LocalDateStringConverter
 import scala.collection.JavaConversions._
