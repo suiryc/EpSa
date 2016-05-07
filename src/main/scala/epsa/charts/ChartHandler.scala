@@ -1,23 +1,27 @@
 package epsa.charts
 
+import epsa.Settings.scalePercents
+import epsa.controllers.{Form, Images}
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import javafx.beans.property.{ObjectProperty, SimpleObjectProperty}
+import javafx.event.ActionEvent
 import javafx.geometry.Bounds
 import javafx.scene.chart.{LineChart, NumberAxis, XYChart}
-import javafx.scene.control.{ScrollPane, Tooltip}
+import javafx.scene.control._
+import javafx.scene.image.ImageView
 import javafx.scene.input.{MouseEvent, ScrollEvent}
 import javafx.scene.layout.{AnchorPane, Region}
 import javafx.scene.shape.{Line, Rectangle}
 import scala.collection.JavaConversions._
 import scala.concurrent.duration._
 import suiryc.scala.concurrent.Cancellable
+import suiryc.scala.javafx.beans.value.RichObservableValue
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.javafx.event.EventHandler._
 import suiryc.scala.javafx.geometry.BoundsEx
 import suiryc.scala.math.BigDecimals._
-
-// TODO: visual hint about current zoom factor + 'button' to reset to 1 ?
 
 trait ChartSeriesData {
   val date: LocalDate
@@ -108,13 +112,15 @@ class ChartHandler[A <: ChartMark](
   private val xAxis = xAxisWrapper.axis
 
   // Resize chart when necessary
-  xAxis.widthProperty.listen { _ =>
+  xAxis.widthProperty.listen {
     resizeChart()
   }
   // We want to redraw marks after zoom has been applied. Listening on x axis
   // scale changes appear to do the trick.
-  xAxis.scaleProperty.listen { _ =>
-    if (meta.marks.nonEmpty) drawMarks()
+  if (meta.marks.nonEmpty) {
+    xAxis.scaleProperty.listen {
+      drawMarks()
+    }
   }
 
   /** Date format for 'x' axis. */
@@ -141,7 +147,9 @@ class ChartHandler[A <: ChartMark](
   /** Currently displayed 'x' data value. */
   private var currentXPos: Option[Long] = None
   /** Zoom factor. */
-  private var xZoom: BigDecimal = BigDecimal(1)
+  private val xZoomProperty: ObjectProperty[BigDecimal] = new SimpleObjectProperty[BigDecimal]()
+  private def xZoom: BigDecimal = xZoomProperty.get
+  private def xZoom_=(v: BigDecimal) = xZoomProperty.set(v)
   /** Minimal zoom factor. */
   private val xZoomMin: BigDecimal = BigDecimal(1) / 16
   /** Maximal zoom factor. */
@@ -192,6 +200,39 @@ class ChartHandler[A <: ChartMark](
     drawReferenceLines()
     // Also redraw markers.
     if (meta.marks.nonEmpty) drawMarks()
+  }
+
+  // Display current zoom value, and allow user to change to a predefined set
+  // of values.
+  private val zoomNode = new Hyperlink()
+  zoomNode.getStyleClass.add("chart-zoom-level")
+  zoomNode.setGraphic(new ImageView(Images.iconMagnifierZoom))
+  // Don't allow focus
+  zoomNode.setFocusTraversable(false)
+  xZoomProperty.listen { v =>
+    zoomNode.setText(Form.formatAmount(scalePercents(v * 100), "%"))
+  }
+  xZoom = BigDecimal(1)
+  val contextMenu = new ContextMenu()
+  private def loop(zoom: BigDecimal): Unit =
+    if (zoom <= xZoomMax) {
+      val menuItem = new MenuItem(Form.formatAmount(scalePercents(zoom * 100), "%"))
+      menuItem.setOnAction { (_: ActionEvent) =>
+        // Stay on view center after zooming
+        val viewedBounds = getChartBackgroundViewedBounds()
+        val x = viewedBounds.getMinX + viewedBounds.getWidth / 2
+        val xPos = getX(getChartBackgroundBounds, viewedBounds.getMinX + viewedBounds.getWidth / 2)
+        zoomOn(zoom, x, xPos)
+      }
+      contextMenu.getItems.add(menuItem)
+      loop(zoom * 2)
+    }
+  loop(xZoomMin)
+  zoomNode.setOnMouseReleased { (event: MouseEvent) =>
+    // Reset visited state
+    zoomNode.setVisited(false)
+    // Show context menu where is mouse
+    contextMenu.show(zoomNode, event.getScreenX, event.getScreenY)
   }
 
   /** Vertical line to spot currently display 'x' data value. */
@@ -246,6 +287,7 @@ class ChartHandler[A <: ChartMark](
   val anchorPane = new AnchorPane()
   anchorPane.getStylesheets.add(getClass.getResource("/css/chart.css").toExternalForm)
   anchorPane.getStyleClass.add("custom-chart")
+  if (meta.marks.nonEmpty) anchorPane.getStyleClass.add("chart-with-markers")
   val chartPane = new ScrollPane()
   // Don't display vertical scrollbar (we resize to fit parent)
   chartPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER)
@@ -264,7 +306,7 @@ class ChartHandler[A <: ChartMark](
   AnchorPane.setRightAnchor(chart, 0.0)
   AnchorPane.setBottomAnchor(chart, 0.0)
   AnchorPane.setLeftAnchor(chart, 0.0)
-  anchorPane.getChildren.addAll(chart, zoomZone, verticalLineRef, horizontalLineRef, verticalLine, horizontalLine, labelNAV)
+  anchorPane.getChildren.addAll(chart, zoomNode, zoomZone, verticalLineRef, horizontalLineRef, verticalLine, horizontalLine, labelNAV)
   // Note: it is not a good idea to track mouse from chartBg, since
   // crossing any displayed element (e.g. grid) will trigger exited/entered.
   // Better track mouse on chart, and check whether it is over the graph.
@@ -275,6 +317,18 @@ class ChartHandler[A <: ChartMark](
   chart.setOnMouseReleased(onMouseReleased _)
   chart.setOnMouseDragged(onMouseDragged _)
   chart.setOnScroll(onScroll _)
+
+  // Place zoom node at top center of view
+  RichObservableValue.listen(
+    List(chart.widthProperty, chartPane.widthProperty, chartPane.hvalueProperty, zoomNode.widthProperty),
+    {
+      // Don't use cached bounds as these were get while zoom is being applied
+      // (but content not yet resized actually).
+      // Set on pixel edge for harper icon rendering in any case
+      val bounds = getChartBackgroundViewedBounds(cached = false)
+      zoomNode.setTranslateX(pixelEdge(bounds.getMinX + bounds.getWidth / 2 - zoomNode.getWidth / 2))
+    }
+  )
 
   /** Chart background viewed bounds. */
   private var chartBgViewedBounds: Option[Bounds] = None
@@ -317,8 +371,8 @@ class ChartHandler[A <: ChartMark](
   }
 
   /** Gets, and caches, chart background viewed bounds. */
-  private def getChartBackgroundViewedBounds: Bounds = {
-    if (chartBgViewedBounds.isEmpty) {
+  private def getChartBackgroundViewedBounds(cached: Boolean = true): Bounds = {
+    if (chartBgViewedBounds.isEmpty || !cached) {
       chartBgViewedBounds = Some(BoundsEx.getViewedBounds(chartPane))
     }
 
@@ -349,7 +403,7 @@ class ChartHandler[A <: ChartMark](
     // Compare x axis width to actual data range and resize chart (actually
     // the parent anchor pane) if necessary. Also take into account elements
     // around the chart (like y axis, padding etc).
-    val viewedBounds = getChartBackgroundViewedBounds
+    val viewedBounds = getChartBackgroundViewedBounds()
     val data = series.getData.map(v => math.round(v.getXValue.doubleValue))
     val range =
       if (data.isEmpty) 0
@@ -451,6 +505,44 @@ class ChartHandler[A <: ChartMark](
         meta.handler(mark, ChartMarkEvent.Exited)
       }
 
+      // Check marker and zoom bounds to prevent collision
+      val cancellable = RichObservableValue.listen(
+        List(markRegion.boundsInParentProperty, zoomNode.boundsInParentProperty),
+        {
+          val markBounds = markRegion.getBoundsInParent
+          val zoomBounds = zoomNode.getBoundsInParent
+          if (((markBounds.getMinX >= zoomBounds.getMinX) && (markBounds.getMinX <= zoomBounds.getMaxX)) ||
+              ((markBounds.getMaxX >= zoomBounds.getMinX) && (markBounds.getMaxX <= zoomBounds.getMaxX))) {
+            // The marker and zoom bounds are colliding horizontally
+            if (markRegion.getLayoutY == 0) {
+              // If the marker is at the top of the chart (first collision),
+              // move it at the bottom, and invert it (pointing up).
+              // Adjust vertical line accordingly.
+              markRegion.setScaleY(-markRegion.getScaleY)
+              markRegion.setLayoutY(pixelCenter(bounds.getMaxY))
+              vertical.setStartY(pixelCenter(bounds.getMaxY))
+              vertical.setEndY(pixelCenter(y))
+            }
+          } else {
+            // The marker and zoom bounds don't collide horizontally
+            if (markRegion.getLayoutY != 0) {
+              // If the marker is at the bottom of the chart (previous collision),
+              // revert it to the top (pointing down).
+              // Adjust vertical line accordingly.
+              markRegion.setScaleY(-markRegion.getScaleY)
+              markRegion.setLayoutY(0)
+              vertical.setStartY(pixelCenter(bounds.getMinY))
+              vertical.setEndY(pixelCenter(y))
+            }
+          }
+        }
+      )
+      // It is necessary to remove listeners once marker is removed, otherwise
+      // it keeps getting triggered because the zoom node is still there.
+      markRegion.parentProperty.listen { parent =>
+        if (parent == null) cancellable.cancel()
+      }
+
       List(vertical, markRegion)
     }
     anchorPane.getChildren.addAll(add)
@@ -485,6 +577,24 @@ class ChartHandler[A <: ChartMark](
 
     xAxisWrapper.updateTicks(series, xZoom)
     resizeChart(xViewOffset)
+  }
+
+  /** Apply zoom value and keep xPos data at given x position in view. */
+  private def zoomOn(zoom: BigDecimal, x: Double, xPos: Option[Long]): Unit = {
+    if (zoom != xZoom) {
+      xZoom = zoom
+      val viewedBounds = getChartBackgroundViewedBounds()
+      // Note: we want to keep the zoom 'center' (mouse position) where it is.
+      // xOffset = distance between view (left) bound and mouse position
+      // xViewOffset = first 'x' value to show in chart view
+      // (xPos - xViewOffset) * zoom = xOffset
+      // => xViewOffset = xPos - xOffset / zoom
+      val xViewOffset = xPos.map { pos =>
+        val xOffset = x - viewedBounds.getMinX
+        round(pos - xOffset / zoom)
+      }
+      refreshView(resetData = false, xViewOffset)
+    }
   }
 
   /** Hides zoom 'highlight' area. */
@@ -631,7 +741,7 @@ class ChartHandler[A <: ChartMark](
    */
   def checkLabelPosition() = if (labelNAV.isVisible) {
     val bounds = getChartBackgroundBounds
-    val viewedBounds = getChartBackgroundViewedBounds
+    val viewedBounds = getChartBackgroundViewedBounds()
 
     // Note: (x,y) position is relative to top/left
     val x = labelNAV.getTranslateX
@@ -831,14 +941,14 @@ class ChartHandler[A <: ChartMark](
 
       val range = math.abs(pos2 - pos1)
       val zoom = if (range > 0) {
-        val viewedBounds = getChartBackgroundViewedBounds
+        val viewedBounds = getChartBackgroundViewedBounds()
         val zoom0 = BigDecimal(math.round(viewedBounds.getWidth)) / range
         if (zoom0 > xZoomMax) xZoomMax
         else zoom0
       } else xZoom
 
       if (zoom != xZoom) {
-        val viewedBounds = getChartBackgroundViewedBounds
+        val viewedBounds = getChartBackgroundViewedBounds()
         xZoom = zoom
         // When target zoom is higher than maximum zoom, selected range (once
         // zoomed) is smaller than view. So compute the actual left data index
@@ -875,7 +985,7 @@ class ChartHandler[A <: ChartMark](
           else xZoom / (-2 * deltaY)
 
         // Note: actual minimal zoom depends on data dates range and viewed bounds
-        val viewedBounds = getChartBackgroundViewedBounds
+        val viewedBounds = getChartBackgroundViewedBounds()
         val data = series.getData.map(v => math.round(v.getXValue.doubleValue))
         val range =
           if (data.isEmpty) 0
@@ -896,17 +1006,7 @@ class ChartHandler[A <: ChartMark](
         }
 
         val zoom = getZoom(zoom0)
-        if (zoom != xZoom) {
-          xZoom = zoom
-          // Note: we want to keep the zoom 'center' (mouse position) where it is.
-          // xOffset = distance between view (left) bound and mouse position
-          // xPosMin = first 'x' value to show in chart view
-          // (xPos - xPosMin) * zoom = xOffset
-          // => xPosMin = xPos - xOffset / zoom
-          val xOffset = event.getX - viewedBounds.getMinX
-          val xPosMin = round(xPos - xOffset / zoom)
-          refreshView(resetData = false, xViewOffset = Some(xPosMin))
-        }
+        zoomOn(zoom, event.getX, Some(xPos))
       }
     }
   }

@@ -82,8 +82,8 @@
    * is an even number) so that it is centered on the series data it points to.
    */
   -fx-translate-x: -7.5px;
-  /* Add some space between marker and chart top. */
-  -fx-translate-y: 2;
+  /* Add some space between marker and pane top. */
+  -fx-translate-y: 2px;
   /* SVG 'map-marker-1' icon from 'simpleicon.com'
    * See: http://simpleicon.com/map-marker-1.html
    * Other candidates:
@@ -102,4 +102,14 @@
    * left (which has already enough space separation it from the border.
    */
   -fx-padding: 10px 5px 0px 0px;
+}
+
+/* Move up zoom node to add some space over chart top. */
+.custom-chart .chart-zoom-level {
+  -fx-translate-y: -1px;
+}
+
+/* Remove underline on zoom level. */
+.custom-chart .chart-zoom-level:hover {
+  -fx-underline: false;
 }
