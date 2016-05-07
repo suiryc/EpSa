@@ -8,19 +8,17 @@ import epsa.charts._
 import epsa.controllers.MainController.State
 import epsa.model.Savings
 import epsa.util.{Awaits, JFXStyles}
+import epsa.util.JFXStyles.AnimationHighlighter
 import grizzled.slf4j.Logging
 import java.time.LocalDate
 import java.util.UUID
-import javafx.animation.{KeyFrame, Timeline}
 import javafx.beans.property.{SimpleObjectProperty, SimpleStringProperty}
-import javafx.event.ActionEvent
 import javafx.fxml.{FXML, FXMLLoader}
 import javafx.scene.Scene
 import javafx.scene.control._
 import javafx.scene.image.ImageView
 import javafx.scene.layout.{AnchorPane, Region}
 import javafx.stage.{Stage, WindowEvent}
-import javafx.util.{Duration => jfxDuration}
 import scala.collection.JavaConversions._
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -68,6 +66,8 @@ class AccountHistoryController extends Logging {
   private val currency = epsa.Settings.currency()
 
   private var stage: Stage = _
+
+  private var chartHandler: Option[ChartHandler[HistoryMark]] = None
 
   def initialize(stage: Stage, state: State): Unit = {
     import epsa.Main.Akka.dispatcher
@@ -145,6 +145,11 @@ class AccountHistoryController extends Logging {
     }
     historyTable.setRoot(root)
     historyTable.setShowRoot(false)
+
+    // React when entry is selected in history
+    historyTable.getSelectionModel.selectedItemProperty.listen { item =>
+      onHistoryEntry(Option(item))
+    }
 
     // Now build (async) the account history chart.
     Future {
@@ -253,18 +258,7 @@ class AccountHistoryController extends Logging {
           if (indices.nonEmpty) flow.show(indices.min)
       }
 
-      def toggleAnimationHighlight(set: Boolean): Unit =
-        rows.foreach { row =>
-          JFXStyles.toggleAnimationHighlight(row, set = set)
-        }
-
-      animationHighlighter.foreach(_.stop())
-      val timeline = new Timeline(
-        new KeyFrame(jfxDuration.seconds(0.5), { _: ActionEvent => toggleAnimationHighlight(set = true) }),
-        new KeyFrame(jfxDuration.seconds(1.0), { _: ActionEvent => toggleAnimationHighlight(set = false) })
-      )
-      timeline.setCycleCount(3)
-      animationHighlighter = Some(AnimationHighlighter(rows, timeline, () => toggleAnimationHighlight(set = false)))
+      animationHighlighter = Some(JFXStyles.highlightAnimation(rows, animationHighlighter))
     }
   }
 
@@ -432,7 +426,6 @@ class AccountHistoryController extends Logging {
     }
 
     // TODO: handle more than one series in chart (invested + gross) ?
-    // TODO: link history entry (when selected) to show (if not in view) and hint (blink ?) marker in chart ?
     val grossHistory = history.data.map { data =>
       ChartSeriesData(data.date, data.grossAmount)
     }
@@ -463,6 +456,7 @@ class AccountHistoryController extends Logging {
       showIndicator.cancel()
       progressIndicator.setVisible(false)
       historyPane.getChildren.add(pane)
+      this.chartHandler = Some(chartHandler)
     }
   }
 
@@ -500,6 +494,16 @@ class AccountHistoryController extends Logging {
         // $1=units $2=NAV
         AssetEventItem(Strings.assetEventRefundDetails1.format(e.part.units, e.part.value))
       )
+  }
+
+  private def onHistoryEntry(itemOpt: Option[TreeItem[AssetEventItem]]): Unit = {
+    for {
+      item <- itemOpt
+      date <- item.getValue.date
+      chartHandler <- this.chartHandler
+    } {
+      chartHandler.highlightMark(date)
+    }
   }
 
 }
@@ -545,14 +549,6 @@ object AccountHistoryController {
 
   case class HistoryMark(date: LocalDate, items: List[AssetEventItem]) extends ChartMark {
     override val comment = Some(items.map(_.desc).mkString("\n"))
-  }
-
-  case class AnimationHighlighter(rows: List[TreeTableRow[AssetEventItem]], timeline: Timeline, onStop: () => Unit) {
-    timeline.play()
-    def stop(): Unit = {
-      timeline.stop()
-      onStop()
-    }
   }
 
   /** Builds a dialog out of this controller. */

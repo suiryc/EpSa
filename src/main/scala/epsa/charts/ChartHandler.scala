@@ -2,6 +2,8 @@ package epsa.charts
 
 import epsa.Settings.scalePercents
 import epsa.controllers.{Form, Images}
+import epsa.util.JFXStyles
+import epsa.util.JFXStyles.AnimationHighlighter
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import javafx.beans.property.{ObjectProperty, SimpleObjectProperty}
@@ -91,6 +93,8 @@ class ChartHandler[A <: ChartMark](
   settings: ChartSettings
 ) {
 
+  import ChartHandler._
+
   // Note: using a CategoryAxis has many drawbacks.
   // First, it does not properly handle disparities in time scale (dates that
   // are not evenly placed). Then each 'category' is represented by a 'tick'
@@ -122,6 +126,11 @@ class ChartHandler[A <: ChartMark](
       drawMarks()
     }
   }
+
+  /** Current markers. */
+  private var markers: Map[LocalDate, Marker] = Map.empty
+
+  private var animationHighlighter: Option[AnimationHighlighter] = None
 
   /** Date format for 'x' axis. */
   private val dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
@@ -213,7 +222,7 @@ class ChartHandler[A <: ChartMark](
     zoomNode.setText(Form.formatAmount(scalePercents(v * 100), "%"))
   }
   xZoom = BigDecimal(1)
-  val contextMenu = new ContextMenu()
+  private val contextMenu = new ContextMenu()
   private def loop(zoom: BigDecimal): Unit =
     if (zoom <= xZoomMax) {
       val menuItem = new MenuItem(Form.formatAmount(scalePercents(zoom * 100), "%"))
@@ -284,7 +293,7 @@ class ChartHandler[A <: ChartMark](
   private var labelVLCancellable: List[Cancellable] = Nil
 
   /** Chart pane. */
-  val anchorPane = new AnchorPane()
+  private val anchorPane = new AnchorPane()
   anchorPane.getStylesheets.add(getClass.getResource("/css/chart.css").toExternalForm)
   anchorPane.getStyleClass.add("custom-chart")
   if (meta.marks.nonEmpty) anchorPane.getStyleClass.add("chart-with-markers")
@@ -353,7 +362,7 @@ class ChartHandler[A <: ChartMark](
   // max again. Cancel our listener shortly after setting it in case the content
   // is smaller than parent (in which case the H value won't change).
   chartPane.setHvalue(chartPane.getHmax)
-  val cancellable = chartPane.hvalueProperty.listen2 { (cancellable, v) =>
+  private val cancellable = chartPane.hvalueProperty.listen2 { (cancellable, v) =>
     chartPane.setHvalue(chartPane.getHmax)
     cancellable.cancel()
   }
@@ -438,17 +447,39 @@ class ChartHandler[A <: ChartMark](
         // function) appears to do the trick (at least on Windows).
         xAxis.scaleProperty.listen2 { cancellable =>
           cancellable.cancel()
-          // Note: since computed offset may be lower than chart minimum value,
-          // make sure the requested offset (which takes into account nodes at
-          // the left of the chart) is at least 0.
-          val hoffset = math.max(0, getX(getChartBackgroundBounds, offset))
-          val hvalue = BoundsEx.computeHValue(chartPane, hoffset)
-          chartPane.setHvalue(hvalue)
+          scrollTo(offset)
         }
       }
       JFXSystem.runLater {
         anchorPane.requestLayout()
       }
+    }
+  }
+
+  /** Scroll to request offset (to get it on left of view). */
+  private def scrollTo(offset: Long): Unit = {
+    // Note: since computed offset may be lower than chart minimum value,
+    // make sure the requested offset (which takes into account nodes at
+    // the left of the chart) is at least 0.
+    val hoffset = math.max(0, getX(getChartBackgroundBounds, offset))
+    val hvalue = BoundsEx.computeHValue(chartPane, hoffset)
+    chartPane.setHvalue(hvalue)
+  }
+
+  /** Highlights requested mark. */
+  def highlightMark(date: LocalDate): Unit = {
+    markers.get(date).foreach { marker =>
+      val viewedBounds = getChartBackgroundViewedBounds()
+      val nodes = List(marker.verticalLine, marker.region)
+
+      // Make sure the marker is visible (and scroll to center on it if not).
+      val xPos = xAxisWrapper.dateToNumber(date)
+      val x = getX(getChartBackgroundBounds, xPos)
+      if ((x <= viewedBounds.getMinX) || (x >= viewedBounds.getMaxX)) {
+        computeViewOffset(viewedBounds.getMinX + viewedBounds.getWidth / 2, Some(xPos)).foreach(scrollTo)
+      }
+
+      animationHighlighter = Some(JFXStyles.highlightAnimation(nodes, animationHighlighter))
     }
   }
 
@@ -462,14 +493,17 @@ class ChartHandler[A <: ChartMark](
     // path) 'disappears' while chart is resized.
 
     // First remove current markers
-    val remove = anchorPane.getChildren.filter { child =>
-      val styleClasses = child.getStyleClass
-      styleClasses.contains("chart-marker") || styleClasses.contains("chart-marker-line")
+    val remove = markers.values.flatMap { marker =>
+      // It is necessary to remove listener once marker is removed, otherwise
+      // it keeps getting triggered because the zoom node is still there.
+      marker.cancellable.cancel()
+      List(marker.verticalLine, marker.region)
     }
+    markers = Map.empty
     anchorPane.getChildren.removeAll(remove)
 
     val bounds = getChartBackgroundBounds
-    val add = meta.marks.values.flatMap { mark =>
+    markers = meta.marks.map { case (date, mark) =>
       val xPos = xAxisWrapper.dateToNumber(mark.date)
       val (x, y) = getXY(bounds, xPos)
 
@@ -506,6 +540,14 @@ class ChartHandler[A <: ChartMark](
       }
 
       // Check marker and zoom bounds to prevent collision
+      // Notes:
+      // Change Y 'layout' as 'translate' is used in CSS.
+      // Don't change Y 'scale' when moving mark to bottom of chart as
+      // it is used in CSS (which ultimately overrides what the code
+      // may set). Instead use styling to do it through a pseudo class
+      // (using a class style may have some glitches, e.g. the SVG path
+      // appearing unscaled for an instant the first time we change the
+      // style class).
       val cancellable = RichObservableValue.listen(
         List(markRegion.boundsInParentProperty, zoomNode.boundsInParentProperty),
         {
@@ -518,8 +560,8 @@ class ChartHandler[A <: ChartMark](
               // If the marker is at the top of the chart (first collision),
               // move it at the bottom, and invert it (pointing up).
               // Adjust vertical line accordingly.
-              markRegion.setScaleY(-markRegion.getScaleY)
               markRegion.setLayoutY(pixelCenter(bounds.getMaxY))
+              JFXStyles.togglePseudoClass(markRegion, "inverted", set = true)
               vertical.setStartY(pixelCenter(bounds.getMaxY))
               vertical.setEndY(pixelCenter(y))
             }
@@ -529,21 +571,19 @@ class ChartHandler[A <: ChartMark](
               // If the marker is at the bottom of the chart (previous collision),
               // revert it to the top (pointing down).
               // Adjust vertical line accordingly.
-              markRegion.setScaleY(-markRegion.getScaleY)
               markRegion.setLayoutY(0)
+              JFXStyles.togglePseudoClass(markRegion, "inverted", set = false)
               vertical.setStartY(pixelCenter(bounds.getMinY))
               vertical.setEndY(pixelCenter(y))
             }
           }
         }
       )
-      // It is necessary to remove listeners once marker is removed, otherwise
-      // it keeps getting triggered because the zoom node is still there.
-      markRegion.parentProperty.listen { parent =>
-        if (parent == null) cancellable.cancel()
-      }
 
-      List(vertical, markRegion)
+      date -> Marker(markRegion, vertical, cancellable)
+    }
+    val add = markers.values.flatMap { marker =>
+      List(marker.verticalLine, marker.region)
     }
     anchorPane.getChildren.addAll(add)
 
@@ -583,17 +623,22 @@ class ChartHandler[A <: ChartMark](
   private def zoomOn(zoom: BigDecimal, x: Double, xPos: Option[Long]): Unit = {
     if (zoom != xZoom) {
       xZoom = zoom
-      val viewedBounds = getChartBackgroundViewedBounds()
       // Note: we want to keep the zoom 'center' (mouse position) where it is.
-      // xOffset = distance between view (left) bound and mouse position
-      // xViewOffset = first 'x' value to show in chart view
-      // (xPos - xViewOffset) * zoom = xOffset
-      // => xViewOffset = xPos - xOffset / zoom
-      val xViewOffset = xPos.map { pos =>
-        val xOffset = x - viewedBounds.getMinX
-        round(pos - xOffset / zoom)
-      }
+      val xViewOffset = computeViewOffset(x, xPos)
       refreshView(resetData = false, xViewOffset)
+    }
+  }
+
+  /** Computes the 'x' position at the left of the viewed area so that the given 'x' position appears at the given offset. */
+  private def computeViewOffset(x: Double, xPos: Option[Long]): Option[Long] = {
+    // xOffset = distance between view (left) bound and mouse position
+    // xViewOffset = first 'x' value to show in chart view
+    // (xPos - xViewOffset) * zoom = xOffset
+    // => xViewOffset = xPos - xOffset / zoom
+    val viewedBounds = getChartBackgroundViewedBounds()
+    xPos.map { pos =>
+      val xOffset = x - viewedBounds.getMinX
+      round(pos - xOffset / xZoom)
     }
   }
 
@@ -686,7 +731,7 @@ class ChartHandler[A <: ChartMark](
     bounds.getMinX + xAxis.getDisplayPosition(xPos)
 
   /** Gets 'x' and 'y' position for given chart value. */
-  def getXY(bounds: Bounds, xPos: Long): (Double, Double) = {
+  private def getXY(bounds: Bounds, xPos: Long): (Double, Double) = {
     val x = getX(bounds, xPos)
     val y = bounds.getMinY + yAxis.getDisplayPosition(valuesMap(xPos))
     (x, y)
@@ -703,7 +748,7 @@ class ChartHandler[A <: ChartMark](
    * Default position is where the middle of the label is the currently
    * displayed 'x' chart value.
    */
-  def setLabelX() = if (labelNAV.isVisible) {
+  private def setLabelX() = if (labelNAV.isVisible) {
     val bounds = getChartBackgroundBounds
 
     currentXPos.map(getXY(bounds, _)) match {
@@ -721,7 +766,7 @@ class ChartHandler[A <: ChartMark](
    * Default position is where the bottom of the label is above the currently
    * displayed 'y' chart value by 10 pixels.
    */
-  def setLabelY() = if (labelNAV.isVisible) {
+  private def setLabelY() = if (labelNAV.isVisible) {
     val bounds = getChartBackgroundBounds
 
     currentXPos.map(getXY(bounds, _)) match {
@@ -739,7 +784,7 @@ class ChartHandler[A <: ChartMark](
    * Make sure it remains inside the chart background, and if possible does not
    * 'hide' the currently displayed chart data value.
    */
-  def checkLabelPosition() = if (labelNAV.isVisible) {
+  private def checkLabelPosition() = if (labelNAV.isVisible) {
     val bounds = getChartBackgroundBounds
     val viewedBounds = getChartBackgroundViewedBounds()
 
@@ -1027,4 +1072,8 @@ class ChartHandler[A <: ChartMark](
     onMouseMoved(event)
   }
 
+}
+
+object ChartHandler {
+  case class Marker(region: Region, verticalLine: Line, cancellable: Cancellable)
 }

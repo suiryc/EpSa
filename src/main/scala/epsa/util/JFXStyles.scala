@@ -1,9 +1,13 @@
 package epsa.util
 
+import javafx.animation.{KeyFrame, Timeline}
 import javafx.css.PseudoClass
+import javafx.event.ActionEvent
 import javafx.scene.Node
 import javafx.scene.control.{Control, Tooltip}
 import javafx.scene.image.ImageView
+import javafx.util.{Duration => jfxDuration}
+import suiryc.scala.javafx.event.EventHandler._
 
 object JFXStyles {
 
@@ -22,6 +26,9 @@ object JFXStyles {
   private def setPseudoClass(node: Node, pseudoClass: PseudoClass, set: Boolean): Unit =
   // See: http://stackoverflow.com/a/24231728
     node.pseudoClassStateChanged(pseudoClass, set)
+
+  def togglePseudoClass(node: Node, pseudoClass: String, set: Boolean): Unit =
+    node.pseudoClassStateChanged(PseudoClass.getPseudoClass(pseudoClass), set)
 
   def toggleStyles(node: Control, msgOpt: Option[String], styles: Style*): Unit = {
     // Apply all style changes
@@ -44,7 +51,7 @@ object JFXStyles {
     node.setTooltip(msgOpt.map(new Tooltip(_)).orNull)
   }
 
-  def toggleAnimationHighlight(node: Control, set: Boolean): Unit = {
+  def toggleAnimationHighlight(node: Node, set: Boolean): Unit = {
     setPseudoClass(node, animationHighlightClass, set)
   }
 
@@ -92,6 +99,21 @@ object JFXStyles {
     }
   }
 
+  def highlightAnimation(nodes: List[Node], animationHighlighter: Option[AnimationHighlighter]): AnimationHighlighter = {
+    def toggle(set: Boolean): Unit =
+      nodes.foreach { node =>
+        toggleAnimationHighlight(node, set = set)
+      }
+
+    animationHighlighter.foreach(_.stop())
+    val timeline = new Timeline(
+      new KeyFrame(jfxDuration.seconds(0.5), { _: ActionEvent => toggle(set = true) }),
+      new KeyFrame(jfxDuration.seconds(1.0), { _: ActionEvent => toggle(set = false) })
+    )
+    timeline.setCycleCount(3)
+    AnimationHighlighter(nodes, timeline, () => toggle(set = false))
+  }
+
   trait Style {
     val pseudoClass: PseudoClass
     val set: Boolean
@@ -104,6 +126,14 @@ object JFXStyles {
 
   case class WarningStyle(set: Boolean, msg: String = "") extends Style {
     override val pseudoClass = warningClass
+  }
+
+  case class AnimationHighlighter(rows: List[Node], timeline: Timeline, onStop: () => Unit) {
+    timeline.play()
+    def stop(): Unit = {
+      timeline.stop()
+      onStop()
+    }
   }
 
 }
