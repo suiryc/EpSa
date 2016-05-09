@@ -23,14 +23,17 @@ class AvailabilityListCell(baseOpt: Option[LocalDate]) extends ListCellEx[Option
   override protected def itemText(item: Option[LocalDate]) = Form.formatAvailability(item, baseOpt, long = false)
 }
 
-class AmountCell[A](suffix: String, na: String) extends TableCellEx[A, Option[BigDecimal]] {
-  override protected def itemText(item: Option[BigDecimal]) = item.map(Form.formatAmount(_, suffix)).getOrElse(na)
+class FormatCell[A, B](format: B => String) extends TableCellEx[A, B] {
+  override protected def itemText(item: B) = format(item)
 }
 
-trait ColoredAmount extends Cell[Option[BigDecimal]] {
-  override protected def updateItem(item: Option[BigDecimal], empty: Boolean) {
+trait ColoredCell[A] extends Cell[A] {
+
+  def value(a: A): Option[BigDecimal]
+
+  override protected def updateItem(item: A, empty: Boolean) {
     super.updateItem(item, empty)
-    (if (empty) None else item).find(_ != 0) match {
+    (if (empty) None else Some(item)).flatMap(value).find(_ != 0) match {
       case Some(v) =>
         if (v > 0) JFXStyles.togglePositive(this)
         else JFXStyles.toggleNegative(this)

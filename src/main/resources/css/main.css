@@ -3,6 +3,16 @@
   -fx-text-alignment: CENTER;
 }
 
+/* Dedicated 'sum' row style.
+ * Use bold text, add a top border to denote separation, and darken a bit the
+ * content color.
+ */
+.table-view .table-row-cell:row-sum {
+  -fx-font-weight: bold;
+  -fx-background-color: derive(-fx-table-cell-border-color, -30%), -fx-table-cell-border-color, derive(-fx-background, -6%);
+  -fx-background-insets: 0, 2 0 0 0, 1 0 1 0;
+}
+
 /* Set text color for 'positive' and 'negative' values.
  * 'fill' is for shapes like Text, 'text-fill' for nodes with text.
  * Take care of table cells specifically: by default text color becomes
