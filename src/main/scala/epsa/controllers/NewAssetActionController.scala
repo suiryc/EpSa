@@ -202,6 +202,7 @@ class NewAssetActionController {
       field.setPadding(new Insets(4))
     }
     latestDateButton.setPadding(new Insets(4))
+    latestDateButton.setDisable(savings.latestAssetAction.isEmpty)
 
     // Setup NAV history buttons
     for (field <- List(srcNAVButton, dstNAVButton)) {
@@ -563,7 +564,7 @@ class NewAssetActionController {
             val text = nav.value.toString
             field.setUserData(nav)
             field.setText(text)
-            field.setTooltip(new Tooltip(s"${Strings.date}: ${nav.date}"))
+            field.textField.setTooltip(new Tooltip(s"${Strings.date}: ${nav.date}\n${Strings.nav}: ${Form.formatAmount(nav.value, epsa.Settings.currency())}"))
             field.setOnButtonAction { (event: ActionEvent) =>
               field.setText(text)
             }
@@ -574,7 +575,7 @@ class NewAssetActionController {
           case None =>
             field.setUserData(null)
             field.setText(null)
-            field.setTooltip(null)
+            field.textField.setTooltip(null)
             field.buttonDisableProperty.unbind()
             field.setOnButtonAction(null)
             field.setButtonDisable(true)
