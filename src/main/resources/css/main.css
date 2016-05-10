@@ -7,10 +7,21 @@
  * Use bold text, add a top border to denote separation, and darken a bit the
  * content color.
  */
-.table-view .table-row-cell:row-sum {
+.table-view .table-row-cell:row-total {
   -fx-font-weight: bold;
   -fx-background-color: derive(-fx-table-cell-border-color, -30%), -fx-table-cell-border-color, derive(-fx-background, -6%);
-  -fx-background-insets: 0, 2 0 0 0, 1 0 1 0;
+  -fx-background-insets: 0, 2 0 0 0, 2 0 1 0;
+}
+
+.table-view .table-row-cell:row-total-partial {
+  -fx-font-weight: bold;
+  -fx-background-color: -fx-table-cell-border-color, derive(-fx-background, -2%);
+}
+
+.table-view .table-row-cell:row-total-partial:first {
+  -fx-font-weight: bold;
+  -fx-background-color: derive(-fx-table-cell-border-color, -10%), -fx-table-cell-border-color, derive(-fx-background, -2%);
+  -fx-background-insets: 0, 2 0 0 0, 2 0 1 0;
 }
 
 /* Set text color for 'positive' and 'negative' values.

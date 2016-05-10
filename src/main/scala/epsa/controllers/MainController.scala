@@ -3,7 +3,7 @@ package epsa.controllers
 import akka.actor.{Actor, ActorRef, Props}
 import epsa.I18N
 import epsa.I18N.Strings
-import epsa.Settings.scalePercents
+import epsa.Settings.{scalePercents, scaleVWAP}
 import epsa.charts.{ChartHandler, ChartSettings}
 import epsa.model.Savings
 import epsa.storage.DataStore
@@ -355,12 +355,23 @@ class MainController extends Logging {
     row.itemProperty.listen { v =>
       Option(v) match {
         case Some(item) =>
-          JFXStyles.togglePseudoClass(row, "row-sum", set = item.isSum)
-          if (item.isSum) row.setContextMenu(null)
+          val (total, partialTotal, first) = item.kind match {
+            case AssetDetailsKind.Standard            => (false, false, item.first)
+            case AssetDetailsKind.TotalPartial        => (false, true, item.first)
+            case AssetDetailsKind.TotalByFund         => (false, true, item.first)
+            case AssetDetailsKind.TotalByAvailability => (false, true, item.first)
+            case AssetDetailsKind.Total               => (true, false, item.first)
+          }
+          JFXStyles.togglePseudoClass(row, "row-total", set = total)
+          JFXStyles.togglePseudoClass(row, "row-total-partial", set = partialTotal)
+          JFXStyles.togglePseudoClass(row, "first", set = first)
+          if (item.kind != AssetDetailsKind.Standard) row.setContextMenu(null)
           else row.setContextMenu(menu)
 
         case None =>
-          JFXStyles.togglePseudoClass(row, "row-sum", set = false)
+          JFXStyles.togglePseudoClass(row, "row-total", set = false)
+          JFXStyles.togglePseudoClass(row, "row-total-partial", set = false)
+          JFXStyles.togglePseudoClass(row, "first", set = false)
           row.setContextMenu(null)
       }
     }
@@ -378,7 +389,7 @@ class MainController extends Logging {
 
     // Note: it is expected that we have an asset because there is an invested
     // amount. So there is no need to try to prevent division by 0.
-    AssetDetails(
+    StandardAssetDetails(
       asset = asset,
       scheme = savings.getScheme(asset.schemeId),
       fund = savings.getFund(asset.fundId),
@@ -1029,43 +1040,69 @@ object MainController {
 
   private val ASSET_KEY_GROSS_GAIN_PCT = "grossGainPct"
 
-  case class AssetDetails(asset: Savings.Asset, scheme: Savings.Scheme, fund: Savings.Fund,
-    date: Option[LocalDate], nav: Option[BigDecimal], isSum: Boolean = false)
-  {
+  object AssetDetailsKind extends Enumeration {
+    val Standard = Value
+    val TotalPartial = Value
+    val TotalByFund = Value
+    val TotalByAvailability = Value
+    val Total = Value
+  }
+
+  trait AssetDetails {
+    val asset: Savings.Asset
+    val scheme: Savings.Scheme
+    val fund: Savings.Fund
+    val date: Option[LocalDate]
+    val nav: Option[BigDecimal]
+
+    val kind: AssetDetailsKind.Value
+    var first: Boolean = false
 
     private val currency = epsa.Settings.currency()
 
-    val grossAmount = nav.map { value =>
+    def units = asset.units
+    def vwap = asset.vwap
+    def investedAmount = asset.investedAmount
+    lazy val grossAmount = nav.map { value =>
       asset.amount(value)
     }
-    val grossGain = grossAmount.map { amount =>
-      amount - asset.investedAmount
+    lazy val grossGain = grossAmount.map { amount =>
+      amount - investedAmount
     }
-    val grossGainPct =
-      if (asset.investedAmount == 0) Some(BigDecimal(0))
-      else grossGain.map(v => scalePercents((v * 100) / asset.investedAmount))
+    lazy val grossGainPct =
+      if (investedAmount == 0) Some(BigDecimal(0))
+      else grossGain.map(v => scalePercents((v * 100) / investedAmount))
 
     def formatAvailability(long: Boolean) =
-      if (isSum) null
+      if ((kind != AssetDetailsKind.Standard) && (kind != AssetDetailsKind.TotalByAvailability)) null
       else Form.formatAvailability(asset.availability, date = None, long)
-    val formatUnits =
-      if (isSum) null
-      else asset.units.toString
-    val formatVWAP =
-      if (isSum) null
-      else Form.formatAmount(asset.vwap, currency)
-    val formatDate =
-      if (isSum) null
+    lazy val formatUnits =
+      if ((kind != AssetDetailsKind.Standard) && (kind != AssetDetailsKind.TotalByFund)) null
+      else units.toString
+    lazy val formatVWAP =
+      if ((kind != AssetDetailsKind.Standard) && (kind != AssetDetailsKind.TotalByFund)) null
+      else Form.formatAmount(vwap, currency)
+    lazy val formatDate =
+      if ((kind != AssetDetailsKind.Standard) && (kind != AssetDetailsKind.TotalByFund)) null
       else date.map(_.toString).getOrElse(Strings.na)
-    val formatNAV =
-      if (isSum) null
+    lazy val formatNAV =
+      if ((kind != AssetDetailsKind.Standard) && (kind != AssetDetailsKind.TotalByFund)) null
       else nav.map(Form.formatAmount(_, currency)).getOrElse(Strings.na)
-    val formatInvestedAmount = Form.formatAmount(asset.investedAmount, currency)
-    val formatGrossAmount = grossAmount.map(Form.formatAmount(_, currency)).getOrElse(Strings.na)
-    val formatGrossGain = grossGain.map(Form.formatAmount(_, currency)).getOrElse(Strings.na)
-    val formatGrossGainPct = grossGainPct.map(Form.formatAmount(_, "%")).getOrElse(Strings.na)
-
+    lazy val formatInvestedAmount = Form.formatAmount(investedAmount, currency)
+    lazy val formatGrossAmount = grossAmount.map(Form.formatAmount(_, currency)).getOrElse(Strings.na)
+    lazy val formatGrossGain = grossGain.map(Form.formatAmount(_, currency)).getOrElse(Strings.na)
+    lazy val formatGrossGainPct = grossGainPct.map(Form.formatAmount(_, "%")).getOrElse(Strings.na)
   }
+
+  case class StandardAssetDetails(asset: Savings.Asset, scheme: Savings.Scheme, fund: Savings.Fund,
+    date: Option[LocalDate], nav: Option[BigDecimal]) extends AssetDetails
+  {
+    val kind = AssetDetailsKind.Standard
+  }
+
+  case class TotalAssetDetails(asset: Savings.Asset, scheme: Savings.Scheme, fund: Savings.Fund,
+    date: Option[LocalDate], nav: Option[BigDecimal], kind: AssetDetailsKind.Value,
+    override val investedAmount: BigDecimal) extends AssetDetails
 
   /**
    * Special items list that automatically adds a 'sum' of all wrapped assets.
@@ -1077,23 +1114,72 @@ object MainController {
 
     private def orZero(v: Option[BigDecimal]): BigDecimal = v.getOrElse(0)
 
-    val sum0 = AssetDetails(
-      asset = Savings.Asset(null, null, None, units = 1, vwap = 0),
-      scheme = Savings.Scheme(null, null, None, Nil),
-      fund = Savings.Fund(null, null, None),
-      date = None,
-      nav = Some(0),
-      isSum = true
-    )
-    val sum = source0.foldLeft(sum0) { (acc, details) =>
-      acc.copy(
-        asset = acc.asset.copy(vwap = acc.asset.vwap + details.asset.investedAmount),
-        nav = Some(orZero(acc.nav) + orZero(details.grossAmount))
+    private def computeTotal(assets: List[AssetDetails], kind: AssetDetailsKind.Value,
+                             scheme: Option[Savings.Scheme], fund: Option[Savings.Fund],
+                             availability: Option[LocalDate]): AssetDetails =
+    {
+      val total0 = TotalAssetDetails(
+        asset = Savings.Asset(null, null, availability, units = 0, vwap = 0),
+        scheme = scheme.getOrElse(Savings.Scheme(null, null, None, Nil)),
+        fund = fund.getOrElse(Savings.Fund(null, null, None)),
+        date = None,
+        nav = Some(0),
+        kind = kind,
+        investedAmount = 0
       )
+      assets.foldLeft(total0) { (acc, details) =>
+        val units = acc.units + details.units
+        val investedAmount = acc.investedAmount + details.investedAmount
+        val vwap = scaleVWAP(investedAmount / units)
+        acc.copy(
+          asset = acc.asset.copy(units = units, vwap = vwap),
+          date = details.date,
+          nav = details.nav,
+          investedAmount = investedAmount
+        )
+      }
     }
+
+    val assets0 = source0.toList
+
+    val total = computeTotal(assets0, kind = AssetDetailsKind.Total, scheme = None, fund = None, availability = None)
+    val totalByScheme = assets0.groupBy(_.scheme).map { case (scheme, assets) =>
+      computeTotal(assets, kind = AssetDetailsKind.TotalPartial, scheme = Some(scheme), fund = None, availability = None)
+    }.toList
+    val totalByFund = assets0.groupBy(_.fund).map { case (fund, assets) =>
+      computeTotal(assets, kind = AssetDetailsKind.TotalByFund, scheme = None, fund = Some(fund), availability = None)
+    }.toList
+    val totalByAvailability = assets0.groupBy(_.asset.availability).map { case (availability, assets) =>
+      computeTotal(assets, kind = AssetDetailsKind.TotalByAvailability, scheme = None, fund = None, availability = availability)
+    }.toList
+
+    var totals: List[AssetDetails] = Nil
+
+    def updateTotals(): Unit = {
+      def tagFirst(assets: List[AssetDetails]): List[AssetDetails] = {
+        @scala.annotation.tailrec
+        def loop(assets: List[AssetDetails], first: Boolean): Unit =
+          assets match {
+            case head :: tail =>
+              head.first = first
+              loop(tail, first = false)
+
+            case Nil =>
+          }
+
+        loop(assets, first = true)
+        assets
+      }
+
+      // TODO: also sort according to table sorting
+      totals = (tagFirst(totalByScheme) ::: tagFirst(totalByFund) ::: tagFirst(totalByAvailability)) :+ total
+    }
+
+    updateTotals()
 
     override def sourceChanged(c: Change[_ <: AssetDetails]): Unit = {
       fireChange(c)
+      updateTotals()
     }
 
     override def getSourceIndex(index: Int): Int =
@@ -1101,10 +1187,10 @@ object MainController {
 
     override def get(index: Int): AssetDetails =
       if (index < getSource.size) getSource.get(index)
-      else if (index == getSource.size) sum
+      else if (index < getSource.size + totals.size) totals(index - getSource.size)
       else throw new ArrayIndexOutOfBoundsException(index)
 
-    override def size(): Int = getSource.size + 1
+    override def size(): Int = getSource.size + totals.size
 
   }
 
@@ -1235,14 +1321,14 @@ object MainController {
     def fundComment(details: AssetDetails) = details.fund.comment
     def formatAvailability(details: AssetDetails, long: Boolean) = details.formatAvailability(long)
     def formatUnits(details: AssetDetails, long: Boolean) = details.formatUnits
-    def units(details: AssetDetails) = Some(details.asset.units)
+    def units(details: AssetDetails) = Some(details.units)
     def formatVWAP(details: AssetDetails, long: Boolean) = details.formatVWAP
-    def vwap(details: AssetDetails) = Some(details.asset.vwap)
+    def vwap(details: AssetDetails) = Some(details.vwap)
     def formatDate(details: AssetDetails, long: Boolean) = details.formatDate
     def formatNAV(details: AssetDetails, long: Boolean) = details.formatNAV
     def nav(details: AssetDetails) = details.nav
     def formatInvestedAmount(details: AssetDetails, long: Boolean) = details.formatInvestedAmount
-    def investedAmount(details: AssetDetails) = Some(details.asset.investedAmount)
+    def investedAmount(details: AssetDetails) = Some(details.investedAmount)
     def formatGrossAmount(details: AssetDetails, long: Boolean) = details.formatGrossAmount
     def grossAmount(details: AssetDetails) = details.grossAmount
     def formatGrossGain(details: AssetDetails, long: Boolean) = details.formatGrossGain

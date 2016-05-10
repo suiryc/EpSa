@@ -10,6 +10,9 @@ import javafx.stage.Window
 import spray.json._
 import suiryc.scala.math.Ordered._
 
+// TODO: VWAP is actually not per availability, but for all asset units of a given found ?
+//       in this case, compute 'real' VWAP/invested amount and also display it
+
 object Savings {
 
   import epsa.Settings._
