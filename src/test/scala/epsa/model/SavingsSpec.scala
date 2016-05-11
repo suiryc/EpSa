@@ -213,29 +213,38 @@ class SavingsSpec extends WordSpec with Matchers {
 
     "handle resolving assets availability by date" in {
       val scheme = savings2.schemes.head
-      val fund = savings2.funds.head
+      val fund1 = savings2.funds.head
+      val fund2 = savings2.funds(1)
       val date = LocalDate.now.minusDays(10)
+      // Check that multiple availability dates get merged at expected date
+      // and that asset scheme/fund with only one availability date also gets
+      // resolved once date is reached.
       val savings = savings2.processEvents(
-        Savings.MakePayment(date.plusDays(1), Savings.AssetPart(scheme.id, fund.id, None, BigDecimal(1), BigDecimal(1)), None),
-        Savings.MakePayment(date.plusDays(2), Savings.AssetPart(scheme.id, fund.id, Some(date.plusDays(10)), BigDecimal(2), BigDecimal(2)), None),
-        Savings.MakePayment(date.plusDays(3), Savings.AssetPart(scheme.id, fund.id, Some(date.plusDays(11)), BigDecimal(3), BigDecimal(3)), None)
+        Savings.MakePayment(date.plusDays(1), Savings.AssetPart(scheme.id, fund1.id, None, BigDecimal(1), BigDecimal(1)), None),
+        Savings.MakePayment(date.plusDays(2), Savings.AssetPart(scheme.id, fund1.id, Some(date.plusDays(10)), BigDecimal(2), BigDecimal(2)), None),
+        Savings.MakePayment(date.plusDays(3), Savings.AssetPart(scheme.id, fund1.id, Some(date.plusDays(11)), BigDecimal(3), BigDecimal(3)), None),
+        Savings.MakePayment(date.plusDays(4), Savings.AssetPart(scheme.id, fund2.id, Some(date.plusDays(10)), BigDecimal(4), BigDecimal(4)), None)
       )
       checkSavings(date, savings,
-        Savings.Asset(scheme.id, fund.id, None, BigDecimal(1), 0),
-        Savings.Asset(scheme.id, fund.id, Some(date.plusDays(10)), BigDecimal(2), 0),
-        Savings.Asset(scheme.id, fund.id, Some(date.plusDays(11)), BigDecimal(3), 0)
+        Savings.Asset(scheme.id, fund1.id, None, BigDecimal(1), 0),
+        Savings.Asset(scheme.id, fund1.id, Some(date.plusDays(10)), BigDecimal(2), 0),
+        Savings.Asset(scheme.id, fund1.id, Some(date.plusDays(11)), BigDecimal(3), 0),
+        Savings.Asset(scheme.id, fund2.id, Some(date.plusDays(10)), BigDecimal(4), 0)
       )
       checkSavings(date.plusDays(9), savings,
-        Savings.Asset(scheme.id, fund.id, None, BigDecimal(1), 0),
-        Savings.Asset(scheme.id, fund.id, Some(date.plusDays(10)), BigDecimal(2), 0),
-        Savings.Asset(scheme.id, fund.id, Some(date.plusDays(11)), BigDecimal(3), 0)
+        Savings.Asset(scheme.id, fund1.id, None, BigDecimal(1), 0),
+        Savings.Asset(scheme.id, fund1.id, Some(date.plusDays(10)), BigDecimal(2), 0),
+        Savings.Asset(scheme.id, fund1.id, Some(date.plusDays(11)), BigDecimal(3), 0),
+        Savings.Asset(scheme.id, fund2.id, Some(date.plusDays(10)), BigDecimal(4), 0)
       )
       checkSavings(date.plusDays(10), savings,
-        Savings.Asset(scheme.id, fund.id, None, BigDecimal(3), 0),
-        Savings.Asset(scheme.id, fund.id, Some(date.plusDays(11)), BigDecimal(3), 0)
+        Savings.Asset(scheme.id, fund1.id, None, BigDecimal(3), 0),
+        Savings.Asset(scheme.id, fund1.id, Some(date.plusDays(11)), BigDecimal(3), 0),
+        Savings.Asset(scheme.id, fund2.id, None, BigDecimal(4), 0)
       )
       checkSavings(date.plusDays(11), savings,
-        Savings.Asset(scheme.id, fund.id, None, BigDecimal(6), 0)
+        Savings.Asset(scheme.id, fund1.id, None, BigDecimal(6), 0),
+        Savings.Asset(scheme.id, fund2.id, None, BigDecimal(4), 0)
       )
     }
 

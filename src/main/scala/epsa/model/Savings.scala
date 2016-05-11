@@ -612,24 +612,20 @@ case class Savings(
 
     def process(computation: AssetComputation, asset: Savings.Asset): AssetComputation = {
       val key = getKey(asset)
-      if (computation.keys.contains(key)) {
-        // Merge assets
-        val (previous, filtered) = computation.computed.partition(getKey(_) == key)
-        val asset0 = Savings.Asset(
-          schemeId = key.schemeId,
-          fundId = key.fundId,
-          availability = key.availability,
-          units = BigDecimal(0),
-          vwap = BigDecimal(0)
-        )
-        val computedAsset = (previous :+ asset).foldLeft(asset0) { (computed, asset) =>
-          val units = computed.units + asset.units
-          val vwap = scaleVWAP((computed.investedAmount + asset.investedAmount) / units)
-          computed.copy(units = units, vwap = vwap)
-        }
-        computation.copy(computed = filtered :+ computedAsset)
+      val (previous, filtered) = computation.computed.partition(getKey(_) == key)
+      val asset0 = Savings.Asset(
+        schemeId = key.schemeId,
+        fundId = key.fundId,
+        availability = key.availability,
+        units = BigDecimal(0),
+        vwap = BigDecimal(0)
+      )
+      val computedAsset = (previous :+ asset).foldLeft(asset0) { (computed, asset) =>
+        val units = computed.units + asset.units
+        val vwap = scaleVWAP((computed.investedAmount + asset.investedAmount) / units)
+        computed.copy(units = units, vwap = vwap)
       }
-      else computation.copy(computed = computation.computed :+ asset, keys = computation.keys + key)
+      computation.copy(computed = filtered :+ computedAsset)
     }
 
     val computedAssets = assets.foldLeft(AssetComputation())(process).computed
