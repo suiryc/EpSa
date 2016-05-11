@@ -37,6 +37,7 @@ import suiryc.scala.javafx.event.EventHandler._
 import suiryc.scala.javafx.scene.control.{Dialogs, TableViews}
 import suiryc.scala.javafx.stage.{FileChoosers, Stages}
 import suiryc.scala.javafx.util.Callback
+import suiryc.scala.math.Ordering.localDateOrdering
 import suiryc.scala.settings.Preference
 import suiryc.scala.util.Comparators
 
@@ -1060,6 +1061,7 @@ object MainController {
 
     private val currency = epsa.Settings.currency()
 
+    def availability = asset.availability
     def units = asset.units
     def vwap = asset.vwap
     def investedAmount = asset.investedAmount
@@ -1240,6 +1242,19 @@ object MainController {
     })
   }
 
+  /** Asset field with date to display. */
+  case class AssetDateField(tableLabel: String, detailsLabel: String,
+    format: (AssetDetails, Boolean) => String,
+    value: (AssetDetails) => Option[LocalDate]
+   ) extends AssetField[AssetDetails] {
+    val column = new TableColumn[AssetDetails, AssetDetails](tableLabel)
+    column.setCellValueFactory(Callback { data =>
+      new SimpleObjectProperty(data.getValue)
+    })
+    column.setCellFactory(Callback { new FormatCell[AssetDetails, AssetDetails](v => format(v, false)) })
+    column.setComparator(AssetField.dateComparator(value))
+  }
+
   /** Asset field with amount to display. */
   case class AssetAmountField(tableLabel: String, detailsLabel: String,
     format: (AssetDetails, Boolean) => String,
@@ -1295,11 +1310,11 @@ object MainController {
     def fields() = ListMap(
       ASSET_KEY_SCHEME          -> AssetTextField(Strings.scheme, Strings.schemeColon, AssetField.formatScheme, AssetField.schemeComment),
       ASSET_KEY_FUND            -> AssetTextField(Strings.fund, Strings.fundColon, AssetField.formatFund, AssetField.fundComment),
-      ASSET_KEY_AVAILABILITY    -> AssetTextField(Strings.availability, Strings.availabilityColon, AssetField.formatAvailability),
+      ASSET_KEY_AVAILABILITY    -> AssetDateField(Strings.availability, Strings.availabilityColon, AssetField.formatAvailability, AssetField.availabilikty),
       ASSET_KEY_UNITS           -> AssetAmountField(Strings.units, Strings.unitsColon, AssetField.formatUnits, AssetField.units, null),
       ASSET_KEY_VWAP            -> AssetAmountField(Strings.vwap, Strings.vwapColon, AssetField.formatVWAP, AssetField.vwap, epsa.Settings.currency()),
       ASSET_KEY_NAV             -> AssetAmountField(Strings.nav, Strings.navColon, AssetField.formatNAV, AssetField.nav, epsa.Settings.currency()),
-      ASSET_KEY_DATE            -> AssetTextField(Strings.date, Strings.dateColon, AssetField.formatDate),
+      ASSET_KEY_DATE            -> AssetDateField(Strings.date, Strings.dateColon, AssetField.formatDate, AssetField.date),
       ASSET_KEY_INVESTED_AMOUNT -> AssetAmountField(Strings.invested, Strings.investedAmountColon, AssetField.formatInvestedAmount, AssetField.investedAmount, epsa.Settings.currency()),
       ASSET_KEY_GROSS_AMOUNT    -> AssetAmountField(Strings.gross, Strings.grossAmountColon, AssetField.formatGrossAmount, AssetField.grossAmount, epsa.Settings.currency()),
       ASSET_KEY_GROSS_GAIN      -> AssetColoredAmountField(Strings.gross, Strings.grossGainColon, AssetField.formatGrossGain, AssetField.grossGain, epsa.Settings.currency()),
@@ -1307,11 +1322,18 @@ object MainController {
     )
 
     val bigDecimalComparator = Comparators.optionComparator[BigDecimal]
+    val localDateComparator = Comparators.optionComparator[LocalDate]
 
     def amountComparator(value: AssetDetails => Option[BigDecimal]): Comparator[AssetDetails] = {
       new Comparator[AssetDetails] {
         override def compare(o1: AssetDetails, o2: AssetDetails): Int =
           bigDecimalComparator.compare(value(o1), value(o2))
+      }
+    }
+    def dateComparator(value: AssetDetails => Option[LocalDate]): Comparator[AssetDetails] = {
+      new Comparator[AssetDetails] {
+        override def compare(o1: AssetDetails, o2: AssetDetails): Int =
+          localDateComparator.compare(value(o1), value(o2))
       }
     }
 
@@ -1320,11 +1342,13 @@ object MainController {
     def formatFund(details: AssetDetails, long: Boolean) = details.fund.name
     def fundComment(details: AssetDetails) = details.fund.comment
     def formatAvailability(details: AssetDetails, long: Boolean) = details.formatAvailability(long)
+    def availabilikty(details: AssetDetails) = details.availability
     def formatUnits(details: AssetDetails, long: Boolean) = details.formatUnits
     def units(details: AssetDetails) = Some(details.units)
     def formatVWAP(details: AssetDetails, long: Boolean) = details.formatVWAP
     def vwap(details: AssetDetails) = Some(details.vwap)
     def formatDate(details: AssetDetails, long: Boolean) = details.formatDate
+    def date(details: AssetDetails) = details.date
     def formatNAV(details: AssetDetails, long: Boolean) = details.formatNAV
     def nav(details: AssetDetails) = details.nav
     def formatInvestedAmount(details: AssetDetails, long: Boolean) = details.formatInvestedAmount
