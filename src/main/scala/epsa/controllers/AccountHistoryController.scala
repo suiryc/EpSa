@@ -203,6 +203,12 @@ class AccountHistoryController extends Logging {
       List(historyTable.widthProperty, clippedContainer.widthProperty, columnEventDate.widthProperty),
       updateColumnWidth()
     )
+    // Requesting layout (in runLater) usually helps when the table is first
+    // being shown. Otherwise the column is often properly resized but it is
+    // not applied (visually) until we interact with the stage ...
+    JFXSystem.runLater {
+      historyTable.requestLayout()
+    }
 
     def restoreDividerPositions(): Unit = {
       // Restore SplitPane divider positions
