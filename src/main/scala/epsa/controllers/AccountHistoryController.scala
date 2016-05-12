@@ -143,6 +143,8 @@ class AccountHistoryController extends Logging {
           savings.processEvent(event)
       }
     }
+    // Note: changing root clears the table sort order. Fortunately we do
+    // set the order upon restoring view which is done later.
     historyTable.setRoot(root)
     historyTable.setShowRoot(false)
 

@@ -3,9 +3,8 @@ package epsa.controllers
 import akka.actor.{Actor, ActorRef, Props}
 import epsa.I18N
 import epsa.I18N.Strings
-import epsa.Settings.{scalePercents, scaleVWAP}
 import epsa.charts.{ChartHandler, ChartSettings}
-import epsa.model.Savings
+import epsa.model._
 import epsa.storage.DataStore
 import epsa.tools.EsaliaInvestmentFundProber
 import epsa.util.{Awaits, JFXStyles}
@@ -13,21 +12,19 @@ import grizzled.slf4j.Logging
 import java.io.PrintWriter
 import java.nio.file.Path
 import java.time.LocalDate
-import java.util.{Comparator, UUID}
-import javafx.beans.property.{SimpleObjectProperty, SimpleStringProperty}
-import javafx.collections.ListChangeListener.Change
-import javafx.collections.{FXCollections, ObservableList}
-import javafx.collections.transformation.{SortedList, TransformationList}
+import java.util. UUID
+import javafx.beans.property.SimpleObjectProperty
+import javafx.collections.FXCollections
+import javafx.collections.transformation.SortedList
 import javafx.event.ActionEvent
 import javafx.fxml.{FXML, FXMLLoader}
 import javafx.scene.{Parent, Scene}
-import javafx.scene.layout.{GridPane, Region}
+import javafx.scene.layout.GridPane
 import javafx.scene.control._
 import javafx.scene.image.ImageView
 import javafx.scene.input._
 import javafx.stage._
 import scala.collection.JavaConversions._
-import scala.collection.immutable.ListMap
 import scala.util.Success
 import suiryc.scala.RichOption._
 import suiryc.scala.{javafx => jfx}
@@ -37,15 +34,13 @@ import suiryc.scala.javafx.event.EventHandler._
 import suiryc.scala.javafx.scene.control.{Dialogs, TableViews}
 import suiryc.scala.javafx.stage.{FileChoosers, Stages}
 import suiryc.scala.javafx.util.Callback
-import suiryc.scala.math.Ordering.localDateOrdering
 import suiryc.scala.settings.Preference
-import suiryc.scala.util.Comparators
 
 // TODO: if requested (menu entry, saved in settings) display 'totals' by availability date or scheme/fund ?
 // TODO: display more information in assets table and details: net gain/loss (amount/percentage)
 // TODO: change details pane position; set below table ? (then have NAV history graph on the right side of details)
 // TODO: menu entries with latest datastore locations ?
-// TODO: when computing assets, order by scheme/fund/availability ?
+// TODO: when computing assets, order by scheme/fund/availability by default
 // TODO: manage encryption of datastore ?
 //         -> possible to read/write
 //         -> how to determine beforehand ?
@@ -94,11 +89,11 @@ class MainController extends Logging {
 
   private val columnAmount = new TableColumn[AssetDetails, Nothing](Strings.amount)
 
-  columnAmount.getColumns.addAll(assetFields(ASSET_KEY_INVESTED_AMOUNT).column, assetFields(ASSET_KEY_GROSS_AMOUNT).column)
+  columnAmount.getColumns.addAll(assetFields(AssetField.KEY_INVESTED_AMOUNT).column, assetFields(AssetField.KEY_GROSS_AMOUNT).column)
 
   private val columnGain = new TableColumn[AssetDetails, Nothing](Strings.gain)
 
-  columnGain.getColumns.addAll(assetFields(ASSET_KEY_GROSS_GAIN).column, assetFields(ASSET_KEY_GROSS_GAIN_PCT).column)
+  columnGain.getColumns.addAll(assetFields(AssetField.KEY_GROSS_GAIN).column, assetFields(AssetField.KEY_GROSS_GAIN_PCT).column)
 
   def initialize(state: State): Unit = {
     // Note: make the actor name unique (with timestamp) so that it can be
@@ -468,17 +463,22 @@ class MainController extends Logging {
       val assetsDetails = assets.map(getAssetDetails)
       val sortedAssetsDetails = new SortedList(FXCollections.observableList(assetsDetails))
       sortedAssetsDetails.comparatorProperty.bind(assetsTable.comparatorProperty)
-      val sortedAssetsWithTotal = new AssetsWithTotal(sortedAssetsDetails)
+      val sortedAssetsWithTotal = new AssetDetailsWithTotal(sortedAssetsDetails)
+      // Bind (and first set) our total comparator to the table comparator
+      sortedAssetsWithTotal.comparatorProperty.setValue(assetsTable.getComparator)
+      sortedAssetsWithTotal.comparatorProperty.bind(assetsTable.comparatorProperty)
       // It is better (up to JavaFX 8) to unbind the previous SortedList
       // comparator if any. The previous list will eventually get GCed, but not
       // the binding itself.
       // See: http://bugs.java.com/bugdatabase/view_bug.do?bug_id=8089305
       Option(assetsTable.getItems).foreach {
-        case items: AssetsWithTotal =>
+        case items: AssetDetailsWithTotal =>
           items.getSource.asInstanceOf[SortedList[AssetDetails]].comparatorProperty.unbind()
         case _ =>
       }
-      assetsTable.setItems(sortedAssetsWithTotal)
+      // Note: TableView.setItems clears the sort order if items are not in a
+      // SortedList.
+      TableViews.setItems(assetsTable, sortedAssetsWithTotal)
 
       fileCloseMenu.setDisable(DataStore.dbOpened.isEmpty)
       fileSaveMenu.setDisable(!dirty)
@@ -1018,353 +1018,6 @@ object MainController {
   case class OnTest(n: Int)
 
   case object OnFundGraph
-
-  private val ASSET_KEY_SCHEME = "scheme"
-
-  private val ASSET_KEY_FUND = "fund"
-
-  private val ASSET_KEY_AVAILABILITY = "availability"
-
-  private val ASSET_KEY_UNITS = "units"
-
-  private val ASSET_KEY_VWAP = "vwap"
-
-  private val ASSET_KEY_DATE = "date"
-
-  private val ASSET_KEY_NAV = "nav"
-
-  private val ASSET_KEY_INVESTED_AMOUNT = "investedAmount"
-
-  private val ASSET_KEY_GROSS_AMOUNT = "grossAmount"
-
-  private val ASSET_KEY_GROSS_GAIN = "grossGain"
-
-  private val ASSET_KEY_GROSS_GAIN_PCT = "grossGainPct"
-
-  object AssetDetailsKind extends Enumeration {
-    val Standard = Value
-    val TotalPartial = Value
-    val TotalByFund = Value
-    val TotalByAvailability = Value
-    val Total = Value
-  }
-
-  trait AssetDetails {
-    val asset: Savings.Asset
-    val scheme: Savings.Scheme
-    val fund: Savings.Fund
-    val date: Option[LocalDate]
-    val nav: Option[BigDecimal]
-
-    val kind: AssetDetailsKind.Value
-    var first: Boolean = false
-
-    private val currency = epsa.Settings.currency()
-
-    def availability = asset.availability
-    def units = asset.units
-    def vwap = asset.vwap
-    def investedAmount = asset.investedAmount
-    lazy val grossAmount = nav.map { value =>
-      asset.amount(value)
-    }
-    lazy val grossGain = grossAmount.map { amount =>
-      amount - investedAmount
-    }
-    lazy val grossGainPct =
-      if (investedAmount == 0) Some(BigDecimal(0))
-      else grossGain.map(v => scalePercents((v * 100) / investedAmount))
-
-    def formatAvailability(long: Boolean) =
-      if ((kind != AssetDetailsKind.Standard) && (kind != AssetDetailsKind.TotalByAvailability)) null
-      else Form.formatAvailability(asset.availability, date = None, long)
-    lazy val formatUnits =
-      if ((kind != AssetDetailsKind.Standard) && (kind != AssetDetailsKind.TotalByFund)) null
-      else units.toString
-    lazy val formatVWAP =
-      if ((kind != AssetDetailsKind.Standard) && (kind != AssetDetailsKind.TotalByFund)) null
-      else Form.formatAmount(vwap, currency)
-    lazy val formatDate =
-      if ((kind != AssetDetailsKind.Standard) && (kind != AssetDetailsKind.TotalByFund)) null
-      else date.map(_.toString).getOrElse(Strings.na)
-    lazy val formatNAV =
-      if ((kind != AssetDetailsKind.Standard) && (kind != AssetDetailsKind.TotalByFund)) null
-      else nav.map(Form.formatAmount(_, currency)).getOrElse(Strings.na)
-    lazy val formatInvestedAmount = Form.formatAmount(investedAmount, currency)
-    lazy val formatGrossAmount = grossAmount.map(Form.formatAmount(_, currency)).getOrElse(Strings.na)
-    lazy val formatGrossGain = grossGain.map(Form.formatAmount(_, currency)).getOrElse(Strings.na)
-    lazy val formatGrossGainPct = grossGainPct.map(Form.formatAmount(_, "%")).getOrElse(Strings.na)
-  }
-
-  case class StandardAssetDetails(asset: Savings.Asset, scheme: Savings.Scheme, fund: Savings.Fund,
-    date: Option[LocalDate], nav: Option[BigDecimal]) extends AssetDetails
-  {
-    val kind = AssetDetailsKind.Standard
-  }
-
-  case class TotalAssetDetails(asset: Savings.Asset, scheme: Savings.Scheme, fund: Savings.Fund,
-    date: Option[LocalDate], nav: Option[BigDecimal], kind: AssetDetailsKind.Value,
-    override val investedAmount: BigDecimal) extends AssetDetails
-
-  /**
-   * Special items list that automatically adds a 'sum' of all wrapped assets.
-   *
-   * Ensures the dynamically generated row remains at the end of the table.
-   * See: http://stackoverflow.com/a/30509417
-   */
-  class AssetsWithTotal(source0: ObservableList[AssetDetails]) extends TransformationList[AssetDetails, AssetDetails](source0) {
-
-    private def orZero(v: Option[BigDecimal]): BigDecimal = v.getOrElse(0)
-
-    private def computeTotal(assets: List[AssetDetails], kind: AssetDetailsKind.Value,
-                             scheme: Option[Savings.Scheme], fund: Option[Savings.Fund],
-                             availability: Option[LocalDate]): AssetDetails =
-    {
-      val total0 = TotalAssetDetails(
-        asset = Savings.Asset(null, null, availability, units = 0, vwap = 0),
-        scheme = scheme.getOrElse(Savings.Scheme(null, null, None, Nil)),
-        fund = fund.getOrElse(Savings.Fund(null, null, None)),
-        date = None,
-        nav = Some(0),
-        kind = kind,
-        investedAmount = 0
-      )
-      assets.foldLeft(total0) { (acc, details) =>
-        val units = acc.units + details.units
-        val investedAmount = acc.investedAmount + details.investedAmount
-        val vwap = scaleVWAP(investedAmount / units)
-        acc.copy(
-          asset = acc.asset.copy(units = units, vwap = vwap),
-          date = details.date,
-          nav = details.nav,
-          investedAmount = investedAmount
-        )
-      }
-    }
-
-    val assets0 = source0.toList
-
-    val total = computeTotal(assets0, kind = AssetDetailsKind.Total, scheme = None, fund = None, availability = None)
-    val totalByScheme = assets0.groupBy(_.scheme).map { case (scheme, assets) =>
-      computeTotal(assets, kind = AssetDetailsKind.TotalPartial, scheme = Some(scheme), fund = None, availability = None)
-    }.toList
-    val totalByFund = assets0.groupBy(_.fund).map { case (fund, assets) =>
-      computeTotal(assets, kind = AssetDetailsKind.TotalByFund, scheme = None, fund = Some(fund), availability = None)
-    }.toList
-    val totalByAvailability = assets0.groupBy(_.asset.availability).map { case (availability, assets) =>
-      computeTotal(assets, kind = AssetDetailsKind.TotalByAvailability, scheme = None, fund = None, availability = availability)
-    }.toList
-
-    var totals: List[AssetDetails] = Nil
-
-    def updateTotals(): Unit = {
-      def tagFirst(assets: List[AssetDetails]): List[AssetDetails] = {
-        @scala.annotation.tailrec
-        def loop(assets: List[AssetDetails], first: Boolean): Unit =
-          assets match {
-            case head :: tail =>
-              head.first = first
-              loop(tail, first = false)
-
-            case Nil =>
-          }
-
-        loop(assets, first = true)
-        assets
-      }
-
-      // TODO: also sort according to table sorting
-      totals = (tagFirst(totalByScheme) ::: tagFirst(totalByFund) ::: tagFirst(totalByAvailability)) :+ total
-    }
-
-    updateTotals()
-
-    override def sourceChanged(c: Change[_ <: AssetDetails]): Unit = {
-      fireChange(c)
-      updateTotals()
-    }
-
-    override def getSourceIndex(index: Int): Int =
-      if (index < getSource.size) index else -1
-
-    override def get(index: Int): AssetDetails =
-      if (index < getSource.size) getSource.get(index)
-      else if (index < getSource.size + totals.size) totals(index - getSource.size)
-      else throw new ArrayIndexOutOfBoundsException(index)
-
-    override def size(): Int = getSource.size + totals.size
-
-  }
-
-  /** Asset field settings. */
-  trait AssetField[A] {
-    /** Field name in table. */
-    val tableLabel: String
-    /** Field name in details pane. */
-    val detailsLabel: String
-    /** Field comment if any. */
-    val comment: (AssetDetails) => Option[String] = { _ => None }
-    /** How to format field value. */
-    val format: (AssetDetails, Boolean) => String
-
-    /** The details pane label (where value is displayed). */
-    val detailsValue = new Label
-    detailsValue.setMinWidth(Region.USE_PREF_SIZE)
-    detailsValue.setMinHeight(Region.USE_PREF_SIZE)
-    // Display graphic on the right side
-    detailsValue.setContentDisplay(ContentDisplay.RIGHT)
-
-    /** The table column. */
-    val column: TableColumn[AssetDetails, A]
-
-    def updateDetailsValue(assetDetailsOpt: Option[AssetDetails]): Unit = {
-      detailsValue.setText(assetDetailsOpt.map(format(_, true)).orNull)
-      assetDetailsOpt.flatMap(comment) match {
-        case Some(text) =>
-          detailsValue.setTooltip(new Tooltip(text))
-          detailsValue.setGraphic(AssetField.tooltipHint)
-
-        case None =>
-          detailsValue.setTooltip(null)
-          detailsValue.setGraphic(null)
-      }
-    }
-  }
-
-  /** Asset field with formatted text value to display. */
-  case class AssetTextField(tableLabel: String, detailsLabel: String,
-    format: (AssetDetails, Boolean) => String,
-    override val comment: (AssetDetails) => Option[String] = { _ => None }
-  ) extends AssetField[String] {
-    val column = new TableColumn[AssetDetails, String](tableLabel)
-    column.setCellValueFactory(Callback { data =>
-      new SimpleStringProperty(format(data.getValue, false))
-    })
-  }
-
-  /** Asset field with date to display. */
-  case class AssetDateField(tableLabel: String, detailsLabel: String,
-    format: (AssetDetails, Boolean) => String,
-    value: (AssetDetails) => Option[LocalDate]
-   ) extends AssetField[AssetDetails] {
-    val column = new TableColumn[AssetDetails, AssetDetails](tableLabel)
-    column.setCellValueFactory(Callback { data =>
-      new SimpleObjectProperty(data.getValue)
-    })
-    column.setCellFactory(Callback { new FormatCell[AssetDetails, AssetDetails](v => format(v, false)) })
-    column.setComparator(AssetField.dateComparator(value))
-  }
-
-  /** Asset field with amount to display. */
-  case class AssetAmountField(tableLabel: String, detailsLabel: String,
-    format: (AssetDetails, Boolean) => String,
-    value: (AssetDetails) => Option[BigDecimal],
-    suffix: String
-  ) extends AssetField[AssetDetails] {
-    val column = new TableColumn[AssetDetails, AssetDetails](tableLabel)
-    column.setCellValueFactory(Callback { data =>
-      new SimpleObjectProperty(data.getValue)
-    })
-    column.setCellFactory(Callback { new FormatCell[AssetDetails, AssetDetails](v => format(v, false)) })
-    column.setComparator(AssetField.amountComparator(value))
-  }
-
-  /** Asset field with (colored) amount to display. */
-  case class AssetColoredAmountField(tableLabel: String, detailsLabel: String,
-    format: (AssetDetails, Boolean) => String,
-    value: (AssetDetails) => Option[BigDecimal],
-    suffix: String
-  ) extends AssetField[AssetDetails] {
-    val column = new TableColumn[AssetDetails, AssetDetails](tableLabel)
-    column.setCellValueFactory(Callback { data =>
-      new SimpleObjectProperty(data.getValue)
-    })
-    val value0 = value
-    column.setCellFactory(Callback {
-      new FormatCell[AssetDetails, AssetDetails](v => format(v, false)) with ColoredCell[AssetDetails] {
-        def value(v: AssetDetails) = value0(v)
-      }
-    })
-    column.setComparator(AssetField.amountComparator(value))
-
-    override def updateDetailsValue(assetDetailsOpt: Option[AssetDetails]): Unit = {
-      super.updateDetailsValue(assetDetailsOpt)
-      assetDetailsOpt.flatMap(value).find(_ != 0) match {
-        case Some(v) =>
-          if (v > 0) JFXStyles.togglePositive(detailsValue)
-          else JFXStyles.toggleNegative(detailsValue)
-
-        case None =>
-          JFXStyles.toggleNeutral(detailsValue)
-      }
-    }
-  }
-
-  object AssetField {
-
-    // Asset fields.
-    // Note: declare the fields through a def so that changing language applies
-    // upon reloading view.
-    // Order here is the one the fields will appear in the asset details pane
-    // and table columns.
-    def fields() = ListMap(
-      ASSET_KEY_SCHEME          -> AssetTextField(Strings.scheme, Strings.schemeColon, AssetField.formatScheme, AssetField.schemeComment),
-      ASSET_KEY_FUND            -> AssetTextField(Strings.fund, Strings.fundColon, AssetField.formatFund, AssetField.fundComment),
-      ASSET_KEY_AVAILABILITY    -> AssetDateField(Strings.availability, Strings.availabilityColon, AssetField.formatAvailability, AssetField.availabilikty),
-      ASSET_KEY_UNITS           -> AssetAmountField(Strings.units, Strings.unitsColon, AssetField.formatUnits, AssetField.units, null),
-      ASSET_KEY_VWAP            -> AssetAmountField(Strings.vwap, Strings.vwapColon, AssetField.formatVWAP, AssetField.vwap, epsa.Settings.currency()),
-      ASSET_KEY_NAV             -> AssetAmountField(Strings.nav, Strings.navColon, AssetField.formatNAV, AssetField.nav, epsa.Settings.currency()),
-      ASSET_KEY_DATE            -> AssetDateField(Strings.date, Strings.dateColon, AssetField.formatDate, AssetField.date),
-      ASSET_KEY_INVESTED_AMOUNT -> AssetAmountField(Strings.invested, Strings.investedAmountColon, AssetField.formatInvestedAmount, AssetField.investedAmount, epsa.Settings.currency()),
-      ASSET_KEY_GROSS_AMOUNT    -> AssetAmountField(Strings.gross, Strings.grossAmountColon, AssetField.formatGrossAmount, AssetField.grossAmount, epsa.Settings.currency()),
-      ASSET_KEY_GROSS_GAIN      -> AssetColoredAmountField(Strings.gross, Strings.grossGainColon, AssetField.formatGrossGain, AssetField.grossGain, epsa.Settings.currency()),
-      ASSET_KEY_GROSS_GAIN_PCT  -> AssetColoredAmountField(Strings.grossPct, Strings.grossGainPctColon, AssetField.formatGrossGainPct, AssetField.grossGainPct, "%")
-    )
-
-    val bigDecimalComparator = Comparators.optionComparator[BigDecimal]
-    val localDateComparator = Comparators.optionComparator[LocalDate]
-
-    def amountComparator(value: AssetDetails => Option[BigDecimal]): Comparator[AssetDetails] = {
-      new Comparator[AssetDetails] {
-        override def compare(o1: AssetDetails, o2: AssetDetails): Int =
-          bigDecimalComparator.compare(value(o1), value(o2))
-      }
-    }
-    def dateComparator(value: AssetDetails => Option[LocalDate]): Comparator[AssetDetails] = {
-      new Comparator[AssetDetails] {
-        override def compare(o1: AssetDetails, o2: AssetDetails): Int =
-          localDateComparator.compare(value(o1), value(o2))
-      }
-    }
-
-    def formatScheme(details: AssetDetails, long: Boolean) = details.scheme.name
-    def schemeComment(details: AssetDetails) = details.scheme.comment
-    def formatFund(details: AssetDetails, long: Boolean) = details.fund.name
-    def fundComment(details: AssetDetails) = details.fund.comment
-    def formatAvailability(details: AssetDetails, long: Boolean) = details.formatAvailability(long)
-    def availabilikty(details: AssetDetails) = details.availability
-    def formatUnits(details: AssetDetails, long: Boolean) = details.formatUnits
-    def units(details: AssetDetails) = Some(details.units)
-    def formatVWAP(details: AssetDetails, long: Boolean) = details.formatVWAP
-    def vwap(details: AssetDetails) = Some(details.vwap)
-    def formatDate(details: AssetDetails, long: Boolean) = details.formatDate
-    def date(details: AssetDetails) = details.date
-    def formatNAV(details: AssetDetails, long: Boolean) = details.formatNAV
-    def nav(details: AssetDetails) = details.nav
-    def formatInvestedAmount(details: AssetDetails, long: Boolean) = details.formatInvestedAmount
-    def investedAmount(details: AssetDetails) = Some(details.investedAmount)
-    def formatGrossAmount(details: AssetDetails, long: Boolean) = details.formatGrossAmount
-    def grossAmount(details: AssetDetails) = details.grossAmount
-    def formatGrossGain(details: AssetDetails, long: Boolean) = details.formatGrossGain
-    def grossGain(details: AssetDetails) = details.grossGain
-    def formatGrossGainPct(details: AssetDetails, long: Boolean) = details.formatGrossGainPct
-    def grossGainPct(details: AssetDetails) = details.grossGainPct
-
-    // Note: there need to be distinct ImageView instances to display an image
-    // more than once.
-    def tooltipHint = new ImageView(Images.iconInformationBalloon)
-
-  }
 
   def build(state: State, needRestart: Boolean = false, applicationStart: Boolean = false): Unit = {
     val stage = state.stage
