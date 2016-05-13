@@ -12,7 +12,7 @@ import grizzled.slf4j.Logging
 import java.io.PrintWriter
 import java.nio.file.Path
 import java.time.LocalDate
-import java.util. UUID
+import java.util.UUID
 import javafx.beans.property.SimpleObjectProperty
 import javafx.collections.FXCollections
 import javafx.collections.transformation.SortedList
@@ -34,13 +34,13 @@ import suiryc.scala.javafx.event.EventHandler._
 import suiryc.scala.javafx.scene.control.{Dialogs, TableViews}
 import suiryc.scala.javafx.stage.{FileChoosers, Stages}
 import suiryc.scala.javafx.util.Callback
+import suiryc.scala.math.Ordering.localDateOrdering
 import suiryc.scala.settings.Preference
 
 // TODO: if requested (menu entry, saved in settings) display 'totals' by availability date or scheme/fund ?
 // TODO: display more information in assets table and details: net gain/loss (amount/percentage)
 // TODO: change details pane position; set below table ? (then have NAV history graph on the right side of details)
 // TODO: menu entries with latest datastore locations ?
-// TODO: when computing assets, order by scheme/fund/availability by default
 // TODO: manage encryption of datastore ?
 //         -> possible to read/write
 //         -> how to determine beforehand ?
@@ -460,7 +460,11 @@ class MainController extends Logging {
       val assets =
         if (!newState.viewUpToDateAssets) newSavings.assets
         else newSavings.computeAssets(LocalDate.now).assets
-      val assetsDetails = assets.map(getAssetDetails)
+      // Get details and sort by scheme, fund then availability by default
+      // See: http://stackoverflow.com/a/10027682
+      val assetsDetails = assets.map(getAssetDetails).sortBy { details =>
+        (details.scheme.name, details.fund.name, details.asset.availability)
+      }
       val sortedAssetsDetails = new SortedList(FXCollections.observableList(assetsDetails))
       sortedAssetsDetails.comparatorProperty.bind(assetsTable.comparatorProperty)
       val sortedAssetsWithTotal = new AssetDetailsWithTotal(sortedAssetsDetails)
