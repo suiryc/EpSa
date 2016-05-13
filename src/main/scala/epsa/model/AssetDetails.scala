@@ -113,7 +113,13 @@ case class TotalAssetDetails(
  * Ensures the dynamically generated rows remain at the end of the table.
  * See: http://stackoverflow.com/a/30509417
  */
-class AssetDetailsWithTotal(source0: ObservableList[AssetDetails]) extends TransformationList[AssetDetails, AssetDetails](source0) {
+class AssetDetailsWithTotal(
+  source0: ObservableList[AssetDetails],
+  showTotalsByScheme: Boolean,
+  showTotalsByFund: Boolean,
+  showTotalsByAvailability: Boolean
+) extends TransformationList[AssetDetails, AssetDetails](source0)
+{
 
   // Notes:
   // We wish to append partial totals (by scheme, by fund, and by availability
@@ -200,27 +206,42 @@ class AssetDetailsWithTotal(source0: ObservableList[AssetDetails]) extends Trans
   // Partial totals, with proper initial sorting and bound comparators.
   // Listen for changes in each group in order to propagate them (so that
   // the table rows are updated).
-  private val totalByScheme = toSorted(assets0.groupBy(_.scheme).map { case (scheme, assets) =>
-    computeTotal(assets, kind = AssetDetailsKind.TotalPartial, scheme = Some(scheme), fund = None, availability = None)
-  }.toList.sortBy(_.scheme.name))
-  totalByScheme.comparatorProperty.bind(comparatorProperty)
-  totalByScheme.listen { change =>
-    adaptChange(change, getSource.size)
-  }
-  private val totalByFund = toSorted(assets0.groupBy(_.fund).map { case (fund, assets) =>
-    computeTotal(assets, kind = AssetDetailsKind.TotalByFund, scheme = None, fund = Some(fund), availability = None)
-  }.toList.sortBy(_.fund.name))
-  totalByFund.comparatorProperty.bind(comparatorProperty)
-  totalByFund.listen { change =>
-    adaptChange(change, getSource.size + totalByScheme.size)
-  }
-  private val totalByAvailability = toSorted(assets0.groupBy(_.asset.availability).map { case (availability, assets) =>
-    computeTotal(assets, kind = AssetDetailsKind.TotalByAvailability, scheme = None, fund = None, availability = availability)
-  }.toList.sortBy(_.asset.availability))
-  totalByAvailability.comparatorProperty.bind(comparatorProperty)
-  totalByAvailability.listen { change =>
-    adaptChange(change, getSource.size + totalByScheme.size + totalByFund.size)
-  }
+  private val totalByScheme =
+    if (!showTotalsByScheme) toSorted(Nil)
+    else {
+      val totals = toSorted(assets0.groupBy(_.scheme).map { case (scheme, assets) =>
+        computeTotal(assets, kind = AssetDetailsKind.TotalPartial, scheme = Some(scheme), fund = None, availability = None)
+      }.toList.sortBy(_.scheme.name))
+      totals.comparatorProperty.bind(comparatorProperty)
+      totals.listen { change =>
+        adaptChange(change, getSource.size)
+      }
+      totals
+    }
+  private val totalByFund =
+    if (!showTotalsByFund) toSorted(Nil)
+    else {
+      val totals = toSorted(assets0.groupBy(_.fund).map { case (fund, assets) =>
+        computeTotal(assets, kind = AssetDetailsKind.TotalByFund, scheme = None, fund = Some(fund), availability = None)
+      }.toList.sortBy(_.fund.name))
+      totals.comparatorProperty.bind(comparatorProperty)
+      totals.listen { change =>
+        adaptChange(change, getSource.size + totalByScheme.size)
+      }
+      totals
+    }
+  private val totalByAvailability =
+    if (!showTotalsByAvailability) toSorted(Nil)
+    else {
+      val totals = toSorted(assets0.groupBy(_.asset.availability).map { case (availability, assets) =>
+        computeTotal(assets, kind = AssetDetailsKind.TotalByAvailability, scheme = None, fund = None, availability = availability)
+      }.toList.sortBy(_.asset.availability))
+      totals.comparatorProperty.bind(comparatorProperty)
+      totals.listen { change =>
+        adaptChange(change, getSource.size + totalByScheme.size + totalByFund.size)
+      }
+      totals
+    }
 
   private var totals: List[AssetDetails] = Nil
 

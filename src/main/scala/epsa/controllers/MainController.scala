@@ -37,7 +37,6 @@ import suiryc.scala.javafx.util.Callback
 import suiryc.scala.math.Ordering.localDateOrdering
 import suiryc.scala.settings.Preference
 
-// TODO: if requested (menu entry, saved in settings) display 'totals' by availability date or scheme/fund ?
 // TODO: display more information in assets table and details: net gain/loss (amount/percentage)
 // TODO: change details pane position; set below table ? (then have NAV history graph on the right side of details)
 // TODO: menu entries with latest datastore locations ?
@@ -64,6 +63,15 @@ class MainController extends Logging {
 
   @FXML
   protected var viewAccountHistoryMenu: MenuItem = _
+
+  @FXML
+  protected var totalsBySchemeMenu: CheckMenuItem = _
+
+  @FXML
+  protected var totalsByFundMenu: CheckMenuItem = _
+
+  @FXML
+  protected var totalsByAvailabilityMenu: CheckMenuItem = _
 
   @FXML
   protected var toolsExportRawAccountHistoryMenu: MenuItem = _
@@ -149,6 +157,23 @@ class MainController extends Logging {
     assetsTable.addEventHandler(KeyEvent.KEY_PRESSED, { (event: KeyEvent) =>
       if (CTRL_C.`match`(event)) Option(assetsTable.getSelectionModel.getSelectedItem).foreach(copyAssetDetailsToClipboard)
     })
+
+    // Handle totals displaying settings
+    for {
+      (menu, pref) <- List(
+        (totalsBySchemeMenu, totalsByScheme),
+        (totalsByFundMenu, totalsByFund),
+        (totalsByAvailabilityMenu, totalsByAvailability)
+      )
+    } {
+      // First select shown totals saved in settings
+      menu.setSelected(pref())
+      // Listen for changes to save new value in settings, then refresh the view
+      menu.selectedProperty.listen { selected =>
+        pref() = selected
+        refresh()
+      }
+    }
   }
 
   /** Restores (persisted) view. */
@@ -467,7 +492,12 @@ class MainController extends Logging {
       }
       val sortedAssetsDetails = new SortedList(FXCollections.observableList(assetsDetails))
       sortedAssetsDetails.comparatorProperty.bind(assetsTable.comparatorProperty)
-      val sortedAssetsWithTotal = new AssetDetailsWithTotal(sortedAssetsDetails)
+      val sortedAssetsWithTotal = new AssetDetailsWithTotal(
+        sortedAssetsDetails,
+        showTotalsByScheme = totalsBySchemeMenu.isSelected,
+        showTotalsByFund = totalsByFundMenu.isSelected,
+        showTotalsByAvailability = totalsByAvailabilityMenu.isSelected
+      )
       // Bind (and first set) our total comparator to the table comparator
       sortedAssetsWithTotal.comparatorProperty.setValue(assetsTable.getComparator)
       sortedAssetsWithTotal.comparatorProperty.bind(assetsTable.comparatorProperty)
@@ -955,6 +985,12 @@ object MainController {
   private val assetsColumnsPref = Preference.from(s"$prefsKeyPrefix.assets.columns", null:String)
 
   private val accountHistoryPath = Preference.from("account.history.path", null:Path)
+
+  private val totalsByScheme = Preference.from("totals.by-scheme", true)
+
+  private val totalsByFund = Preference.from("totals.by-fund", true)
+
+  private val totalsByAvailability = Preference.from("totals.by-availability", true)
 
   case class State(
     stage: Stage,
