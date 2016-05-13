@@ -12,7 +12,6 @@ import javafx.fxml.{FXML, FXMLLoader}
 import javafx.geometry.Insets
 import javafx.scene.Node
 import javafx.scene.control._
-import javafx.scene.layout.GridPane
 import javafx.stage.{Modality, Stage, Window}
 import javafx.util.converter.LocalDateStringConverter
 import scala.collection.JavaConversions._
@@ -26,6 +25,8 @@ import suiryc.scala.javafx.stage.Stages
 import suiryc.scala.javafx.util.Callback
 
 // TODO: option of default day/month and number of years for frozen assets ?
+// or better: have a user-defined list of availability periods (including
+// presented order), and have a button to apply one of them (or reset to now)
 class NewAssetActionController {
 
   import epsa.Settings.{scaleAmount, scaleUnits}
@@ -102,8 +103,6 @@ class NewAssetActionController {
   private var mainController: MainController = _
 
   private lazy val stage = paymentButton.getScene.getWindow.asInstanceOf[Stage]
-
-  private lazy val srcFundGridPane = srcEmptyButton.getParent.asInstanceOf[GridPane]
 
   private lazy val toggleButtons = List(paymentButton, transferButton, refundButton)
 
