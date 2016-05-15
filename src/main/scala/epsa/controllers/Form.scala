@@ -63,6 +63,8 @@ object AssetActionKind extends Enumeration {
 
 case class SchemeAndFund(scheme: Savings.Scheme, fund: Savings.Fund) extends Ordered[SchemeAndFund] {
 
+  val id = Savings.AssetId(scheme.id, fund.id)
+
   def compare(other: SchemeAndFund): Int = {
     val c1 = scheme.name.compare(other.scheme.name)
     if (c1 != 0) c1

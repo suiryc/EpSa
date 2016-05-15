@@ -22,7 +22,9 @@ class SavingsSpec extends WordSpec with Matchers {
     "have an empty ctor" in {
       savings0.schemes shouldBe empty
       savings0.funds shouldBe empty
-      savings0.assets shouldBe empty
+      savings0.assets.list shouldBe empty
+      savings0.assets.byId shouldBe empty
+      savings0.assets.vwaps shouldBe empty
       savings0.latestAssetAction shouldBe empty
     }
 
@@ -34,7 +36,9 @@ class SavingsSpec extends WordSpec with Matchers {
       val savings = savings0.processEvent(event)
       savings.schemes.size shouldBe 1
       savings.funds shouldBe empty
-      savings.assets shouldBe empty
+      savings.assets.list shouldBe empty
+      savings.assets.byId shouldBe empty
+      savings.assets.vwaps shouldBe empty
       savings.latestAssetAction shouldBe empty
 
       val scheme = savings.schemes.head
@@ -87,7 +91,9 @@ class SavingsSpec extends WordSpec with Matchers {
       val savings = savings0.processEvent(event)
       savings.schemes shouldBe empty
       savings.funds.size shouldBe 1
-      savings.assets shouldBe empty
+      savings.assets.list shouldBe empty
+      savings.assets.byId shouldBe empty
+      savings.assets.vwaps shouldBe empty
       savings.latestAssetAction shouldBe empty
 
       val fund = savings.funds.head
@@ -209,6 +215,50 @@ class SavingsSpec extends WordSpec with Matchers {
         Savings.Asset(scheme.id, fund2.id, None, BigDecimal(12), 0),
         Savings.Asset(scheme.id, fund2.id, Some(date.plusDays(10)), BigDecimal(10), 0)
       )
+    }
+
+    "handle assets list and vwaps populating" in {
+      val scheme = savings2.schemes.head
+      val fund1 = savings2.funds.head
+      val fund2 = savings2.funds(1)
+      val date = LocalDate.now.minusDays(10)
+
+      // Create 2 assets entries
+      val savings2_1 = savings2.processEvents(
+        Savings.MakePayment(date.plusDays(1), Savings.AssetPart(scheme.id, fund1.id, None, BigDecimal(1), BigDecimal(1)), None),
+        Savings.MakePayment(date.plusDays(2), Savings.AssetPart(scheme.id, fund1.id, Some(date.plusDays(10)), BigDecimal(1), BigDecimal(1)), None),
+        Savings.MakePayment(date.plusDays(2), Savings.AssetPart(scheme.id, fund1.id, None, BigDecimal(1), BigDecimal(1)), None)
+      )
+      savings2_1.assets.list.size shouldBe 2
+      savings2_1.assets.byId.size shouldBe 1
+      savings2_1.assets.vwaps.size shouldBe 1
+
+      // Create a 3rd entry by transferring part of an existing one
+      val savings2_2 = savings2_1.processEvents(
+        Savings.MakeTransfer(date.plusDays(3), Savings.AssetPart(scheme.id, fund1.id, None, BigDecimal(1), BigDecimal(1)),
+          Savings.AssetPart(scheme.id, fund2.id, None, BigDecimal(1), BigDecimal(1)), None)
+      )
+      savings2_2.assets.list.size shouldBe 3
+      savings2_2.assets.byId.size shouldBe 2
+      savings2_2.assets.vwaps.size shouldBe 2
+
+      // Empty one entry by transferring to an existing one, keeping 2 different ids
+      val savings2_3 = savings2_2.processEvents(
+        Savings.MakeTransfer(date.plusDays(4), Savings.AssetPart(scheme.id, fund1.id, None, BigDecimal(1), BigDecimal(1)),
+          Savings.AssetPart(scheme.id, fund2.id, None, BigDecimal(1), BigDecimal(1)), None)
+      )
+      savings2_3.assets.list.size shouldBe 2
+      savings2_3.assets.byId.size shouldBe 2
+      savings2_3.assets.vwaps.size shouldBe 2
+
+      // Then empty account
+      val savings2_4 = savings2_3.processEvents(
+        Savings.MakeRefund(date.plusDays(6), Savings.AssetPart(scheme.id, fund1.id, Some(date.plusDays(10)), BigDecimal(1), BigDecimal(1)), None),
+        Savings.MakeRefund(date.plusDays(6), Savings.AssetPart(scheme.id, fund2.id, None, BigDecimal(2), BigDecimal(1)), None)
+      )
+      savings2_4.assets.list shouldBe empty
+      savings2_4.assets.byId shouldBe empty
+      savings2_4.assets.vwaps shouldBe empty
     }
 
     "handle resolving assets availability by date" in {
@@ -377,6 +427,8 @@ class SavingsSpec extends WordSpec with Matchers {
       val scheme = savings2.schemes.head
       val fund1 = savings2.funds.head
       val fund2 = savings2.funds(1)
+      val id1 = Savings.AssetId(scheme.id, fund1.id)
+      val id2 = Savings.AssetId(scheme.id, fund2.id)
       val date = LocalDate.now.minusDays(10)
 
       // Invest 1 unit at price 6; VWAP = 1*6 / 1 = 6
@@ -384,6 +436,7 @@ class SavingsSpec extends WordSpec with Matchers {
         Savings.MakePayment(date.plusDays(1), Savings.AssetPart(scheme.id, fund1.id, None, BigDecimal(1), BigDecimal(6)), None)
       )
       checkSavings(date, savings2_1,
+        Map(id1 -> BigDecimal(6)),
         Savings.Asset(scheme.id, fund1.id, None, BigDecimal(1), BigDecimal(6))
       )
 
@@ -392,6 +445,7 @@ class SavingsSpec extends WordSpec with Matchers {
         Savings.MakePayment(date.plusDays(1), Savings.AssetPart(scheme.id, fund1.id, None, BigDecimal(2), BigDecimal(3)), None)
       )
       checkSavings(date, savings2_2,
+        Map(id1 -> BigDecimal(4)),
         Savings.Asset(scheme.id, fund1.id, None, BigDecimal(3), BigDecimal(4))
       )
 
@@ -400,6 +454,7 @@ class SavingsSpec extends WordSpec with Matchers {
         Savings.MakeRefund(date.plusDays(1), Savings.AssetPart(scheme.id, fund1.id, None, BigDecimal(1), BigDecimal(100)), None)
       )
       checkSavings(date, savings2_3,
+        Map(id1 -> BigDecimal(4)),
         Savings.Asset(scheme.id, fund1.id, None, BigDecimal(2), BigDecimal(4))
       )
 
@@ -408,29 +463,36 @@ class SavingsSpec extends WordSpec with Matchers {
         Savings.MakePayment(date.plusDays(1), Savings.AssetPart(scheme.id, fund1.id, Some(date.plusDays(10)), BigDecimal(2), BigDecimal(2)), None)
       )
       checkSavings(date, savings2_4,
+        Map(id1 -> BigDecimal(3)),
         Savings.Asset(scheme.id, fund1.id, None, BigDecimal(2), BigDecimal(4)),
         Savings.Asset(scheme.id, fund1.id, Some(date.plusDays(10)), BigDecimal(2), BigDecimal(2))
       )
       checkSavings(date.plusDays(11), savings2_4,
+        Map(id1 -> BigDecimal(3)),
         Savings.Asset(scheme.id, fund1.id, None, BigDecimal(4), BigDecimal(3))
       )
 
       // Transfer 2 units at price 2 (with VWAP = 4) to 4 units at price 1; dstVWAP = (2 * 4) / 4 = 2
+      // With VWAP = 3 (availability independent); dstVWAP = (2 * 3) / 4 = 1.5
       val savings2_5 = savings2_4.processEvent(
         Savings.MakeTransfer(date.plusDays(1), Savings.AssetPart(scheme.id, fund1.id, None, BigDecimal(2), BigDecimal(2)),
           Savings.AssetPart(scheme.id, fund2.id, None, BigDecimal(4), BigDecimal(1)), None)
       )
       checkSavings(date, savings2_5,
+        Map(id1 -> BigDecimal(3), id2 -> BigDecimal("1.5")),
         Savings.Asset(scheme.id, fund1.id, Some(date.plusDays(10)), BigDecimal(2), BigDecimal(2)),
         Savings.Asset(scheme.id, fund2.id, None, BigDecimal(4), BigDecimal(2))
       )
 
       // Transfer 2 units at price 4 (with VWAP = 2) to 8 units at price 1; dstVWAP = (4 * 2 + 2 * 2) / (4 + 8) = 1
+      // With VWAP = 3 (availability independent) we should get the same result since all amounts are merged in the asset
+      //   dstVWAP = (4 * 1.5 + 2 * 3) / (4 + 8) = 1  (as expected)
       val savings2_6 = savings2_5.processEvent(
         Savings.MakeTransfer(date.plusDays(1), Savings.AssetPart(scheme.id, fund1.id, Some(date.plusDays(10)), BigDecimal(2), BigDecimal(4)),
           Savings.AssetPart(scheme.id, fund2.id, None, BigDecimal(8), BigDecimal(1)), None)
       )
       checkSavings(date, savings2_6,
+        Map(id2 -> BigDecimal(1)),
         Savings.Asset(scheme.id, fund2.id, None, BigDecimal(12), BigDecimal(1))
       )
     }
@@ -496,11 +558,20 @@ class SavingsSpec extends WordSpec with Matchers {
   }
 
   private def checkSavings(date: LocalDate, savings0: Savings, expectedAssets: Savings.Asset*): Unit = {
+    checkSavings(date, savings0, Map.empty[Savings.AssetId, BigDecimal], expectedAssets:_*)
+  }
+
+  private def checkSavings(date: LocalDate, savings0: Savings, expectedVWAPs: Map[Savings.AssetId, BigDecimal], expectedAssets: Savings.Asset*): Unit = {
     val savings = savings0.computeAssets(date)
     withClue(s"Expecting ${expectedAssets.toList} for $savings:\n") {
-      savings.assets.size shouldBe expectedAssets.size
+      savings.assets.list.size shouldBe expectedAssets.size
       expectedAssets.foreach { expectedAsset =>
         checkAsset(date, savings, expectedAsset)
+      }
+    }
+    if (expectedVWAPs.nonEmpty) {
+      withClue(s"Expecting $expectedVWAPs for $savings:\n") {
+        savings.assets.vwaps shouldBe expectedVWAPs
       }
     }
   }

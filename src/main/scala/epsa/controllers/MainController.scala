@@ -74,6 +74,9 @@ class MainController extends Logging {
   protected var totalsPerAvailabilityMenu: CheckMenuItem = _
 
   @FXML
+  protected var vwapPerAssetMenu: CheckMenuItem = _
+
+  @FXML
   protected var toolsExportRawAccountHistoryMenu: MenuItem = _
 
   @FXML
@@ -158,17 +161,18 @@ class MainController extends Logging {
       if (CTRL_C.`match`(event)) Option(assetsTable.getSelectionModel.getSelectedItem).foreach(copyAssetDetailsToClipboard)
     })
 
-    // Handle totals displaying settings
+    // Handle displaying settings
     for {
       (menu, pref) <- List(
         (totalsPerSchemeMenu, totalsPerScheme),
         (totalsPerFundMenu, totalsPerFund),
-        (totalsPerAvailabilityMenu, totalsPerAvailability)
+        (totalsPerAvailabilityMenu, totalsPerAvailability),
+        (vwapPerAssetMenu, vwapPerAsset)
       )
     } {
-      // First select shown totals saved in settings
+      // First select menu according to saved settings
       menu.setSelected(pref())
-      // Listen for changes to save new value in settings, then refresh the view
+      // Then listen for changes to save new value in settings, then refresh the view
       menu.selectedProperty.listen { selected =>
         pref() = selected
         refresh()
@@ -410,12 +414,16 @@ class MainController extends Logging {
 
     // Note: it is expected that we have an asset because there is an invested
     // amount. So there is no need to try to prevent division by 0.
+    val actualVWAP =
+      if (vwapPerAssetMenu.isSelected) None
+      else savings.assets.vwaps.get(asset.id)
     StandardAssetDetails(
       asset = asset,
       scheme = savings.getScheme(asset.schemeId),
       fund = savings.getFund(asset.fundId),
       date = state.assetsValue.get(asset.fundId).map(_.date),
-      nav = state.assetsValue.get(asset.fundId).map(_.value)
+      nav = state.assetsValue.get(asset.fundId).map(_.value),
+      actualVWAP
     )
   }
 
@@ -483,8 +491,8 @@ class MainController extends Logging {
       getState.set(newState)
       // Then update table content: takes care of added/removed entries
       val assets =
-        if (!newState.viewUpToDateAssets) newSavings.assets
-        else newSavings.computeAssets(LocalDate.now).assets
+        if (!newState.viewUpToDateAssets) newSavings.assets.list
+        else newSavings.computeAssets(LocalDate.now).assets.list
       // Get details and sort by scheme, fund then availability by default
       // See: http://stackoverflow.com/a/10027682
       val assetsDetails = assets.map(getAssetDetails).sortBy { details =>
@@ -992,6 +1000,7 @@ object MainController {
 
   private val totalsPerAvailability = Preference.from("totals.per-availability", true)
 
+  private val vwapPerAsset = Preference.from("vwap.per-asset", false)
 
   case class State(
     stage: Stage,

@@ -405,7 +405,7 @@ class EditFundsController {
    * A fund can be deleted only if it has no assets.
    */
   private def canDeleteFund(fund: Savings.Fund): Boolean =
-    !savings.assets.exists(_.fundId == fund.id)
+    !savings.assets.list.exists(_.fundId == fund.id)
 
   /** Updates the list of schemes. */
   private def updateSchemes(): Unit = {

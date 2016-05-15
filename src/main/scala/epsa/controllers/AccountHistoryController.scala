@@ -356,7 +356,7 @@ class AccountHistoryController extends Logging {
 
     // Gets all assets NAVs for a given date.
     def assetsNAV(savings: Savings, date: LocalDate): Map[UUID, Savings.AssetValue] =
-      savings.assets.map(_.fundId).distinct.flatMap { fundId =>
+      savings.assets.list.map(_.fundId).distinct.flatMap { fundId =>
         assetNAV(fundId, date).map(fundId -> _)
       }.toMap
 
@@ -372,7 +372,7 @@ class AccountHistoryController extends Logging {
     def atDate(history: History, savings: Savings, date: LocalDate): History = {
       val navs = assetsNAV(savings, date)
       if (validDate(date, navs)) {
-        val (history2, historyData) = savings.assets.foldLeft(history, HistoryData(date)) { case ((acc1, acc2), asset) =>
+        val (history2, historyData) = savings.assets.list.foldLeft(history, HistoryData(date)) { case ((acc1, acc2), asset) =>
           getNAV(asset.fundId, date, navs) match {
             case Some(nav) =>
               (acc1,

@@ -170,6 +170,7 @@
                   <CheckMenuItem fx:id="totalsPerFundMenu" mnemonicParsing="false" selected="true" text="%Totals per fund" />
                   <CheckMenuItem fx:id="totalsPerAvailabilityMenu" mnemonicParsing="false" selected="true" text="%Totals per availability" />
                   <SeparatorMenuItem mnemonicParsing="false" />
+                  <CheckMenuItem fx:id="vwapPerAssetMenu" mnemonicParsing="false" selected="true" text="%VWAP per asset" />
                   <CheckMenuItem mnemonicParsing="false" onAction="#onUpToDateAssets" selected="true" text="%Up to date assets" />
               </items>
             </Menu>

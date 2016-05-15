@@ -33,6 +33,8 @@ object AssetDetailsKind extends Enumeration {
 trait AssetDetails {
   /** Concerned asset. */
   val asset: Savings.Asset
+  /** VWAP to use (if not the asset one). */
+  val actualVWAP: Option[BigDecimal] = None
   /** Concerned scheme. */
   val scheme: Savings.Scheme
   /** Concerned fund. */
@@ -52,7 +54,7 @@ trait AssetDetails {
   // The following functions/values give access to detailed values and formats
   def availability = asset.availability
   def units = asset.units
-  def vwap = asset.vwap
+  def vwap = actualVWAP.getOrElse(asset.vwap)
   def investedAmount = asset.investedAmount
   lazy val grossAmount = nav.map { value =>
     asset.amount(value)
@@ -91,7 +93,8 @@ case class StandardAssetDetails(
   scheme: Savings.Scheme,
   fund: Savings.Fund,
   date: Option[LocalDate],
-  nav: Option[BigDecimal]
+  nav: Option[BigDecimal],
+  override val actualVWAP: Option[BigDecimal]
 ) extends AssetDetails {
   val kind = AssetDetailsKind.Standard
 }

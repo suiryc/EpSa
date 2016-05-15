@@ -397,7 +397,7 @@ class EditSchemesController {
    * A scheme can be deleted only if it has no assets.
    */
   private def canDeleteScheme(scheme: Savings.Scheme): Boolean =
-    !savings.assets.exists(_.schemeId == scheme.id)
+    !savings.assets.list.exists(_.schemeId == scheme.id)
 
   /** Updates the list of schemes. */
   private def updateSchemes(): Unit = {

@@ -442,7 +442,7 @@ class NewAssetActionController {
     // Note: previous selected value is kept if still present in new items
 
     // Scheme&fund with asset
-    val fundsWithAsset = savings.assets.map { asset =>
+    val fundsWithAsset = savings.assets.list.map { asset =>
       val scheme = savings.getScheme(asset.schemeId)
       val fund = savings.getFund(asset.fundId)
       SchemeAndFund(scheme, fund)
@@ -486,7 +486,7 @@ class NewAssetActionController {
     // that it does not get recomputed according to content.
     if (isDstEnabled) {
       // Scheme&fund with asset
-      val fundsWithAsset = savings.assets.map { asset =>
+      val fundsWithAsset = savings.assets.list.map { asset =>
         val scheme = savings.getScheme(asset.schemeId)
         val fund = savings.getFund(asset.fundId)
         SchemeAndFund(scheme, fund)
@@ -529,7 +529,7 @@ class NewAssetActionController {
         // Note: get availabilities for selected scheme&fund, sorted by date (with
         // immediate availability first).
         val availabilities = getSrcFund.map { schemeAndFund =>
-          filterAssets(savings.computeAssets(date).assets, schemeAndFund).map(_.availability).distinct.sortBy { opt =>
+          savings.computeAssets(date).assets.byId.getOrElse(schemeAndFund.id, Nil).map(_.availability).distinct.sortBy { opt =>
             opt.getOrElse(LocalDate.ofEpochDay(0))
           }
         }.getOrElse(Nil)
@@ -732,12 +732,6 @@ class NewAssetActionController {
 
     event
   }
-
-  private def filterAssets(assets: List[Savings.Asset], schemeAndFund: SchemeAndFund): List[Savings.Asset] =
-    assets.filter { asset =>
-      (asset.schemeId == schemeAndFund.scheme.id) &&
-        (asset.fundId == schemeAndFund.fund.id)
-    }
 
   private def getToggleKind(toggle: Toggle): AssetActionKind.Value =
     toggle.getUserData.asInstanceOf[AssetActionKind.Value]
