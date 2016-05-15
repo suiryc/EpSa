@@ -55,7 +55,7 @@ trait AssetDetails {
   def availability = asset.availability
   def units = asset.units
   def vwap = actualVWAP.getOrElse(asset.vwap)
-  def investedAmount = asset.investedAmount
+  def investedAmount = asset.amount(vwap)
   lazy val grossAmount = nav.map { value =>
     asset.amount(value)
   }
