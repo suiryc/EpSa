@@ -65,13 +65,13 @@ class MainController extends Logging {
   protected var viewAccountHistoryMenu: MenuItem = _
 
   @FXML
-  protected var totalsBySchemeMenu: CheckMenuItem = _
+  protected var totalsPerSchemeMenu: CheckMenuItem = _
 
   @FXML
-  protected var totalsByFundMenu: CheckMenuItem = _
+  protected var totalsPerFundMenu: CheckMenuItem = _
 
   @FXML
-  protected var totalsByAvailabilityMenu: CheckMenuItem = _
+  protected var totalsPerAvailabilityMenu: CheckMenuItem = _
 
   @FXML
   protected var toolsExportRawAccountHistoryMenu: MenuItem = _
@@ -161,9 +161,9 @@ class MainController extends Logging {
     // Handle totals displaying settings
     for {
       (menu, pref) <- List(
-        (totalsBySchemeMenu, totalsByScheme),
-        (totalsByFundMenu, totalsByFund),
-        (totalsByAvailabilityMenu, totalsByAvailability)
+        (totalsPerSchemeMenu, totalsPerScheme),
+        (totalsPerFundMenu, totalsPerFund),
+        (totalsPerAvailabilityMenu, totalsPerAvailability)
       )
     } {
       // First select shown totals saved in settings
@@ -377,11 +377,11 @@ class MainController extends Logging {
       Option(v) match {
         case Some(item) =>
           val (total, partialTotal, first) = item.kind match {
-            case AssetDetailsKind.Standard            => (false, false, item.first)
-            case AssetDetailsKind.TotalPartial        => (false, true, item.first)
-            case AssetDetailsKind.TotalByFund         => (false, true, item.first)
-            case AssetDetailsKind.TotalByAvailability => (false, true, item.first)
-            case AssetDetailsKind.Total               => (true, false, item.first)
+            case AssetDetailsKind.Standard             => (false, false, item.first)
+            case AssetDetailsKind.TotalPartial         => (false, true, item.first)
+            case AssetDetailsKind.TotalPerFund         => (false, true, item.first)
+            case AssetDetailsKind.TotalPerAvailability => (false, true, item.first)
+            case AssetDetailsKind.Total                => (true, false, item.first)
           }
           JFXStyles.togglePseudoClass(row, "row-total", set = total)
           JFXStyles.togglePseudoClass(row, "row-total-partial", set = partialTotal)
@@ -494,9 +494,9 @@ class MainController extends Logging {
       sortedAssetsDetails.comparatorProperty.bind(assetsTable.comparatorProperty)
       val sortedAssetsWithTotal = new AssetDetailsWithTotal(
         sortedAssetsDetails,
-        showTotalsByScheme = totalsBySchemeMenu.isSelected,
-        showTotalsByFund = totalsByFundMenu.isSelected,
-        showTotalsByAvailability = totalsByAvailabilityMenu.isSelected
+        showTotalsPerScheme = totalsPerSchemeMenu.isSelected,
+        showTotalsPerFund = totalsPerFundMenu.isSelected,
+        showTotalsPerAvailability = totalsPerAvailabilityMenu.isSelected
       )
       // Bind (and first set) our total comparator to the table comparator
       sortedAssetsWithTotal.comparatorProperty.setValue(assetsTable.getComparator)
@@ -986,11 +986,12 @@ object MainController {
 
   private val accountHistoryPath = Preference.from("account.history.path", null:Path)
 
-  private val totalsByScheme = Preference.from("totals.by-scheme", true)
+  private val totalsPerScheme = Preference.from("totals.per-scheme", true)
 
-  private val totalsByFund = Preference.from("totals.by-fund", true)
+  private val totalsPerFund = Preference.from("totals.per-fund", true)
 
-  private val totalsByAvailability = Preference.from("totals.by-availability", true)
+  private val totalsPerAvailability = Preference.from("totals.per-availability", true)
+
 
   case class State(
     stage: Stage,

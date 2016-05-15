@@ -21,10 +21,10 @@ object AssetDetailsKind extends Enumeration {
   val Standard = Value
   /** Partial total details. */
   val TotalPartial = Value
-  /** Partial (by fund) total details. */
-  val TotalByFund = Value
-  /** Partial (by availability) total details. */
-  val TotalByAvailability = Value
+  /** Partial (per fund) total details. */
+  val TotalPerFund = Value
+  /** Partial (per availability) total details. */
+  val TotalPerAvailability = Value
   /** Total details. */
   val Total = Value
 }
@@ -65,19 +65,19 @@ trait AssetDetails {
     else grossGain.map(v => scalePercents((v * 100) / investedAmount))
 
   def formatAvailability(long: Boolean) =
-    if ((kind != AssetDetailsKind.Standard) && (kind != AssetDetailsKind.TotalByAvailability)) null
+    if ((kind != AssetDetailsKind.Standard) && (kind != AssetDetailsKind.TotalPerAvailability)) null
     else Form.formatAvailability(asset.availability, date = None, long)
   lazy val formatUnits =
-    if ((kind != AssetDetailsKind.Standard) && (kind != AssetDetailsKind.TotalByFund)) null
+    if ((kind != AssetDetailsKind.Standard) && (kind != AssetDetailsKind.TotalPerFund)) null
     else units.toString
   lazy val formatVWAP =
-    if ((kind != AssetDetailsKind.Standard) && (kind != AssetDetailsKind.TotalByFund)) null
+    if ((kind != AssetDetailsKind.Standard) && (kind != AssetDetailsKind.TotalPerFund)) null
     else Form.formatAmount(vwap, currency)
   lazy val formatDate =
-    if ((kind != AssetDetailsKind.Standard) && (kind != AssetDetailsKind.TotalByFund)) null
+    if ((kind != AssetDetailsKind.Standard) && (kind != AssetDetailsKind.TotalPerFund)) null
     else date.map(_.toString).getOrElse(Strings.na)
   lazy val formatNAV =
-    if ((kind != AssetDetailsKind.Standard) && (kind != AssetDetailsKind.TotalByFund)) null
+    if ((kind != AssetDetailsKind.Standard) && (kind != AssetDetailsKind.TotalPerFund)) null
     else nav.map(Form.formatAmount(_, currency)).getOrElse(Strings.na)
   lazy val formatInvestedAmount = Form.formatAmount(investedAmount, currency)
   lazy val formatGrossAmount = grossAmount.map(Form.formatAmount(_, currency)).getOrElse(Strings.na)
@@ -115,15 +115,15 @@ case class TotalAssetDetails(
  */
 class AssetDetailsWithTotal(
   source0: ObservableList[AssetDetails],
-  showTotalsByScheme: Boolean,
-  showTotalsByFund: Boolean,
-  showTotalsByAvailability: Boolean
+  showTotalsPerScheme: Boolean,
+  showTotalsPerFund: Boolean,
+  showTotalsPerAvailability: Boolean
 ) extends TransformationList[AssetDetails, AssetDetails](source0)
 {
 
   // Notes:
-  // We wish to append partial totals (by scheme, by fund, and by availability
-  // date) and the grand total at the end of the table.
+  // We wish to append partial totals (per scheme, per fund, and per
+  // availability date) and the grand total at the end of the table.
   // We would also like for partial totals to be sortable (only the entries
   // inside each total group, not between groups).
   // To do so, we create SortedList for each partial total group, and bind its
@@ -147,14 +147,14 @@ class AssetDetailsWithTotal(
       investedAmount = 0
     )
     assets.foldLeft(total0) { (acc, details) =>
-      // For total by fund, units, NAV and VWAP are displayed, so we use the
+      // For total per fund, units, NAV and VWAP are displayed, so we use the
       // real values. For other totals, cheat with units and NAV so that gross
       // amount and derived values are computed for us.
       val units =
-        if (kind != AssetDetailsKind.TotalByFund) BigDecimal(1)
+        if (kind != AssetDetailsKind.TotalPerFund) BigDecimal(1)
         else acc.units + details.units
       val nav =
-        if (kind != AssetDetailsKind.TotalByFund) Some(orZero(acc.nav) + orZero(details.grossAmount))
+        if (kind != AssetDetailsKind.TotalPerFund) Some(orZero(acc.nav) + orZero(details.grossAmount))
         else details.nav
       val investedAmount = acc.investedAmount + details.investedAmount
       val vwap = scaleVWAP(investedAmount / units)
@@ -206,8 +206,8 @@ class AssetDetailsWithTotal(
   // Partial totals, with proper initial sorting and bound comparators.
   // Listen for changes in each group in order to propagate them (so that
   // the table rows are updated).
-  private val totalByScheme =
-    if (!showTotalsByScheme) toSorted(Nil)
+  private val totalPerScheme =
+    if (!showTotalsPerScheme) toSorted(Nil)
     else {
       val totals = toSorted(assets0.groupBy(_.scheme).map { case (scheme, assets) =>
         computeTotal(assets, kind = AssetDetailsKind.TotalPartial, scheme = Some(scheme), fund = None, availability = None)
@@ -218,27 +218,27 @@ class AssetDetailsWithTotal(
       }
       totals
     }
-  private val totalByFund =
-    if (!showTotalsByFund) toSorted(Nil)
+  private val totalPerFund =
+    if (!showTotalsPerFund) toSorted(Nil)
     else {
       val totals = toSorted(assets0.groupBy(_.fund).map { case (fund, assets) =>
-        computeTotal(assets, kind = AssetDetailsKind.TotalByFund, scheme = None, fund = Some(fund), availability = None)
+        computeTotal(assets, kind = AssetDetailsKind.TotalPerFund, scheme = None, fund = Some(fund), availability = None)
       }.toList.sortBy(_.fund.name))
       totals.comparatorProperty.bind(comparatorProperty)
       totals.listen { change =>
-        adaptChange(change, getSource.size + totalByScheme.size)
+        adaptChange(change, getSource.size + totalPerScheme.size)
       }
       totals
     }
-  private val totalByAvailability =
-    if (!showTotalsByAvailability) toSorted(Nil)
+  private val totalPerAvailability =
+    if (!showTotalsPerAvailability) toSorted(Nil)
     else {
       val totals = toSorted(assets0.groupBy(_.asset.availability).map { case (availability, assets) =>
-        computeTotal(assets, kind = AssetDetailsKind.TotalByAvailability, scheme = None, fund = None, availability = availability)
+        computeTotal(assets, kind = AssetDetailsKind.TotalPerAvailability, scheme = None, fund = None, availability = availability)
       }.toList.sortBy(_.asset.availability))
       totals.comparatorProperty.bind(comparatorProperty)
       totals.listen { change =>
-        adaptChange(change, getSource.size + totalByScheme.size + totalByFund.size)
+        adaptChange(change, getSource.size + totalPerScheme.size + totalPerFund.size)
       }
       totals
     }
@@ -262,7 +262,7 @@ class AssetDetailsWithTotal(
     }
 
     // Rebuild all totals, tagging the first row of each group
-    totals = (tagFirst(totalByScheme.toList) ::: tagFirst(totalByFund.toList) ::: tagFirst(totalByAvailability.toList)) :+ total
+    totals = (tagFirst(totalPerScheme.toList) ::: tagFirst(totalPerFund.toList) ::: tagFirst(totalPerAvailability.toList)) :+ total
   }
 
   updateTotals()

@@ -140,7 +140,7 @@ object AssetField {
   def fields() = ListMap(
     KEY_SCHEME          -> AssetTextField(Strings.scheme, Strings.schemeColon, AssetField.formatScheme, AssetField.schemeComment),
     KEY_FUND            -> AssetTextField(Strings.fund, Strings.fundColon, AssetField.formatFund, AssetField.fundComment),
-    KEY_AVAILABILITY    -> AssetDateField(Strings.availability, Strings.availabilityColon, AssetField.formatAvailability, AssetField.availabilikty),
+    KEY_AVAILABILITY    -> AssetDateField(Strings.availability, Strings.availabilityColon, AssetField.formatAvailability, AssetField.availability),
     KEY_UNITS           -> AssetAmountField(Strings.units, Strings.unitsColon, AssetField.formatUnits, AssetField.units, null),
     KEY_VWAP            -> AssetAmountField(Strings.vwap, Strings.vwapColon, AssetField.formatVWAP, AssetField.vwap, epsa.Settings.currency()),
     KEY_NAV             -> AssetAmountField(Strings.nav, Strings.navColon, AssetField.formatNAV, AssetField.nav, epsa.Settings.currency()),
@@ -172,7 +172,7 @@ object AssetField {
   def formatFund(details: AssetDetails, long: Boolean) = details.fund.name
   def fundComment(details: AssetDetails) = details.fund.comment
   def formatAvailability(details: AssetDetails, long: Boolean) = details.formatAvailability(long)
-  def availabilikty(details: AssetDetails) = details.availability
+  def availability(details: AssetDetails) = details.availability
   def formatUnits(details: AssetDetails, long: Boolean) = details.formatUnits
   def units(details: AssetDetails) = Some(details.units)
   def formatVWAP(details: AssetDetails, long: Boolean) = details.formatVWAP

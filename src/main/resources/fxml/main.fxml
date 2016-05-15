@@ -166,9 +166,9 @@
                      </graphic>
                   </MenuItem>
                   <SeparatorMenuItem mnemonicParsing="false" />
-                  <CheckMenuItem fx:id="totalsBySchemeMenu" mnemonicParsing="false" selected="true" text="%Totals by scheme" />
-                  <CheckMenuItem fx:id="totalsByFundMenu" mnemonicParsing="false" selected="true" text="%Totals by fund" />
-                  <CheckMenuItem fx:id="totalsByAvailabilityMenu" mnemonicParsing="false" selected="true" text="%Totals by availability" />
+                  <CheckMenuItem fx:id="totalsPerSchemeMenu" mnemonicParsing="false" selected="true" text="%Totals per scheme" />
+                  <CheckMenuItem fx:id="totalsPerFundMenu" mnemonicParsing="false" selected="true" text="%Totals per fund" />
+                  <CheckMenuItem fx:id="totalsPerAvailabilityMenu" mnemonicParsing="false" selected="true" text="%Totals per availability" />
                   <SeparatorMenuItem mnemonicParsing="false" />
                   <CheckMenuItem mnemonicParsing="false" onAction="#onUpToDateAssets" selected="true" text="%Up to date assets" />
               </items>
