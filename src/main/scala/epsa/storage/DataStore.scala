@@ -6,7 +6,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.sql.{Date, Timestamp}
-import java.time.{Instant, LocalDate}
+import java.time.{Instant, LocalDate, Month}
 import java.util.UUID
 import javafx.stage.{FileChooser, Window}
 import org.h2.engine.Constants
@@ -332,7 +332,7 @@ object DataStore {
     }
   }
 
-  protected val tables = List[DataStoreTable](EventSource, AssetHistory)
+  protected val tables = List[DataStoreTable](EventSource, AssetHistory, UnavailabilityPeriods)
 
   protected trait DataStoreTable {
 
@@ -348,10 +348,13 @@ object DataStore {
     protected[DataStore] def deleteEntries(db: DatabaseDef): Future[Int] =
       db.run(entries.delete)
 
-    protected[DataStore] def readEntries(db: DatabaseDef): Future[Seq[Entries#TableElementType]] =
+    protected[DataStore] def readEntries(db: DatabaseDef): Future[Seq[Entry]] =
       db.run(entries.result)
 
-    protected[DataStore] def writeEntries(db: DatabaseDef, values: Seq[Entries#TableElementType]): Future[Unit] =
+    def readEntries(): Future[Seq[Entry]] =
+      getDBRead.flatMap(readEntries)
+
+    protected[DataStore] def writeEntries(db: DatabaseDef, values: Seq[Entry]): Future[Unit] =
       db.run {
         entries ++= values
       }.map(_ => ())
@@ -553,6 +556,79 @@ object DataStore {
           }
           orphans
         }
+      }
+    }
+
+  }
+
+  object UnavailabilityPeriods extends DataStoreTable {
+
+    override protected[DataStore] val tableName = "unavailabilityPeriods"
+
+    import scala.reflect._
+
+    protected implicit def enumColumnType[A <: Enum[A]](implicit tag: ClassTag[A]) = MappedColumnType.base[A, String](
+      { d => d.name },
+      { d => Enum.valueOf(classTag[A].runtimeClass.asInstanceOf[Class[A]], d) }
+    )
+
+    protected type Entry = Savings.UnavailabilityPeriod
+
+    protected class Entries(tag: Tag) extends Table[Entry](tag, tableName) {
+      def id = column[String]("id", O.PrimaryKey)
+      def years = column[Int]("years")
+      def month = column[Option[Month]]("month")
+      def * = (id, years, month) <> (Savings.UnavailabilityPeriod.tupled, Savings.UnavailabilityPeriod.unapply)
+    }
+
+    override protected val entries = TableQuery[Entries]
+
+    def writeEntry(value: Entry)(implicit dbOpt: Option[DatabaseDef] = None): Future[Unit] = {
+      def write(db: DatabaseDef): Future[Unit] =
+        db.run {
+          entries += value
+        }.map(_ => ())
+
+      dbOpt match {
+        case Some(db) => write(db)
+        case None =>
+          getDBTemp.flatMap { tmp =>
+            tmp.addAction(this, write)
+            write(tmp.db)
+          }
+      }
+    }
+
+    def updateEntry(id1: String, value: Entry)(implicit dbOpt: Option[DatabaseDef] = None): Future[Unit] = {
+      def update(db: DatabaseDef): Future[Unit] =
+        db.run {
+          DBIO.sequence(List(
+            entries.filter(_.id === id1).delete,
+            entries += value
+          )).transactionally
+        }.map(_ => ())
+
+      dbOpt match {
+        case Some(db) => update(db)
+        case None =>
+          getDBTemp.flatMap { tmp =>
+            tmp.addAction(this, update)
+            update(tmp.db)
+          }
+      }
+    }
+
+    def deleteEntry(id: String)(implicit dbOpt: Option[DatabaseDef] = None): Future[Int] = {
+      def delete(db: DatabaseDef): Future[Int] =
+        db.run(entries.filter(_.id === id).delete)
+
+      dbOpt match {
+        case Some(db) => delete(db)
+        case None     =>
+          getDBTemp.flatMap { tmp =>
+            tmp.addAction(this, delete)
+            delete(tmp.db)
+          }
       }
     }
 

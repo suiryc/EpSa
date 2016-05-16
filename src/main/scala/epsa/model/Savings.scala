@@ -4,7 +4,7 @@ import epsa.Settings.scaleVWAP
 import epsa.charts.ChartSeriesData
 import epsa.util.Awaits
 import grizzled.slf4j.Logging
-import java.time.LocalDate
+import java.time.{LocalDate, Month}
 import java.util.UUID
 import javafx.stage.Window
 import spray.json._
@@ -172,6 +172,8 @@ object Savings {
   {
     def amount(value: BigDecimal) = scaleAmount(units * value)
   }
+
+  case class UnavailabilityPeriod(id: String, years: Int, month: Option[Month])
 
   sealed trait Event
 
