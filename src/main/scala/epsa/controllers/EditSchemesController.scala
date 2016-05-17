@@ -23,6 +23,8 @@ import suiryc.scala.javafx.scene.control.CheckBoxListCellEx
 import suiryc.scala.javafx.stage.Stages
 import suiryc.scala.javafx.util.Callback
 
+// TODO: save stage location
+
 class EditSchemesController {
 
   import EditSchemesController._

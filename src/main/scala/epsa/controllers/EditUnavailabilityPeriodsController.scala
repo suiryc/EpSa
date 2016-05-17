@@ -23,6 +23,7 @@ import suiryc.scala.javafx.stage.Stages
 import suiryc.scala.javafx.util.Callback
 
 // TODO: handle user-defined displaying order ?
+// TODO: save stage location
 
 class EditUnavailabilityPeriodsController {
 

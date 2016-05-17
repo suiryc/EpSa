@@ -37,6 +37,7 @@ import suiryc.scala.javafx.util.Callback
 import suiryc.scala.math.Ordering.localDateOrdering
 import suiryc.scala.settings.Preference
 
+// TODO: remove testing menu entries (in 'Tools' section)
 // TODO: display more information in assets table and details: net gain/loss (amount/percentage)
 // TODO: change details pane position; set below table ? (then have NAV history graph on the right side of details)
 // TODO: menu entries with latest datastore locations ?
