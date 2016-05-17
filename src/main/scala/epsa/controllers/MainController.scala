@@ -265,6 +265,10 @@ class MainController extends Logging {
     actor ! OnEditFunds(getSelectedAsset.map(_.fundId))
   }
 
+  def onEditUnavailabilityPeriods(event: ActionEvent): Unit = {
+    actor ! OnEditUnavailabilityPeriods
+  }
+
   def onNewPayment(event: ActionEvent): Unit = {
     actor ! OnNewAssetAction(AssetActionKind.Payment, getSelectedAsset)
   }
@@ -461,6 +465,7 @@ class MainController extends Logging {
       case OnEditUndo        => onEditUndo(state)
       case OnEditSchemes(id) => onEditSchemes(state, id.map(state.savingsUpd.getScheme))
       case OnEditFunds(id)   => onEditFunds(state, id.map(state.savingsUpd.getFund))
+      case OnEditUnavailabilityPeriods => onEditUnavailabilityPeriods(state)
       case OnNewAssetAction(kind, asset) => onNewAssetAction(state, kind, asset)
       case OnOptions         => onOptions(state)
       case OnNetAssetValueHistory(fundId) => onNetAssetValueHistory(state, fundId)
@@ -609,6 +614,13 @@ class MainController extends Logging {
       dialog.setResizable(true)
       val events = dialog.showAndWait().orElse(Nil)
       processEvents(state, events)
+    }
+
+    def onEditUnavailabilityPeriods(state: State): Unit = {
+      val dialog = EditUnavailabilityPeriodsController.buildDialog(Some(state.window))
+      dialog.initModality(Modality.WINDOW_MODAL)
+      dialog.setResizable(true)
+      if (dialog.showAndWait().orElse(false)) refresh(state)
     }
 
     def onNewAssetAction(state: State, kind: AssetActionKind.Value, asset: Option[Savings.Asset]): Unit = {
@@ -1048,6 +1060,8 @@ object MainController {
   case class OnEditSchemes(schemeId: Option[UUID])
 
   case class OnEditFunds(fundId: Option[UUID])
+
+  case object OnEditUnavailabilityPeriods
 
   case class OnNewAssetAction(kind: AssetActionKind.Value, asset: Option[Savings.Asset])
 

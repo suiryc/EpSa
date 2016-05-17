@@ -50,8 +50,13 @@ object Awaits {
     } else {
       None
     }).toSeq
-    val f = RichFuture.executeSequentially(stopOnError = true, actions: _*).map(_ => ())
+    val f = RichFuture.executeSequentially(stopOnError = true, actions).map(_ => ())
     orError(f, owner, DataStore.writeIssueMsg(real = true))
+  }
+
+  def applyDataStoreChanges(owner: Option[Window], actions: List[RichFuture.Action[AnyVal]]): Try[Unit] = {
+    val f = RichFuture.executeSequentially(stopOnError = true, actions).map(_ => ())
+    orError(f, owner, DataStore.writeIssueMsg())
   }
 
   def readDataStoreNAV(owner: Option[Window], fundId: UUID, date: LocalDate, exactDate: Boolean = false): Try[Option[Savings.AssetValue]] =
@@ -62,6 +67,9 @@ object Awaits {
 
   def saveDataStoreNAV(owner: Option[Window], fundId: UUID, nav: Savings.AssetValue): Try[Unit] =
     orError(DataStore.AssetHistory.writeValues(fundId, nav), owner, DataStore.writeIssueMsg())
+
+  def readDataStoreUnavailabilityPeriods(owner: Option[Window]): Try[Seq[Savings.UnavailabilityPeriod]] =
+    orError(DataStore.UnavailabilityPeriods.readEntries(), owner, DataStore.readIssueMsg())
 
   def cleanupDataStore(owner: Option[Window], fundIds: List[UUID]): Unit = {
     orError(DataStore.AssetHistory.cleanup(fundIds), owner, DataStore.cleanupIssueMsg) match {

@@ -1,8 +1,11 @@
 package epsa.controllers
 
+import epsa.I18N.Strings
 import epsa.model.Savings
 import epsa.util.JFXStyles
-import java.time.LocalDate
+import java.time.{LocalDate, Month}
+import java.time.format.TextStyle
+import java.util.Locale
 import javafx.scene.control.{Cell, ListCell}
 import suiryc.scala.javafx.scene.control.{CellWithSeparator, ListCellEx, TableCellEx}
 import suiryc.scala.util.I18NLocale
@@ -21,6 +24,18 @@ class SchemeAndFundCell extends ListCell[Option[SchemeAndFund]] with CellWithSep
 
 class AvailabilityListCell(baseOpt: Option[LocalDate]) extends ListCellEx[Option[LocalDate]] {
   override protected def itemText(item: Option[LocalDate]) = Form.formatAvailability(item, baseOpt, long = false)
+}
+
+class UnavailabilityPeriodCell extends ListCellEx[Savings.UnavailabilityPeriod] {
+  override protected def itemText(item: Savings.UnavailabilityPeriod) = item.id
+}
+
+class MonthListCell extends ListCellEx[Option[Month]] {
+  override protected def itemText(item: Option[Month]) =
+    item.map { month =>
+      val name = month.getDisplayName(TextStyle.FULL, Locale.getDefault)
+      "%02d - %s".format(month.getValue, name.capitalize)
+    }.getOrElse(Strings.na)
 }
 
 class FormatCell[A, B](format: B => String) extends TableCellEx[A, B] {

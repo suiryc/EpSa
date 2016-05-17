@@ -16,6 +16,7 @@ object I18N extends suiryc.scala.util.I18N("i18n.epsa") with I18NWithPreference 
     def editScheme = getString("Edit scheme")
     def editFunds = getString("Edit funds")
     def editFund = getString("Edit fund")
+    def editUnavailabilityPeriods = getString("Edit unavailability periods")
     def newPayment = getString("New payment")
     def newTransfer = getString("New transfer")
     def newRefund = getString("New refund")

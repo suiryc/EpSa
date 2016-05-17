@@ -42,4 +42,7 @@ object Images {
   lazy val iconMagnifierZoom =
     new Image("/images/fugue-icons/magnifier-zoom.png", 0.0, 0.0, true, false, false)
 
+  lazy val iconCalendarMonth =
+    new Image("/images/fugue-icons/calendar-month.png", 0.0, 0.0, true, false, false)
+
 }
