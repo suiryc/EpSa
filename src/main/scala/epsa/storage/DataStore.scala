@@ -155,7 +155,7 @@ object DataStore {
             if (file.delete()) None
             else Some(Future.failed(new Exception("Could not delete pre-existing data store")))
           } catch {
-            case ex: Throwable => Some(Future.failed(ex))
+            case ex: Exception => Some(Future.failed(ex))
           }
         } else None
         // If OK, do change db path
@@ -195,7 +195,7 @@ object DataStore {
             }
             Action {
               RichFuture.executeSequentially(stopOnError = true, actions:_*).map(_ => ()).recover {
-                case ex: Throwable =>
+                case ex: Exception =>
                   throw new Exception(s"Could not apply changes in table[${table.tableName}]", ex)
               }
             }
@@ -268,7 +268,7 @@ object DataStore {
         closeRealDB()
         dbOpen(newPath).map(_ => ())
       } catch {
-        case ex: Throwable => Future.failed(ex)
+        case ex: Exception => Future.failed(ex)
       }
     } else Future.successful(())
 

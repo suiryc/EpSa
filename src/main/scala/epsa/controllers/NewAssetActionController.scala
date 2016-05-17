@@ -755,7 +755,7 @@ class NewAssetActionController {
   private def getBigDecimal(str: String): BigDecimal = try {
     Option(str).map(BigDecimal(_)).getOrElse(BigDecimal(0))
   } catch {
-    case ex: Throwable => BigDecimal(0)
+    case ex: Exception => BigDecimal(0)
   }
 
   private def getSrcNAV: BigDecimal =

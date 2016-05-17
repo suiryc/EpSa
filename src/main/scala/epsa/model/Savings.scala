@@ -229,7 +229,7 @@ object Savings {
           try {
             UUID.fromString(uuid)
           } catch {
-            case ex: Throwable => deserializationError(s"Invalid UUID format: $uuid", ex)
+            case ex: Exception => deserializationError(s"Invalid UUID format: $uuid", ex)
           }
 
         case _ => deserializationError(s"Expected UUID as JsString. Got $value")
@@ -246,7 +246,7 @@ object Savings {
           try {
             LocalDate.parse(dateS)
           } catch {
-            case ex: Throwable => deserializationError(s"Invalid LocalDate format: $dateS", ex)
+            case ex: Exception => deserializationError(s"Invalid LocalDate format: $dateS", ex)
           }
 
         case _ => deserializationError(s"Expected LocalDate as JsString. Got $value")

@@ -197,7 +197,7 @@ class MainController extends Logging {
           val positions = dividerPositions.split(';').map(_.toDouble)
           splitPane.setDividerPositions(positions: _*)
         } catch {
-          case ex: Throwable => warn(s"Could not restore SplitPane divider positions[$dividerPositions]: ${ex.getMessage}")
+          case ex: Exception => warn(s"Could not restore SplitPane divider positions[$dividerPositions]: ${ex.getMessage}")
         }
       }
     }
