@@ -166,7 +166,9 @@ class EditFundsController {
     //   DELETE/'-' applies selected fund deletion
     //   '+' applies selected fund adding/copy
     def keyFilter(event: KeyEvent): Unit = {
-      if (applyReady && (event.getCode == KeyCode.ENTER) && !commentField.isFocused) {
+      if (applyReady && (event.getCode == KeyCode.ENTER)
+        && !commentField.isFocused)
+      {
         onApply(event)
         event.consume()
       }
@@ -176,7 +178,9 @@ class EditFundsController {
         onRemove(event)
         event.consume()
       }
-      else if (addReady && (event.getCharacter == "+") && !nameField.isFocused) {
+      else if (addReady && (event.getCharacter == "+")
+        && !nameField.isFocused && !commentField.isFocused)
+      {
         onAdd(event)
         event.consume()
       }

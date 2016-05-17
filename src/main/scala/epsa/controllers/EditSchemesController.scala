@@ -165,7 +165,9 @@ class EditSchemesController {
     //   DELETE/'-' applies selected scheme deletion
     //   '+' applies selected scheme adding/copy
     def keyFilter(event: KeyEvent): Unit = {
-      if (applyReady && (event.getCode == KeyCode.ENTER) && !commentField.isFocused) {
+      if (applyReady && (event.getCode == KeyCode.ENTER)
+        && !commentField.isFocused)
+      {
         onApply(event)
         event.consume()
       }
@@ -175,7 +177,9 @@ class EditSchemesController {
         onRemove(event)
         event.consume()
       }
-      else if (addReady && (event.getCharacter == "+") && !nameField.isFocused) {
+      else if (addReady && (event.getCharacter == "+")
+        && !nameField.isFocused && !commentField.isFocused)
+      {
         onAdd(event)
         event.consume()
       }
