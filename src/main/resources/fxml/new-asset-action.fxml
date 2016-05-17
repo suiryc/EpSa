@@ -97,10 +97,26 @@
                   <Insets left="5.0" right="5.0" />
                </GridPane.margin></ComboBox>
             <Label text="%Availability:" GridPane.rowIndex="3" />
-            <DatePicker fx:id="srcAvailabilityField" minWidth="110.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0" GridPane.columnIndex="1" GridPane.rowIndex="3">
+            <HBox fx:id="srcAvailabilityBox" spacing="5.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0" GridPane.columnIndex="1" GridPane.rowIndex="3">
                <GridPane.margin>
                   <Insets left="5.0" right="5.0" />
-               </GridPane.margin></DatePicker>
+               </GridPane.margin>
+               <children>
+                  <DatePicker fx:id="srcAvailabilityField" minWidth="110.0" />
+                  <Button fx:id="unavailabilityPeriodButton" maxHeight="1.7976931348623157E308" mnemonicParsing="false" onAction="#onLatestDate">
+                     <graphic>
+                        <ImageView pickOnBounds="true" preserveRatio="true">
+                           <image>
+                              <Image url="@../images/fugue-icons/calendar-month.png" />
+                           </image>
+                        </ImageView>
+                     </graphic>
+                     <tooltip>
+                        <Tooltip text="%Unavailability period" />
+                     </tooltip>
+                  </Button>
+               </children>
+            </HBox>
             <ComboBox fx:id="srcAvailabilityField2" maxWidth="1.7976931348623157E308" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0" GridPane.columnIndex="1" GridPane.rowIndex="3">
                <GridPane.margin>
                   <Insets left="5.0" right="5.0" />

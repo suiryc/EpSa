@@ -9,9 +9,10 @@ import java.time.format.DateTimeFormatter
 import javafx.event.ActionEvent
 import javafx.collections.FXCollections
 import javafx.fxml.{FXML, FXMLLoader}
-import javafx.geometry.Insets
+import javafx.geometry.{Insets, Side}
 import javafx.scene.Node
 import javafx.scene.control._
+import javafx.scene.layout.HBox
 import javafx.stage.{Modality, Stage, Window}
 import javafx.util.converter.LocalDateStringConverter
 import scala.collection.JavaConversions._
@@ -24,9 +25,6 @@ import suiryc.scala.javafx.scene.control.{DatePickers, TextFieldWithButton}
 import suiryc.scala.javafx.stage.Stages
 import suiryc.scala.javafx.util.Callback
 
-// TODO: option of default day/month and number of years for frozen assets ?
-// or better: have a user-defined list of availability periods (including
-// presented order), and have a button to apply one of them (or reset to now)
 class NewAssetActionController {
 
   import epsa.Settings.{scaleAmount, scaleUnits}
@@ -54,7 +52,13 @@ class NewAssetActionController {
   protected var srcFundField: ComboBox[Option[SchemeAndFund]] = _
 
   @FXML
+  protected var srcAvailabilityBox: HBox = _
+
+  @FXML
   protected var srcAvailabilityField: DatePicker = _
+
+  @FXML
+  protected var unavailabilityPeriodButton: Button = _
 
   @FXML
   protected var srcAvailabilityField2: ComboBox[Option[LocalDate]] = _
@@ -119,6 +123,8 @@ class NewAssetActionController {
     mainController = mainController0
     savings = savings0
     actionKind = actionKind0
+
+    val unavailabilityPeriods = Awaits.readDataStoreUnavailabilityPeriods(Some(stage)).getOrElse(Seq.empty).sortBy(_.id)
 
     // Load css
     dialog.getDialogPane.getStylesheets.add(getClass.getResource("/css/form.css").toExternalForm)
@@ -202,6 +208,29 @@ class NewAssetActionController {
     }
     latestDateButton.setPadding(new Insets(4))
     latestDateButton.setDisable(savings.latestAssetAction.isEmpty)
+    unavailabilityPeriodButton.setPadding(new Insets(4))
+    unavailabilityPeriodButton.setDisable(unavailabilityPeriods.isEmpty)
+    // Apply selected unavailability period when requested
+    if (unavailabilityPeriods.nonEmpty) {
+      val contextMenu = new ContextMenu()
+      unavailabilityPeriods.foreach { period =>
+        val menuItem = new MenuItem(period.id)
+        menuItem.setOnAction { (_: ActionEvent) =>
+          getOperationDate.foreach { date =>
+            val (month, dayOfMonth) = period.month match {
+              case Some(v) => (v, 1)
+              case None    => (date.getMonth, date.getDayOfMonth)
+            }
+            val availability = date.plusYears(period.years).withMonth(month.getValue).withDayOfMonth(dayOfMonth)
+            srcAvailabilityField.setValue(availability)
+          }
+        }
+        contextMenu.getItems.add(menuItem)
+      }
+      unavailabilityPeriodButton.setOnAction { (event: ActionEvent) =>
+        contextMenu.show(unavailabilityPeriodButton, Side.RIGHT, 0, 0)
+      }
+    }
 
     // Setup NAV history buttons
     for (field <- List(srcNAVButton, dstNAVButton)) {
@@ -304,7 +333,7 @@ class NewAssetActionController {
     if (disableDst) dstAvailabilityChosen = false
 
     val srcAvailabilityExact = actionKind != AssetActionKind.Payment
-    srcAvailabilityField.setVisible(!srcAvailabilityExact)
+    srcAvailabilityBox.setVisible(!srcAvailabilityExact)
     srcAvailabilityField2.setVisible(srcAvailabilityExact)
 
     // Updating comboboxes usually cleans and re-sets selected value. We want to
