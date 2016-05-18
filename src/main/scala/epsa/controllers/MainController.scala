@@ -3,10 +3,8 @@ package epsa.controllers
 import akka.actor.{Actor, ActorRef, Props}
 import epsa.I18N
 import epsa.I18N.Strings
-import epsa.charts.{ChartHandler, ChartSettings}
 import epsa.model._
 import epsa.storage.DataStore
-import epsa.tools.EsaliaInvestmentFundProber
 import epsa.util.{Awaits, JFXStyles}
 import grizzled.slf4j.Logging
 import java.io.PrintWriter
@@ -37,7 +35,6 @@ import suiryc.scala.javafx.util.Callback
 import suiryc.scala.math.Ordering.localDateOrdering
 import suiryc.scala.settings.Preference
 
-// TODO: remove testing menu entries (in 'Tools' section)
 // TODO: display more information in assets table and details: net gain/loss (amount/percentage)
 // TODO: change details pane position; set below table ? (then have NAV history graph on the right side of details)
 // TODO: menu entries with latest datastore locations ?
@@ -47,7 +44,6 @@ import suiryc.scala.settings.Preference
 //         -> FileChooser does not allow to customize its content (to give password upon open)
 class MainController extends Logging {
 
-  import epsa.Settings.prefs
   import MainController._
 
   @FXML
@@ -310,14 +306,6 @@ class MainController extends Logging {
     actor ! OnCleanupDataStore
   }
 
-  def onTest(event: ActionEvent): Unit = {
-    actor ! OnTest(event.getSource.asInstanceOf[MenuItem].getText.substring(5).toInt)
-  }
-
-  def onFundGraph(event: ActionEvent): Unit = {
-    actor ! OnFundGraph
-  }
-
   private def getState: SimpleObjectProperty[State] = {
     assetsTable.getUserData.asInstanceOf[SimpleObjectProperty[State]]
   }
@@ -475,8 +463,6 @@ class MainController extends Logging {
       case OnExportRawAccountHistory => onExportRawAccountHistory(state)
       case OnImportRawAccountHistory => onImportRawAccountHistory(state)
       case OnCleanupDataStore => onCleanupDataStore(state)
-      case OnTest(n)         => onTest(state, n)
-      case OnFundGraph       => onFundGraph(state)
     }
 
     def processEvents(state: State, events: List[Savings.Event], updateAssetsValue: Boolean = false): Unit = {
@@ -780,131 +766,6 @@ class MainController extends Logging {
       refresh(state)
     }
 
-    def onTest(state: State, n: Int): Unit = {
-      val savings = state.savingsUpd
-
-      def getName(label: String, n: Int, values: Set[String]): String = {
-        val name = s"$label $n"
-        if (!values.contains(name.toLowerCase)) name
-        else getName(label, n + 1, values)
-      }
-
-      def getSchemeName(events: Savings.Event*): String =
-        getName("Scheme", 1, savings.processEvents(events).schemes.map(_.name.toLowerCase).toSet)
-
-      def getFundName(events: Savings.Event*): String =
-        getName("Fund", 1, savings.processEvents(events).funds.map(_.name.toLowerCase).toSet)
-
-      n match {
-        case 1 =>
-          val s1 = savings.createSchemeEvent(getSchemeName())
-          val s2 = savings.createSchemeEvent(getSchemeName(s1))
-          val f1 = savings.createFundEvent(getFundName())
-          val f2 = savings.createFundEvent(getFundName(f1))
-          // Mixes many actions that ultimately gives:
-          //   s1f1: 5 now
-          //   s1f2: 10 now
-          //   s1f2: 15 (+1 month)
-          //   s2f2: 20 now
-          // Purposely performs 2 last payments: last action leaves 2 assets which
-          // shall be merged when computed now.
-          processEvents(state, List(s1, s2, f1, f2,
-            Savings.AssociateFund(s1.schemeId, f1.fundId),
-            Savings.AssociateFund(s1.schemeId, f2.fundId),
-            Savings.AssociateFund(s2.schemeId, f2.fundId),
-            Savings.MakePayment(LocalDate.now.minusMonths(24),
-              Savings.AssetPart(s1.schemeId, f1.fundId, Some(LocalDate.now.minusMonths(12)), 10.0, 1.0), None),
-            Savings.MakePayment(LocalDate.now.minusMonths(24),
-              Savings.AssetPart(s1.schemeId, f1.fundId, Some(LocalDate.now.minusMonths(12)), 10.0, 2.0), None),
-            Savings.MakePayment(LocalDate.now.minusMonths(24),
-              Savings.AssetPart(s1.schemeId, f2.fundId, Some(LocalDate.now.minusMonths(12)), 5.0, 1.0), None),
-            Savings.MakePayment(LocalDate.now.minusMonths(24),
-              Savings.AssetPart(s1.schemeId, f1.fundId, Some(LocalDate.now.minusMonths(1)), 15.0, 2.0), None),
-            Savings.MakePayment(LocalDate.now.minusMonths(24),
-              Savings.AssetPart(s1.schemeId, f2.fundId, Some(LocalDate.now.plusMonths(12)), 15.0, 1.0), None),
-            Savings.MakeRefund(LocalDate.now.minusMonths(12),
-              Savings.AssetPart(s1.schemeId, f1.fundId, Some(LocalDate.now.minusMonths(1)), 10.0, 2.0), None),
-            Savings.MakeRefund(LocalDate.now.minusMonths(1),
-              Savings.AssetPart(s1.schemeId, f1.fundId, None, 10.0, 2.5), None),
-            Savings.MakeTransfer(LocalDate.now.minusMonths(1),
-              Savings.AssetPart(s1.schemeId, f1.fundId, None, 10.0, 0.5), Savings.AssetPart(s1.schemeId, f2.fundId, None, 5.0, 1.0), None),
-            Savings.MakePayment(LocalDate.now.minusMonths(1),
-              Savings.AssetPart(s2.schemeId, f2.fundId, Some(LocalDate.now.minusMonths(1)), 10.0, 1.0), None),
-            Savings.MakePayment(LocalDate.now.minusMonths(1),
-              Savings.AssetPart(s2.schemeId, f2.fundId, Some(LocalDate.now), 10.0, 1.0), None)
-          ))
-
-        case 2 =>
-          val s1 = savings.createSchemeEvent(getSchemeName())
-          val f1 = savings.createFundEvent(getFundName())
-          // Resulting asset shall have its availability date reseted due to the second payment
-          processEvents(state, List(s1, f1,
-            Savings.AssociateFund(s1.schemeId, f1.fundId),
-            Savings.MakePayment(LocalDate.now.minusMonths(24),
-              Savings.AssetPart(s1.schemeId, f1.fundId, Some(LocalDate.now.minusMonths(12)), 5.0, 1.0), None),
-            Savings.MakePayment(LocalDate.now.minusMonths(12),
-              Savings.AssetPart(s1.schemeId, f1.fundId, None, 5.0, 1.0), None)
-          ))
-
-        case 3 =>
-          val s1 = savings.createSchemeEvent(getSchemeName())
-          val f1 = savings.createFundEvent(getFundName())
-          val f2 = savings.createFundEvent(getFundName(f1))
-          // Originating asset shall keep its availability date (even if available for the transfer).
-          processEvents(state, List(s1, f1, f2,
-            Savings.AssociateFund(s1.schemeId, f1.fundId),
-            Savings.AssociateFund(s1.schemeId, f2.fundId),
-            Savings.MakePayment(LocalDate.now.minusMonths(24),
-              Savings.AssetPart(s1.schemeId, f1.fundId, Some(LocalDate.now.minusMonths(12)), 10.0, 1.0), None),
-            Savings.MakeTransfer(LocalDate.now.minusMonths(12),
-              Savings.AssetPart(s1.schemeId, f1.fundId, None, 5.0, 1.0), Savings.AssetPart(s1.schemeId, f2.fundId, None, 5.0, 1.0), None)
-          ))
-      }
-    }
-
-    def onFundGraph(state: State): Unit = {
-      import Preference._
-
-      val stage = new Stage()
-
-      val fundPath = Preference.from("fund.path", null:Path)
-
-      val fileChooser = new FileChooser()
-      fileChooser.setTitle("Open Investment Fund File")
-      fileChooser.getExtensionFilters.addAll(
-        new FileChooser.ExtensionFilter("Excel Files", "*.xls", "*.xlsx"),
-        new FileChooser.ExtensionFilter("All Files", "*.*")
-      )
-      fundPath.option.foreach { path =>
-        FileChoosers.setInitialPath(fileChooser, path.toFile)
-      }
-      val selectedFile = fileChooser.showOpenDialog(stage)
-      Option(selectedFile).flatMap { file =>
-        EsaliaInvestmentFundProber.probe(file.toPath)
-      } match {
-        case Some(hist) =>
-          // Save path in preferences
-          fundPath() = selectedFile.toPath
-          // Then build and display chart
-          val chartHandler = new ChartHandler(
-            seriesName = hist.name.orNull,
-            seriesValues = hist.values,
-            settings = ChartSettings.hidden.copy(
-              xLabel = Strings.date,
-              yLabel = Strings.nav,
-              ySuffix = epsa.Settings.defaultCurrency
-            )
-          )
-          val chartPane = chartHandler.chartPane
-          chartPane.setPrefSize(640, 480)
-          val scene = new Scene(chartPane)
-          stage.setScene(scene)
-          stage.show()
-
-        case None =>
-      }
-    }
-
     private def applyState(state: State, updateAssetsValue: Boolean = false): Unit = {
       // Cheap trick to fill fields with Savings data
       processEvents(state, Nil, updateAssetsValue)
@@ -1079,10 +940,6 @@ object MainController {
   case object OnImportRawAccountHistory
 
   case object OnCleanupDataStore
-
-  case class OnTest(n: Int)
-
-  case object OnFundGraph
 
   def build(state: State, needRestart: Boolean = false, applicationStart: Boolean = false): Unit = {
     val stage = state.stage
