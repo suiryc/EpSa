@@ -13,19 +13,22 @@ import javafx.scene.Node
 import javafx.scene.control._
 import javafx.scene.image.ImageView
 import javafx.scene.input.{KeyCode, KeyEvent, MouseEvent}
-import javafx.stage.Window
+import javafx.stage.{Stage, Window}
 import scala.collection.JavaConversions._
 import suiryc.scala.concurrent.RichFuture.Action
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.event.Events
 import suiryc.scala.javafx.event.EventHandler._
 import suiryc.scala.javafx.stage.Stages
+import suiryc.scala.javafx.stage.Stages.StageLocation
 import suiryc.scala.javafx.util.Callback
+import suiryc.scala.settings.Preference
 
 // TODO: handle user-defined displaying order ?
-// TODO: save stage location
 
 class EditUnavailabilityPeriodsController {
+
+  import EditUnavailabilityPeriodsController._
 
   @FXML
   protected var periodsField: ListView[Savings.UnavailabilityPeriod] = _
@@ -52,8 +55,7 @@ class EditUnavailabilityPeriodsController {
 
   protected var buttonOk: Node = _
 
-  protected lazy val window =
-    nameField.getScene.getWindow
+  private lazy val stage = nameField.getScene.getWindow.asInstanceOf[Stage]
 
   private var entries0: Seq[Savings.UnavailabilityPeriod] = Seq.empty
 
@@ -81,7 +83,7 @@ class EditUnavailabilityPeriodsController {
     monthField.setButtonCell(new MonthListCell)
     monthField.setCellFactory(Callback { new MonthListCell })
 
-    entries0 = Awaits.readDataStoreUnavailabilityPeriods(Some(window)).getOrElse(Seq.empty).sortBy(_.id)
+    entries0 = Awaits.readDataStoreUnavailabilityPeriods(Some(stage)).getOrElse(Seq.empty).sortBy(_.id)
     entries = entries0
 
     // Initialize periods list view
@@ -114,13 +116,14 @@ class EditUnavailabilityPeriodsController {
           name.nonEmpty
       }
 
+      persistView()
       val canClose =
         if (dirty) Form.confirmDiscardPendingChanges(Stages.getStage(dialog), event)
         else true
       if (close && canClose) dialog.close()
     }
     buttonOk.addEventFilter(ActionEvent.ACTION, confirmationFilter[ActionEvent](close = false) _)
-    window.setOnCloseRequest(confirmationFilter(close = true) _)
+    stage.setOnCloseRequest(confirmationFilter(close = true) _)
 
     // Filter keys pressed to trigger some actions if possible:
     //   ENTER applies pending period changes if any
@@ -152,6 +155,21 @@ class EditUnavailabilityPeriodsController {
 
     // Initial focus goes to name field
     nameField.requestFocus()
+  }
+
+  /** Restores (persisted) view. */
+  private def restoreView(): Unit = {
+    // Restore stage location
+    Option(stageLocation()).foreach { loc =>
+      Stages.setLocation(stage, loc, setSize = true)
+    }
+  }
+
+  /** Persists view (stage location, ...). */
+  private def persistView(): Unit = {
+    // Persist stage location
+    // Note: if iconified, resets it
+    stageLocation() = Stages.getLocation(stage).orNull
   }
 
   private def getYears: Int =
@@ -367,6 +385,10 @@ class EditUnavailabilityPeriodsController {
 
 object EditUnavailabilityPeriodsController {
 
+  import epsa.Settings.prefs
+
+  private val stageLocation = Preference.from("stage.edit-unavailability-periods.location", null:StageLocation)
+
   /** Builds a dialog out of this controller. */
   def buildDialog(owner: Option[Window]): Dialog[Boolean] = {
     val dialog = new Dialog[Boolean]()
@@ -381,6 +403,12 @@ object EditUnavailabilityPeriodsController {
     dialog.getDialogPane.setContent(loader.load())
     val controller = loader.getController[EditUnavailabilityPeriodsController]
     controller.initialize(dialog)
+
+    // Wait for dialog to be shown before restoring the view
+    dialog.showingProperty().listen2 { cancellable =>
+      cancellable.cancel()
+      controller.restoreView()
+    }
 
     dialog.setResultConverter(Callback { resultConverter(owner, controller) _ })
     Stages.trackMinimumDimensions(Stages.getStage(dialog))

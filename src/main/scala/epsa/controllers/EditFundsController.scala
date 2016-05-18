@@ -12,7 +12,7 @@ import javafx.scene.Node
 import javafx.scene.control._
 import javafx.scene.image.ImageView
 import javafx.scene.input.{KeyCode, KeyEvent, MouseEvent}
-import javafx.stage.Window
+import javafx.stage.{Stage, Window}
 import scala.collection.JavaConversions._
 import suiryc.scala.RichOption._
 import suiryc.scala.javafx.beans.value.RichObservableValue._
@@ -21,9 +21,9 @@ import suiryc.scala.javafx.event.EventHandler._
 import suiryc.scala.javafx.event.Events
 import suiryc.scala.javafx.scene.control.CheckBoxListCellEx
 import suiryc.scala.javafx.stage.Stages
+import suiryc.scala.javafx.stage.Stages.StageLocation
 import suiryc.scala.javafx.util.Callback
-
-// TODO: save stage location
+import suiryc.scala.settings.Preference
 
 class EditFundsController {
 
@@ -60,8 +60,7 @@ class EditFundsController {
 
   protected var buttonOk: Node = _
 
-  protected lazy val window =
-    nameField.getScene.getWindow
+  private lazy val stage = nameField.getScene.getWindow.asInstanceOf[Stage]
 
   private var applyReady = false
 
@@ -155,13 +154,14 @@ class EditFundsController {
           name.nonEmpty
       }
 
+      persistView()
       val canClose =
         if (dirty) Form.confirmDiscardPendingChanges(Stages.getStage(dialog), event)
         else true
       if (close && canClose) dialog.close()
     }
     buttonOk.addEventFilter(ActionEvent.ACTION, confirmationFilter[ActionEvent](close = false) _)
-    window.setOnCloseRequest(confirmationFilter(close = true) _)
+    stage.setOnCloseRequest(confirmationFilter(close = true) _)
 
     // Filter keys pressed to trigger some actions if possible:
     //   ENTER applies pending fund changes if any (unless comment field has focus)
@@ -195,6 +195,21 @@ class EditFundsController {
 
     // Initial focus goes to name field
     nameField.requestFocus()
+  }
+
+  /** Restores (persisted) view. */
+  private def restoreView(): Unit = {
+    // Restore stage location
+    Option(stageLocation()).foreach { loc =>
+      Stages.setLocation(stage, loc, setSize = true)
+    }
+  }
+
+  /** Persists view (stage location, ...). */
+  private def persistView(): Unit = {
+    // Persist stage location
+    // Note: if iconified, resets it
+    stageLocation() = Stages.getLocation(stage).orNull
   }
 
   private def getSelectedSchemes: List[Savings.Scheme] =
@@ -272,7 +287,7 @@ class EditFundsController {
 
     val events = if (schemes.nonEmpty) {
       val alert = new Alert(Alert.AlertType.CONFIRMATION)
-      alert.initOwner(window)
+      alert.initOwner(stage)
 
       val loader = new FXMLLoader(getClass.getResource("/fxml/select-resources.fxml"), I18N.getResources)
       val root = loader.load[Node]()
@@ -505,6 +520,10 @@ class EditFundsController {
 
 object EditFundsController {
 
+  import epsa.Settings.prefs
+
+  private val stageLocation = Preference.from("stage.edit-funds.location", null:StageLocation)
+
   /** Builds a dialog out of this controller. */
   def buildDialog(owner: Option[Window], savings: Savings, edit: Option[Savings.Fund]): Dialog[List[Savings.Event]] = {
     val dialog = new Dialog[List[Savings.Event]]()
@@ -519,6 +538,12 @@ object EditFundsController {
     dialog.getDialogPane.setContent(loader.load())
     val controller = loader.getController[EditFundsController]
     controller.initialize(savings, dialog, edit)
+
+    // Wait for dialog to be shown before restoring the view
+    dialog.showingProperty().listen2 { cancellable =>
+      cancellable.cancel()
+      controller.restoreView()
+    }
 
     dialog.setResultConverter(Callback { resultConverter(controller) _ })
     Stages.trackMinimumDimensions(Stages.getStage(dialog))
