@@ -76,8 +76,7 @@ case class AssetDateField(tableLabel: String, detailsLabel: String,
 /** Asset field with amount to display. */
 case class AssetAmountField(tableLabel: String, detailsLabel: String,
   format: (AssetDetails, Boolean) => String,
-  value: (AssetDetails) => Option[BigDecimal],
-  suffix: String
+  value: (AssetDetails) => Option[BigDecimal]
 ) extends AssetField[AssetDetails] {
   val column = new TableColumn[AssetDetails, AssetDetails](tableLabel)
   column.setCellValueFactory(Callback { data =>
@@ -90,8 +89,7 @@ case class AssetAmountField(tableLabel: String, detailsLabel: String,
 /** Asset field with (colored) amount to display. */
 case class AssetColoredAmountField(tableLabel: String, detailsLabel: String,
   format: (AssetDetails, Boolean) => String,
-  value: (AssetDetails) => Option[BigDecimal],
-  suffix: String
+  value: (AssetDetails) => Option[BigDecimal]
 ) extends AssetField[AssetDetails] {
   val column = new TableColumn[AssetDetails, AssetDetails](tableLabel)
   column.setCellValueFactory(Callback { data =>
@@ -141,14 +139,14 @@ object AssetField {
     KEY_SCHEME          -> AssetTextField(Strings.scheme, Strings.schemeColon, AssetField.formatScheme, AssetField.schemeComment),
     KEY_FUND            -> AssetTextField(Strings.fund, Strings.fundColon, AssetField.formatFund, AssetField.fundComment),
     KEY_AVAILABILITY    -> AssetDateField(Strings.availability, Strings.availabilityColon, AssetField.formatAvailability, AssetField.availability),
-    KEY_UNITS           -> AssetAmountField(Strings.units, Strings.unitsColon, AssetField.formatUnits, AssetField.units, null),
-    KEY_VWAP            -> AssetAmountField(Strings.vwap, Strings.vwapColon, AssetField.formatVWAP, AssetField.vwap, epsa.Settings.currency()),
-    KEY_NAV             -> AssetAmountField(Strings.nav, Strings.navColon, AssetField.formatNAV, AssetField.nav, epsa.Settings.currency()),
+    KEY_UNITS           -> AssetAmountField(Strings.units, Strings.unitsColon, AssetField.formatUnits, AssetField.units),
+    KEY_VWAP            -> AssetAmountField(Strings.vwap, Strings.vwapColon, AssetField.formatVWAP, AssetField.vwap),
+    KEY_NAV             -> AssetAmountField(Strings.nav, Strings.navColon, AssetField.formatNAV, AssetField.nav),
     KEY_DATE            -> AssetDateField(Strings.date, Strings.dateColon, AssetField.formatDate, AssetField.date),
-    KEY_INVESTED_AMOUNT -> AssetAmountField(Strings.invested, Strings.investedAmountColon, AssetField.formatInvestedAmount, AssetField.investedAmount, epsa.Settings.currency()),
-    KEY_GROSS_AMOUNT    -> AssetAmountField(Strings.gross, Strings.grossAmountColon, AssetField.formatGrossAmount, AssetField.grossAmount, epsa.Settings.currency()),
-    KEY_GROSS_GAIN      -> AssetColoredAmountField(Strings.gross, Strings.grossGainColon, AssetField.formatGrossGain, AssetField.grossGain, epsa.Settings.currency()),
-    KEY_GROSS_GAIN_PCT  -> AssetColoredAmountField(Strings.grossPct, Strings.grossGainPctColon, AssetField.formatGrossGainPct, AssetField.grossGainPct, "%")
+    KEY_INVESTED_AMOUNT -> AssetAmountField(Strings.invested, Strings.investedAmountColon, AssetField.formatInvestedAmount, AssetField.investedAmount),
+    KEY_GROSS_AMOUNT    -> AssetAmountField(Strings.gross, Strings.grossAmountColon, AssetField.formatGrossAmount, AssetField.grossAmount),
+    KEY_GROSS_GAIN      -> AssetColoredAmountField(Strings.gross, Strings.grossGainColon, AssetField.formatGrossGain, AssetField.grossGain),
+    KEY_GROSS_GAIN_PCT  -> AssetColoredAmountField(Strings.grossPct, Strings.grossGainPctColon, AssetField.formatGrossGainPct, AssetField.grossGainPct)
   )
 
   val bigDecimalComparator = Comparators.optionComparator[BigDecimal]
