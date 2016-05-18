@@ -121,7 +121,8 @@ object Savings {
   case class Assets(list: List[Asset] = Nil, vwaps: Map[AssetId, BigDecimal] = Map.empty) {
     lazy val byId = list.groupBy(_.id)
     def units(id: AssetId) = byId.getOrElse(id, Nil).map(_.units).sum
-    def investedAmount(id: AssetId) = scaleAmount(units(id) * vwaps.getOrElse(id, 0))
+    def amount(id: AssetId, value: BigDecimal) = scaleAmount(units(id) * value)
+    def investedAmount(id: AssetId) = amount(id, vwaps.getOrElse(id, 0))
     def addAsset(asset: Asset) = copy(list = list :+ asset)
     def updateAsset(date: LocalDate, asset: Asset) =
       copy(list = list.map { currentAsset =>
@@ -158,7 +159,7 @@ object Savings {
     extends AssetEntry
   {
     def amount(value: BigDecimal): BigDecimal = scaleAmount(units * value)
-    lazy val investedAmount: BigDecimal = scaleAmount(units * vwap)
+    lazy val investedAmount: BigDecimal = amount(vwap)
   }
 
   /** Asset value: holds asset value at a given date. */

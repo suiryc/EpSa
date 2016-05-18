@@ -4,6 +4,7 @@ import akka.actor.Cancellable
 import com.sun.javafx.scene.control.skin.{TreeTableViewSkin, VirtualFlow, VirtualScrollBar}
 import epsa.I18N
 import epsa.I18N.Strings
+import epsa.Settings.scalePercents
 import epsa.charts._
 import epsa.controllers.MainController.State
 import epsa.model.Savings
@@ -35,7 +36,6 @@ import suiryc.scala.math.Ordered._
 import suiryc.scala.math.Ordering._
 import suiryc.scala.settings.Preference
 
-// TODO: display details of account at selected (or hovered ?) date in chart
 class AccountHistoryController extends Logging {
 
   import AccountHistoryController._
@@ -44,10 +44,28 @@ class AccountHistoryController extends Logging {
   protected var splitPane: SplitPane = _
 
   @FXML
+  protected var splitPane_2: SplitPane = _
+
+  @FXML
   protected var historyPane: AnchorPane = _
 
   @FXML
   protected var progressIndicator: ProgressIndicator = _
+
+  @FXML
+  protected var dateLabel: Label = _
+
+  @FXML
+  protected var investedAmountLabel: Label = _
+
+  @FXML
+  protected var grossAmountLabel: Label = _
+
+  @FXML
+  protected var grossGainLabel: Label = _
+
+  @FXML
+  protected var grossGainPctLabel: Label = _
 
   @FXML
   protected var historyTable: TreeTableView[AssetEventItem] = _
@@ -69,18 +87,44 @@ class AccountHistoryController extends Logging {
 
   private var chartHandler: Option[ChartHandler[HistoryMark]] = None
 
+  // Full history events
+  private var events: Seq[Savings.Event] = Seq.empty
+
+  // NAVs deduced from history events
+  private var eventsNAVs: Map[UUID, Seq[Savings.AssetValue]] = Map.empty
+
   def initialize(stage: Stage, state: State): Unit = {
     import epsa.Main.Akka.dispatcher
     this.stage = stage
 
     // Sort events
     val events0 = Awaits.readDataStoreEvents(Some(stage)).getOrElse(Nil) ++ state.eventsUpd
-    val events = Savings.sortEvents(events0)
+    events = Savings.sortEvents(events0)
+
+    // Known NAVs through account history events.
+    // This can complete data store NAVs, especially for old (now deleted) funds.
+    val assetEvents = events.filter(_.isInstanceOf[Savings.AssetEvent]).asInstanceOf[Seq[Savings.AssetEvent]]
+    eventsNAVs = assetEvents.flatMap {
+      case e: Savings.MakePayment =>
+        List(e.part.fundId -> Savings.AssetValue(e.date, e.part.value))
+
+      case e: Savings.MakeTransfer =>
+        List(e.partSrc.fundId -> Savings.AssetValue(e.date, e.partSrc.value),
+          e.partDst.fundId -> Savings.AssetValue(e.date, e.partDst.value))
+
+      case e: Savings.MakeRefund =>
+        List(e.part.fundId -> Savings.AssetValue(e.date, e.part.value))
+    }.groupBy(_._1).mapValues { v =>
+      v.map(_._2).sortBy(_.date)
+    }
 
     // Prepare to display progress indicator (if action takes too long)
     val showIndicator = epsa.Main.Akka.system.scheduler.scheduleOnce(500.milliseconds) {
       progressIndicator.setVisible(true)
     }
+
+    // Display account details as of today
+    showAccountDetails(LocalDate.now)
 
     columnEventDate.setCellValueFactory(Callback { data =>
       new SimpleStringProperty(data.getValue.valueProperty().get().date.map(_.toString).orNull)
@@ -212,23 +256,31 @@ class AccountHistoryController extends Logging {
       historyTable.requestLayout()
     }
 
-    def restoreDividerPositions(): Unit = {
+    def restoreDividerPositions(splitPane: SplitPane, dividerPositions: String): Unit = {
+      // Restore SplitPane divider positions
+      try {
+        val positions = dividerPositions.split(';').map(_.toDouble)
+        splitPane.setDividerPositions(positions: _*)
+      } catch {
+        case ex: Exception => warn(s"Could not restore SplitPane divider positions[$dividerPositions]: ${ex.getMessage}")
+      }
+    }
+
+    def restoreDividersPositions(): Unit = {
       // Restore SplitPane divider positions
       Option(splitPaneDividerPositions()).foreach { dividerPositions =>
-        try {
-          val positions = dividerPositions.split(';').map(_.toDouble)
-          splitPane.setDividerPositions(positions: _*)
-        } catch {
-          case ex: Exception => warn(s"Could not restore SplitPane divider positions[$dividerPositions]: ${ex.getMessage}")
-        }
+        restoreDividerPositions(splitPane, dividerPositions)
+      }
+      Option(splitPane2DividerPositions()).foreach { dividerPositions =>
+        restoreDividerPositions(splitPane_2, dividerPositions)
       }
     }
 
     // On Linux, we must wait a bit after changing stage size before setting
     // divider positions, otherwise the value gets altered a bit by stage
     // resizing ...
-    if (!jfx.isLinux) restoreDividerPositions()
-    else JFXSystem.scheduleOnce(200.millis)(restoreDividerPositions())
+    if (!jfx.isLinux) restoreDividersPositions()
+    else JFXSystem.scheduleOnce(200.millis)(restoreDividersPositions())
   }
 
   /** Persists view (stage location, ...). */
@@ -242,6 +294,7 @@ class AccountHistoryController extends Logging {
 
     // Persist SplitPane divider positions
     splitPaneDividerPositions() = splitPane.getDividerPositions.mkString(";")
+    splitPane2DividerPositions() = splitPane_2.getDividerPositions.mkString(";")
   }
 
   def onCloseRequest(event: WindowEvent): Unit = {
@@ -276,22 +329,6 @@ class AccountHistoryController extends Logging {
     var assetsNAVIdxs = Map[UUID, Int]()
     // Known NAV dates from data store
     val assetsNAVDates = assetsNAVs.values.flatten.map(_.date).toList.toSet
-    // Known NAVs through account history events.
-    // This can complete data store NAVs, especially for old (now deleted) funds.
-    val assetEvents = events.filter(_.isInstanceOf[Savings.AssetEvent]).asInstanceOf[Seq[Savings.AssetEvent]]
-    val eventsNAVs = assetEvents.flatMap {
-      case e: Savings.MakePayment =>
-        List(e.part.fundId -> Savings.AssetValue(e.date, e.part.value))
-
-      case e: Savings.MakeTransfer =>
-        List(e.partSrc.fundId -> Savings.AssetValue(e.date, e.partSrc.value),
-          e.partDst.fundId -> Savings.AssetValue(e.date, e.partDst.value))
-
-      case e: Savings.MakeRefund =>
-        List(e.part.fundId -> Savings.AssetValue(e.date, e.part.value))
-    }.groupBy(_._1).mapValues { v =>
-      v.map(_._2).sortBy(_.date)
-    }
     // Known NAV dates from account history events
     val eventsNAVDates = eventsNAVs.values.flatten.map(_.date).toList.toSet
     // All known NAV dates (data store + history), for which we may have a chart series data
@@ -440,6 +477,9 @@ class AccountHistoryController extends Logging {
     val marks = historyTable.getRoot.getChildren.toList.map(_.getValue).groupBy(_.date.get).map { case (date, items) =>
       date -> HistoryMark(date, items)
     }
+    // TODO: callback for mouse events (over/click 'x', exited)
+    //    => display account details at date (at least when clicked)
+    //    => get back to selected entry when exiting chart ? (or leave untouched)
     val meta = ChartMeta(marks, onMarkEvent _)
     val chartHandler = new ChartHandler(
       seriesName = title,
@@ -511,7 +551,51 @@ class AccountHistoryController extends Logging {
       chartHandler <- this.chartHandler
     } {
       chartHandler.highlightMark(date)
+      showAccountDetails(date)
     }
+  }
+
+  private def showAccountDetails(date: LocalDate): Unit = {
+    case class AccountDetails(investedAmount: BigDecimal, grossAmount: BigDecimal) {
+      def grossGain = grossAmount - investedAmount
+      def grossGainPct =
+        if (investedAmount == 0) BigDecimal(0)
+        else scalePercents((grossGain * 100) / investedAmount)
+    }
+
+    // Gets a fund NAV at given date, from history events and data store NAV history.
+    def getNAV(fundId: UUID): Option[Savings.AssetValue] =
+      (eventsNAVs.getOrElse(fundId, Nil) ++ Awaits.readDataStoreNAV(Some(stage), fundId, date).getOrElse(None)).filter { nav =>
+        nav.date <= date
+      }.sortBy(date.toEpochDay - _.date.toEpochDay).headOption
+
+    val history = events.takeWhile {
+      case e: Savings.AssetEvent => e.date <= date
+      case _                     => true
+    }
+
+    val savings = Savings().processEvents(history)
+    val assets = savings.assets
+    val details = assets.byId.keys.foldLeft(AccountDetails(0, 0)) { (details, assetId) =>
+      details.copy(
+        investedAmount = details.investedAmount + assets.investedAmount(assetId),
+        grossAmount = details.grossAmount + getNAV(assetId.fundId).map(nav => assets.amount(assetId, nav.value)).getOrElse(0)
+      )
+    }
+
+    def coloredAmount(label: Label, value: BigDecimal, suffix: String): Unit = {
+      label.setText(Form.formatAmount(value, suffix))
+      if (value == 0) JFXStyles.toggleNeutral(label)
+      else if (value > 0) JFXStyles.togglePositive(label)
+      else JFXStyles.toggleNegative(label)
+    }
+
+    val currency = epsa.Settings.currency()
+    dateLabel.setText(date.toString)
+    investedAmountLabel.setText(Form.formatAmount(details.investedAmount, currency))
+    grossAmountLabel.setText(Form.formatAmount(details.grossAmount, currency))
+    coloredAmount(grossGainLabel, details.grossGain, currency)
+    coloredAmount(grossGainPctLabel, details.grossGainPct, "%")
   }
 
 }
@@ -526,6 +610,8 @@ object AccountHistoryController {
   private val stageLocation = Preference.from(s"$prefsKeyPrefix.location", null:StageLocation)
 
   private val splitPaneDividerPositions = Preference.from(s"$prefsKeyPrefix.splitPane.dividerPositions", null:String)
+
+  private val splitPane2DividerPositions = Preference.from(s"$prefsKeyPrefix.splitPane.2.dividerPositions", null:String)
 
   private val historyColumnsPref = Preference.from(s"$prefsKeyPrefix.history.columns", null:String)
 
