@@ -529,7 +529,7 @@ class ChartHandler[A <: ChartMark](
       markRegion.setLayoutX(pixelEdge(x))
 
       mark.comment.foreach { comment =>
-        Tooltip.install(markRegion, new Tooltip(comment))
+        Tooltip.install(markRegion, new Tooltip(s"${dateFormatter.format(date)}\n$comment"))
       }
 
       markRegion.setOnMouseEntered { (_: MouseEvent) =>
