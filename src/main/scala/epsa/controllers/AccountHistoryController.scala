@@ -323,6 +323,12 @@ class AccountHistoryController extends Logging {
     }
   }
 
+  private def onMouseEvent(data: ChartSeriesData, event: ChartEvent.Value): Unit = {
+    if (event != ChartEvent.Exited) {
+      showAccountDetails(data.date)
+    }
+  }
+
   private def buildHistory(state: State, events: Seq[Savings.Event], showIndicator: Cancellable): Unit = {
     // Cached data store NAVs, and index in sequence (for more efficient search)
     var assetsNAVs = Map[UUID, Seq[Savings.AssetValue]]()
@@ -477,10 +483,7 @@ class AccountHistoryController extends Logging {
     val marks = historyTable.getRoot.getChildren.toList.map(_.getValue).groupBy(_.date.get).map { case (date, items) =>
       date -> HistoryMark(date, items)
     }
-    // TODO: callback for mouse events (over/click 'x', exited)
-    //    => display account details at date (at least when clicked)
-    //    => get back to selected entry when exiting chart ? (or leave untouched)
-    val meta = ChartMeta(marks, onMarkEvent _)
+    val meta = ChartMeta(marks, onMarkEvent _, onMouseEvent _)
     val chartHandler = new ChartHandler(
       seriesName = title,
       seriesValues = grossHistory,

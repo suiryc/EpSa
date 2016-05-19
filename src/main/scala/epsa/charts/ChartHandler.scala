@@ -48,9 +48,16 @@ object ChartMarkEvent extends Enumeration {
   val Exited = Value
 }
 
+object ChartEvent extends Enumeration {
+  val Moved = Value
+  val Clicked = Value
+  val Exited = Value
+}
+
 case class ChartMeta[A <: ChartMark](
   marks: Map[LocalDate, A] = Map.empty[LocalDate, A],
-  handler: (A, ChartMarkEvent.Value) => Unit = { (_: A, _: ChartMarkEvent.Value) => }
+  marksHandler: (A, ChartMarkEvent.Value) => Unit = { (_: A, _: ChartMarkEvent.Value) => },
+  mouseHandler: (ChartSeriesData, ChartEvent.Value) => Unit = { (_: ChartSeriesData, _: ChartEvent.Value) => }
 )
 
 case class ChartSettings(
@@ -533,10 +540,10 @@ class ChartHandler[A <: ChartMark](
       }
 
       markRegion.setOnMouseEntered { (_: MouseEvent) =>
-        meta.handler(mark, ChartMarkEvent.Entered)
+        meta.marksHandler(mark, ChartMarkEvent.Entered)
       }
       markRegion.setOnMouseExited { (_: MouseEvent) =>
-        meta.handler(mark, ChartMarkEvent.Exited)
+        meta.marksHandler(mark, ChartMarkEvent.Exited)
       }
 
       // Check marker and zoom bounds to prevent collision
@@ -927,6 +934,7 @@ class ChartHandler[A <: ChartMark](
    */
   private def onMouseExited(event: MouseEvent): Unit = {
     hideLines(clearRef = false)
+    meta.mouseHandler(null, ChartEvent.Exited)
   }
 
   /**
@@ -942,6 +950,8 @@ class ChartHandler[A <: ChartMark](
         if (!currentXPos.contains(xPos)) {
           currentXPos = Some(xPos)
           drawLines(event, currentXPos)
+          val data = ChartSeriesData(xAxisWrapper.numberToDate(xPos), valuesMap(xPos))
+          meta.mouseHandler(data, ChartEvent.Moved)
         }
       }
     } else {
@@ -959,8 +969,11 @@ class ChartHandler[A <: ChartMark](
     withMouseInChartBackground(event) { bounds =>
       getX(bounds, event.getX).foreach { xPos =>
         xZoomPos1 = Some(xPos)
-        labelNAV.setDataRef(Some(ChartData(xPos, valuesMap(xPos))))
+        val yValue = valuesMap(xPos)
+        labelNAV.setDataRef(Some(ChartData(xPos, yValue)))
         drawReferenceLines(xZoomPos1)
+        val data = ChartSeriesData(xAxisWrapper.numberToDate(xPos), yValue)
+        meta.mouseHandler(data, ChartEvent.Clicked)
 
         zoomZone.setX(pixelEdge(getX(bounds, xPos)))
         zoomZone.setWidth(0)
