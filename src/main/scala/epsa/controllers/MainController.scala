@@ -11,7 +11,6 @@ import java.io.PrintWriter
 import java.nio.file.Path
 import java.time.LocalDate
 import java.util.UUID
-import javafx.beans.property.SimpleObjectProperty
 import javafx.collections.FXCollections
 import javafx.collections.transformation.SortedList
 import javafx.event.ActionEvent
@@ -86,6 +85,8 @@ class MainController extends Logging {
   @FXML
   protected var assetsTable: TableView[AssetDetails] = _
 
+  lazy private val stage = splitPane.getScene.getWindow.asInstanceOf[Stage]
+
   private val clipboard = Clipboard.getSystemClipboard
 
   private val CTRL_C = new KeyCodeCombination(KeyCode.C, KeyCombination.CONTROL_DOWN)
@@ -119,9 +120,12 @@ class MainController extends Logging {
     // function which would retrieve table cells value.
     // It should not be necessary anymore as we reload the stage when necessary
     // (option changes) or can still ask to 'refresh' the table.
-    val stateProperty = new SimpleObjectProperty[State](state)
+    // In any case, we sometimes need to get the current state. So store it as
+    // user data.
+    state.save()
+
+    // Allow user to show/hide columns
     assetsTable.setTableMenuButtonVisible(true)
-    assetsTable.setUserData(stateProperty)
 
     // Note: if using a SortedList as table items, column sorting works out
     // of the box. But wrapping the SortedList does not because the default
@@ -307,8 +311,8 @@ class MainController extends Logging {
     actor ! OnCleanupDataStore
   }
 
-  private def getState: SimpleObjectProperty[State] = {
-    assetsTable.getUserData.asInstanceOf[SimpleObjectProperty[State]]
+  private def getState: State = {
+    stage.getUserData.asInstanceOf[State]
   }
 
   /**
@@ -403,7 +407,7 @@ class MainController extends Logging {
 
   /** Gets (computes) given asset details. */
   private def getAssetDetails(asset: Savings.Asset): AssetDetails = {
-    val state = getState.get()
+    val state = getState
     val savings = state.savingsUpd
 
     // Note: it is expected that we have an asset because there is an invested
@@ -466,26 +470,26 @@ class MainController extends Logging {
       case OnCleanupDataStore => onCleanupDataStore(state)
     }
 
-    def processEvents(state: State, events: List[Savings.Event], updateAssetsValue: Boolean = false): Unit = {
+    def processEvents(oldState: State, events: List[Savings.Event], updateAssetsValue: Boolean = false): Unit = {
       // Time to delete Net asset value history upon deleting fund
       events.collect {
         case Savings.DeleteFund(fundId) => DataStore.AssetHistory.deleteValues(fundId)
       }
-      val newEvents = state.eventsUpd ::: events
-      val newSavings = state.savingsUpd.processEvents(events)
+      val newEvents = oldState.eventsUpd ::: events
+      val savings = oldState.savingsUpd.processEvents(events)
       val newAssetsValue =
-        if (!updateAssetsValue) state.assetsValue
-        else newSavings.getNAVs(Some(state.window), LocalDate.now)
-      val newState = state.copy(eventsUpd = newEvents, savingsUpd = newSavings, assetsValue = newAssetsValue)
-      val dirty = newState.hasPendingChanges
+        if (!updateAssetsValue) oldState.assetsValue
+        else savings.getNAVs(Some(oldState.stage), LocalDate.now)
+      val state = oldState.copy(eventsUpd = newEvents, savingsUpd = savings, assetsValue = newAssetsValue)
+      val dirty = state.hasPendingChanges
 
       // First update state associated to assets table: takes care of
       // schemes/funds updated names if any.
-      getState.set(newState)
+      state.save()
       // Then update table content: takes care of added/removed entries
       val assets =
-        if (!newState.viewUpToDateAssets) newSavings.assets.list
-        else newSavings.computeAssets(LocalDate.now).assets.list
+        if (!state.viewUpToDateAssets) savings.assets.list
+        else savings.computeAssets(LocalDate.now).assets.list
       // Get details and sort by scheme, fund then availability by default
       // See: http://stackoverflow.com/a/10027682
       val assetsDetails = assets.map(getAssetDetails).sortBy { details =>
@@ -518,17 +522,17 @@ class MainController extends Logging {
       fileCloseMenu.setDisable(DataStore.dbOpened.isEmpty)
       fileSaveMenu.setDisable(!dirty)
       editUndoMenu.setDisable(!dirty)
-      viewNetAssetValueHistoryMenu.setDisable(newState.savingsUpd.funds.isEmpty)
-      val hasHistory = Awaits.hasDataStoreEvents(Some(state.window)).getOrElse(false) || newState.eventsUpd.nonEmpty
+      viewNetAssetValueHistoryMenu.setDisable(state.savingsUpd.funds.isEmpty)
+      val hasHistory = Awaits.hasDataStoreEvents(Some(oldState.stage)).getOrElse(false) || state.eventsUpd.nonEmpty
       viewAccountHistoryMenu.setDisable(!hasHistory)
       toolsExportRawAccountHistoryMenu.setDisable(!hasHistory)
 
       val title = DataStore.dbOpened.map { name =>
         s"[$name${if (dirty) " *" else ""}] - "
       }.getOrElse(if (dirty) " * - " else "") + epsa.Main.name
-      newState.stage.setTitle(title)
+      state.stage.setTitle(title)
 
-      context.become(receive(newState))
+      context.become(receive(state))
     }
 
     def refresh(state: State): Unit = {
@@ -589,7 +593,7 @@ class MainController extends Logging {
     }
 
     def onEditSchemes(state: State, edit: Option[Savings.Scheme]): Unit = {
-      val dialog = EditSchemesController.buildDialog(Some(state.window), state.savingsUpd, edit)
+      val dialog = EditSchemesController.buildDialog(Some(state.stage), state.savingsUpd, edit)
       dialog.initModality(Modality.WINDOW_MODAL)
       dialog.setResizable(true)
       val events = dialog.showAndWait().orElse(Nil)
@@ -597,7 +601,7 @@ class MainController extends Logging {
     }
 
     def onEditFunds(state: State, edit: Option[Savings.Fund]): Unit = {
-      val dialog = EditFundsController.buildDialog(Some(state.window), state.savingsUpd, edit)
+      val dialog = EditFundsController.buildDialog(Some(state.stage), state.savingsUpd, edit)
       dialog.initModality(Modality.WINDOW_MODAL)
       dialog.setResizable(true)
       val events = dialog.showAndWait().orElse(Nil)
@@ -605,14 +609,14 @@ class MainController extends Logging {
     }
 
     def onEditUnavailabilityPeriods(state: State): Unit = {
-      val dialog = EditUnavailabilityPeriodsController.buildDialog(Some(state.window))
+      val dialog = EditUnavailabilityPeriodsController.buildDialog(Some(state.stage))
       dialog.initModality(Modality.WINDOW_MODAL)
       dialog.setResizable(true)
       if (dialog.showAndWait().orElse(false)) refresh(state)
     }
 
     def onNewAssetAction(state: State, kind: AssetActionKind.Value, asset: Option[Savings.Asset]): Unit = {
-      val dialog = NewAssetActionController.buildDialog(Some(state.window), MainController.this, state.savingsUpd, kind, asset)
+      val dialog = NewAssetActionController.buildDialog(Some(state.stage), MainController.this, state.savingsUpd, kind, asset)
       dialog.initModality(Modality.WINDOW_MODAL)
       dialog.setResizable(true)
       val event = dialog.showAndWait().orElse(None)
@@ -623,7 +627,7 @@ class MainController extends Logging {
     }
 
     def onOptions(state: State): Unit = {
-      val dialog = OptionsController.buildDialog(Some(state.window))
+      val dialog = OptionsController.buildDialog(Some(state.stage))
       dialog.initModality(Modality.WINDOW_MODAL)
       dialog.setResizable(true)
       val (reload, needRestart) = dialog.showAndWait().orElse((false, false))
@@ -638,7 +642,7 @@ class MainController extends Logging {
     }
 
     def onNetAssetValueHistory(state: State, fundId: Option[UUID]): Unit = {
-      val dialog = NetAssetValueHistoryController.buildStage(MainController.this, state.savingsUpd, fundId, state.window)
+      val dialog = NetAssetValueHistoryController.buildStage(MainController.this, state.savingsUpd, fundId, state.stage)
       // Notes:
       // Don't set as modal, since we wish to display the window while still
       // interacting with the main stage.
@@ -661,7 +665,7 @@ class MainController extends Logging {
     }
 
     def onExportRawAccountHistory(state: State): Unit = {
-      val events = Awaits.readDataStoreEvents(Some(state.window)).getOrElse(Nil) ++ state.eventsUpd
+      val events = Awaits.readDataStoreEvents(Some(state.stage)).getOrElse(Nil) ++ state.eventsUpd
       import spray.json._
       import Savings.JsonProtocol._
       val eventsJson = events.map(_.toJson)
@@ -678,7 +682,7 @@ class MainController extends Logging {
       accountHistoryPath.option.foreach { path =>
         FileChoosers.setInitialPath(fileChooser, path.toFile)
       }
-      val selectedFile = fileChooser.showSaveDialog(state.window)
+      val selectedFile = fileChooser.showSaveDialog(state.stage)
       Option(selectedFile).foreach { file =>
         try {
           val writer = new PrintWriter(file, "UTF-8")
@@ -687,7 +691,7 @@ class MainController extends Logging {
           accountHistoryPath() = selectedFile.toPath
           if (writer.checkError) {
             Dialogs.error(
-              owner = Some(state.window),
+              owner = Some(state.stage),
               title = Some(Strings.exportRawAccountHistory),
               headerText = Some(Strings.fileWriteError),
               contentText = None,
@@ -697,7 +701,7 @@ class MainController extends Logging {
         } catch {
           case ex: Exception =>
             Dialogs.error(
-              owner = Some(state.window),
+              owner = Some(state.stage),
               title = Some(Strings.exportRawAccountHistory),
               headerText = Some(Strings.fileWriteError),
               contentText = None,
@@ -712,7 +716,7 @@ class MainController extends Logging {
       val doImport = if (!toolsExportRawAccountHistoryMenu.isDisable || pendingChanges) {
         // If there is history to export, or pending changes, ask confirmation as we will replace history/changes
         val resp = Dialogs.confirmation(
-          owner = Some(state.window),
+          owner = Some(state.stage),
           title = Some(Strings.importRawAccountHistory),
           headerText = if (pendingChanges) Some(Strings.irreversibleAction) else Some(Strings.confirmAction),
           contentText = Some(Strings.importRawAccountHistory)
@@ -730,7 +734,7 @@ class MainController extends Logging {
         accountHistoryPath.option.foreach { path =>
           FileChoosers.setInitialPath(fileChooser, path.toFile)
         }
-        val selectedFile = fileChooser.showOpenDialog(state.window)
+        val selectedFile = fileChooser.showOpenDialog(state.stage)
         Option(selectedFile).flatMap { file =>
           // We could try to use typesafe Config (HOCON), which would allow to
           // handle variables for shared values. But it does not handle decimal
@@ -745,7 +749,7 @@ class MainController extends Logging {
           } catch {
             case ex: Exception =>
               Dialogs.error(
-                owner = Some(state.window),
+                owner = Some(state.stage),
                 title = Some(Strings.importRawAccountHistory),
                 headerText = Some(Strings.fileReadError),
                 contentText = None,
@@ -763,7 +767,7 @@ class MainController extends Logging {
     }
 
     def onCleanupDataStore(state: State): Unit = {
-      Awaits.cleanupDataStore(Some(state.window), state.savingsUpd.funds.map(_.id))
+      Awaits.cleanupDataStore(Some(state.stage), state.savingsUpd.funds.map(_.id))
       refresh(state)
     }
 
@@ -787,7 +791,7 @@ class MainController extends Logging {
         val buttonSaveType = new ButtonType(fileSaveMenu.getText, ButtonBar.ButtonData.OK_DONE)
         val alert = new Alert(Alert.AlertType.CONFIRMATION, "",
           ButtonType.OK, ButtonType.CANCEL, buttonSaveType)
-        alert.initOwner(state.window)
+        alert.initOwner(state.stage)
         alert.setHeaderText(Strings.pendingChanges)
 
         // Filter action on "Save" button to trigger saving and check result:
@@ -833,7 +837,7 @@ class MainController extends Logging {
       // try to use it (e.g. Dialog to show upon issue).
       // For simplicity, we waits for result and display issue after receiving
       // it.
-      val owner = owner0.orElse(Some(state.window))
+      val owner = owner0.orElse(Some(state.stage))
 
       def save() =
         Awaits.saveDataStoreChanges(owner, state.eventsUpd).isSuccess
@@ -886,7 +890,7 @@ object MainController {
     assetsValue: Map[UUID, Savings.AssetValue] = Map.empty
   ) {
 
-    lazy val window = stage.getScene.getWindow
+    def save(): Unit = stage.setUserData(this)
 
     def hasPendingChanges: Boolean =
       eventsUpd.nonEmpty || DataStore.hasPendingChanges
@@ -968,7 +972,7 @@ object MainController {
 
     if (needRestart) {
       Dialogs.information(
-        owner = Some(state.window),
+        owner = Some(state.stage),
         title = None,
         headerText = Some(Strings.needRestart)
       )
