@@ -519,8 +519,9 @@ class AccountHistoryController extends Logging {
         AssetEventItem(event.date, Strings.assetEventPaymentMain.format(
           Form.formatAmount(e.part.amount(e.part.value), currency),
           savings.getFund(e.part.fundId).name, savings.getScheme(e.part.schemeId).name), event.comment),
-        // $1=units $2=NAV
-        AssetEventItem(Strings.assetEventPaymentDetails1.format(e.part.units, e.part.value))
+        // $1=units $2=NAV $3=availability
+        AssetEventItem(Strings.assetEventPaymentDetails1.format(e.part.units, e.part.value,
+          Form.formatAvailability(e.part.availability, Some(e.date), long = true)))
       )
 
     case e: Savings.MakeTransfer =>
@@ -530,11 +531,13 @@ class AccountHistoryController extends Logging {
           Form.formatAmount(e.partSrc.amount(e.partSrc.value), currency),
           savings.getFund(e.partSrc.fundId).name, savings.getScheme(e.partSrc.schemeId).name,
           savings.getFund(e.partDst.fundId).name, savings.getScheme(e.partDst.schemeId).name), event.comment),
-        // $1=src units $2=src NAV
-        AssetEventItem(Strings.assetEventTransferDetails1.format(e.partSrc.units, e.partSrc.value)),
-        // $1=dst units $2=dst NAV $3=dst amount
+        // $1=src units $2=src NAV $3=src availability
+        AssetEventItem(Strings.assetEventTransferDetails1.format(e.partSrc.units, e.partSrc.value,
+          Form.formatAvailability(e.partSrc.availability, Some(e.date), long = true))),
+        // $1=dst units $2=dst NAV $3=dst amount $4=dst availability
         AssetEventItem(Strings.assetEventTransferDetails2.format(e.partDst.units, e.partDst.value,
-          Form.formatAmount(e.partDst.amount(e.partDst.value), currency)))
+          Form.formatAmount(e.partDst.amount(e.partDst.value), currency),
+          Form.formatAvailability(e.partDst.availability, Some(e.date), long = true)))
       )
 
     case e: Savings.MakeRefund =>
