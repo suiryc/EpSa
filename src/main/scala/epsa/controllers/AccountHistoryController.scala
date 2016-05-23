@@ -18,6 +18,7 @@ import javafx.fxml.{FXML, FXMLLoader}
 import javafx.scene.Scene
 import javafx.scene.control._
 import javafx.scene.image.ImageView
+import javafx.scene.input.MouseEvent
 import javafx.scene.layout.{AnchorPane, Region}
 import javafx.stage.{Stage, WindowEvent}
 import scala.collection.JavaConversions._
@@ -301,7 +302,7 @@ class AccountHistoryController extends Logging {
     persistView()
   }
 
-  private def onMarkEvent(mark: HistoryMark, event: ChartMarkEvent.Value): Unit = {
+  private def onMarkEvent(event: ChartMarkEvent.Value, mark: HistoryMark): Unit = {
     // Do some animation (highlighting) when getting on the marker.
     if (event == ChartMarkEvent.Entered) {
       val items = historyTable.getRoot.getChildren.filter { item =>
@@ -323,7 +324,7 @@ class AccountHistoryController extends Logging {
     }
   }
 
-  private def onMouseEvent(data: ChartSeriesData, event: ChartEvent.Value): Unit = {
+  private def onMouseEvent(event: ChartEvent.Value, mouseEvent: MouseEvent, data: ChartSeriesData): Unit = {
     if (event != ChartEvent.Exited) {
       showAccountDetails(data.date)
     }

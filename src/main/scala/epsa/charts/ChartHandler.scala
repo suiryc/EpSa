@@ -12,7 +12,7 @@ import javafx.geometry.Bounds
 import javafx.scene.chart.{LineChart, NumberAxis, XYChart}
 import javafx.scene.control._
 import javafx.scene.image.ImageView
-import javafx.scene.input.{MouseEvent, ScrollEvent}
+import javafx.scene.input.{MouseButton, MouseEvent, ScrollEvent}
 import javafx.scene.layout.{AnchorPane, Region}
 import javafx.scene.shape.{Line, Rectangle}
 import scala.collection.JavaConversions._
@@ -56,8 +56,8 @@ object ChartEvent extends Enumeration {
 
 case class ChartMeta[A <: ChartMark](
   marks: Map[LocalDate, A] = Map.empty[LocalDate, A],
-  marksHandler: (A, ChartMarkEvent.Value) => Unit = { (_: A, _: ChartMarkEvent.Value) => },
-  mouseHandler: (ChartSeriesData, ChartEvent.Value) => Unit = { (_: ChartSeriesData, _: ChartEvent.Value) => }
+  marksHandler: (ChartMarkEvent.Value, A) => Unit = { (_: ChartMarkEvent.Value, _: A) => },
+  mouseHandler: (ChartEvent.Value, MouseEvent, ChartSeriesData) => Unit = { (_: ChartEvent.Value, _: MouseEvent, _: ChartSeriesData) => }
 )
 
 case class ChartSettings(
@@ -332,6 +332,7 @@ class ChartHandler[A <: ChartMark](
   chart.setOnMousePressed(onMousePressed _)
   chart.setOnMouseReleased(onMouseReleased _)
   chart.setOnMouseDragged(onMouseDragged _)
+  chart.setOnMouseClicked(onMouseClicked _)
   chart.setOnScroll(onScroll _)
 
   // Place zoom node at top center of view
@@ -540,10 +541,10 @@ class ChartHandler[A <: ChartMark](
       }
 
       markRegion.setOnMouseEntered { (_: MouseEvent) =>
-        meta.marksHandler(mark, ChartMarkEvent.Entered)
+        meta.marksHandler(ChartMarkEvent.Entered, mark)
       }
       markRegion.setOnMouseExited { (_: MouseEvent) =>
-        meta.marksHandler(mark, ChartMarkEvent.Exited)
+        meta.marksHandler(ChartMarkEvent.Exited, mark)
       }
 
       // Check marker and zoom bounds to prevent collision
@@ -934,7 +935,7 @@ class ChartHandler[A <: ChartMark](
    */
   private def onMouseExited(event: MouseEvent): Unit = {
     hideLines(clearRef = false)
-    meta.mouseHandler(null, ChartEvent.Exited)
+    meta.mouseHandler(ChartEvent.Exited, event, null)
   }
 
   /**
@@ -951,7 +952,7 @@ class ChartHandler[A <: ChartMark](
           currentXPos = Some(xPos)
           drawLines(event, currentXPos)
           val data = ChartSeriesData(xAxisWrapper.numberToDate(xPos), valuesMap(xPos))
-          meta.mouseHandler(data, ChartEvent.Moved)
+          meta.mouseHandler(ChartEvent.Moved, event, data)
         }
       }
     } else {
@@ -966,20 +967,19 @@ class ChartHandler[A <: ChartMark](
    * Draws reference value lines.
    */
   private def onMousePressed(event: MouseEvent): Unit = {
-    withMouseInChartBackground(event) { bounds =>
-      getX(bounds, event.getX).foreach { xPos =>
-        xZoomPos1 = Some(xPos)
-        val yValue = valuesMap(xPos)
-        labelNAV.setDataRef(Some(ChartData(xPos, yValue)))
-        drawReferenceLines(xZoomPos1)
-        val data = ChartSeriesData(xAxisWrapper.numberToDate(xPos), yValue)
-        meta.mouseHandler(data, ChartEvent.Clicked)
+    if (event.getButton == MouseButton.PRIMARY) {
+      withMouseInChartBackground(event) { bounds =>
+        getX(bounds, event.getX).foreach { xPos =>
+          xZoomPos1 = Some(xPos)
+          labelNAV.setDataRef(Some(ChartData(xPos, valuesMap(xPos))))
+          drawReferenceLines(xZoomPos1)
 
-        zoomZone.setX(pixelEdge(getX(bounds, xPos)))
-        zoomZone.setWidth(0)
-        zoomZone.setY(bounds.getMinY)
-        zoomZone.setHeight(bounds.getMaxY - bounds.getMinY)
-        zoomZone.setVisible(true)
+          zoomZone.setX(pixelEdge(getX(bounds, xPos)))
+          zoomZone.setWidth(0)
+          zoomZone.setY(bounds.getMinY)
+          zoomZone.setHeight(bounds.getMaxY - bounds.getMinY)
+          zoomZone.setVisible(true)
+        }
       }
     }
   }
@@ -991,41 +991,43 @@ class ChartHandler[A <: ChartMark](
    * Displays selected range values if different from previous one.
    */
   private def onMouseReleased(event: MouseEvent): Unit = {
-    for {
-      pos1 <- xZoomPos1
-      pos2 <- xZoomPos2
-    } {
-      hideLines(clearRef = true)
+    if (event.getButton == MouseButton.PRIMARY) {
+      for {
+        pos1 <- xZoomPos1
+        pos2 <- xZoomPos2
+      } {
+        hideLines(clearRef = true)
 
-      val range = math.abs(pos2 - pos1)
-      val zoom = if (range > 0) {
-        val viewedBounds = getChartBackgroundViewedBounds()
-        val zoom0 = BigDecimal(math.round(viewedBounds.getWidth)) / range
-        if (zoom0 > xZoomMax) xZoomMax
-        else zoom0
-      } else xZoom
+        val range = math.abs(pos2 - pos1)
+        val zoom = if (range > 0) {
+          val viewedBounds = getChartBackgroundViewedBounds()
+          val zoom0 = BigDecimal(math.round(viewedBounds.getWidth)) / range
+          if (zoom0 > xZoomMax) xZoomMax
+          else zoom0
+        } else xZoom
 
-      if (zoom != xZoom) {
-        val viewedBounds = getChartBackgroundViewedBounds()
-        xZoom = zoom
-        // When target zoom is higher than maximum zoom, selected range (once
-        // zoomed) is smaller than view. So compute the actual left data index
-        // that makes the selected range centered.
-        // If target zoom is lower than maximum zoom, the computed left index
-        // matches the lower end of the selected range.
-        //
-        // number of visible data = viewWidth / zoom
-        // center of zoom area = (pos1 + pos2) / 2
-        // data on the left of the view = center - half visible data
-        //  = (pos1 + pos2) / 2 - (viewWidth / zoom) / 2
-        //  = (pos1 + pos2 - viewWidth / zoom) / 2
-        val offset = round((pos1 + pos2 - viewedBounds.getWidth / xZoom) / 2)
-        refreshView(resetData = false, xViewOffset = Some(offset))
+        if (zoom != xZoom) {
+          val viewedBounds = getChartBackgroundViewedBounds()
+          xZoom = zoom
+          // When target zoom is higher than maximum zoom, selected range (once
+          // zoomed) is smaller than view. So compute the actual left data index
+          // that makes the selected range centered.
+          // If target zoom is lower than maximum zoom, the computed left index
+          // matches the lower end of the selected range.
+          //
+          // number of visible data = viewWidth / zoom
+          // center of zoom area = (pos1 + pos2) / 2
+          // data on the left of the view = center - half visible data
+          //  = (pos1 + pos2) / 2 - (viewWidth / zoom) / 2
+          //  = (pos1 + pos2 - viewWidth / zoom) / 2
+          val offset = round((pos1 + pos2 - viewedBounds.getWidth / xZoom) / 2)
+          refreshView(resetData = false, xViewOffset = Some(offset))
+        }
+        // else: either we selected the same zone, or we cannot zoom anymore
       }
-      // else: either we selected the same zone, or we cannot zoom anymore
-    }
 
-    hideZoomArea()
+      hideZoomArea()
+    }
   }
 
   /**
@@ -1076,13 +1078,35 @@ class ChartHandler[A <: ChartMark](
    * Calls 'onMouseMoved' listening code.
    */
   private def onMouseDragged(event: MouseEvent): Unit = {
-    withMouseInChartBackground(event) { bounds =>
-      getX(bounds, event.getX).foreach { xPos =>
-        xZoomPos2 = Some(xPos)
+    if (event.getButton == MouseButton.PRIMARY) {
+      withMouseInChartBackground(event) { bounds =>
+        getX(bounds, event.getX).foreach { xPos =>
+          xZoomPos2 = Some(xPos)
+        }
       }
     }
 
+    // Note: when dragging mouse, JavaFX does not trigger 'moving' events,
+    // do it ourself.
     onMouseMoved(event)
+  }
+
+  /**
+   * onMouseClicked listener.
+   *
+   * Call backs user-defined event handler.
+   */
+  private def onMouseClicked(event: MouseEvent): Unit = {
+    // We want real clicks (and filter dragged mouse 'click')
+    if (event.isStillSincePress) {
+      withMouseInChartBackground(event) { bounds =>
+        getX(bounds, event.getX).foreach { xPos =>
+          val data = ChartSeriesData(xAxisWrapper.numberToDate(xPos), valuesMap(xPos))
+          if (event.getButton == MouseButton.PRIMARY)
+            meta.mouseHandler(ChartEvent.Clicked, event, data)
+        }
+      }
+    }
   }
 
 }
