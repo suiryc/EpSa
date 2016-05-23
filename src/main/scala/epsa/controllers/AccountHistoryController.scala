@@ -329,6 +329,7 @@ class AccountHistoryController extends Logging {
     }
   }
 
+  // TODO: update progress indicator ?
   private def buildHistory(state: State, events: Seq[Savings.Event], showIndicator: Cancellable): Unit = {
     // Cached data store NAVs, and index in sequence (for more efficient search)
     var assetsNAVs = Map[UUID, Seq[Savings.AssetValue]]()
@@ -495,18 +496,18 @@ class AccountHistoryController extends Logging {
         ySuffix = epsa.Settings.defaultCurrency
       )
     )
-    val pane = chartHandler.chartPane
-    AnchorPane.setTopAnchor(pane, 0.0)
-    AnchorPane.setRightAnchor(pane, 0.0)
-    AnchorPane.setBottomAnchor(pane, 0.0)
-    AnchorPane.setLeftAnchor(pane, 0.0)
 
-    // It is better to add chart in scene through JavaFX thread
-    JFXSystem.runLater{
+    // It is better/required to add chart in scene through JavaFX thread
+    JFXSystem.runLater {
       // Hide indicator and display chart
       showIndicator.cancel()
       progressIndicator.setVisible(false)
-      historyPane.getChildren.add(pane)
+      val pane = chartHandler.chartPane
+      historyPane.getChildren.setAll(pane)
+      AnchorPane.setTopAnchor(pane, 0.0)
+      AnchorPane.setRightAnchor(pane, 0.0)
+      AnchorPane.setBottomAnchor(pane, 0.0)
+      AnchorPane.setLeftAnchor(pane, 0.0)
       this.chartHandler = Some(chartHandler)
     }
   }
