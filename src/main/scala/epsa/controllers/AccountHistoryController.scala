@@ -330,19 +330,28 @@ class AccountHistoryController extends Logging {
     }
   }
 
-  // TODO: update progress indicator ?
   private def buildHistory(state: State, events: Seq[Savings.Event], showIndicator: Cancellable): Unit = {
     // Cached data store NAVs, and index in sequence (for more efficient search)
     var assetsNAVs = Map[UUID, Seq[Savings.AssetValue]]()
     var assetsNAVIdxs = Map[UUID, Int]()
-    // Known NAV dates from data store
-    val assetsNAVDates = assetsNAVs.values.flatten.map(_.date).toList.toSet
     // Known NAV dates from account history events
     val eventsNAVDates = eventsNAVs.values.flatten.map(_.date).toList.toSet
-    // All known NAV dates (data store + history), for which we may have a chart series data
-    val dates = eventsNAVDates ++ assetsNAVDates
     // The oldest date we can display in account history
-    val firstDate = dates.toList.sorted.headOption
+    val firstDate = eventsNAVDates.toList.sorted.headOption
+
+    // Update progress as we go through first date to today.
+    val progressEnd = LocalDate.now.toEpochDay
+    val progressStart = firstDate.map(_.toEpochDay).getOrElse(progressEnd)
+    val progressRange = progressEnd - progressStart
+
+    def updateProgress(date: LocalDate): Unit = {
+      val progress =
+        if (progressRange <= 0) -1.0
+        else (date.toEpochDay - progressStart).toDouble / progressRange
+      JFXSystem.runLater {
+        progressIndicator.setProgress(progress)
+      }
+    }
 
     // Reads NAV history from data store, and cache it
     def getAssetHistory(fundId: UUID): Seq[Savings.AssetValue] =
@@ -416,7 +425,7 @@ class AccountHistoryController extends Logging {
     // history data. Otherwise returns input history.
     def atDate(history: History, savings: Savings, date: LocalDate): History = {
       val navs = assetsNAV(savings, date)
-      if (validDate(date, navs)) {
+      val r = if (validDate(date, navs)) {
         val (history2, historyData) = savings.assets.list.foldLeft(history, HistoryData(date)) { case ((acc1, acc2), asset) =>
           getNAV(asset.fundId, date, navs) match {
             case Some(nav) =>
@@ -431,6 +440,10 @@ class AccountHistoryController extends Logging {
         }
         history2.addData(historyData)
       } else history
+
+      updateProgress(date)
+
+      r
     }
 
     // Updates history for given dates range.
