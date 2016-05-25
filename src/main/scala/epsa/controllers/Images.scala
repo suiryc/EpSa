@@ -45,4 +45,7 @@ object Images {
   lazy val iconCalendarMonth =
     new Image("/images/fugue-icons/calendar-month.png", 0.0, 0.0, true, false, false)
 
+  lazy val iconCalendarDay =
+    new Image("/images/fugue-icons/calendar-day.png", 0.0, 0.0, true, false, false)
+
 }

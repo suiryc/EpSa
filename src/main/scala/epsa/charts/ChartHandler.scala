@@ -51,6 +51,7 @@ object ChartMarkEvent extends Enumeration {
 object ChartEvent extends Enumeration {
   val Moved = Value
   val Clicked = Value
+  val RightClicked = Value
   val Exited = Value
 }
 
@@ -1104,6 +1105,8 @@ class ChartHandler[A <: ChartMark](
           val data = ChartSeriesData(xAxisWrapper.numberToDate(xPos), valuesMap(xPos))
           if (event.getButton == MouseButton.PRIMARY)
             meta.mouseHandler(ChartEvent.Clicked, event, data)
+          else if (event.getButton == MouseButton.SECONDARY)
+            meta.mouseHandler(ChartEvent.RightClicked, event, data)
         }
       }
     }

@@ -16,6 +16,8 @@ import suiryc.scala.util.Comparators
 
 /** Asset field settings. */
 trait AssetField[A] {
+  /** Field key. */
+  val key: String
   /** Field name in table. */
   val tableLabel: String
   /** Field name in details pane. */
@@ -26,11 +28,21 @@ trait AssetField[A] {
   val format: (AssetDetails, Boolean) => String
 
   /** The details pane label (where value is displayed). */
-  val detailsValue = new Label
-  detailsValue.setMinWidth(Region.USE_PREF_SIZE)
-  detailsValue.setMinHeight(Region.USE_PREF_SIZE)
-  // Display graphic on the right side
-  detailsValue.setContentDisplay(ContentDisplay.RIGHT)
+  // Note: the label is cached so that all tabs (savings on various dates)
+  // can display their respective details.
+  lazy val detailsValue = AssetField.detailsLabels.get(key) match {
+    case Some(label) =>
+      label
+
+    case None =>
+      val label = new Label
+      label.setMinWidth(Region.USE_PREF_SIZE)
+      label.setMinHeight(Region.USE_PREF_SIZE)
+      // Display graphic on the right side
+      label.setContentDisplay(ContentDisplay.RIGHT)
+      AssetField.detailsLabels += key -> label
+      label
+  }
 
   /** The table column. */
   val column: TableColumn[AssetDetails, A]
@@ -50,7 +62,7 @@ trait AssetField[A] {
 }
 
 /** Asset field with formatted text value to display. */
-case class AssetTextField(tableLabel: String, detailsLabel: String,
+case class AssetTextField(key: String, tableLabel: String, detailsLabel: String,
   format: (AssetDetails, Boolean) => String,
   override val comment: (AssetDetails) => Option[String] = { _ => None }
 ) extends AssetField[String] {
@@ -61,7 +73,7 @@ case class AssetTextField(tableLabel: String, detailsLabel: String,
 }
 
 /** Asset field with date to display. */
-case class AssetDateField(tableLabel: String, detailsLabel: String,
+case class AssetDateField(key: String, tableLabel: String, detailsLabel: String,
   format: (AssetDetails, Boolean) => String,
   value: (AssetDetails) => Option[LocalDate]
 ) extends AssetField[AssetDetails] {
@@ -74,7 +86,7 @@ case class AssetDateField(tableLabel: String, detailsLabel: String,
 }
 
 /** Asset field with amount to display. */
-case class AssetAmountField(tableLabel: String, detailsLabel: String,
+case class AssetAmountField(key: String, tableLabel: String, detailsLabel: String,
   format: (AssetDetails, Boolean) => String,
   value: (AssetDetails) => Option[BigDecimal]
 ) extends AssetField[AssetDetails] {
@@ -87,7 +99,7 @@ case class AssetAmountField(tableLabel: String, detailsLabel: String,
 }
 
 /** Asset field with (colored) amount to display. */
-case class AssetColoredAmountField(tableLabel: String, detailsLabel: String,
+case class AssetColoredAmountField(key: String, tableLabel: String, detailsLabel: String,
   format: (AssetDetails, Boolean) => String,
   value: (AssetDetails) => Option[BigDecimal]
 ) extends AssetField[AssetDetails] {
@@ -130,24 +142,28 @@ object AssetField {
   val KEY_GROSS_GAIN = "grossGain"
   val KEY_GROSS_GAIN_PCT = "grossGainPct"
 
+  private var detailsLabels = Map.empty[String, Label]
+
   // Asset fields.
   // Note: declare the fields through a def so that changing language applies
   // upon reloading view.
   // Order here is the one the fields will appear in the asset details pane
   // and table columns.
-  def fields() = ListMap(
-    KEY_SCHEME          -> AssetTextField(Strings.scheme, Strings.schemeColon, AssetField.formatScheme, AssetField.schemeComment),
-    KEY_FUND            -> AssetTextField(Strings.fund, Strings.fundColon, AssetField.formatFund, AssetField.fundComment),
-    KEY_AVAILABILITY    -> AssetDateField(Strings.availability, Strings.availabilityColon, AssetField.formatAvailability, AssetField.availability),
-    KEY_UNITS           -> AssetAmountField(Strings.units, Strings.unitsColon, AssetField.formatUnits, AssetField.units),
-    KEY_VWAP            -> AssetAmountField(Strings.vwap, Strings.vwapColon, AssetField.formatVWAP, AssetField.vwap),
-    KEY_NAV             -> AssetAmountField(Strings.nav, Strings.navColon, AssetField.formatNAV, AssetField.nav),
-    KEY_DATE            -> AssetDateField(Strings.date, Strings.dateColon, AssetField.formatDate, AssetField.date),
-    KEY_INVESTED_AMOUNT -> AssetAmountField(Strings.invested, Strings.investedAmountColon, AssetField.formatInvestedAmount, AssetField.investedAmount),
-    KEY_GROSS_AMOUNT    -> AssetAmountField(Strings.gross, Strings.grossAmountColon, AssetField.formatGrossAmount, AssetField.grossAmount),
-    KEY_GROSS_GAIN      -> AssetColoredAmountField(Strings.gross, Strings.grossGainColon, AssetField.formatGrossGain, AssetField.grossGain),
-    KEY_GROSS_GAIN_PCT  -> AssetColoredAmountField(Strings.grossPct, Strings.grossGainPctColon, AssetField.formatGrossGainPct, AssetField.grossGainPct)
-  )
+  def fields() = List(
+    AssetTextField(KEY_SCHEME, Strings.scheme, Strings.schemeColon, AssetField.formatScheme, AssetField.schemeComment),
+    AssetTextField(KEY_FUND, Strings.fund, Strings.fundColon, AssetField.formatFund, AssetField.fundComment),
+    AssetDateField(KEY_AVAILABILITY, Strings.availability, Strings.availabilityColon, AssetField.formatAvailability, AssetField.availability),
+    AssetAmountField(KEY_UNITS, Strings.units, Strings.unitsColon, AssetField.formatUnits, AssetField.units),
+    AssetAmountField(KEY_VWAP, Strings.vwap, Strings.vwapColon, AssetField.formatVWAP, AssetField.vwap),
+    AssetAmountField(KEY_NAV, Strings.nav, Strings.navColon, AssetField.formatNAV, AssetField.nav),
+    AssetDateField(KEY_DATE, Strings.date, Strings.dateColon, AssetField.formatDate, AssetField.date),
+    AssetAmountField(KEY_INVESTED_AMOUNT, Strings.invested, Strings.investedAmountColon, AssetField.formatInvestedAmount, AssetField.investedAmount),
+    AssetAmountField(KEY_GROSS_AMOUNT, Strings.gross, Strings.grossAmountColon, AssetField.formatGrossAmount, AssetField.grossAmount),
+    AssetColoredAmountField(KEY_GROSS_GAIN, Strings.gross, Strings.grossGainColon, AssetField.formatGrossGain, AssetField.grossGain),
+    AssetColoredAmountField(KEY_GROSS_GAIN_PCT, Strings.grossPct, Strings.grossGainPctColon, AssetField.formatGrossGainPct, AssetField.grossGainPct)
+  ).map { field =>
+    field.key -> field
+  }.foldLeft(ListMap.empty[String, AssetField[_]])(_ + _)
 
   val bigDecimalComparator = Comparators.optionComparator[BigDecimal]
   val localDateComparator = Comparators.optionComparator[LocalDate]

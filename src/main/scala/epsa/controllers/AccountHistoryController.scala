@@ -14,6 +14,7 @@ import grizzled.slf4j.Logging
 import java.time.LocalDate
 import java.util.UUID
 import javafx.beans.property.{SimpleObjectProperty, SimpleStringProperty}
+import javafx.event.ActionEvent
 import javafx.fxml.{FXML, FXMLLoader}
 import javafx.scene.Scene
 import javafx.scene.control._
@@ -71,6 +72,10 @@ class AccountHistoryController extends Logging {
   @FXML
   protected var historyTable: TreeTableView[AssetEventItem] = _
 
+  private var mainController: MainController = _
+
+  private val historyChartContextMenu = new ContextMenu()
+
   private val columnEventDate = new TreeTableColumn[AssetEventItem, String](Strings.date)
 
   private val columnEventDesc = new TreeTableColumn[AssetEventItem, AssetEventItem](Strings.event)
@@ -94,8 +99,9 @@ class AccountHistoryController extends Logging {
   // NAVs deduced from history events
   private var eventsNAVs: Map[UUID, Seq[Savings.AssetValue]] = Map.empty
 
-  def initialize(stage: Stage, state: State): Unit = {
+  def initialize(mainController: MainController, stage: Stage, state: State): Unit = {
     import epsa.Main.Akka.dispatcher
+    this.mainController = mainController
     this.stage = stage
 
     // Sort events
@@ -104,20 +110,7 @@ class AccountHistoryController extends Logging {
 
     // Known NAVs through account history events.
     // This can complete data store NAVs, especially for old (now deleted) funds.
-    val assetEvents = events.filter(_.isInstanceOf[Savings.AssetEvent]).asInstanceOf[Seq[Savings.AssetEvent]]
-    eventsNAVs = assetEvents.flatMap {
-      case e: Savings.MakePayment =>
-        List(e.part.fundId -> Savings.AssetValue(e.date, e.part.value))
-
-      case e: Savings.MakeTransfer =>
-        List(e.partSrc.fundId -> Savings.AssetValue(e.date, e.partSrc.value),
-          e.partDst.fundId -> Savings.AssetValue(e.date, e.partDst.value))
-
-      case e: Savings.MakeRefund =>
-        List(e.part.fundId -> Savings.AssetValue(e.date, e.part.value))
-    }.groupBy(_._1).mapValues { v =>
-      v.map(_._2).sortBy(_.date)
-    }
+    eventsNAVs = Savings.getEventsNAVs(events)
 
     // Prepare to display progress indicator (if action takes too long)
     val showIndicator = epsa.Main.Akka.system.scheduler.scheduleOnce(500.milliseconds) {
@@ -325,8 +318,38 @@ class AccountHistoryController extends Logging {
   }
 
   private def onMouseEvent(event: ChartEvent.Value, mouseEvent: MouseEvent, data: ChartSeriesData): Unit = {
-    if (event != ChartEvent.Exited) {
-      showAccountDetails(data.date)
+    event match {
+      case ChartEvent.Moved =>
+        showAccountDetails(data.date)
+
+      case ChartEvent.RightClicked =>
+        // Hide context menu (remains displayed until hidden or item selected)
+        historyChartContextMenu.hide()
+        // Replace content with new item (for currently selected date)
+        val header = new CustomMenuItem(new Label(data.date.toString), false)
+        header.getStyleClass.addAll("header", "no-select")
+        val savingsOnDate = new MenuItem(Strings.savingsOnDate,
+          new ImageView(Images.iconCalendarDay))
+        savingsOnDate.setOnAction { (event: ActionEvent) =>
+          // Request main window to show savings on selected date
+          mainController.onSavingsOnDate(data.date)
+        }
+        historyChartContextMenu.getItems.setAll(header, new SeparatorMenuItem, savingsOnDate)
+        // Display context menu at current mouse position
+        historyChartContextMenu.show(historyPane, mouseEvent.getScreenX, mouseEvent.getScreenY)
+        // Hide context menu if chart loses focus (e.g. clicking elsewhere, or
+        // going to another window).
+        chartHandler.foreach { handler =>
+          handler.chartPane.focusedProperty.listen2 { (cancellable, focused) =>
+            if (!focused) {
+              cancellable.cancel()
+              historyChartContextMenu.hide()
+            }
+          }
+        }
+
+      case _ =>
+        // We don't care
     }
   }
 
@@ -586,9 +609,7 @@ class AccountHistoryController extends Logging {
 
     // Gets a fund NAV at given date, from history events and data store NAV history.
     def getNAV(fundId: UUID): Option[Savings.AssetValue] =
-      (eventsNAVs.getOrElse(fundId, Nil) ++ Awaits.readDataStoreNAV(Some(stage), fundId, date).getOrElse(None)).filter { nav =>
-        nav.date <= date
-      }.sortBy(date.toEpochDay - _.date.toEpochDay).headOption
+      Savings.getNAV(Some(stage), fundId, date, eventsNAVs)
 
     val history = events.takeWhile {
       case e: Savings.AssetEvent => e.date <= date
@@ -667,7 +688,7 @@ object AccountHistoryController {
   }
 
   /** Builds a dialog out of this controller. */
-  def buildDialog(state: State): Stage = {
+  def buildDialog(mainController: MainController, state: State): Stage = {
     val stage = new Stage()
     stage.getIcons.setAll(Images.iconClockHistory)
     stage.setTitle(title)
@@ -676,7 +697,7 @@ object AccountHistoryController {
     stage.setScene(new Scene(loader.load()))
     stage.getScene.getStylesheets.add(getClass.getResource("/css/main.css").toExternalForm)
     val controller = loader.getController[AccountHistoryController]
-    controller.initialize(stage, state)
+    controller.initialize(mainController, stage, state)
 
     // Delegate closing request to controller
     stage.setOnCloseRequest(controller.onCloseRequest _)

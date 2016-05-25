@@ -5,21 +5,19 @@ import epsa.I18N
 import epsa.I18N.Strings
 import epsa.model._
 import epsa.storage.DataStore
-import epsa.util.{Awaits, JFXStyles}
+import epsa.util.Awaits
 import grizzled.slf4j.Logging
 import java.io.PrintWriter
 import java.nio.file.Path
 import java.time.LocalDate
 import java.util.UUID
-import javafx.collections.FXCollections
-import javafx.collections.transformation.SortedList
 import javafx.event.ActionEvent
 import javafx.fxml.{FXML, FXMLLoader}
 import javafx.scene.{Parent, Scene}
 import javafx.scene.layout.GridPane
 import javafx.scene.control._
 import javafx.scene.image.ImageView
-import javafx.scene.input._
+import javafx.scene.input.{KeyCode, KeyEvent}
 import javafx.stage._
 import scala.collection.JavaConversions._
 import scala.util.Success
@@ -30,11 +28,8 @@ import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.javafx.event.EventHandler._
 import suiryc.scala.javafx.scene.control.{Dialogs, TableViews}
 import suiryc.scala.javafx.stage.{FileChoosers, Stages}
-import suiryc.scala.javafx.util.Callback
-import suiryc.scala.math.Ordering.localDateOrdering
 import suiryc.scala.settings.Preference
 
-// TODO: date picker to display account details at requested date ?
 // TODO: display more information in assets table and details: net gain/loss (amount/percentage)
 // TODO: change details pane position; set below table ? (then have NAV history graph on the right side of details)
 // TODO: menu entries with latest datastore locations ?
@@ -56,10 +51,13 @@ class MainController extends Logging {
   protected var editUndoMenu: MenuItem = _
 
   @FXML
-  protected var viewNetAssetValueHistoryMenu: MenuItem = _
+  protected var viewSavingsOnDateMenu: MenuItem = _
 
   @FXML
   protected var viewAccountHistoryMenu: MenuItem = _
+
+  @FXML
+  protected var viewNetAssetValueHistoryMenu: MenuItem = _
 
   @FXML
   protected var totalsPerSchemeMenu: CheckMenuItem = _
@@ -83,27 +81,11 @@ class MainController extends Logging {
   protected var assetDetails: GridPane = _
 
   @FXML
-  protected var assetsTable: TableView[AssetDetails] = _
+  protected var tabPane: TabPane = _
 
   lazy private val stage = splitPane.getScene.getWindow.asInstanceOf[Stage]
 
-  private val clipboard = Clipboard.getSystemClipboard
-
-  private val CTRL_C = new KeyCodeCombination(KeyCode.C, KeyCombination.CONTROL_DOWN)
-
   private var actor: ActorRef = _
-
-  private val assetFields = AssetField.fields()
-
-  private val assetsColumns = assetFields.mapValues(_.column).toList
-
-  private val columnAmount = new TableColumn[AssetDetails, Nothing](Strings.amount)
-
-  columnAmount.getColumns.addAll(assetFields(AssetField.KEY_INVESTED_AMOUNT).column, assetFields(AssetField.KEY_GROSS_AMOUNT).column)
-
-  private val columnGain = new TableColumn[AssetDetails, Nothing](Strings.gain)
-
-  columnGain.getColumns.addAll(assetFields(AssetField.KEY_GROSS_GAIN).column, assetFields(AssetField.KEY_GROSS_GAIN_PCT).column)
 
   def initialize(state: State): Unit = {
     // Note: make the actor name unique (with timestamp) so that it can be
@@ -123,45 +105,6 @@ class MainController extends Logging {
     // In any case, we sometimes need to get the current state. So store it as
     // user data.
     state.save()
-
-    // Allow user to show/hide columns
-    assetsTable.setTableMenuButtonVisible(true)
-
-    // Note: if using a SortedList as table items, column sorting works out
-    // of the box. But wrapping the SortedList does not because the default
-    // sort policy does explicitly check for a SortedList which comparator is
-    // bound to the table one.
-    // Since we will ensure it, override the sort policy.
-    assetsTable.setSortPolicy(Callback { true })
-
-    // Note: Asset gives scheme/fund UUID. Since State is immutable (and is
-    // changed when applying events in controller) we must delegate scheme/fund
-    // lookup to the controller.
-    assetsTable.setRowFactory(Callback { newAssetRow() })
-
-    // Show details of selected asset
-    // Note: setting constraints on each row does not seem necessary
-    assetFields.values.zipWithIndex.foreach {
-      case (field, idx) =>
-        val label = new Label(field.detailsLabel)
-        assetDetails.getChildren.add(label)
-        GridPane.setColumnIndex(label, 0)
-        GridPane.setRowIndex(label, idx)
-        val value = field.detailsValue
-        assetDetails.getChildren.add(value)
-        GridPane.setColumnIndex(value, 1)
-        GridPane.setRowIndex(value, idx)
-    }
-
-    assetsTable.getSelectionModel.selectedItemProperty.listen { assetDetails =>
-      val assetDetailsOpt = Option(assetDetails)
-      assetFields.values.foreach(_.updateDetailsValue(assetDetailsOpt))
-    }
-
-    // Handle 'Ctrl-c' to copy asset information.
-    assetsTable.addEventHandler(KeyEvent.KEY_PRESSED, { (event: KeyEvent) =>
-      if (CTRL_C.`match`(event)) Option(assetsTable.getSelectionModel.getSelectedItem).foreach(copyAssetDetailsToClipboard)
-    })
 
     // Handle displaying settings
     for {
@@ -189,9 +132,6 @@ class MainController extends Logging {
       Stages.setLocation(stage, loc, setSize = true)
     }
 
-    // Restore assets columns order and width
-    TableViews.setColumnsView(assetsTable, assetsColumns, Option(assetsColumnsPref()))
-
     def restoreDividerPositions(): Unit = {
       // Restore SplitPane divider positions
       Option(splitPaneDividerPositions()).foreach { dividerPositions =>
@@ -213,13 +153,13 @@ class MainController extends Logging {
   }
 
   /** Persists view (stage location, ...). */
-  private def persistView(state: State): Unit = {
+  private def persistView(state: State, savingsView: SavingsView): Unit = {
     // Persist stage location
     // Note: if iconified, resets it
     stageLocation() = Stages.getLocation(state.stage).orNull
 
     // Persist assets table columns order and width
-    assetsColumnsPref() = TableViews.getColumnsView(assetsTable, assetsColumns)
+    assetsColumnsPref() = TableViews.getColumnsView(savingsView.assetsTable, savingsView.assetsColumns)
 
     // Persist SplitPane divider positions
     splitPaneDividerPositions() = splitPane.getDividerPositions.mkString(";")
@@ -295,6 +235,18 @@ class MainController extends Logging {
     actor ! OnAccountHistory
   }
 
+  def onSavingsOnDate(event: ActionEvent): Unit = {
+    actor ! OnSavingsOnDate(None)
+  }
+
+  def onSavingsOnDate(date: LocalDate): Unit = {
+    // Prepare to show savings on request date
+    actor ! OnSavingsOnDate(Some(date))
+    // And bring back the window to front (as we expect another window - from
+    // which we are called - to be in front).
+    stage.toFront()
+  }
+
   def onUpToDateAssets(event: ActionEvent): Unit = {
     actor ! OnUpToDateAssets(event.getSource.asInstanceOf[CheckMenuItem].isSelected)
   }
@@ -315,135 +267,55 @@ class MainController extends Logging {
     stage.getUserData.asInstanceOf[State]
   }
 
-  /**
-   * Creates a new Asset table view row.
-   *
-   * Binds menu context to edit asset scheme/fund.
-   */
-  private def newAssetRow(): TableRow[AssetDetails] = {
-    val row = new TableRow[AssetDetails]()
-
-    // See: https://www.marshall.edu/genomicjava/2013/12/30/javafx-tableviews-with-contextmenus/
-    val menu = new ContextMenu()
-    val editScheme = new MenuItem(Strings.editScheme,
-      new ImageView(Images.iconTables))
-    editScheme.setOnAction { (event: ActionEvent) =>
-      Option(row.getItem).foreach { details =>
-        actor ! OnEditSchemes(Some(details.asset.schemeId))
-      }
-    }
-    val editFund = new MenuItem(Strings.editFund,
-      new ImageView(Images.iconTable))
-    editFund.setOnAction { (event: ActionEvent) =>
-      Option(row.getItem).foreach { details =>
-        actor ! OnEditFunds(Some(details.asset.fundId))
-      }
-    }
-
-    val newPayment = new MenuItem(Strings.newPayment,
-      new ImageView(Images.iconTableImport))
-    newPayment.setOnAction { (event: ActionEvent) =>
-      Option(row.getItem).foreach { details =>
-        actor ! OnNewAssetAction(AssetActionKind.Payment, Some(details.asset))
-      }
-    }
-    val newArbitrage = new MenuItem(Strings.newTransfer,
-      new ImageView(Images.iconTablesRelation))
-    newArbitrage.setOnAction { (event: ActionEvent) =>
-      Option(row.getItem).foreach { details =>
-        actor ! OnNewAssetAction(AssetActionKind.Transfer, Some(details.asset))
-      }
-    }
-    val newRefund = new MenuItem(Strings.newRefund,
-      new ImageView(Images.iconTableExport))
-    newRefund.setOnAction { (event: ActionEvent) =>
-      Option(row.getItem).foreach { details =>
-        actor ! OnNewAssetAction(AssetActionKind.Refund, Some(details.asset))
-      }
-    }
-
-    val navHistory = new MenuItem(NetAssetValueHistoryController.title,
-      new ImageView(Images.iconChartUp))
-    navHistory.setOnAction { (event: ActionEvent) =>
-      Option(row.getItem).foreach { details =>
-        actor ! OnNetAssetValueHistory(Some(details.asset.fundId))
-      }
-    }
-
-    menu.getItems.addAll(editScheme, editFund, new SeparatorMenuItem(),
-      newPayment, newArbitrage, newRefund, new SeparatorMenuItem(),
-      navHistory)
-
-    // Apply appropriate context menu (and style) according to actual row item
-    row.itemProperty.listen { v =>
-      Option(v) match {
-        case Some(item) =>
-          val (total, partialTotal, first) = item.kind match {
-            case AssetDetailsKind.Standard             => (false, false, item.first)
-            case AssetDetailsKind.TotalPartial         => (false, true, item.first)
-            case AssetDetailsKind.TotalPerFund         => (false, true, item.first)
-            case AssetDetailsKind.TotalPerAvailability => (false, true, item.first)
-            case AssetDetailsKind.Total                => (true, false, item.first)
-          }
-          JFXStyles.togglePseudoClass(row, "row-total", set = total)
-          JFXStyles.togglePseudoClass(row, "row-total-partial", set = partialTotal)
-          JFXStyles.togglePseudoClass(row, "first", set = first)
-          if (item.kind != AssetDetailsKind.Standard) row.setContextMenu(null)
-          else row.setContextMenu(menu)
-
-        case None =>
-          JFXStyles.togglePseudoClass(row, "row-total", set = false)
-          JFXStyles.togglePseudoClass(row, "row-total-partial", set = false)
-          JFXStyles.togglePseudoClass(row, "first", set = false)
-          row.setContextMenu(null)
-      }
-    }
-
-    row
-  }
-
   private def getSelectedAsset: Option[Savings.Asset] =
-    Option(assetsTable.getSelectionModel.getSelectedItem).map(_.asset)
-
-  /** Gets (computes) given asset details. */
-  private def getAssetDetails(asset: Savings.Asset): AssetDetails = {
-    val state = getState
-    val savings = state.savingsUpd
-
-    // Note: it is expected that we have an asset because there is an invested
-    // amount. So there is no need to try to prevent division by 0.
-    val actualVWAP =
-      if (vwapPerAssetMenu.isSelected) None
-      else savings.assets.vwaps.get(asset.id)
-    StandardAssetDetails(
-      asset = asset,
-      scheme = savings.getScheme(asset.schemeId),
-      fund = savings.getFund(asset.fundId),
-      date = state.assetsValue.get(asset.fundId).map(_.date),
-      nav = state.assetsValue.get(asset.fundId).map(_.value),
-      actualVWAP
-    )
-  }
-
-  /** Copy asset details to clipboard. */
-  private def copyAssetDetailsToClipboard(details: AssetDetails): Unit = {
-    val text = assetFields.values.flatMap { field =>
-      Option(field.format(details, true)) match {
-        case Some(value) => Some(s"${field.detailsLabel} $value")
-        case None        => None
-      }
-    }.mkString("", "\n", "\n")
-
-    val content = new ClipboardContent()
-    content.putString(text)
-    clipboard.setContent(content)
-  }
+    Option(tabPane.getSelectionModel.getSelectedItem).map(_.getUserData).flatMap {
+      case tab: SavingsViewTab => tab.view.getSelectedAsset
+      case _                   => None
+    }
 
   object ControllerActor {
     def props(state: State) = Props(new ControllerActor(state))
   }
 
   class ControllerActor(state0: State) extends Actor {
+
+    val savingsOnDateStage = {
+      import com.sun.javafx.scene.control.skin.DatePickerSkin
+      import suiryc.scala.javafx.scene.control.Dialogs
+
+      // Note:
+      // We can create a DatePicker and associate a DatePickerSkin (calendar
+      // popup Node) that we can use wherever we want while having access to
+      // the DatePicker action callback.
+      // See: http://stackoverflow.com/a/34684268
+      // Then we can display the calendar as a modal Node to select the Date
+      // to display the savings at.
+      val picker = new DatePicker(LocalDate.now)
+      val skin = new DatePickerSkin(picker)
+      val popup = skin.getPopupContent
+      popup.applyCss()
+
+      // Cancel request (close stage) on ESC
+      def keyFilter(stage: Stage)(event: KeyEvent): Unit = {
+        if (event.getCode == KeyCode.ESCAPE) {
+          stage.close()
+          event.consume()
+        }
+      }
+      Dialogs.modalNode(
+        splitPane.getScene.getWindow,
+        { (stage: Stage) =>
+          picker.setOnAction { (_: ActionEvent) =>
+            addSavingsOnDateTab(Some(picker.getValue))
+            stage.close()
+          }
+          stage.addEventFilter(KeyEvent.KEY_PRESSED, keyFilter(stage) _)
+          popup
+        }
+      )
+    }
+
+    val toDateSavingsViewTab = addSavingsOnDateTab(None, init = true)
 
     applyState(state0, updateAssetsValue = true)
 
@@ -464,6 +336,7 @@ class MainController extends Logging {
       case OnOptions         => onOptions(state)
       case OnNetAssetValueHistory(fundId) => onNetAssetValueHistory(state, fundId)
       case OnAccountHistory  => onAccountHistory(state)
+      case OnSavingsOnDate(date) => onSavingsOnDate(state, date)
       case OnUpToDateAssets(set) => onUpToDateAssets(state, set)
       case OnExportRawAccountHistory => onExportRawAccountHistory(state)
       case OnImportRawAccountHistory => onImportRawAccountHistory(state)
@@ -486,44 +359,15 @@ class MainController extends Logging {
       // First update state associated to assets table: takes care of
       // schemes/funds updated names if any.
       state.save()
-      // Then update table content: takes care of added/removed entries
-      val assets =
-        if (!state.viewUpToDateAssets) savings.assets.list
-        else savings.computeAssets(LocalDate.now).assets.list
-      // Get details and sort by scheme, fund then availability by default
-      // See: http://stackoverflow.com/a/10027682
-      val assetsDetails = assets.map(getAssetDetails).sortBy { details =>
-        (details.scheme.name, details.fund.name, details.asset.availability)
-      }
-      val sortedAssetsDetails = new SortedList(FXCollections.observableList(assetsDetails))
-      sortedAssetsDetails.comparatorProperty.bind(assetsTable.comparatorProperty)
-      val sortedAssetsWithTotal = new AssetDetailsWithTotal(
-        sortedAssetsDetails,
-        showTotalsPerScheme = totalsPerSchemeMenu.isSelected,
-        showTotalsPerFund = totalsPerFundMenu.isSelected,
-        showTotalsPerAvailability = totalsPerAvailabilityMenu.isSelected
-      )
-      // Bind (and first set) our total comparator to the table comparator
-      sortedAssetsWithTotal.comparatorProperty.setValue(assetsTable.getComparator)
-      sortedAssetsWithTotal.comparatorProperty.bind(assetsTable.comparatorProperty)
-      // It is better (up to JavaFX 8) to unbind the previous SortedList
-      // comparator if any. The previous list will eventually get GCed, but not
-      // the binding itself.
-      // See: http://bugs.java.com/bugdatabase/view_bug.do?bug_id=8089305
-      Option(assetsTable.getItems).foreach {
-        case items: AssetDetailsWithTotal =>
-          items.getSource.asInstanceOf[SortedList[AssetDetails]].comparatorProperty.unbind()
-        case _ =>
-      }
-      // Note: TableView.setItems clears the sort order if items are not in a
-      // SortedList.
-      TableViews.setItems(assetsTable, sortedAssetsWithTotal)
+      // Then update tabs table content: takes care of added/removed entries
+      refreshTabs(state)
 
       fileCloseMenu.setDisable(DataStore.dbOpened.isEmpty)
       fileSaveMenu.setDisable(!dirty)
       editUndoMenu.setDisable(!dirty)
       viewNetAssetValueHistoryMenu.setDisable(state.savingsUpd.funds.isEmpty)
       val hasHistory = Awaits.hasDataStoreEvents(Some(oldState.stage)).getOrElse(false) || state.eventsUpd.nonEmpty
+      viewSavingsOnDateMenu.setDisable(!hasHistory)
       viewAccountHistoryMenu.setDisable(!hasHistory)
       toolsExportRawAccountHistoryMenu.setDisable(!hasHistory)
 
@@ -537,6 +381,19 @@ class MainController extends Logging {
 
     def refresh(state: State): Unit = {
       applyState(state, updateAssetsValue = true)
+    }
+
+    def refreshTab(tab: TabWithState, state: State): Unit = {
+      val refreshData = RefreshData(state, vwapPerAssetMenu.isSelected, totalsPerSchemeMenu.isSelected,
+        totalsPerFundMenu.isSelected, totalsPerAvailabilityMenu.isSelected)
+      tab.refresh(refreshData)
+    }
+
+    def refreshTabs(state: State): Unit = {
+      tabPane.getTabs.map(_.getUserData).foreach {
+        case tab: TabWithState => refreshTab(tab, state)
+        case _                 =>
+      }
     }
 
     def onFileNew(state: State): Unit = {
@@ -571,7 +428,7 @@ class MainController extends Logging {
 
     def onExit(state: State): Unit = {
       if (checkPendingChanges(state)) {
-        persistView(state)
+        persistView(state, toDateSavingsViewTab.view)
 
         context.stop(self)
         epsa.Main.shutdown(state.stage)
@@ -635,10 +492,71 @@ class MainController extends Logging {
         // Reset I18N cache to apply any language change
         I18N.reset()
         // Persist now to restore it when rebuilding the stage
-        persistView(state)
+        persistView(state, toDateSavingsViewTab.view)
         context.stop(self)
         MainController.build(state, needRestart, applicationStart = false)
       }
+    }
+
+    def onSavingsOnDate(state: State, dateOpt: Option[LocalDate]): Unit = {
+      // Show the modal stage, which requires to select a date then creates
+      // a new Tab to display savings on the selected date.
+      dateOpt match {
+        case Some(date) => addSavingsOnDateTab(Some(date))
+        case None       => savingsOnDateStage.show()
+      }
+    }
+
+    def addSavingsOnDateTab(dateOpt: Option[LocalDate], init: Boolean = false): SavingsViewTab = {
+      val state = getState
+      val savingsViewTab = new SavingsViewTab(self, dateOpt)
+
+      // Restore assets columns order and width
+      val columnPrefs = if (init) {
+        // Add labels to show details of selected asset
+        // Note: setting constraints on each row does not seem necessary
+        savingsViewTab.view.assetFields.values.zipWithIndex.foreach {
+          case (field, idx) =>
+            val label = new Label(field.detailsLabel)
+            assetDetails.getChildren.add(label)
+            GridPane.setColumnIndex(label, 0)
+            GridPane.setRowIndex(label, idx)
+            val value = field.detailsValue
+            assetDetails.getChildren.add(value)
+            GridPane.setColumnIndex(value, 1)
+            GridPane.setRowIndex(value, idx)
+        }
+
+        // Update details to actual selected asset in selected tab
+        tabPane.getSelectionModel.selectedItemProperty.listen { v =>
+          Option(v).map(_.getUserData).foreach {
+            case tab: SavingsViewTab => tab.view.updateDetailsValue()
+            case _                   => toDateSavingsViewTab.view.updateDetailsValue(None)
+          }
+        }
+
+        // Restore from preferences for main tab
+        Option(assetsColumnsPref())
+      } else {
+        // Apply main tab (current) view to new tabs
+        Some(TableViews.getColumnsView(toDateSavingsViewTab.view.assetsTable, toDateSavingsViewTab.view.assetsColumns))
+      }
+      TableViews.setColumnsView(savingsViewTab.view.assetsTable, savingsViewTab.view.assetsColumns, columnPrefs)
+
+      // Add the tab to the tab pane, and refresh its content
+      val tab = savingsViewTab.tab
+      tabPane.getTabs.add(tab)
+      tabPane.getSelectionModel.select(tab)
+      refreshTab(savingsViewTab, state)
+
+      savingsViewTab
+    }
+
+    def onAccountHistory(state: State): Unit = {
+      val stage = AccountHistoryController.buildDialog(MainController.this, state)
+      stage.initModality(Modality.NONE)
+      stage.setResizable(true)
+      stage.show()
     }
 
     def onNetAssetValueHistory(state: State, fundId: Option[UUID]): Unit = {
@@ -651,13 +569,6 @@ class MainController extends Logging {
       dialog.initModality(Modality.NONE)
       dialog.setResizable(true)
       dialog.show()
-    }
-
-    def onAccountHistory(state: State): Unit = {
-      val stage = AccountHistoryController.buildDialog(state)
-      stage.initModality(Modality.NONE)
-      stage.setResizable(true)
-      stage.show()
     }
 
     def onUpToDateAssets(state: State, set: Boolean): Unit = {
@@ -910,6 +821,13 @@ object MainController {
 
   }
 
+  case class RefreshData(state: State, vwapPerAsset: Boolean, showTotalsPerScheme: Boolean,
+    showTotalsPerFund: Boolean, showTotalsPerAvailability: Boolean)
+
+  trait TabWithState {
+    def refresh(data: RefreshData)
+  }
+
   case object Refresh
 
   case object OnFileNew
@@ -938,6 +856,8 @@ object MainController {
 
   case object OnAccountHistory
 
+  case class OnSavingsOnDate(date: Option[LocalDate])
+
   case class OnUpToDateAssets(set: Boolean)
 
   case object OnExportRawAccountHistory
@@ -948,7 +868,7 @@ object MainController {
 
   def build(state: State, needRestart: Boolean = false, applicationStart: Boolean = false): Unit = {
     val stage = state.stage
-    stage.getIcons.add(Images.iconPiggyBank)
+    stage.getIcons.setAll(Images.iconPiggyBank)
 
     val loader = new FXMLLoader(getClass.getResource("/fxml/main.fxml"), I18N.getResources)
     val root = loader.load[Parent]()

@@ -102,6 +102,47 @@ object Savings {
     join(sorted)
   }
 
+  /**
+   * Gets NAVs out of events.
+   *
+   * This can complete data store NAVs, especially for old (now deleted) funds.
+   *
+   * @param events events to get NAVs out of
+   * @return NAVs
+   */
+  def getEventsNAVs(events: Seq[Event]): Map[UUID, Seq[AssetValue]] = {
+    val assetEvents = events.filter(_.isInstanceOf[Savings.AssetEvent]).asInstanceOf[Seq[Savings.AssetEvent]]
+    assetEvents.flatMap {
+      case e: Savings.MakePayment =>
+        List(e.part.fundId -> Savings.AssetValue(e.date, e.part.value))
+
+      case e: Savings.MakeTransfer =>
+        List(e.partSrc.fundId -> Savings.AssetValue(e.date, e.partSrc.value),
+          e.partDst.fundId -> Savings.AssetValue(e.date, e.partDst.value))
+
+      case e: Savings.MakeRefund =>
+        List(e.part.fundId -> Savings.AssetValue(e.date, e.part.value))
+    }.groupBy(_._1).mapValues { v =>
+      v.map(_._2).sortBy(_.date)
+    }
+  }
+
+  /**
+   * Gets a fund NAV at given date, from history events and data store NAV history.
+   *
+   * Nearest predating NAV is returned if there is none for requested date.
+   *
+   * @param owner parent window
+   * @param fundId fund to get NAV for
+   * @param date date to get NAV on
+   * @param eventsNAVs NAVs deduced from history events
+   */
+  def getNAV(owner: Option[Window], fundId: UUID, date: LocalDate,
+    eventsNAVs: Map[UUID, Seq[AssetValue]] = Map.empty): Option[Savings.AssetValue] =
+    (eventsNAVs.getOrElse(fundId, Nil) ++ Awaits.readDataStoreNAV(owner, fundId, date).getOrElse(None)).filter { nav =>
+      nav.date <= date
+    }.sortBy(date.toEpochDay - _.date.toEpochDay).headOption
+
   case class Scheme(id: UUID, name: String, comment: Option[String], funds: List[UUID]) {
     // See: http://stackoverflow.com/a/19348339
     import scala.math.Ordered.orderingToOrdered
@@ -663,15 +704,18 @@ case class Savings(
   /**
    * Gets NAVs for given date.
    *
+   * For each asset fund, read NAV from data store.
+   * Nearest predating NAV is returned if there is none for requested date.
+   *
    * @param owner parent window if any (to display error dialog if necessary)
    * @param date date to get NAVs on
-   * @param exactDate whether we want NAVs for the exact date, or if nearest predating date is OK too
+   * @param eventsNAVs NAVs deduced from history events
    * @return NAVs
    */
-  def getNAVs(owner: Option[Window], date: LocalDate, exactDate: Boolean = false): Map[UUID, Savings.AssetValue] =
+  def getNAVs(owner: Option[Window], date: LocalDate,
+    eventsNAVs: Map[UUID, Seq[AssetValue]] = Map.empty): Map[UUID, Savings.AssetValue] =
     assets.list.map(_.fundId).distinct.flatMap { fundId =>
-      val nav = Awaits.readDataStoreNAV(owner, fundId, date, exactDate).getOrElse(None)
-      nav.map(fundId -> _)
+      getNAV(owner, fundId, date, eventsNAVs).map(fundId -> _)
     }.toMap
 
 }

@@ -44,6 +44,8 @@ trait AssetDetails {
   /** NAV. */
   val nav: Option[BigDecimal]
 
+  /** Date on which availability is based on. */
+  val availabilityBase: Option[LocalDate]
   /** Kind of details. */
   val kind: AssetDetailsKind.Value
   /** Whether this is the first (used for styling in partial totals sections). */
@@ -68,7 +70,7 @@ trait AssetDetails {
 
   def formatAvailability(long: Boolean) =
     if ((kind != AssetDetailsKind.Standard) && (kind != AssetDetailsKind.TotalPerAvailability)) null
-    else Form.formatAvailability(asset.availability, date = None, long)
+    else Form.formatAvailability(asset.availability, date = availabilityBase, long)
   lazy val formatUnits =
     if ((kind != AssetDetailsKind.Standard) && (kind != AssetDetailsKind.TotalPerFund)) null
     else units.toString
@@ -94,7 +96,8 @@ case class StandardAssetDetails(
   fund: Savings.Fund,
   date: Option[LocalDate],
   nav: Option[BigDecimal],
-  override val actualVWAP: Option[BigDecimal]
+  override val actualVWAP: Option[BigDecimal],
+  availabilityBase: Option[LocalDate]
 ) extends AssetDetails {
   val kind = AssetDetailsKind.Standard
 }
@@ -106,6 +109,7 @@ case class TotalAssetDetails(
   fund: Savings.Fund,
   date: Option[LocalDate],
   nav: Option[BigDecimal],
+  availabilityBase: Option[LocalDate],
   kind: AssetDetailsKind.Value,
   override val investedAmount: BigDecimal
 ) extends AssetDetails
@@ -120,7 +124,8 @@ class AssetDetailsWithTotal(
   source0: ObservableList[AssetDetails],
   showTotalsPerScheme: Boolean,
   showTotalsPerFund: Boolean,
-  showTotalsPerAvailability: Boolean
+  showTotalsPerAvailability: Boolean,
+  availabilityBase: Option[LocalDate]
 ) extends TransformationList[AssetDetails, AssetDetails](source0)
 {
 
@@ -146,6 +151,7 @@ class AssetDetailsWithTotal(
       fund = fund.getOrElse(Savings.Fund(null, null, None)),
       date = None,
       nav = Some(0),
+      availabilityBase = availabilityBase,
       kind = kind,
       investedAmount = 0
     )
@@ -233,6 +239,7 @@ class AssetDetailsWithTotal(
       }
       totals
     }
+  // TODO: resolve availabilities (to prevent multiple 'available' lines if 'up to date assets' is unchecked)
   private val totalPerAvailability =
     if (!showTotalsPerAvailability) toSorted(Nil)
     else {

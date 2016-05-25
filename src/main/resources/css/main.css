@@ -85,3 +85,17 @@
   -fx-background: orange;
   -fx-table-cell-border-color: derive(-fx-background, 20%);
 }
+
+/* Custom menu item header. */
+.custom-menu-item.header > .label {
+  -fx-font-weight: bold;
+}
+
+/* Disable highlighting for no-select custom menu items. */
+.custom-menu-item.no-select:focused {
+  -fx-background-color: transparent;
+}
+
+.custom-menu-item.no-select:focused > .label {
+  -fx-text-fill: -fx-text-base-color;
+}
