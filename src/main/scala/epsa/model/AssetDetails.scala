@@ -239,11 +239,14 @@ class AssetDetailsWithTotal(
       }
       totals
     }
-  // TODO: resolve availabilities (to prevent multiple 'available' lines if 'up to date assets' is unchecked)
   private val totalPerAvailability =
     if (!showTotalsPerAvailability) toSorted(Nil)
     else {
-      val totals = toSorted(assets0.groupBy(_.asset.availability).map { case (availability, assets) =>
+      // Resolve availabilities for given date, otherwise we may have multiple
+      // 'available' totals if 'up to date assets' is disabled.
+      val totals = toSorted(assets0.groupBy { details =>
+        Savings.resolveAvailability(details.asset.availability, availabilityBase)
+      }.map { case (availability, assets) =>
         computeTotal(assets, kind = AssetDetailsKind.TotalPerAvailability, scheme = None, fund = None, availability = availability)
       }.toList.sortBy(_.asset.availability))
       totals.comparatorProperty.bind(comparatorProperty)
