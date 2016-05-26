@@ -9,6 +9,7 @@ import java.util.UUID
 import javafx.stage.Window
 import spray.json._
 import suiryc.scala.math.Ordered._
+import suiryc.scala.spray.json.JsonFormats
 
 /** Savings helpers. */
 object Savings {
@@ -257,43 +258,7 @@ object Savings {
   case class MakeRefund(date: LocalDate, part: AssetPart, comment: Option[String])
     extends AssetEvent
 
-  object JsonProtocol extends DefaultJsonProtocol {
-
-    // UUID format is not present in spray-json
-    // See: https://github.com/spray/spray-json/issues/24
-    implicit object UUIDFormat extends JsonFormat[UUID] {
-
-      def write(uuid: UUID): JsValue =
-        JsString(uuid.toString)
-
-      def read(value: JsValue): UUID = value match {
-        case JsString(uuid) =>
-          try {
-            UUID.fromString(uuid)
-          } catch {
-            case ex: Exception => deserializationError(s"Invalid UUID format: $uuid", ex)
-          }
-
-        case _ => deserializationError(s"Expected UUID as JsString. Got $value")
-      }
-    }
-
-    implicit object LocalDateFormat extends JsonFormat[LocalDate] {
-
-      def write(date: LocalDate): JsValue =
-        JsString(date.toString)
-
-      def read(value: JsValue): LocalDate = value match {
-        case JsString(dateS) =>
-          try {
-            LocalDate.parse(dateS)
-          } catch {
-            case ex: Exception => deserializationError(s"Invalid LocalDate format: $dateS", ex)
-          }
-
-        case _ => deserializationError(s"Expected LocalDate as JsString. Got $value")
-      }
-    }
+  object JsonProtocol extends DefaultJsonProtocol with JsonFormats {
 
     implicit val createSchemeFormat = jsonFormat3(CreateScheme)
     implicit val updateSchemeFormat = jsonFormat3(UpdateScheme)
