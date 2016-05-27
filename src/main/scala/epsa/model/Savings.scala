@@ -320,6 +320,38 @@ object Savings {
 
 }
 
+// TODO: take into account levies while processing events
+// Notes:
+// We need to know:
+//   - the NAV of each used fund at the beginning (actually the day before) and end date of each levy period
+//   - the 'VWAP' (computed from the NAV at the start of period and any payment done before the end of the period) of each used fund at the end of each levy period
+// For a fund, during a levy period: gain/loss = units@end * (NAV@end - VWAP@end)
+// Upon loss:
+//   - the NAV of the period is kept to compute the gain/loss of the next period (meaning the loss is pushed forward on the next period, adding to the result of that next period)
+//   - the period is zeroed (as the loss is pushed to the next period)
+//   - upon computing an actual amount levied (refund), loss on the last period is pushed back on any previous period recursively until either
+//     * there is no more loss: the levy rate of the reached period is applied on the gain remaining for that period
+//    or
+//     * there is no more period: it is considered a global loss and the levy is not due
+// VWAP is otherwise computed as usual during each period.
+//
+// If there is a transfer or refund after a levy period has ended, the associated gain/loss is computed in proportion ('removed units / initial total units').
+// Upon transfer the proportioned gain/loss of each past period, and the current period 'pushed forward' proportioned loss, is applied on the destination fund.
+// In both cases the gain/loss on the source fund is updated: computed in proportion of 'remaining units / initial total units', or 'initial fund gain/loss - transferred/refunded proportioned gain/loss' ?
+//
+// For easier computing, missing periods are replaced by fake periods with 0% levy rate.
+// This e.g. takes care of actual loss after a levy ended, that is taking into account the actual fund NAV compared to when the levy was active:
+//   - upon global loss, no past levy is due
+//   - upon lowered gain (current gain is lower than what if was when the levy ended), the amount due is lowered accordingly
+// (How it works: the fake period will be seen as a loss and thus pushed back on previous periods as explained above)
+//
+// TODO: when computing, keep issues to display visual warning hint that things are missing
+//   - consider too old NAV (> 1 month ? or 'mean' NAV period ?) as an issue ?
+// TODO: is it actually ok to compute gain/loss for each period (loss being pushed forward and backward if necessary) and apply proportions upon refund/transfers ?
+//       Or should we keep NAV/VWAPs and compute gain/loss - with losses being taken care of at that time - when needed based on the quantity of concerned units ?
+// TODO: upon partial refund/transfer, are both outgoing and remaining gain/loss computed in proportion of concerned units ?
+//       Or only one (the outgoing one ?) while the other is computed so that the initial gain/loss is preserved ? (meaning we try to prevent any rounding issue, which may actually not be significant in this case ?)
+
 case class Savings(
   schemes: List[Savings.Scheme] = Nil,
   funds: List[Savings.Fund] = Nil,

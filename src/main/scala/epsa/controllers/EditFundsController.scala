@@ -25,6 +25,11 @@ import suiryc.scala.javafx.stage.Stages.StageLocation
 import suiryc.scala.javafx.util.Callback
 import suiryc.scala.settings.Preference
 
+// TODO: possibility (checkbox) to disable a fund
+//   - fund kept in db (for history) and accessible in fund editing form, but not useable elsewhere
+//     => only allowed if fund is used in current savings
+//   - stored as an Event in history (or in dedicated datastore table ?)
+// TODO: when deleting a fund which was used in assets actions history, warn about loss of history details
 class EditFundsController {
 
   import EditFundsController._

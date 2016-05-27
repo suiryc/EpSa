@@ -139,6 +139,7 @@ class AssetDetailsWithTotal(
   // changes in each group and propagate them (with appropriate adaptation to
   // fir the transformed list given as table items).
 
+  // TODO: keep in mind missing NAVs and have visual hint (warning icon with tooltip) on concerned cell for user
   private def orZero(v: Option[BigDecimal]): BigDecimal = v.getOrElse(0)
 
   private def computeTotal(assets: List[AssetDetails], kind: AssetDetailsKind.Value,

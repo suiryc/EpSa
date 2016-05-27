@@ -25,6 +25,13 @@ import suiryc.scala.javafx.stage.Stages.StageLocation
 import suiryc.scala.javafx.util.Callback
 import suiryc.scala.settings.Preference
 
+// TODO: possibility (checkbox) to disable a scheme
+//   - scheme kept in memory, and accessible in scheme editing form, but not useable elsewhere
+//   - disables all funds
+//     => kept in db (for history) and accessible in fund editing form, but not useable elsewhere
+//     => only allowed if no fund is used in current savings
+//   - stored as an Event in history (or in dedicated datastore table ?)
+// TODO: when deleting a scheme which was used (actually associated funds) in assets actions history, warn about loss of history details
 class EditSchemesController {
 
   import EditSchemesController._

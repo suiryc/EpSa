@@ -30,6 +30,11 @@ import suiryc.scala.javafx.scene.control.{Dialogs, TableViews}
 import suiryc.scala.javafx.stage.{FileChoosers, Stages}
 import suiryc.scala.settings.Preference
 
+// TODO: sort events before processing them (upon loading; also upon building updates ?): needed to compute levies properly
+// TODO: sort events upon exporting
+// TODO: warn user if events are not sorted in datastore (upon loading datastore)
+// TODO: explicitely reload datastore + process datastore&updates when we know updates are introducing out of order actions ?
+// TODO: menu entry (or automatic action ?) to sort datastore and replace current events
 // TODO: display more information in assets table and details: net gain/loss (amount/percentage)
 // TODO: change details pane position; set below table ? (then have NAV history graph on the right side of details)
 // TODO: menu entries with latest datastore locations ?
