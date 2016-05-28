@@ -130,11 +130,11 @@ class EditFundsController {
     }
 
     schemesField.setCellFactory(Callback { new CheckBoxSchemeCell })
-    schemesField.setItems(FXCollections.observableList(savings.schemes.map(SelectableScheme)))
     // Prevent item selection
     schemesField.getSelectionModel.selectedIndexProperty.listen {
       JFXSystem.runLater(schemesField.getSelectionModel.clearSelection())
     }
+    updateSchemes()
 
     // Select initial fund if any
     edit0.foreach(fundsField.getSelectionModel.select)
@@ -143,21 +143,11 @@ class EditFundsController {
     // We need to handle both 'OK' button and dialog window closing request
     // with non-applied changes.
     def confirmationFilter[A <: Event](close: Boolean)(event: A): Unit = {
-      val name = nameField.getText.trim
-      val comment = Form.textOrNone(commentField.getText)
-      // Changes are pending if not editing but name is not empty, or editing
-      // and having changed anything.
-      val dirty = edit match {
-        case Some(fund) =>
-          val oldSchemes = savings.schemes.filter(_.funds.contains(fund.id)).map(_.id).toSet
-          val newSchemes = getSelectedSchemes.map(_.id).toSet
-          (fund.name != name) ||
-            (fund.comment != comment) ||
-            oldSchemes != newSchemes
-
-        case None =>
-          name.nonEmpty
-      }
+      // We require confirmation if either:
+      //   - there are pending changes (selected fund) ready to apply
+      //   - there is a pending fund ready to add
+      //   - unless validating changes, there are pending events to apply
+      val dirty = applyReady || (addReady && edit.isEmpty) || (close && events.nonEmpty)
 
       persistView()
       val canClose =
@@ -291,7 +281,7 @@ class EditFundsController {
     }
 
     val events = if (schemes.nonEmpty) {
-      val alert = new Alert(Alert.AlertType.CONFIRMATION)
+      val alert = new Alert(Alert.AlertType.CONFIRMATION, "", ButtonType.OK)
       alert.initOwner(stage)
 
       val loader = new FXMLLoader(getClass.getResource("/fxml/select-resources.fxml"), I18N.getResources)

@@ -460,13 +460,6 @@ class NewAssetActionController {
     computeAmount(getDstUnits, getDstNAV, dstAmountField)
   }
 
-  private def buildSchemeAndFunds(entries: List[SchemeAndFund]*): List[Option[SchemeAndFund]] =
-    entries.foldLeft(List[Option[SchemeAndFund]]()) { (acc, schemeAndFunds) =>
-      val rest = schemeAndFunds.map(Some(_))
-      if (acc.isEmpty || schemeAndFunds.isEmpty) acc ::: rest
-      else acc ::: None :: rest
-    }
-
   private def updateSchemeAndFund(): Unit = {
     // Note: previous selected value is kept if still present in new items
 
@@ -496,9 +489,9 @@ class NewAssetActionController {
       // with a separator between categories:
       //   - funds that already have assets
       //   - funds without assets
-      srcFundField.setItems(FXCollections.observableList(buildSchemeAndFunds(fundsWithAsset, fundsOther)))
+      srcFundField.setItems(FXCollections.observableList(Form.buildOptions(fundsWithAsset, fundsOther)))
     } else {
-      srcFundField.setItems(FXCollections.observableList(buildSchemeAndFunds(fundsWithAsset)))
+      srcFundField.setItems(FXCollections.observableList(Form.buildOptions(fundsWithAsset)))
     }
     updateDstSchemeAndFund()
   }
@@ -532,8 +525,8 @@ class NewAssetActionController {
       val fundsDst = getSrcFund.map { schemeAndFund =>
         val (fundsSameScheme1, fundsOtherScheme1) = fundsWithAsset.filterNot(_ == schemeAndFund).partition(_.scheme == schemeAndFund.scheme)
         val (fundsSameScheme2, fundsOtherScheme2) = fundsOther.partition(_.scheme == schemeAndFund.scheme)
-        buildSchemeAndFunds(fundsSameScheme1, fundsSameScheme2, fundsOtherScheme1, fundsOtherScheme2)
-      }.getOrElse(buildSchemeAndFunds(fundsWithAsset, fundsOther))
+        Form.buildOptions(fundsSameScheme1, fundsSameScheme2, fundsOtherScheme1, fundsOtherScheme2)
+      }.getOrElse(Form.buildOptions(fundsWithAsset, fundsOther))
 
       // Choices are listed by order of 'preference' (chances to be chosen),
       // with a separator between categories:

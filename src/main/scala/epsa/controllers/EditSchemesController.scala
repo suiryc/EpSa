@@ -132,11 +132,11 @@ class EditSchemesController {
     }
 
     fundsField.setCellFactory(Callback { new CheckBoxFundCell })
-    fundsField.setItems(FXCollections.observableList(savings.funds.map(SelectableFund)))
     // Prevent item selection
     fundsField.getSelectionModel.selectedIndexProperty.listen {
       JFXSystem.runLater(fundsField.getSelectionModel.clearSelection())
     }
+    updateFunds()
 
     // Select initial scheme if any
     edit0.foreach(schemesField.getSelectionModel.select)
@@ -145,20 +145,11 @@ class EditSchemesController {
     // We need to handle both 'OK' button and dialog window closing request
     // with non-applied changes.
     def confirmationFilter[A <: Event](close: Boolean)(event: A): Unit = {
-      val name = nameField.getText.trim
-      val comment = Form.textOrNone(commentField.getText)
-      // Changes are pending if not editing but name is not empty, or editing
-      // and having changed anything.
-      val dirty = edit match {
-        case Some(scheme) =>
-          val newFunds = getSelectedFunds.map(_.id).toSet
-          (scheme.name != name) ||
-            (scheme.comment != comment) ||
-            scheme.funds.toSet != newFunds
-
-        case None =>
-          name.nonEmpty
-      }
+      // We require confirmation if either:
+      //   - there are pending changes (selected scheme) ready to apply
+      //   - there is a pending scheme ready to add
+      //   - unless validating changes, there are pending events to apply
+      val dirty = applyReady || (addReady && edit.isEmpty) || (close && events.nonEmpty)
 
       persistView()
       val canClose =

@@ -53,6 +53,21 @@ object Form {
     }
     else true
   }
+
+  /**
+   * Converts sequence of lists into list of options.
+   *
+   * Flattens elements into a list of options containing original elements
+   * in order separated by Nones.
+   * e.g. (a, b, c), (d, e) gives (Some(a), Some(b), Some(c), None, Some(d), Some(e))
+   */
+  def buildOptions[A](lists: List[A]*): List[Option[A]] =
+    lists.foldLeft(List[Option[A]]()) { (acc, list) =>
+      val rest = list.map(Some(_))
+      if (acc.isEmpty || list.isEmpty) acc ::: rest
+      else acc ::: None :: rest
+    }
+
 }
 
 object AssetActionKind extends Enumeration {
