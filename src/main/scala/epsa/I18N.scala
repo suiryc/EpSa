@@ -105,6 +105,7 @@ object I18N extends suiryc.scala.util.I18N("i18n.epsa") with I18NWithPreference 
     def fileWriteError = getString("Could not write file")
     def accountHistoryIssues = getString("warning.account-history.issues")
     def accountHistoryIssuesNAV = getString("warning.account-history.issues.nav")
+    def unexpectedIssue = getString("error.unexpected-issue")
   }
 
 }

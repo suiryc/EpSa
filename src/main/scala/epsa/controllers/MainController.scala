@@ -326,7 +326,27 @@ class MainController extends Logging {
 
     override def receive: Receive = receive(state0)
 
-    def receive(state: State): Receive = {
+    // Wrap actual partial function in a try/catch to display unexpected issues.
+    // Otherwise window becomes unusable (akka messages goes to dead letters).
+    def receive(state: State): Receive =
+      new PartialFunction[Any, Unit]() {
+        val r = receive0(state)
+        override def isDefinedAt(x: Any): Boolean = r.isDefinedAt(x)
+        override def apply(x: Any): Unit = try {
+          r.apply(x)
+        } catch {
+          case ex: Exception =>
+            Dialogs.error(
+              owner = Some(state.stage),
+              title = Some(state.stage.getTitle),
+              headerText = Some(Strings.unexpectedIssue),
+              contentText = None,
+              ex = Some(ex)
+            )
+        }
+      }
+
+    def receive0(state: State): Receive = {
       case Refresh           => refresh(state)
       case OnFileNew         => onFileNew(state)
       case OnFileOpen        => onFileOpen(state)
