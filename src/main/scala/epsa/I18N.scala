@@ -90,6 +90,7 @@ object I18N extends suiryc.scala.util.I18N("i18n.epsa") with I18NWithPreference 
     def unselectingNonEmptyResource = getString("warning.unselecting-nonempty-resource")
     def deleteAssociatedSchemes = getString("confirmation.delete-associated-schemes")
     def deleteAssociatedFunds = getString("confirmation.delete-associated-funds")
+    def deleteUsedResource = getString("confirmation.delete-used-resource")
     def nameExists = getString("Name already exists")
     def nameEmpty = getString("Name cannot be empty")
     def schemeNotEmpty =getString("Scheme is not empty")

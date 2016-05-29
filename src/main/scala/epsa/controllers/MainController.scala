@@ -30,6 +30,9 @@ import suiryc.scala.javafx.scene.control.{Dialogs, TableViews}
 import suiryc.scala.javafx.stage.{FileChoosers, Stages}
 import suiryc.scala.settings.Preference
 
+// TODO: smart deletion of funds ?
+//         - keep the necessary data (NAV on some dates) used to compute levies
+//         - way to determine if all levies of past fund assets were paid already, so that all NAVs can reall be deleted ?
 // TODO: sort events before processing them (upon loading; also upon building updates ?): needed to compute levies properly
 // TODO: sort events upon exporting
 // TODO: warn user if events are not sorted in datastore (upon loading datastore)

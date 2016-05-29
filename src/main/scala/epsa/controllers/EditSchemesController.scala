@@ -20,13 +20,12 @@ import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.javafx.event.EventHandler._
 import suiryc.scala.javafx.event.Events
-import suiryc.scala.javafx.scene.control.{CheckBoxListCellWithInfo, CheckBoxListCellWithSeparator}
+import suiryc.scala.javafx.scene.control.{CheckBoxListCellWithInfo, CheckBoxListCellWithSeparator, Dialogs}
 import suiryc.scala.javafx.stage.Stages
 import suiryc.scala.javafx.stage.Stages.StageLocation
 import suiryc.scala.javafx.util.Callback
 import suiryc.scala.settings.Preference
 
-// TODO: when deleting a scheme which was used (actually associated funds) in assets actions history, warn about loss of history details
 class EditSchemesController {
 
   import EditSchemesController._
@@ -311,12 +310,21 @@ class EditSchemesController {
     if (Events.isOnNode(event)) {
       // Make sure there is something to delete, and that we can
       getScheme.foreach { scheme =>
-        if (canDeleteScheme(scheme)) {
+        if (canDeleteScheme(scheme) && confirmSchemeDeletion(scheme)) {
           applyEvents(Savings.DeleteScheme(scheme.id) :: confirmFundsDeletion(scheme))
         }
       }
     }
   }
+
+  private def confirmSchemeDeletion(scheme: Savings.Scheme): Boolean =
+    if (!scheme.used) true
+    else Dialogs.confirmation(
+      owner = Some(stage),
+      title = None,
+      headerText = Some(Strings.confirmAction),
+      contentText = Some(Strings.deleteUsedResource)
+    ).contains(ButtonType.OK)
 
   private def confirmFundsDeletion(scheme: Savings.Scheme): List[Savings.Event] = {
     val lone = scheme.funds.filterNot { fundId =>
