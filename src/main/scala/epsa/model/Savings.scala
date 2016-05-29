@@ -144,18 +144,22 @@ object Savings {
       nav.date <= date
     }.sortBy(date.toEpochDay - _.date.toEpochDay).headOption
 
-  case class Scheme(id: UUID, name: String, comment: Option[String], funds: List[UUID]) {
+  case class Scheme(id: UUID, name: String, comment: Option[String], funds: List[UUID],
+    used: Boolean = false, active: Boolean = false, disabled: Boolean = false)
+  {
     // See: http://stackoverflow.com/a/19348339
     import scala.math.Ordered.orderingToOrdered
     def compareParams(other: Scheme): Int =
-      (name, comment) compare (other.name, other.comment)
+      (name, comment, disabled) compare (other.name, other.comment, other.disabled)
   }
 
-  case class Fund(id: UUID, name: String, comment: Option[String]) {
+  case class Fund(id: UUID, name: String, comment: Option[String],
+    used: Boolean = false, active: Boolean = false, disabled: Boolean = false)
+  {
     // See: http://stackoverflow.com/a/19348339
     import scala.math.Ordered.orderingToOrdered
     def compareParams(other: Fund): Int =
-      (name, comment) compare (other.name, other.comment)
+      (name, comment, disabled) compare (other.name, other.comment, other.disabled)
   }
 
   case class AssetId(schemeId: UUID, fundId: UUID)
@@ -228,8 +232,12 @@ object Savings {
   case class CreateScheme(schemeId: UUID, name: String, comment: Option[String])
     extends Event
 
-  case class UpdateScheme(schemeId: UUID, name: String, comment: Option[String])
+  case class UpdateScheme(schemeId: UUID, name: String, comment: Option[String], disabled: Boolean)
     extends Event
+
+  object UpdateScheme {
+    def apply(scheme: Scheme): UpdateScheme = UpdateScheme(scheme.id, scheme.name, scheme.comment, scheme.disabled)
+  }
 
   case class DeleteScheme(schemeId: UUID)
     extends Event
@@ -237,8 +245,12 @@ object Savings {
   case class CreateFund(fundId: UUID, name: String, comment: Option[String])
     extends Event
 
-  case class UpdateFund(fundId: UUID, name: String, comment: Option[String])
+  case class UpdateFund(fundId: UUID, name: String, comment: Option[String], disabled: Boolean)
     extends Event
+
+  object UpdateFund {
+    def apply(fund: Fund): UpdateFund = UpdateFund(fund.id, fund.name, fund.comment, fund.disabled)
+  }
 
   case class DeleteFund(fundId: UUID)
     extends Event
@@ -261,10 +273,10 @@ object Savings {
   object JsonProtocol extends DefaultJsonProtocol with JsonFormats {
 
     implicit val createSchemeFormat = jsonFormat3(CreateScheme)
-    implicit val updateSchemeFormat = jsonFormat3(UpdateScheme)
+    implicit val updateSchemeFormat = jsonFormat4(UpdateScheme.apply)
     implicit val deleteSchemeFormat = jsonFormat1(DeleteScheme)
     implicit val createFundFormat = jsonFormat3(CreateFund)
-    implicit val updateFundFormat = jsonFormat3(UpdateFund)
+    implicit val updateFundFormat = jsonFormat4(UpdateFund.apply)
     implicit val deleteFundFormat = jsonFormat1(DeleteFund)
     implicit val associateFundFormat = jsonFormat2(AssociateFund)
     implicit val dissociateFundFormat = jsonFormat2(DissociateFund)
@@ -398,10 +410,10 @@ case class Savings(
 
   def processEvent(event: Event): Savings = event match {
     case CreateScheme(id, name, comment)               => createScheme(id, name, comment)
-    case UpdateScheme(id, name, comment)               => updateScheme(id, name, comment)
+    case UpdateScheme(id, name, comment, disabled)     => updateScheme(id, name, comment, disabled)
     case DeleteScheme(id)                              => deleteScheme(id)
     case CreateFund(id, name, comment)                 => createFund(id, name, comment)
-    case UpdateFund(id, name, comment)                 => updateFund(id, name, comment)
+    case UpdateFund(id, name, comment, disabled)       => updateFund(id, name, comment, disabled)
     case DeleteFund(id)                                => deleteFund(id)
     case AssociateFund(schemeId, fundId)               => associateFund(schemeId, fundId)
     case DissociateFund(schemeId, fundId)              => dissociateFund(schemeId, fundId)
@@ -414,10 +426,10 @@ case class Savings(
     copy(schemes = schemes :+ Scheme(id, name, comment, Nil))
   }
 
-  protected def updateScheme(id: UUID, name: String, comment: Option[String]): Savings = {
+  protected def updateScheme(id: UUID, name: String, comment: Option[String], disabled: Boolean): Savings = {
     val updated = schemes.map { scheme =>
       if (scheme.id != id) scheme
-      else scheme.copy(name = name, comment = comment)
+      else scheme.copy(name = name, comment = comment, disabled = disabled && !scheme.active)
     }
     copy(schemes = updated)
   }
@@ -430,10 +442,10 @@ case class Savings(
     copy(funds = funds :+ Fund(id, name, comment))
   }
 
-  protected def updateFund(id: UUID, name: String, comment: Option[String]): Savings = {
+  protected def updateFund(id: UUID, name: String, comment: Option[String], disabled: Boolean): Savings = {
     val updated = funds.map { fund =>
       if (fund.id != id) fund
-      else fund.copy(name = name, comment = comment)
+      else fund.copy(name = name, comment = comment, disabled = disabled && !fund.active)
     }
     copy(funds = updated)
   }
@@ -456,6 +468,31 @@ case class Savings(
       else scheme.copy(funds = scheme.funds.filterNot(_ == fundId))
     }
     copy(schemes = updated)
+  }
+
+  protected def triggerActiveScheme(schemeId: UUID, set: Boolean): Savings = {
+    val updated = schemes.map { scheme =>
+      if (scheme.id != schemeId) scheme
+      else scheme.copy(used = true, active = set)
+    }
+    copy(schemes = updated)
+  }
+
+  protected def triggerActiveFund(fundId: UUID, set: Boolean): Savings = {
+    val updated = funds.map { fund =>
+      if (fund.id != fundId) fund
+      else fund.copy(used = true, active = set)
+    }
+    copy(funds = updated)
+  }
+
+  protected def triggerActiveAsset(part: AssetPart): Savings = {
+    triggerActiveScheme(part.schemeId, set = true).triggerActiveFund(part.fundId, set = true)
+  }
+
+  protected def checkActiveAsset(part: AssetPart): Savings = {
+    triggerActiveScheme(part.schemeId, assets.byId.keys.exists(_.schemeId == part.schemeId))
+      .triggerActiveFund(part.fundId, assets.byId.keys.exists(_.fundId == part.fundId))
   }
 
   protected def makePayment(date: LocalDate, part: AssetPart, comment: Option[String],
@@ -486,7 +523,7 @@ case class Savings(
     val vwap = scaleVWAP((assets.investedAmount(part.id) + srcInvestedAmount.getOrElse(part.amount(part.value))) / units)
     val savings = savings0.copy(assets = assets0.copy(vwaps = assets0.vwaps + (part.id -> vwap)))
 
-    savings.copy(latestAssetAction = Some(date))
+    savings.copy(latestAssetAction = Some(date)).triggerActiveAsset(part)
   }
 
   protected def makeTransfer(date: LocalDate, partSrc: AssetPart, partDst: AssetPart, comment: Option[String]): Savings = {
@@ -506,7 +543,7 @@ case class Savings(
     // given one (which may be empty if asset is actually available for the
     // given date).
     val savings =
-      if (units <= 0) removeAsset(date, part)
+      if (units <= 0) removeAsset(date, part).checkActiveAsset(part)
       else updateAsset(date, Asset(part.schemeId, part.fundId, currentAsset.availability, units, vwap))
     savings.copy(latestAssetAction = Some(date))
   }
@@ -526,11 +563,26 @@ case class Savings(
   def getScheme(schemeId: UUID): Scheme =
     findScheme(schemeId).get
 
+  def getSchemes(associated: Option[UUID]): List[Scheme] = {
+    val r = associated match {
+      case Some(fundId) => schemes.filter(_.funds.contains(fundId))
+      case None         => schemes
+    }
+    r.sortBy(_.name)
+  }
+
   def findFund(fundId: UUID): Option[Fund] =
     funds.find(_.id == fundId)
 
   def getFund(fundId: UUID): Fund =
     findFund(fundId).get
+
+  def getFunds(associated: Boolean): List[Fund] = {
+    val r =
+      if (!associated) funds
+      else schemes.flatMap(_.funds).distinct.map(getFund)
+    r.sortBy(_.name)
+  }
 
   def hasAsset(schemeId: UUID, fundId: UUID): Boolean =
     assets.byId.contains(AssetId(schemeId, fundId))
@@ -596,8 +648,8 @@ case class Savings(
     // In order, we have:
     // 1. deleted schemes (with funds dissociation)
     // 2. deleted funds (with remaining dissociations)
-    // 3. created schemes
-    // 4. created funds
+    // 3. created schemes (possibly disabled)
+    // 4. created funds (possibly disabled)
     // 5. funds associated to created schemes
     // 6. created funds remaining associations
     // 7. remaining schemes updates
@@ -614,8 +666,12 @@ case class Savings(
       } :+ Savings.DeleteFund(fundId)
     } ::: schemesCreatedOrdered.map { scheme =>
       Savings.CreateScheme(scheme.id, scheme.name, scheme.comment)
+    } ::: schemesCreatedOrdered.filter(_.disabled).map { scheme =>
+      Savings.UpdateScheme(scheme).copy(disabled = scheme.disabled)
     } ::: fundsCreatedOrdered.map { fund =>
       Savings.CreateFund(fund.id, fund.name, fund.comment)
+    } ::: fundsCreatedOrdered.filter(_.disabled).map { fund =>
+      Savings.UpdateFund(fund).copy(disabled = fund.disabled)
     } ::: schemesCreatedOrdered.flatMap { scheme =>
       scheme.funds.map { fundId =>
         Savings.AssociateFund(scheme.id, fundId)
@@ -630,7 +686,7 @@ case class Savings(
       val oldScheme = getScheme(newScheme.id)
       val event1 =
         if (newScheme.compareParams(oldScheme) == 0) None
-        else Some(Savings.UpdateScheme(newScheme.id, newScheme.name, newScheme.comment))
+        else Some(Savings.UpdateScheme(newScheme.id, newScheme.name, newScheme.comment, newScheme.disabled))
 
       // Note: don't forget to ignore created/deleted funds (already taken care of)
       val oldFunds = oldScheme.funds.toSet
@@ -647,7 +703,7 @@ case class Savings(
     } ::: fundsRemainingOrdered.flatMap { newFund =>
       val oldFund = getFund(newFund.id)
       if (newFund.compareParams(oldFund) == 0) None
-      else Some(Savings.UpdateFund(newFund.id, newFund.name, newFund.comment))
+      else Some(Savings.UpdateFund(newFund.id, newFund.name, newFund.comment, newFund.disabled))
       // Note: association/dissociation to old, new or remaining schemes have
       // been taken care of already.
     }

@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <?import javafx.geometry.Insets?>
+<?import javafx.scene.control.CheckBox?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.ListView?>
 <?import javafx.scene.control.TextArea?>
@@ -55,6 +56,7 @@
         </columnConstraints>
         <rowConstraints>
           <RowConstraints maxHeight="1.7976931348623157E308" minHeight="-Infinity" vgrow="NEVER" />
+           <RowConstraints maxHeight="1.7976931348623157E308" minHeight="-Infinity" vgrow="NEVER" />
           <RowConstraints maxHeight="1.7976931348623157E308" minHeight="-Infinity" vgrow="SOMETIMES" />
             <RowConstraints maxHeight="1.7976931348623157E308" minHeight="-Infinity" vgrow="SOMETIMES" />
             <RowConstraints maxHeight="1.7976931348623157E308" minHeight="-Infinity" vgrow="NEVER" />
@@ -70,27 +72,37 @@
                   <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
                </GridPane.margin>
             </TextField>
-            <Label alignment="CENTER_RIGHT" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="-Infinity" minWidth="-Infinity" text="%Funds:" GridPane.rowIndex="1">
+            <Label alignment="CENTER_RIGHT" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="-Infinity" minWidth="-Infinity" text="%Disabled:" GridPane.rowIndex="1">
                <GridPane.margin>
                   <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
                </GridPane.margin>
             </Label>
-            <ListView fx:id="fundsField" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="200.0" minWidth="200.0" prefHeight="200.0" prefWidth="300.0" GridPane.columnIndex="1" GridPane.rowIndex="1">
+            <CheckBox fx:id="disabledCheckBox" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="-Infinity" minWidth="-Infinity" mnemonicParsing="false" GridPane.columnIndex="1" GridPane.rowIndex="1">
+               <GridPane.margin>
+                  <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
+               </GridPane.margin>
+            </CheckBox>
+            <Label alignment="CENTER_RIGHT" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="-Infinity" minWidth="-Infinity" text="%Funds:" GridPane.rowIndex="2">
+               <GridPane.margin>
+                  <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
+               </GridPane.margin>
+            </Label>
+            <ListView fx:id="fundsField" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="200.0" minWidth="200.0" prefHeight="200.0" prefWidth="300.0" GridPane.columnIndex="1" GridPane.rowIndex="2">
                <GridPane.margin>
                   <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
                </GridPane.margin>
             </ListView>
-            <Label alignment="CENTER_RIGHT" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="-Infinity" minWidth="-Infinity" text="%Comment:" GridPane.rowIndex="2">
+            <Label alignment="CENTER_RIGHT" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="-Infinity" minWidth="-Infinity" text="%Comment:" GridPane.rowIndex="3">
                <GridPane.margin>
                   <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
                </GridPane.margin>
             </Label>
-            <TextArea fx:id="commentField" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="75.0" minWidth="200.0" prefHeight="75.0" prefWidth="200.0" GridPane.columnIndex="1" GridPane.rowIndex="2">
+            <TextArea fx:id="commentField" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="75.0" minWidth="200.0" prefHeight="75.0" prefWidth="200.0" GridPane.columnIndex="1" GridPane.rowIndex="3">
                <GridPane.margin>
                   <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
                </GridPane.margin>
             </TextArea>
-            <ImageView fx:id="tickField" onMouseReleased="#onApply" onTouchReleased="#onApply" pickOnBounds="true" preserveRatio="true" styleClass="image-button" GridPane.columnSpan="2" GridPane.rowIndex="3">
+            <ImageView fx:id="tickField" onMouseReleased="#onApply" onTouchReleased="#onApply" pickOnBounds="true" preserveRatio="true" styleClass="image-button" GridPane.columnSpan="2" GridPane.rowIndex="4">
                <image>
                   <Image url="@../images/fugue-icons/tick-white.png" />
                </image>

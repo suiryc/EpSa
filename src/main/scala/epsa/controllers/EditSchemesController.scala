@@ -15,35 +15,33 @@ import javafx.scene.input.{KeyCode, KeyEvent, MouseEvent}
 import javafx.stage.{Stage, Window}
 import scala.collection.JavaConversions._
 import suiryc.scala.RichOption._
+import suiryc.scala.javafx.beans.value.RichObservableValue
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.javafx.event.EventHandler._
 import suiryc.scala.javafx.event.Events
-import suiryc.scala.javafx.scene.control.CheckBoxListCellEx
+import suiryc.scala.javafx.scene.control.{CheckBoxListCellWithInfo, CheckBoxListCellWithSeparator}
 import suiryc.scala.javafx.stage.Stages
 import suiryc.scala.javafx.stage.Stages.StageLocation
 import suiryc.scala.javafx.util.Callback
 import suiryc.scala.settings.Preference
 
-// TODO: possibility (checkbox) to disable a scheme
-//   - scheme kept in memory, and accessible in scheme editing form, but not useable elsewhere
-//   - disables all funds
-//     => kept in db (for history) and accessible in fund editing form, but not useable elsewhere
-//     => only allowed if no fund is used in current savings
-//   - stored as an Event in history (or in dedicated datastore table ?)
 // TODO: when deleting a scheme which was used (actually associated funds) in assets actions history, warn about loss of history details
 class EditSchemesController {
 
   import EditSchemesController._
 
   @FXML
-  protected var schemesField: ListView[Savings.Scheme] = _
+  protected var schemesField: ListView[Option[Savings.Scheme]] = _
 
   @FXML
   protected var nameField: TextField = _
 
   @FXML
-  protected var fundsField: ListView[SelectableFund] = _
+  protected var disabledCheckBox: CheckBox = _
+
+  @FXML
+  protected var fundsField: ListView[Option[SelectableFund]] = _
 
   @FXML
   protected var commentField: TextArea = _
@@ -94,44 +92,15 @@ class EditSchemesController {
     // Handle scheme selection changes
     schemesField.getSelectionModel.selectedItemProperty.listen(onSelectedScheme())
 
-    // Re-check form when scheme name or comment is changed
-    nameField.textProperty.listen(checkForm())
-    commentField.textProperty.listen(checkForm())
+    // Re-check form when scheme params are changed
+    RichObservableValue.listen[AnyRef](
+      List(nameField.textProperty, disabledCheckBox.selectedProperty, commentField.textProperty),
+      checkForm()
+    )
 
     // Initialize funds list view
     // Use CheckBox ListCell elements to populate its content.
-    class CheckBoxFundCell extends CheckBoxListCellEx[SelectableFund] {
-
-      import CheckBoxListCellEx._
-
-      override def getInfo(item: SelectableFund): CellInfo =
-        CellInfo(
-          text = item.fund.name,
-          observable = item.check,
-          checked = edit.exists(_.funds.contains(item.fund.id)),
-          locked = edit.exists(scheme => savings.hasAsset(scheme.id, item.fund.id))
-        )
-
-      override protected def setLocked(locked: Boolean): Unit = {
-        // If locked (i.e. cell is disabled) use a higher opacity than usual,
-        // and display a tooltip explaining why the checkbox can't be changed.
-        if (!locked) {
-          setTooltip(null)
-          setOpacity(1.0)
-        }
-        else {
-          setTooltip(new Tooltip(Strings.unselectingNonEmptyResource))
-          setOpacity(0.8)
-        }
-      }
-
-      override protected def statusChanged(oldValue: Boolean, newValue: Boolean): Unit = {
-        checkForm()
-      }
-
-    }
-
-    fundsField.setCellFactory(Callback { new CheckBoxFundCell })
+    fundsField.setCellFactory(Callback { newFundCell() })
     // Prevent item selection
     fundsField.getSelectionModel.selectedIndexProperty.listen {
       JFXSystem.runLater(fundsField.getSelectionModel.clearSelection())
@@ -139,7 +108,7 @@ class EditSchemesController {
     updateFunds()
 
     // Select initial scheme if any
-    edit0.foreach(schemesField.getSelectionModel.select)
+    edit0.foreach(scheme => schemesField.getSelectionModel.select(Some(scheme)))
 
     // Request confirmation if changes are pending.
     // We need to handle both 'OK' button and dialog window closing request
@@ -209,8 +178,83 @@ class EditSchemesController {
     stageLocation() = Stages.getLocation(stage).orNull
   }
 
-  private def getSelectedFunds: List[Savings.Fund] =
-    fundsField.getItems.toList.filter(_.check.get).map(_.fund)
+  /**
+   * Creates a new Scheme list view cell.
+   *
+   * Cell has the appropriate value displaying.
+   * An event filter is added on the generated cell to allow de-selecting a
+   * Scheme in the list view by clicking on it a second time.
+   */
+  private def newSchemeCell(lv: ListView[Option[Savings.Scheme]]): ListCell[Option[Savings.Scheme]] = {
+    // See: http://stackoverflow.com/questions/23622703/deselect-an-item-on-an-javafx-listview-on-click
+    val cell = new SchemeCell
+
+    def eventFilter(event: MouseEvent): Unit = {
+      if (schemesField.getSelectionModel.getSelectedIndices.contains(cell.getIndex)) {
+        // De-select scheme
+        schemesField.getSelectionModel.clearSelection(cell.getIndex)
+      }
+      else if (cell.getItem != null) {
+        // Select scheme
+        schemesField.getSelectionModel.select(cell.getIndex)
+      }
+      // In any case, consume the event so that ListView does not try to
+      // process it: we are overriding its behaviour.
+      event.consume()
+
+      // At least re-focus on the schemes field it not done
+      if (!schemesField.isFocused) schemesField.requestFocus()
+    }
+
+    cell.addEventFilter(MouseEvent.MOUSE_PRESSED, eventFilter _)
+
+    cell
+  }
+
+  /**
+   * Creates a new Fund list view checkbox cell.
+   *
+   * Cell has the appropriate value displaying.
+   * Cell is locked (cannot be deselected) if there is an existing asset for the
+   * concerned scheme and fund.
+   */
+  private def newFundCell(): CheckBoxListCellWithSeparator[SelectableFund] = {
+    class CheckBoxFundCell extends CheckBoxListCellWithSeparator[SelectableFund] {
+
+      import CheckBoxListCellWithInfo._
+
+      override def getInfo(item0: Option[SelectableFund]): CellInfo = {
+        // Note: we are only called when there is an actual item.
+        val item = item0.get
+        CellInfo(
+          text = item.fund.name,
+          observable = item.check,
+          checked = edit.exists(_.funds.contains(item.fund.id)),
+          locked = edit.exists(scheme => savings.hasAsset(scheme.id, item.fund.id))
+        )
+      }
+
+      override protected def setLocked(locked: Boolean): Unit = {
+        // If locked (i.e. cell is disabled) use a lower opacity than usual,
+        // and display a tooltip explaining why the checkbox can't be changed.
+        if (!locked) {
+          setTooltip(null)
+          setOpacity(1.0)
+        }
+        else {
+          setTooltip(new Tooltip(Strings.unselectingNonEmptyResource))
+          setOpacity(0.8)
+        }
+      }
+
+      override protected def statusChanged(oldValue: Boolean, newValue: Boolean): Unit = {
+        checkForm()
+      }
+
+    }
+
+    new CheckBoxFundCell
+  }
 
   /**
    * Called when releasing mouse/touch on 'plus' image.
@@ -237,10 +281,15 @@ class EditSchemesController {
         loop(1)
       }
       else nameField.getText.trim
+      val disabled = disabledCheckBox.isSelected
       val comment = Form.textOrNone(commentField.getText)
 
       val event = savings.createSchemeEvent(name, comment)
+      // Note: take into account the fact that flattening events will remove
+      // unnecessary events; we can push an 'UpdateScheme' with the 'disabled'
+      // state without checking whether it is needed.
       val newEvents = event ::
+        Savings.UpdateScheme(event.schemeId, name, comment, disabled) ::
         getSelectedFunds.map { fund =>
           Savings.AssociateFund(event.schemeId, fund.id)
         }
@@ -261,7 +310,7 @@ class EditSchemesController {
   def onRemove(event: Event): Unit = {
     if (Events.isOnNode(event)) {
       // Make sure there is something to delete, and that we can
-      Option(schemesField.getSelectionModel.getSelectedItem).foreach { scheme =>
+      getScheme.foreach { scheme =>
         if (canDeleteScheme(scheme)) {
           applyEvents(Savings.DeleteScheme(scheme.id) :: confirmFundsDeletion(scheme))
         }
@@ -280,7 +329,7 @@ class EditSchemesController {
     }
 
     val events = if (funds.nonEmpty) {
-      val alert = new Alert(Alert.AlertType.CONFIRMATION)
+      val alert = new Alert(Alert.AlertType.CONFIRMATION, "", ButtonType.OK)
       alert.initOwner(stage)
 
       val loader = new FXMLLoader(getClass.getResource("/fxml/select-resources.fxml"), I18N.getResources)
@@ -288,14 +337,15 @@ class EditSchemesController {
       alert.getDialogPane.setContent(root)
       val label = root.lookup("#labelField").asInstanceOf[Label]
       label.setText(Strings.deleteAssociatedFunds)
-      val resourcesField = root.lookup("#resourcesField").asInstanceOf[ListView[Savings.Fund]]
+      val resourcesField = root.lookup("#resourcesField").asInstanceOf[ListView[Option[Savings.Fund]]]
       resourcesField.setCellFactory(Callback { new FundCell })
       resourcesField.getSelectionModel.setSelectionMode(SelectionMode.MULTIPLE)
-      resourcesField.setItems(FXCollections.observableList(funds))
+      val entries = Form.buildOptions(funds.filter(!_.disabled), funds.filter(_.disabled))
+      resourcesField.setItems(FXCollections.observableList(entries))
       resourcesField.getSelectionModel.selectAll()
 
       if (!alert.showAndWait().contains(ButtonType.OK)) Nil
-      else resourcesField.getSelectionModel.getSelectedItems.toList.map { fund =>
+      else resourcesField.getSelectionModel.getSelectedItems.toList.flatten.map { fund =>
         Savings.DeleteFund(fund.id)
       }
     }
@@ -316,10 +366,11 @@ class EditSchemesController {
     if (Events.isOnNode(event)) {
       edit.foreach { scheme =>
         val name = nameField.getText.trim
+        val disabled = disabledCheckBox.isSelected
         val comment = Form.textOrNone(commentField.getText)
         val event1 =
-          if ((name == scheme.name) && (comment == scheme.comment)) None
-          else Some(Savings.UpdateScheme(scheme.id, name, comment))
+          if (scheme.copy(name = name, comment = comment, disabled = disabled) == scheme) None
+          else Some(Savings.UpdateScheme(scheme.id, name, comment, disabled))
 
         val oldFunds = scheme.funds.toSet
         val newFunds = getSelectedFunds.map(_.id).toSet
@@ -337,7 +388,7 @@ class EditSchemesController {
 
   /** Handles scheme selection changes. */
   private def onSelectedScheme(): Unit = {
-    val newEdit = Option(schemesField.getSelectionModel.getSelectedItem)
+    val newEdit = getScheme
 
     // Update editing fields if we are selecting a new scheme
     newEdit.filterNot(edit.contains).foreach { scheme =>
@@ -356,39 +407,6 @@ class EditSchemesController {
 
     // Finally, re-check form
     checkForm()
-  }
-
-  /**
-   * Creates a new Scheme list view cell.
-   *
-   * Cell has the appropriate value displaying.
-   * An event filter is added on the generated cell to allow de-selecting a
-   * Scheme in the list view by clicking on it a second time.
-   */
-  private def newSchemeCell(lv: ListView[Savings.Scheme]): ListCell[Savings.Scheme] = {
-    // See: http://stackoverflow.com/questions/23622703/deselect-an-item-on-an-javafx-listview-on-click
-    val cell = new SchemeCell
-
-    def eventFilter(event: MouseEvent): Unit = {
-      if (schemesField.getSelectionModel.getSelectedIndices.contains(cell.getIndex)) {
-        // De-select scheme
-        schemesField.getSelectionModel.clearSelection(cell.getIndex)
-      }
-      else if (cell.getItem != null) {
-        // Select scheme
-        schemesField.getSelectionModel.select(cell.getIndex)
-      }
-      // In any case, consume the event so that ListView does not try to
-      // process it: we are overriding its behaviour.
-      event.consume()
-
-      // At least re-focus on the schemes field it not done
-      if (!schemesField.isFocused) schemesField.requestFocus()
-    }
-
-    cell.addEventFilter(MouseEvent.MOUSE_PRESSED, eventFilter _)
-
-    cell
   }
 
   /**
@@ -421,15 +439,16 @@ class EditSchemesController {
   /** Updates the list of schemes. */
   private def updateSchemes(): Unit = {
     schemesField.getSelectionModel.clearSelection()
-    schemesField.setItems(FXCollections.observableList(savings.schemes))
+    val schemes = savings.getSchemes(associated = None)
+    val entries = Form.buildOptions(schemes.filter(!_.disabled), schemes.filter(_.disabled))
+    schemesField.setItems(FXCollections.observableList(entries))
   }
 
   /** Updates the list of funds. */
   private def updateFunds(): Unit = {
-    fundsField.setItems(FXCollections.observableList(savings.funds.map(SelectableFund)))
-    // Refresh ListView in order to re-create cells with appropriate content
-    // (checkbox selection, etc).
-    fundsField.refresh()
+    val funds = savings.getFunds(associated = false).map(SelectableFund)
+    val entries = Form.buildOptions(funds.filter(!_.fund.disabled), funds.filter(_.fund.disabled))
+    fundsField.setItems(FXCollections.observableList(entries))
   }
 
   /**
@@ -439,6 +458,8 @@ class EditSchemesController {
    */
   private def updateEditFields(scheme: Savings.Scheme): Unit = {
     nameField.setText(scheme.name)
+    disabledCheckBox.setSelected(scheme.disabled)
+    disabledCheckBox.setDisable(scheme.active)
     commentField.setText(scheme.comment.orNull)
     // Refresh ListView in order to re-create cells with appropriate content
     // (checkbox selection, etc).
@@ -462,12 +483,12 @@ class EditSchemesController {
    */
   private def checkForm(): Unit = {
     val name = nameField.getText.trim
+    val disabled = disabledCheckBox.isSelected
     val comment = Form.textOrNone(commentField.getText)
     // Edition is OK if either name or funds are changed.
     val editOk = edit.exists { scheme =>
       val newFunds = getSelectedFunds.map(_.id).toSet
-      (scheme.name != name) ||
-        (scheme.comment != comment) ||
+      (scheme.copy(name = name, comment = comment, disabled = disabled) != scheme) ||
         scheme.funds.toSet != newFunds
     }
     val exists = savings.schemes.exists(_.name.equalsIgnoreCase(name)) && !edit.exists(_.name.equalsIgnoreCase(name))
@@ -482,7 +503,7 @@ class EditSchemesController {
     )
 
     // Minus field status: enable deletion if selected scheme can be deleted
-    Option(schemesField.getSelectionModel.getSelectedItem) match {
+    getScheme match {
       case None =>
         deleteReady = false
         JFXStyles.toggleImageButton(minusField, set = deleteReady)
@@ -504,6 +525,12 @@ class EditSchemesController {
     applyReady = nameOk && editOk
     JFXStyles.toggleImageButton(tickField, applyReady)
   }
+
+  private def getScheme: Option[Savings.Scheme] =
+    Option(schemesField.getSelectionModel.getSelectedItem).flatten
+
+  private def getSelectedFunds: List[Savings.Fund] =
+    fundsField.getItems.toList.flatten.filter(_.check.get).map(_.fund)
 
 }
 

@@ -10,11 +10,11 @@ import javafx.scene.control.{Cell, ListCell}
 import suiryc.scala.javafx.scene.control.{CellWithSeparator, ListCellEx, TableCellEx}
 import suiryc.scala.util.I18NLocale
 
-class SchemeCell extends ListCellEx[Savings.Scheme] {
+class SchemeCell extends ListCell[Option[Savings.Scheme]] with CellWithSeparator[Savings.Scheme] {
   override protected def itemText(item: Savings.Scheme) = item.name
 }
 
-class FundCell extends ListCellEx[Savings.Fund] {
+class FundCell extends ListCell[Option[Savings.Fund]] with CellWithSeparator[Savings.Fund] {
   override protected def itemText(item: Savings.Fund) = item.name
 }
 

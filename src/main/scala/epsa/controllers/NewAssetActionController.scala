@@ -477,13 +477,17 @@ class NewAssetActionController {
     // always. The best solution is to have an explicit preferred width so
     // that it does not get recomputed according to content.
     if (actionKind == AssetActionKind.Payment) {
-      // Other scheme&fund
+      // Other scheme&fund (filter disabled ones)
       val fundsOther = savings.schemes.flatMap { scheme =>
         scheme.funds.map { fundId =>
           val fund = savings.getFund(fundId)
           SchemeAndFund(scheme, fund)
         }
-      }.filterNot(fundsWithAsset.contains).sorted
+      }.filterNot { schemeAndFund =>
+        schemeAndFund.scheme.disabled ||
+          schemeAndFund.fund.disabled ||
+          fundsWithAsset.contains(schemeAndFund)
+      }.sorted
 
       // Choices are listed by order of 'preference' (chances to be chosen),
       // with a separator between categories:
@@ -513,13 +517,17 @@ class NewAssetActionController {
         val fund = savings.getFund(asset.fundId)
         SchemeAndFund(scheme, fund)
       }.distinct.sorted
-      // Other scheme&fund
+      // Other scheme&fund (filter disabled ones)
       val fundsOther = savings.schemes.flatMap { scheme =>
         scheme.funds.map { fundId =>
           val fund = savings.getFund(fundId)
           SchemeAndFund(scheme, fund)
         }
-      }.filterNot(fundsWithAsset.contains).sorted
+      }.filterNot { schemeAndFund =>
+        schemeAndFund.scheme.disabled ||
+          schemeAndFund.fund.disabled ||
+          fundsWithAsset.contains(schemeAndFund)
+      }.sorted
       // Other scheme&fund for destination, with first same scheme as source if
       // selected
       val fundsDst = getSrcFund.map { schemeAndFund =>

@@ -50,7 +50,7 @@ class NetAssetValueHistoryController {
   protected var progressIndicator: ProgressIndicator = _
 
   @FXML
-  protected var fundField: ComboBox[Savings.Fund] = _
+  protected var fundField: ComboBox[Option[Savings.Fund]] = _
 
   @FXML
   protected var importButton: Button = _
@@ -76,18 +76,17 @@ class NetAssetValueHistoryController {
     fundField.setButtonCell(new FundCell)
     fundField.setCellFactory(Callback { new FundCell })
 
-    val funds = savings.schemes.flatMap { scheme =>
-      scheme.funds.map(savings.getFund)
-    }.distinct.sortBy(_.name)
-    fundField.setItems(FXCollections.observableList(funds))
+    val funds = savings.getFunds(associated = true)
+    val entries = Form.buildOptions(funds.filter(!_.disabled), funds.filter(_.disabled))
+    fundField.setItems(FXCollections.observableList(entries))
 
     importButton.setDisable(funds.isEmpty)
     purgeButton.setDisable(funds.isEmpty)
 
     fundIdOpt.flatMap { fundId =>
       funds.find(_.id == fundId)
-    }.orElse(funds.headOption).foreach { fund =>
-      fundField.getSelectionModel.select(fund)
+    }.orElse(entries.flatten.headOption).foreach { fund =>
+      fundField.getSelectionModel.select(Some(fund))
       loadHistory(fund)
     }
   }
@@ -122,11 +121,11 @@ class NetAssetValueHistoryController {
   }
 
   def onFund(event: ActionEvent): Unit = {
-    Option(fundField.getValue).foreach(loadHistory)
+    getFund.foreach(loadHistory)
   }
 
   def onImport(event: ActionEvent): Unit = {
-    Option(fundField.getValue).foreach { fund =>
+    getFund.foreach { fund =>
       val fileChooser = new FileChooser()
       fileChooser.setTitle(Strings.importNAVHistory)
       fileChooser.getExtensionFilters.addAll(
@@ -161,7 +160,7 @@ class NetAssetValueHistoryController {
   }
 
   def onPurge(event: ActionEvent): Unit = {
-    Option(fundField.getValue).foreach { fund =>
+    getFund.foreach { fund =>
       val resp = Dialogs.confirmation(
         owner = Some(stage),
         title = None,
@@ -434,6 +433,9 @@ class NetAssetValueHistoryController {
     Stages.trackMinimumDimensions(resultStage)
     resultStage.show()
   }
+
+  private def getFund: Option[Savings.Fund] =
+    Option(fundField.getValue).flatten
 
 }
 

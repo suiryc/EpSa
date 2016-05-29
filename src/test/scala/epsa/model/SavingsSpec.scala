@@ -61,19 +61,42 @@ class SavingsSpec extends WordSpec with Matchers {
     }
 
     "handle updating a scheme name" in {
-      val scheme0 = savings1.schemes.head
-      val schemeName = scheme0.name + "-new"
-      val savings = savings1.processEvent(Savings.UpdateScheme(scheme0.id, schemeName, scheme0.comment))
-      val scheme = savings.schemes.head
-      scheme shouldBe scheme0.copy(name = schemeName)
+      val scheme = savings1.schemes.head
+      val schemeName = scheme.name + "-new"
+      val savings = savings1.processEvent(Savings.UpdateScheme(scheme).copy(name = schemeName))
+      savings.schemes.head shouldBe scheme.copy(name = schemeName)
     }
 
     "handle updating a scheme comment" in {
-      val scheme0 = savings1.schemes.head
+      val scheme = savings1.schemes.head
       val schemeComment = Some("New comment")
-      val savings = savings1.processEvent(Savings.UpdateScheme(scheme0.id, scheme0.name, schemeComment))
-      val scheme = savings.schemes.head
-      scheme shouldBe scheme0.copy(comment = schemeComment)
+      val savings = savings1.processEvent(Savings.UpdateScheme(scheme).copy(comment = schemeComment))
+      savings.schemes.head shouldBe scheme.copy(comment = schemeComment)
+    }
+
+    "handle disabling a scheme" in {
+      val scheme = savings1.schemes.head
+      val savings = savings1.processEvent(Savings.UpdateScheme(scheme).copy(disabled = true))
+      savings.schemes.head shouldBe scheme.copy(disabled = true)
+    }
+
+    "handle enabling a scheme" in {
+      val scheme = savings1.schemes.head
+      val savings = savings1.processEvents(
+        Savings.UpdateScheme(scheme).copy(disabled = true),
+        Savings.UpdateScheme(scheme).copy(disabled = false)
+      )
+      savings.schemes.head shouldBe scheme
+    }
+
+    "prevent disabling an active scheme" in {
+      val scheme = savings2.schemes.head
+      val fund = savings2.funds.head
+      val savings = savings2.processEvents(
+        Savings.MakePayment(LocalDate.now.minusDays(10), Savings.AssetPart(scheme.id, fund.id, None, BigDecimal(1), BigDecimal(1)), None),
+        Savings.UpdateScheme(scheme).copy(disabled = true)
+      )
+      savings.schemes.head shouldBe scheme.copy(used = true, active = true)
     }
 
     "handle deleting a scheme" in {
@@ -114,19 +137,42 @@ class SavingsSpec extends WordSpec with Matchers {
     }
 
     "handle updating a fund name" in {
-      val fund0 = savings1.funds.head
-      val fundName = fund0.name + "-new"
-      val savings = savings1.processEvent(Savings.UpdateFund(fund0.id, fundName, fund0.comment))
-      val fund = savings.funds.head
-      fund shouldBe fund0.copy(name = fundName)
+      val fund = savings1.funds.head
+      val fundName = fund.name + "-new"
+      val savings = savings1.processEvent(Savings.UpdateFund(fund).copy(name = fundName))
+      savings.funds.head shouldBe fund.copy(name = fundName)
     }
 
     "handle updating a fund comment" in {
-      val fund0 = savings1.funds.head
+      val fund = savings1.funds.head
       val fundComment = Some("New comment")
-      val savings = savings1.processEvent(Savings.UpdateFund(fund0.id, fund0.name, fundComment))
-      val fund = savings.funds.head
-      fund shouldBe fund0.copy(comment = fundComment)
+      val savings = savings1.processEvent(Savings.UpdateFund(fund).copy(comment = fundComment))
+      savings.funds.head shouldBe fund.copy(comment = fundComment)
+    }
+
+    "handle disabling a fund" in {
+      val fund = savings1.funds.head
+      val savings = savings1.processEvent(Savings.UpdateFund(fund).copy(disabled = true))
+      savings.funds.head shouldBe fund.copy(disabled = true)
+    }
+
+    "handle enabling a fund" in {
+      val fund = savings1.funds.head
+      val savings = savings1.processEvents(
+        Savings.UpdateFund(fund).copy(disabled = true),
+        Savings.UpdateFund(fund).copy(disabled = false)
+      )
+      savings.funds.head shouldBe fund
+    }
+
+    "prevent disabling an active fund" in {
+      val scheme = savings2.schemes.head
+      val fund = savings2.funds.head
+      val savings = savings2.processEvents(
+        Savings.MakePayment(LocalDate.now.minusDays(10), Savings.AssetPart(scheme.id, fund.id, None, BigDecimal(1), BigDecimal(1)), None),
+        Savings.UpdateFund(fund).copy(disabled = true)
+      )
+      savings.funds.head shouldBe fund.copy(used = true, active = true)
     }
 
     "handle deleting a fund" in {
@@ -144,7 +190,6 @@ class SavingsSpec extends WordSpec with Matchers {
       savings.funds.size shouldBe 1
       savings.schemes.head shouldBe scheme0.copy(funds = List(fund.id))
     }
-
 
     "handle dissociating a fund from a scheme" in {
       val scheme0 = savings1.schemes.head
@@ -259,6 +304,10 @@ class SavingsSpec extends WordSpec with Matchers {
       savings2_4.assets.list shouldBe empty
       savings2_4.assets.byId shouldBe empty
       savings2_4.assets.vwaps shouldBe empty
+
+      savings2_4.getScheme(scheme.id) shouldBe scheme.copy(used = true, active = false)
+      savings2_4.getFund(fund1.id) shouldBe fund1.copy(used = true, active = false)
+      savings2_4.getFund(fund2.id) shouldBe fund2.copy(used = true, active = false)
     }
 
     "handle resolving assets availability by date" in {
@@ -307,11 +356,13 @@ class SavingsSpec extends WordSpec with Matchers {
 
       // Simple events should remain
       checkFlattening(savings2, createScheme2)
-      checkFlattening(savings2, Savings.UpdateScheme(scheme.id, scheme.name + "-new", scheme.comment))
-      checkFlattening(savings2, Savings.UpdateScheme(scheme.id, scheme.name, Some("New comment")))
+      checkFlattening(savings2, Savings.UpdateScheme(scheme).copy(name = scheme.name + "-new"))
+      checkFlattening(savings2, Savings.UpdateScheme(scheme).copy(comment = Some("New comment")))
+      checkFlattening(savings2, Savings.UpdateScheme(scheme).copy(disabled = true))
       checkFlattening(savings2, createFund3)
-      checkFlattening(savings2, Savings.UpdateFund(fund1.id, fund1.name + "-new", fund1.comment))
-      checkFlattening(savings2, Savings.UpdateFund(fund1.id, fund1.name, Some("New comment")))
+      checkFlattening(savings2, Savings.UpdateFund(fund1).copy(name = fund1.name + "-new"))
+      checkFlattening(savings2, Savings.UpdateFund(fund1).copy(comment = Some("New comment")))
+      checkFlattening(savings2, Savings.UpdateFund(fund1).copy(disabled = true))
       // Note: this case actually triggers a warning because flattening first
       // dissociates fund (which is right) and thus resulting scheme differs
       // because *we* did not do it. In this case flattening keep the provided
@@ -327,17 +378,55 @@ class SavingsSpec extends WordSpec with Matchers {
         List(Savings.DissociateFund(scheme.id, fund1.id), Savings.DissociateFund(scheme.id, fund2.id), Savings.DeleteScheme(scheme.id))
       )
 
+      // Redundant events should be de-duplicated
+      checkFlattening(savings2,
+        List(Savings.UpdateScheme(scheme)),
+        Nil
+      )
+      checkFlattening(savings2,
+        List(Savings.UpdateScheme(scheme.copy(name = scheme.name + "-new")), Savings.UpdateScheme(scheme.copy(name = scheme.name + "-new"))),
+        List(Savings.UpdateScheme(scheme.copy(name = scheme.name + "-new")))
+      )
+      checkFlattening(savings2,
+        List(Savings.UpdateScheme(scheme.copy(comment = Some("New comment"))), Savings.UpdateScheme(scheme.copy(comment = Some("New comment")))),
+        List(Savings.UpdateScheme(scheme.copy(comment = Some("New comment"))))
+      )
+      checkFlattening(savings2,
+        List(Savings.UpdateScheme(scheme.copy(disabled = true)), Savings.UpdateScheme(scheme.copy(disabled = true))),
+        List(Savings.UpdateScheme(scheme.copy(disabled = true)))
+      )
+      checkFlattening(savings2,
+        List(Savings.UpdateFund(fund1)),
+        Nil
+      )
+      checkFlattening(savings2,
+        List(Savings.UpdateFund(fund1.copy(name = fund1.name + "-new")), Savings.UpdateFund(fund1.copy(name = fund1.name + "-new"))),
+        List(Savings.UpdateFund(fund1.copy(name = fund1.name + "-new")))
+      )
+      checkFlattening(savings2,
+        List(Savings.UpdateFund(fund1.copy(comment = Some("New comment"))), Savings.UpdateFund(fund1.copy(comment = Some("New comment")))),
+        List(Savings.UpdateFund(fund1.copy(comment = Some("New comment"))))
+      )
+      checkFlattening(savings2,
+        List(Savings.UpdateFund(fund1.copy(disabled = true)), Savings.UpdateFund(fund1.copy(disabled = true))),
+        List(Savings.UpdateFund(fund1.copy(disabled = true)))
+      )
+
       // Events cancelling each other should disappear
       checkFlattening(savings2,
         List(createScheme2, Savings.DeleteScheme(createScheme2.schemeId)),
         Nil
       )
       checkFlattening(savings2,
-        List(Savings.UpdateScheme(scheme.id, scheme.name + "-new", scheme.comment), Savings.UpdateScheme(scheme.id, scheme.name, scheme.comment)),
+        List(Savings.UpdateScheme(scheme.copy(name = scheme.name + "-new")), Savings.UpdateScheme(scheme)),
         Nil
       )
       checkFlattening(savings2,
-        List(Savings.UpdateScheme(scheme.id, scheme.name, Some("New comment")), Savings.UpdateScheme(scheme.id, scheme.name, scheme.comment)),
+        List(Savings.UpdateScheme(scheme.copy(comment = Some("New comment"))), Savings.UpdateScheme(scheme)),
+        Nil
+      )
+      checkFlattening(savings2,
+        List(Savings.UpdateScheme(scheme.copy(disabled = true)), Savings.UpdateScheme(scheme)),
         Nil
       )
       checkFlattening(savings2,
@@ -345,11 +434,15 @@ class SavingsSpec extends WordSpec with Matchers {
         Nil
       )
       checkFlattening(savings2,
-        List(Savings.UpdateFund(fund1.id, fund1.name + "-new", scheme.comment), Savings.UpdateFund(fund1.id, fund1.name, scheme.comment)),
+        List(Savings.UpdateFund(fund1.copy(name = fund1.name + "-new")), Savings.UpdateFund(fund1)),
         Nil
       )
       checkFlattening(savings2,
-        List(Savings.UpdateFund(fund1.id, fund1.name, Some("New comment")), Savings.UpdateFund(fund1.id, fund1.name, scheme.comment)),
+        List(Savings.UpdateFund(fund1.copy(comment = Some("New comment"))), Savings.UpdateFund(fund1)),
+        Nil
+      )
+      checkFlattening(savings2,
+        List(Savings.UpdateFund(fund1.copy(disabled = true)), Savings.UpdateFund(fund1)),
         Nil
       )
       checkFlattening(savings2,
@@ -365,8 +458,8 @@ class SavingsSpec extends WordSpec with Matchers {
     }
 
     "handle UpdateScheme" in {
-      checkEventSerialization(Savings.UpdateScheme(savings1.schemes.head.id, "scheme new name", None))
-      checkEventSerialization(Savings.UpdateScheme(savings1.schemes.head.id, "scheme new name", Some("scheme new comment")))
+      checkEventSerialization(Savings.UpdateScheme(savings1.schemes.head.id, "scheme new name", None, disabled = false))
+      checkEventSerialization(Savings.UpdateScheme(savings1.schemes.head.id, "scheme new name", Some("scheme new comment"), disabled = true))
     }
 
     "handle DeleteScheme" in {
@@ -378,8 +471,8 @@ class SavingsSpec extends WordSpec with Matchers {
     }
 
     "handle UpdateFund" in {
-      checkEventSerialization(Savings.UpdateFund(savings1.funds.head.id, "fund new name", None))
-      checkEventSerialization(Savings.UpdateFund(savings1.funds.head.id, "fund new name", Some("fund new comment")))
+      checkEventSerialization(Savings.UpdateFund(savings1.funds.head.id, "fund new name", None, disabled = false))
+      checkEventSerialization(Savings.UpdateFund(savings1.funds.head.id, "fund new name", Some("fund new comment"), disabled = true))
     }
 
     "handle DeleteFund" in {
@@ -555,6 +648,13 @@ class SavingsSpec extends WordSpec with Matchers {
       if (expectedAsset.vwap != 0) foundAsset0
       else foundAsset0.copy(vwap = 0)
     foundAsset shouldBe expectedAsset
+
+    val scheme = savings.getScheme(expectedAsset.schemeId)
+    scheme.used shouldBe true
+    scheme.active shouldBe true
+    val fund = savings.getFund(expectedAsset.fundId)
+    fund.used shouldBe true
+    fund.active shouldBe true
   }
 
   private def checkSavings(date: LocalDate, savings0: Savings, expectedAssets: Savings.Asset*): Unit = {
