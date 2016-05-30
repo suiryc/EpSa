@@ -39,6 +39,9 @@ object Images {
   lazy val iconInformationBalloon =
     new Image("/images/fugue-icons/information-balloon.png", 0.0, 0.0, true, false, false)
 
+  lazy val iconExclamationRed =
+    new Image("/images/fugue-icons/exclamation-red.png", 0.0, 0.0, true, false, false)
+
   lazy val iconMagnifierZoom =
     new Image("/images/fugue-icons/magnifier-zoom.png", 0.0, 0.0, true, false, false)
 

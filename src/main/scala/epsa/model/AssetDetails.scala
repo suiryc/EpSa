@@ -43,6 +43,8 @@ trait AssetDetails {
   val date: Option[LocalDate]
   /** NAV. */
   val nav: Option[BigDecimal]
+  /** Gross amount warning. */
+  val grossAmountWarning: List[String] = Nil
 
   /** Date on which availability is based on. */
   val availabilityBase: Option[LocalDate]
@@ -111,7 +113,8 @@ case class TotalAssetDetails(
   nav: Option[BigDecimal],
   availabilityBase: Option[LocalDate],
   kind: AssetDetailsKind.Value,
-  override val investedAmount: BigDecimal
+  override val investedAmount: BigDecimal,
+  override val grossAmountWarning: List[String]
 ) extends AssetDetails
 
 /**
@@ -139,7 +142,6 @@ class AssetDetailsWithTotal(
   // changes in each group and propagate them (with appropriate adaptation to
   // fir the transformed list given as table items).
 
-  // TODO: keep in mind missing NAVs and have visual hint (warning icon with tooltip) on concerned cell for user
   private def orZero(v: Option[BigDecimal]): BigDecimal = v.getOrElse(0)
 
   private def computeTotal(assets: List[AssetDetails], kind: AssetDetailsKind.Value,
@@ -154,7 +156,8 @@ class AssetDetailsWithTotal(
       nav = Some(0),
       availabilityBase = availabilityBase,
       kind = kind,
-      investedAmount = 0
+      investedAmount = 0,
+      grossAmountWarning = Nil
     )
     assets.foldLeft(total0) { (acc, details) =>
       // For total per fund, units, NAV and VWAP are displayed, so we use the
@@ -168,11 +171,20 @@ class AssetDetailsWithTotal(
         else details.nav
       val investedAmount = acc.investedAmount + details.investedAmount
       val vwap = scaleVWAP(investedAmount / units)
+      val grossAmountWarning =
+        if ((kind == AssetDetailsKind.TotalPerFund) || details.grossAmount.nonEmpty) acc.grossAmountWarning
+        else {
+          // $1=fund $2=date
+          val warning = Strings.accountHistoryIssuesNAV.format(details.fund.name, availabilityBase.getOrElse(LocalDate.now))
+          if (acc.grossAmountWarning.contains(warning)) acc.grossAmountWarning
+          else acc.grossAmountWarning :+ warning
+        }
       acc.copy(
         asset = acc.asset.copy(units = units, vwap = vwap),
         date = details.date,
         nav = nav,
-        investedAmount = investedAmount
+        investedAmount = investedAmount,
+        grossAmountWarning = grossAmountWarning
       )
     }
   }

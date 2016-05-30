@@ -6,7 +6,8 @@ import epsa.util.JFXStyles
 import java.time.{LocalDate, Month}
 import java.time.format.TextStyle
 import java.util.Locale
-import javafx.scene.control.{Cell, ListCell}
+import javafx.scene.control.{Cell, ContentDisplay, ListCell, Tooltip}
+import javafx.scene.image.ImageView
 import suiryc.scala.javafx.scene.control.{CellWithSeparator, ListCellEx, TableCellEx}
 import suiryc.scala.util.I18NLocale
 
@@ -43,9 +44,7 @@ class FormatCell[A, B](format: B => String) extends TableCellEx[A, B] {
 }
 
 trait ColoredCell[A] extends Cell[A] {
-
   def value(a: A): Option[BigDecimal]
-
   override protected def updateItem(item: A, empty: Boolean) {
     super.updateItem(item, empty)
     (if (empty) None else Some(item)).flatMap(value).find(_ != 0) match {
@@ -55,6 +54,25 @@ trait ColoredCell[A] extends Cell[A] {
 
       case None =>
         JFXStyles.toggleNeutral(this)
+    }
+  }
+}
+
+trait WarningCell[A] extends Cell[A] {
+  // Display graphic on the right side
+  setContentDisplay(ContentDisplay.RIGHT)
+
+  def warning(a: A): Option[String]
+  override protected def updateItem(item: A, empty: Boolean) {
+    super.updateItem(item, empty)
+    (if (empty) None else Some(item)).flatMap(warning) match {
+      case Some(v) =>
+        setTooltip(new Tooltip(v))
+        setGraphic(new ImageView(Images.iconExclamationRed))
+
+      case None =>
+        setTooltip(null)
+        setGraphic(null)
     }
   }
 }
