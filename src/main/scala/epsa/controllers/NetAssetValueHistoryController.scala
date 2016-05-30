@@ -32,7 +32,6 @@ import suiryc.scala.javafx.stage.Stages.StageLocation
 import suiryc.scala.javafx.stage.{FileChoosers, Stages}
 import suiryc.scala.javafx.util.Callback
 
-// TODO: have disabled funds in last positions; have a checkbox to hide them altogether ?
 // TODO: be notified (by main view) if funds are added/removed ?
 // TODO: possibility to manually edit the value for a given date ?
 class NetAssetValueHistoryController {

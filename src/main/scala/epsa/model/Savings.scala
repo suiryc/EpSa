@@ -39,7 +39,7 @@ object Savings {
    * @param events events to sort
    * @return sorted events
    */
-  def sortEvents(events: Seq[Event]): Seq[Event] = {
+  def sortEvents(events: Seq[Event]): (Seq[Event], Boolean) = {
     case class DateRange(min: LocalDate, max: LocalDate)
     case class SortingEvents(prefix: Seq[Event], assetEvents: Seq[AssetEvent]) {
       lazy val dateRange: Option[DateRange] = {
@@ -99,8 +99,9 @@ object Savings {
       }
 
     val sortings = split(events, Nil)
-    val sorted = sort(sortings, Nil)
-    join(sorted)
+    val sortedGroups = sort(sortings, Nil)
+    val sorted = join(sortedGroups)
+    (sorted, sorted != events)
   }
 
   /**

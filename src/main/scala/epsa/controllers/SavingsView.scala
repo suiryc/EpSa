@@ -268,7 +268,7 @@ class SavingsViewTab(val actor: ActorRef, val dateOpt: Option[LocalDate]) extend
         // Compute actual state from account history up to requested date
         val owner = Some(state.stage)
         val events0 = Awaits.readDataStoreEvents(owner).getOrElse(Nil) ++ state.eventsUpd
-        val events = Savings.sortEvents(events0)
+        val (events, _) = Savings.sortEvents(events0)
         val history = events.takeWhile {
           case e: Savings.AssetEvent => e.date <= date
           case _                     => true

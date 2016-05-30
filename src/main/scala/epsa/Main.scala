@@ -44,19 +44,19 @@ class Main extends Application {
   override def start(stage: Stage) {
     I18N.loadLocale()
 
-    def startController(events: Seq[Savings.Event] = Nil): Unit = {
+    def startController(events: Seq[Savings.Event], outOfOrder: Boolean): Unit = {
       val savingsInit = Savings().processEvents(events)
       val state = MainController.State(
         stage = stage,
         savingsInit = savingsInit,
         savingsUpd = savingsInit
       )
-      MainController.build(state, applicationStart = true)
+      MainController.build(state, reorder = outOfOrder, applicationStart = true)
     }
 
     // Note: if stage has no Scene, have it owns a Dialog fails.
     // In any case, we have yet to build and show the stage.
-    val events = Awaits.openDataStore(None, change = false, save = false) match {
+    val events0 = Awaits.openDataStore(None, change = false, save = false) match {
       case Some(Success(())) =>
         // Data store opening succeeded: read events to replay
         // If we failed to read events, user was warned.
@@ -64,7 +64,8 @@ class Main extends Application {
       // Either there was an issue (notified to user) or no default data store
       case _ => Nil
     }
-    startController(events)
+    val (events, outOfOrder) = Savings.sortEvents(events0)
+    startController(events, outOfOrder)
   }
 
 }

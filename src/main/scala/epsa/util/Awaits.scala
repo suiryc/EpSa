@@ -71,7 +71,25 @@ object Awaits {
   def readDataStoreUnavailabilityPeriods(owner: Option[Window]): Try[Seq[Savings.UnavailabilityPeriod]] =
     orError(DataStore.UnavailabilityPeriods.readEntries(), owner, DataStore.readIssueMsg())
 
-  def cleanupDataStore(owner: Option[Window], fundIds: List[UUID]): Unit = {
+  def cleanupDataStore(owner: Option[Window], fundIds: List[UUID], reorder: Boolean): Unit = {
+    if (reorder) {
+      val events0 = readDataStoreEvents(owner).getOrElse(Nil)
+      val (events, outOfOrder) = Savings.sortEvents(events0)
+      if (outOfOrder) {
+        val actions = List(
+          Action(DataStore.EventSource.deleteEntries()),
+          Action(DataStore.EventSource.writeEvents(events.toList))
+        )
+        val f = RichFuture.executeSequentially(stopOnError = true, actions).map(_ => ())
+        orError(f, owner, DataStore.writeIssueMsg()) match {
+          case Success(_) =>
+            Dialogs.information(owner = owner, title = None, headerText = None, contentText = Some(DataStore.eventsReorderedMsg))
+
+          case _ =>
+            // Failure was already notified
+        }
+      }
+    }
     orError(DataStore.AssetHistory.cleanup(fundIds), owner, DataStore.cleanupIssueMsg) match {
       case Success(v) =>
         if (v.nonEmpty) Dialogs.information(owner = owner, title = None, headerText = None, contentText = Some(DataStore.cleanupMsg))

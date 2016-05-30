@@ -100,6 +100,7 @@ object I18N extends suiryc.scala.util.I18N("i18n.epsa") with I18NWithPreference 
     def noDataStoreSelected = getString("No data store selected")
     def dataStoreWriteError = getString("Could not write data store")
     def dataStoreReadError = getString("Could not read data store")
+    def dataStoreEventsReordered = getString("information.datastore-events-reordered")
     def dataStoreCleaned = getString("Cleaned up data store")
     def dataStoreCleanError = getString("Could not cleanup data store")
     def fileReadError = getString("Could not read file")

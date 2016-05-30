@@ -32,19 +32,9 @@ import suiryc.scala.settings.Preference
 
 // TODO: smart deletion of funds ?
 //         - keep the necessary data (NAV on some dates) used to compute levies
-//         - way to determine if all levies of past fund assets were paid already, so that all NAVs can reall be deleted ?
-// TODO: sort events before processing them (upon loading; also upon building updates ?): needed to compute levies properly
-// TODO: sort events upon exporting
-// TODO: warn user if events are not sorted in datastore (upon loading datastore)
-// TODO: explicitely reload datastore + process datastore&updates when we know updates are introducing out of order actions ?
-// TODO: menu entry (or automatic action ?) to sort datastore and replace current events
+//         - way to determine if all levies of past fund assets were paid already, so that all NAVs can really be deleted ?
 // TODO: display more information in assets table and details: net gain/loss (amount/percentage)
 // TODO: change details pane position; set below table ? (then have NAV history graph on the right side of details)
-// TODO: menu entries with latest datastore locations ?
-// TODO: manage encryption of datastore ?
-//         -> possible to read/write
-//         -> how to determine beforehand ?
-//         -> FileChooser does not allow to customize its content (to give password upon open)
 class MainController extends Logging {
 
   import MainController._
@@ -267,8 +257,12 @@ class MainController extends Logging {
     actor ! OnImportRawAccountHistory
   }
 
-  def onCleanupDataStore(event: ActionEvent = null): Unit = {
-    actor ! OnCleanupDataStore
+  def onCleanupDataStore(event: ActionEvent): Unit = {
+    actor ! OnCleanupDataStore(reorder = false)
+  }
+
+  def onCleanupDataStore(reorder: Boolean): Unit = {
+    actor ! OnCleanupDataStore(reorder)
   }
 
   private def getState: State = {
@@ -368,7 +362,7 @@ class MainController extends Logging {
       case OnUpToDateAssets(set) => onUpToDateAssets(state, set)
       case OnExportRawAccountHistory => onExportRawAccountHistory(state)
       case OnImportRawAccountHistory => onImportRawAccountHistory(state)
-      case OnCleanupDataStore => onCleanupDataStore(state)
+      case OnCleanupDataStore(reorder) => onCleanupDataStore(state, reorder)
     }
 
     def processEvents(oldState: State, events: List[Savings.Event], updateAssetsValue: Boolean = false): Unit = {
@@ -376,7 +370,8 @@ class MainController extends Logging {
       events.collect {
         case Savings.DeleteFund(fundId) => DataStore.AssetHistory.deleteValues(fundId)
       }
-      val newEvents = oldState.eventsUpd ::: events
+      val (newEvents0, _) = Savings.sortEvents(oldState.eventsUpd ::: events)
+      val newEvents = newEvents0.toList
       val savings = oldState.savingsUpd.processEvents(events)
       val newAssetsValue =
         if (!updateAssetsValue) oldState.assetsValue
@@ -604,7 +599,8 @@ class MainController extends Logging {
     }
 
     def onExportRawAccountHistory(state: State): Unit = {
-      val events = Awaits.readDataStoreEvents(Some(state.stage)).getOrElse(Nil) ++ state.eventsUpd
+      val events0 = Awaits.readDataStoreEvents(Some(state.stage)).getOrElse(Nil) ++ state.eventsUpd
+      val (events, _) = Savings.sortEvents(events0)
       import spray.json._
       import Savings.JsonProtocol._
       val eventsJson = events.map(_.toJson)
@@ -705,8 +701,8 @@ class MainController extends Logging {
       }
     }
 
-    def onCleanupDataStore(state: State): Unit = {
-      Awaits.cleanupDataStore(Some(state.stage), state.savingsUpd.funds.map(_.id))
+    def onCleanupDataStore(state: State, reorder: Boolean): Unit = {
+      Awaits.cleanupDataStore(Some(state.stage), state.savingsUpd.funds.map(_.id), reorder)
       refresh(state)
     }
 
@@ -751,7 +747,8 @@ class MainController extends Logging {
       val owner = Some(state.stage)
 
       def read() = Awaits.readDataStoreEvents(owner) match {
-        case Success(events) =>
+        case Success(events0) =>
+          val (events, outOfOrder) = Savings.sortEvents(events0)
           val savingsInit = Savings().processEvents(events)
           val newState = State(
             stage = state.stage,
@@ -760,7 +757,7 @@ class MainController extends Logging {
           )
           applyState(newState)
           // Cleanup datastore if necessary
-          self ! OnCleanupDataStore
+          self ! OnCleanupDataStore(outOfOrder)
 
         case _ =>
       }
@@ -892,9 +889,9 @@ object MainController {
 
   case object OnImportRawAccountHistory
 
-  case object OnCleanupDataStore
+  case class OnCleanupDataStore(reorder: Boolean)
 
-  def build(state: State, needRestart: Boolean = false, applicationStart: Boolean = false): Unit = {
+  def build(state: State, reorder: Boolean = false, needRestart: Boolean = false, applicationStart: Boolean = false): Unit = {
     val stage = state.stage
     stage.getIcons.setAll(Images.iconPiggyBank)
 
@@ -926,7 +923,7 @@ object MainController {
       )
     }
 
-    if (applicationStart) controller.onCleanupDataStore()
+    if (applicationStart) controller.onCleanupDataStore(reorder)
   }
 
 }

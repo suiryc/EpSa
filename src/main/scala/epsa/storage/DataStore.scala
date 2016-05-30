@@ -348,6 +348,19 @@ object DataStore {
     protected[DataStore] def deleteEntries(db: DatabaseDef): Future[Int] =
       db.run(entries.delete)
 
+    def deleteEntries()(implicit dbOpt: Option[DatabaseDef] = None): Future[Int] = {
+      dbOpt match {
+        case Some(db) => deleteEntries(db)
+        case None     =>
+          getDBTemp.flatMap { tmp =>
+            // Drop pending actions on this table since we are emptying it
+            tmp.resetActions(this)
+            tmp.addAction(this, deleteEntries)
+            deleteEntries(tmp.db)
+          }
+      }
+    }
+
     protected[DataStore] def readEntries(db: DatabaseDef): Future[Seq[Entry]] =
       db.run(entries.result)
 
@@ -656,6 +669,14 @@ object DataStore {
    */
   def readIssueMsg(real: Boolean = dbTempOpt.isEmpty && dbRealOpt.nonEmpty): String =
     issueMsg(Strings.dataStoreReadError, real)
+
+  /**
+   * Formats events reordering message.
+   *
+   * Reordering is based on real database.
+   */
+  def eventsReorderedMsg: String =
+    issueMsg(Strings.dataStoreEventsReordered, real = true)
 
   /**
    * Formats cleanup message.

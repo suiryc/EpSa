@@ -628,9 +628,10 @@ class SavingsSpec extends WordSpec with Matchers {
         g4e1, g4e2,
         g5e1
       )
-      val eventsSorted = Savings.sortEvents(events)
+      val (eventsSorted, outOfOrder) = Savings.sortEvents(events)
       eventsSorted should not be events
       eventsSorted shouldBe eventsExpected
+      outOfOrder shouldBe true
     }
   }
 
