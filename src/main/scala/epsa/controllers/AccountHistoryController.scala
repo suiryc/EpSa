@@ -514,7 +514,7 @@ class AccountHistoryController extends Logging {
       )
     }
 
-    // TODO: handle more than one series in chart (invested + gross) ?
+    // TODO: handle more than one series in chart (invested + gross amounts) ?
     val grossHistory = history.data.map { data =>
       ChartSeriesData(data.date, data.grossAmount)
     }
@@ -528,8 +528,7 @@ class AccountHistoryController extends Logging {
       meta = meta,
       settings = ChartSettings.hidden.copy(
         xLabel = Strings.date,
-        // TODO: i18n "gross amount" ?
-        yLabel = Strings.gross,
+        yLabel = Strings.grossAmount,
         ySuffix = epsa.Settings.defaultCurrency
       )
     )

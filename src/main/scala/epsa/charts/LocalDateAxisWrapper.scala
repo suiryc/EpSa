@@ -35,7 +35,6 @@ class LocalDateAxisWrapper(settings: ChartSettings) {
       val max = values.max
       axis.setLowerBound(min.doubleValue)
       axis.setUpperBound(max.doubleValue)
-      // TODO: change tick label format/rotation if needed
       // Default tick unit (1 pixel = 1 day): 8 weeks (56 days = 56 pixels)
       // Scale tick unit with zoom, minimum value (for high zooming): 7 days
       val tickUnit = math.max(7, round(7 * 4 * 2 / zoom)).toInt
