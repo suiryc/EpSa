@@ -25,6 +25,8 @@ import suiryc.scala.javafx.event.EventHandler._
 import suiryc.scala.javafx.geometry.BoundsEx
 import suiryc.scala.math.BigDecimals._
 
+// TODO: way to limit y range to currently viewed min/max; and way to reset to auto range
+
 trait ChartSeriesData {
   val date: LocalDate
   val value: BigDecimal
@@ -87,7 +89,7 @@ object ChartSettings {
 }
 
 /**
- * Handles chart for a given investment fund.
+ * Handles chart for a given series.
  *
  * Creates said chart, and manages associated resources:
  *   - zooming with mouse selection (dragging or scrolling)
@@ -155,12 +157,12 @@ class ChartHandler[A <: ChartMark](
   /** Chart series. */
   private val series = new XYChart.Series[Number, Number]()
   series.setName(seriesName)
-  /** Investment fund asset values to display in chart. */
-  private val valuesList = seriesValues.map { v =>
+  /** Series values to display in chart. */
+  private var valuesList = seriesValues.map { v =>
     (dateToNumber(v.date), v.value)
-  }
-  /** Investment fund asset values map. */
-  private val valuesMap = valuesList.toMap
+  }.sortBy(_._1)
+  /** Series values map. */
+  private var valuesMap = valuesList.toMap
   /** Currently displayed 'x' data value. */
   private var currentXPos: Option[Long] = None
   /** Zoom factor. */
@@ -601,6 +603,16 @@ class ChartHandler[A <: ChartMark](
     JFXSystem.runLater {
       anchorPane.requestLayout()
     }
+  }
+
+  def updateSeries(seriesValues: Seq[ChartSeriesData]): Unit = {
+    valuesMap ++= seriesValues.map { v =>
+      dateToNumber(v.date) -> v.value
+    }.toMap
+    valuesList = valuesMap.toList.sortBy(_._1)
+    val viewedBounds = getChartBackgroundViewedBounds()
+    val offset = getX(getChartBackgroundBounds, viewedBounds.getMinX)
+    refreshView(resetData = true, offset)
   }
 
   /**
