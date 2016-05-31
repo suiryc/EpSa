@@ -323,9 +323,7 @@ class AccountHistoryController extends Logging {
         showAccountDetails(data.date)
 
       case ChartEvent.RightClicked =>
-        // Hide context menu (remains displayed until hidden or item selected)
-        historyChartContextMenu.hide()
-        // Replace content with new item (for currently selected date)
+        // Refresh context menu with new item (for currently selected date)
         val header = new CustomMenuItem(new Label(data.date.toString), false)
         header.getStyleClass.addAll("header", "no-select")
         val savingsOnDate = new MenuItem(Strings.savingsOnDate,
@@ -335,18 +333,11 @@ class AccountHistoryController extends Logging {
           mainController.onSavingsOnDate(data.date)
         }
         historyChartContextMenu.getItems.setAll(header, new SeparatorMenuItem, savingsOnDate)
-        // Display context menu at current mouse position
-        historyChartContextMenu.show(historyPane, mouseEvent.getScreenX, mouseEvent.getScreenY)
-        // Hide context menu if chart loses focus (e.g. clicking elsewhere, or
-        // going to another window).
-        chartHandler.foreach { handler =>
-          handler.chartPane.focusedProperty.listen2 { (cancellable, focused) =>
-            if (!focused) {
-              cancellable.cancel()
-              historyChartContextMenu.hide()
-            }
-          }
-        }
+        // Display context menu at current mouse position. Enable auto-hide and
+        // call the 'show(...)' variant without anchor so that clicking anywhere
+        // other than the popup node will make it disappear.
+        historyChartContextMenu.setAutoHide(true)
+        historyChartContextMenu.show(stage, mouseEvent.getScreenX, mouseEvent.getScreenY)
 
       case _ =>
         // We don't care
@@ -521,7 +512,11 @@ class AccountHistoryController extends Logging {
     val marks = historyTable.getRoot.getChildren.toList.map(_.getValue).groupBy(_.date.get).map { case (date, items) =>
       date -> HistoryMark(date, items)
     }
-    val meta = ChartMeta(marks, onMarkEvent _, onMouseEvent _)
+    val meta = ChartMeta(
+      marks = marks,
+      marksHandler = onMarkEvent,
+      mouseHandler = onMouseEvent
+    )
     val chartHandler = new ChartHandler(
       seriesName = title,
       seriesValues = grossHistory,
