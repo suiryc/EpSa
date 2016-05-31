@@ -2,11 +2,12 @@ package epsa.controllers
 
 import epsa.I18N
 import epsa.I18N.Strings
-import epsa.charts.{ChartHandler, ChartSettings}
+import epsa.Settings.getBigDecimal
+import epsa.charts._
 import epsa.model.Savings
 import epsa.storage.DataStore
 import epsa.tools.{BNPParibasInvestmentFundProber, EsaliaInvestmentFundProber, SpreadsheetInvestmentFundProber}
-import epsa.util.Awaits
+import epsa.util.{Awaits, JFXStyles}
 import java.nio.file.Path
 import java.time.LocalDate
 import java.util.UUID
@@ -14,8 +15,9 @@ import javafx.beans.property.SimpleObjectProperty
 import javafx.collections.FXCollections
 import javafx.event.ActionEvent
 import javafx.fxml.{FXML, FXMLLoader}
-import javafx.scene.{Node, Parent, Scene}
+import javafx.scene.{Parent, Scene}
 import javafx.scene.control._
+import javafx.scene.input.MouseEvent
 import javafx.scene.layout.AnchorPane
 import javafx.stage._
 import scala.collection.JavaConversions._
@@ -27,12 +29,11 @@ import suiryc.scala.math.Ordering._
 import suiryc.scala.settings.Preference
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.event.EventHandler._
-import suiryc.scala.javafx.scene.control.Dialogs
+import suiryc.scala.javafx.scene.control.{Dialogs, TextFieldWithButton}
 import suiryc.scala.javafx.stage.Stages.StageLocation
 import suiryc.scala.javafx.stage.{FileChoosers, Stages}
 import suiryc.scala.javafx.util.Callback
 
-// TODO: possibility to manually edit the value for a given date ?
 class NetAssetValueHistoryController {
 
   import NetAssetValueHistoryController._
@@ -56,11 +57,13 @@ class NetAssetValueHistoryController {
   @FXML
   protected var purgeButton: Button = _
 
+  private val historyChartContextMenu = new ContextMenu()
+
   private lazy val stage = fundField.getScene.getWindow.asInstanceOf[Stage]
 
   private var changes = Map[Savings.Fund, Option[Seq[Savings.AssetValue]]]()
 
-  private var chartPane: Option[Node] = None
+  private var chartHandler: Option[ChartHandler[_]] = None
 
   private val probers = List(
     EsaliaInvestmentFundProber,
@@ -176,10 +179,10 @@ class NetAssetValueHistoryController {
     import suiryc.scala.javafx.concurrent.JFXExecutor.executor
 
     // Remove previous chart if any
-    chartPane.foreach { pane =>
-      historyPane.getChildren.remove(pane)
+    chartHandler.foreach { handler =>
+      historyPane.getChildren.remove(handler.chartPane)
     }
-    chartPane = None
+    chartHandler = None
 
     // Prepare to display progress indicator (if action takes too long)
     val showIndicator = epsa.Main.Akka.system.scheduler.scheduleOnce(500.milliseconds) {
@@ -323,26 +326,85 @@ class NetAssetValueHistoryController {
     )
   }
 
+  private def onMouseEvent(event: ChartEvent.Value, mouseEvent: MouseEvent, data: ChartSeriesData): Unit = {
+    event match {
+      case ChartEvent.RightClicked =>
+        // Refresh context menu with new item (for currently selected date)
+        val header = new CustomMenuItem(new Label(data.date.toString), false)
+        header.getStyleClass.addAll("header", "no-select")
+
+        val text = data.value.toString
+        val menuTextField = new TextFieldWithButton("text-field-with-refresh-button")
+        val editNAV = new CustomMenuItem(menuTextField, false)
+        // Set text, and reset it when requested
+        menuTextField.setText(text)
+        menuTextField.setOnButtonAction { (event: ActionEvent) =>
+          menuTextField.setText(text)
+        }
+        // Bind so that changing value allows to reset it
+        menuTextField.buttonDisableProperty.bind(menuTextField.textField.textProperty.isEqualTo(text))
+
+        // Check edited value is OK
+        def getUserNAV = getBigDecimal(menuTextField.getText)
+        menuTextField.textField.textProperty.listen { _ =>
+          val navOk = getUserNAV > 0
+          JFXStyles.toggleError(menuTextField, !navOk,
+            if (navOk) None
+            else Some(Strings.positiveValue)
+          )
+        }
+
+        // Save edited value if applicable when requested
+        menuTextField.textField.setOnAction { (_: ActionEvent) =>
+          val nav = getUserNAV
+          if ((menuTextField.getText != text) && (nav > 0)) {
+            getFund.foreach { fund =>
+              val assetValues = Seq(Savings.AssetValue(data.date, nav))
+              // Compute fund changes (all changes relatively to initial history)
+              val fundChanges = mergeHistory(updatedHistory(fund, Seq.empty), assetValues)
+              changes += fund -> Some(fundChanges)
+              // And refresh chart
+              chartHandler.foreach(_.updateSeries(assetValues))
+            }
+          }
+          // Finally hide the context menu
+          historyChartContextMenu.hide()
+        }
+
+        historyChartContextMenu.getItems.setAll(header, new SeparatorMenuItem, editNAV)
+        // Display context menu at current mouse position. Enable auto-hide and
+        // call the 'show(...)' variant without anchor so that clicking anywhere
+        // other than the popup node will make it disappear.
+        historyChartContextMenu.setAutoHide(true)
+        historyChartContextMenu.show(stage, mouseEvent.getScreenX, mouseEvent.getScreenY)
+
+      case _ =>
+        // We don't care
+    }
+  }
+
   private def displayChart(fund: Savings.Fund, values: Seq[Savings.AssetValue]): Unit = {
     val actualValues = updatedHistory(fund, values)
     purgeButton.setDisable(actualValues.isEmpty)
 
+    val meta = ChartMeta[ChartMark](mouseHandler = onMouseEvent)
     val chartHandler = new ChartHandler(
       seriesName = fund.name,
       seriesValues = actualValues,
+      meta = meta,
       settings = ChartSettings.hidden.copy(
         xLabel = Strings.date,
         yLabel = Strings.nav,
         ySuffix = epsa.Settings.defaultCurrency
       )
     )
-    val pane = chartHandler.chartPane
-    chartPane = Some(pane)
-    AnchorPane.setTopAnchor(pane, 0.0)
-    AnchorPane.setRightAnchor(pane, 0.0)
-    AnchorPane.setBottomAnchor(pane, 0.0)
-    AnchorPane.setLeftAnchor(pane, 0.0)
-    historyPane.getChildren.add(pane)
+    this.chartHandler = Some(chartHandler)
+    val chartPane = chartHandler.chartPane
+    AnchorPane.setTopAnchor(chartPane, 0.0)
+    AnchorPane.setRightAnchor(chartPane, 0.0)
+    AnchorPane.setBottomAnchor(chartPane, 0.0)
+    AnchorPane.setLeftAnchor(chartPane, 0.0)
+    historyPane.getChildren.add(chartPane)
   }
 
   /** Displays history import result in dedicated window. */
@@ -451,12 +513,17 @@ object NetAssetValueHistoryController {
   /** Builds a stage out of this controller. */
   def buildStage(mainController: MainController, savings: Savings, fundId: Option[UUID], window: Window): Dialog[Boolean] = {
     val dialog = new Dialog[Boolean]()
-    Stages.getStage(dialog).getIcons.setAll(Images.iconChartUp)
+    val stage = Stages.getStage(dialog)
+    stage.getIcons.setAll(Images.iconChartUp)
     dialog.setTitle(title)
     dialog.getDialogPane.getButtonTypes.addAll(ButtonType.OK, ButtonType.CANCEL)
 
     val loader = new FXMLLoader(getClass.getResource("/fxml/net-asset-value-history.fxml"), I18N.getResources)
     dialog.getDialogPane.setContent(loader.load())
+    stage.getScene.getStylesheets.addAll(
+      getClass.getResource("/css/main.css").toExternalForm,
+      getClass.getResource("/css/form.css").toExternalForm
+    )
     val controller = loader.getController[NetAssetValueHistoryController]
     controller.initialize(savings, fundId)
 

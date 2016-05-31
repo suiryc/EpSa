@@ -29,6 +29,12 @@ object Settings {
   val percentsScale = 2
   val percentsRounding = BigDecimal.RoundingMode.HALF_EVEN
 
+  def getBigDecimal(str: String): BigDecimal = try {
+    Option(str).map(BigDecimal(_)).getOrElse(BigDecimal(0))
+  } catch {
+    case ex: Exception => BigDecimal(0)
+  }
+
   def scaleAmount(v: BigDecimal): BigDecimal =
     v.setScale(amountScale(), amountRounding())
 

@@ -2,6 +2,7 @@ package epsa.controllers
 
 import epsa.I18N
 import epsa.I18N.Strings
+import epsa.Settings.getBigDecimal
 import epsa.model.Savings
 import epsa.util.{Awaits, JFXStyles}
 import java.time.LocalDate
@@ -780,12 +781,6 @@ class NewAssetActionController {
 
     if (!srcAvailabilityExact) Option(srcAvailabilityField.getValue)
     else Option(srcAvailabilityField2.getValue).getOrElse(None)
-  }
-
-  private def getBigDecimal(str: String): BigDecimal = try {
-    Option(str).map(BigDecimal(_)).getOrElse(BigDecimal(0))
-  } catch {
-    case ex: Exception => BigDecimal(0)
   }
 
   private def getSrcNAV: BigDecimal =
