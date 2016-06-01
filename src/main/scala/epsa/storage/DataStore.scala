@@ -194,14 +194,14 @@ object DataStore {
               Action(action(real.db))
             }
             Action {
-              RichFuture.executeSequentially(stopOnError = true, actions:_*).map(_ => ()).recover {
+              RichFuture.executeAllSequentially(stopOnError = true, actions:_*).map(_ => ()).recover {
                 case ex: Exception =>
                   throw new Exception(s"Could not apply changes in table[${table.tableName}]", ex)
               }
             }
         }.toSeq
         // Execute tables changes sequentially, then close temporary db.
-        RichFuture.executeSequentially(stopOnError = true, actions:_*).map(_ => ()).andThen {
+        RichFuture.executeAllSequentially(stopOnError = true, actions:_*).map(_ => ()).andThen {
           case _ => closeTempDB()
         }
 
@@ -235,7 +235,7 @@ object DataStore {
         }
       }
     }
-    RichFuture.executeSequentially(stopOnError = true, actions: _*).map(_ => ())
+    RichFuture.executeAllSequentially(stopOnError = true, actions: _*).map(_ => ())
   }
 
   /** Closes temporary database. */
@@ -325,7 +325,7 @@ object DataStore {
       }.map { table =>
         Action(ref.run(table.schema.create))
       }
-      RichFuture.executeSequentially(stopOnError = true, actions: _*)
+      RichFuture.executeAllSequentially(stopOnError = true, actions: _*)
       // Result: future completed after missing tables (if any) creation
     }.map { _ =>
       ref
@@ -565,7 +565,7 @@ object DataStore {
               Action(deleteValues(orphan))
             }
             // Delete as many as possible
-            RichFuture.executeSequentially(stopOnError = false, actions)
+            RichFuture.executeAllSequentially(stopOnError = false, actions)
           }
           orphans
         }

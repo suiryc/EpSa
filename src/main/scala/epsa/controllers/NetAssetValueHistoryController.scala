@@ -555,7 +555,7 @@ object NetAssetValueHistoryController {
           }
       }.toSeq
       // Apply as many changes as possible
-      val future = executeSequentially(stopOnError = false, actions: _*)
+      val future = executeAllSequentially(stopOnError = false, actions: _*)
       // Wait for result and display issue if any
       Awaits.orError(future, Some(windows), DataStore.writeIssueMsg())
       // Request main view to refresh (i.e. check for pending changes)

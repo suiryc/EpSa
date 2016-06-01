@@ -50,12 +50,12 @@ object Awaits {
     } else {
       None
     }).toSeq
-    val f = RichFuture.executeSequentially(stopOnError = true, actions).map(_ => ())
+    val f = RichFuture.executeAllSequentially(stopOnError = true, actions).map(_ => ())
     orError(f, owner, DataStore.writeIssueMsg(real = true))
   }
 
   def applyDataStoreChanges(owner: Option[Window], actions: List[RichFuture.Action[AnyVal]]): Try[Unit] = {
-    val f = RichFuture.executeSequentially(stopOnError = true, actions).map(_ => ())
+    val f = RichFuture.executeAllSequentially(stopOnError = true, actions).map(_ => ())
     orError(f, owner, DataStore.writeIssueMsg())
   }
 
@@ -80,7 +80,7 @@ object Awaits {
           Action(DataStore.EventSource.deleteEntries()),
           Action(DataStore.EventSource.writeEvents(events.toList))
         )
-        val f = RichFuture.executeSequentially(stopOnError = true, actions).map(_ => ())
+        val f = RichFuture.executeAllSequentially(stopOnError = true, actions).map(_ => ())
         orError(f, owner, DataStore.writeIssueMsg()) match {
           case Success(_) =>
             Dialogs.information(owner = owner, title = None, headerText = None, contentText = Some(DataStore.eventsReorderedMsg))
