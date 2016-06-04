@@ -54,7 +54,7 @@ object Awaits {
     orError(f, owner, DataStore.writeIssueMsg(real = true))
   }
 
-  def applyDataStoreChanges(owner: Option[Window], actions: List[RichFuture.Action[AnyVal]]): Try[Unit] = {
+  def applyDataStoreChanges(owner: Option[Window], actions: List[RichFuture.Action[Unit, AnyVal]]): Try[Unit] = {
     val f = RichFuture.executeAllSequentially(stopOnError = true, actions).map(_ => ())
     orError(f, owner, DataStore.writeIssueMsg())
   }

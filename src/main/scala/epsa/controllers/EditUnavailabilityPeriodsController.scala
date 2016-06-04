@@ -61,7 +61,7 @@ class EditUnavailabilityPeriodsController {
 
   private var entries: Seq[Savings.UnavailabilityPeriod] = Seq.empty
 
-  private var dbActions: List[Action[AnyVal]] = Nil
+  private var dbActions: List[Action[Unit, AnyVal]] = Nil
 
   private var applyReady = false
 
@@ -179,7 +179,7 @@ class EditUnavailabilityPeriodsController {
   private def getMonth: Option[Month] =
     Option(monthField.getSelectionModel.getSelectedItem).getOrElse(None)
 
-  private def addDbAction(action: Action[AnyVal]): Unit =
+  private def addDbAction(action: Action[Unit, AnyVal]): Unit =
     dbActions :+= action
 
   /**
