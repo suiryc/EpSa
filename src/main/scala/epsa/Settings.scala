@@ -35,6 +35,9 @@ object Settings {
     case ex: Exception => BigDecimal(0)
   }
 
+  def splitAmount(amount: BigDecimal, ratio: BigDecimal): BigDecimal =
+    scaleAmount(amount * ratio)
+
   def scaleAmount(v: BigDecimal): BigDecimal =
     v.setScale(amountScale(), amountRounding())
 

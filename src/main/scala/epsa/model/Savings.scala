@@ -1,18 +1,19 @@
 package epsa.model
 
-import epsa.Settings.scaleVWAP
+import epsa.Settings.{scaleAmount, scaleVWAP}
 import epsa.charts.ChartSeriesData
 import epsa.util.Awaits
 import grizzled.slf4j.Logging
 import java.time.{LocalDate, Month}
 import java.util.UUID
 import javafx.stage.Window
+import scala.collection.mutable
 import spray.json._
 import suiryc.scala.math.Ordered._
 import suiryc.scala.spray.json.JsonFormats
 
 /** Savings helpers. */
-object Savings {
+object Savings extends Logging {
 
   import epsa.Settings._
 
@@ -144,6 +145,29 @@ object Savings {
     (eventsNAVs.getOrElse(fundId, Nil) ++ Awaits.readDataStoreNAV(owner, fundId, date).getOrElse(None)).filter { nav =>
       nav.date <= date
     }.sortBy(date.toEpochDay - _.date.toEpochDay).headOption
+
+  /**
+   * Gets a cached fund NAV at given date from data store NAV history.
+   *
+   * Nearest predating NAV is returned if there is none for requested date.
+   *
+   * @param owner parent window
+   * @param fundId fund to get NAV for
+   * @param date date to get NAV on
+   * @param cache cached NAVs (updated with new value when applicable)
+   */
+  def getNAV(owner: Option[Window], fundId: UUID, date: LocalDate,
+    cache: mutable.Map[LocalDate, AssetValue]): Option[Savings.AssetValue] =
+  {
+    cache.get(date).orElse {
+      val nav = getNAV(owner, fundId, date)
+      trace(s"action=<getNAV> id=<$fundId> date=<$date> nav=<$nav>")
+      nav.foreach { v =>
+        cache(date) = v
+      }
+      nav
+    }
+  }
 
   case class Scheme(id: UUID, name: String, comment: Option[String], funds: List[UUID],
     used: Boolean = false, active: Boolean = false, disabled: Boolean = false)
@@ -333,43 +357,13 @@ object Savings {
 
 }
 
-// TODO: take into account levies while processing events
-// Notes:
-// We need to know:
-//   - the NAV of each used fund at the beginning (actually the day before) and end date of each levy period
-//   - the 'VWAP' (computed from the NAV at the start of period and any payment done before the end of the period) of each used fund at the end of each levy period
-// For a fund, during a levy period: gain/loss = units@end * (NAV@end - VWAP@end)
-// Upon loss:
-//   - the NAV of the period is kept to compute the gain/loss of the next period (meaning the loss is pushed forward on the next period, adding to the result of that next period)
-//   - the period is zeroed (as the loss is pushed to the next period)
-//   - upon computing an actual amount levied (refund), loss on the last period is pushed back on any previous period recursively until either
-//     * there is no more loss: the levy rate of the reached period is applied on the gain remaining for that period
-//    or
-//     * there is no more period: it is considered a global loss and the levy is not due
-// VWAP is otherwise computed as usual during each period.
-//
-// If there is a transfer or refund after a levy period has ended, the associated gain/loss is computed in proportion ('removed units / initial total units').
-// Upon transfer the proportioned gain/loss of each past period, and the current period 'pushed forward' proportioned loss, is applied on the destination fund.
-// In both cases the gain/loss on the source fund is updated: computed in proportion of 'remaining units / initial total units', or 'initial fund gain/loss - transferred/refunded proportioned gain/loss' ?
-//
-// For easier computing, missing periods are replaced by fake periods with 0% levy rate.
-// This e.g. takes care of actual loss after a levy ended, that is taking into account the actual fund NAV compared to when the levy was active:
-//   - upon global loss, no past levy is due
-//   - upon lowered gain (current gain is lower than what if was when the levy ended), the amount due is lowered accordingly
-// (How it works: the fake period will be seen as a loss and thus pushed back on previous periods as explained above)
-//
-// TODO: when computing, keep issues to display visual warning hint that things are missing
-//   - consider too old NAV (> 1 month ? or 'mean' NAV period ?) as an issue ?
-// TODO: is it actually ok to compute gain/loss for each period (loss being pushed forward and backward if necessary) and apply proportions upon refund/transfers ?
-//       Or should we keep NAV/VWAPs and compute gain/loss - with losses being taken care of at that time - when needed based on the quantity of concerned units ?
-// TODO: upon partial refund/transfer, are both outgoing and remaining gain/loss computed in proportion of concerned units ?
-//       Or only one (the outgoing one ?) while the other is computed so that the initial gain/loss is preserved ? (meaning we try to prevent any rounding issue, which may actually not be significant in this case ?)
-
 case class Savings(
   schemes: List[Savings.Scheme] = Nil,
   funds: List[Savings.Fund] = Nil,
   assets: Savings.Assets = Savings.Assets(),
-  latestAssetAction: Option[LocalDate] = None
+  latestAssetAction: Option[LocalDate] = None,
+  levies: Levies = Levies.empty,
+  leviesData: Map[Savings.AssetId, Map[String, List[LevyPeriodData]]] = Map.empty
 ) extends Logging {
 
   import Savings._
@@ -394,6 +388,49 @@ case class Savings(
   // amount (operation) = dstUn * dstVn = srcU * srcV
   //  => dstUn = (srcU * srcV) / dstVn
   // dstVWAP(n) = (dstU(n-1) * dstVWAP(n-1) + srcU * srcVWAP) / dstU(n)
+
+  // Notes on levies:
+  // We need to know for each fund and each levy period:
+  //   - the invested amount: it is computed from the NAV on the day before the
+  //     start of the period, and any payment/transfer done during the period.
+  //   - the gross amount at the end of the period (computed from the NAV)
+  // For a fund, during a levy period: gain/loss = grossAmount - investedAmount
+  // Upon loss:
+  //   - the invested amount of the period is kept to compute the gain/loss of
+  //     the next period (meaning the loss is pushed forward on the next period)
+  //   - the period is zeroed (as the loss is pushed to the next period)
+  //   - upon computing an actual amount levied (refund), loss on the last
+  //     period is pushed back on any previous period recursively until either
+  //     * there is no more loss: the levy rate of the reached period is applied
+  //       on the gain remaining for that period
+  //    or
+  //     * there is no more period: it is considered a global loss and the levy
+  //       is not due
+  //
+  // If there is a transfer or refund after a levy period has ended, the
+  // associated gain/loss is computed proportionally to the total fund units.
+  // Upon transfer the proportioned gain/loss of each past period, and the
+  // current period proportioned invested amount, are applied on the destination
+  // fund.
+  // In both cases the gain/loss on the source fund is updated (remaining value
+  // after removing the proportioned gain/loss).
+  //
+  // For easier computing, missing periods are replaced by fake periods with 0%
+  // levy rate.
+  // This e.g. takes care of actual loss after a levy ended, that is taking into
+  // account the actual fund gross amount compared to when the levy was active:
+  //   - upon global loss, no past levy is due
+  //   - upon lowered gain (current gain is lower than what if was when the levy
+  //     ended), the amount due is lowered accordingly
+  // (How it works: the fake period will be seen as a loss and thus pushed back
+  // on previous periods as explained above.)
+  //
+  // TODO: menu/form to select levies to apply on account
+  // TODO: save chosen levies in DataStore
+  // TODO: should we try to detect missing NAV values (that should have been
+  //       nearer than found ones) ?
+
+  def hasLevies: Boolean = levies.levies.nonEmpty
 
   def processActions(actions: (Savings => Savings.Event)*): Savings =
     actions.foldLeft(this) { (savings, action) =>
@@ -420,7 +457,7 @@ case class Savings(
     case DissociateFund(schemeId, fundId)              => dissociateFund(schemeId, fundId)
     case MakePayment(date, part, comment)              => computeAssets(date).makePayment(date, part, comment)
     case MakeTransfer(date, partSrc, partDst, comment) => computeAssets(date).makeTransfer(date, partSrc, partDst, comment)
-    case MakeRefund(date, part, comment)               => computeAssets(date).makeRefund(date, part, comment)
+    case MakeRefund(date, part, comment)               => computeAssets(date).makeRefund(date, part, comment)._1
   }
 
   protected def createScheme(id: UUID, name: String, comment: Option[String]): Savings = {
@@ -497,56 +534,89 @@ case class Savings(
   }
 
   protected def makePayment(date: LocalDate, part: AssetPart, comment: Option[String],
-    srcInvestedAmountFine: Option[BigDecimal] = None, srcInvestedAmount: Option[BigDecimal] = None): Savings =
+    partSrc: Option[AssetPart] = None, savingsSrc: Option[Savings] = None,
+    srcLeviesPeriodsData: Option[LeviesPeriodsData] = None): Savings =
   {
+    // If transferring to an empty fund, don't check levies period (as it would
+    // create a first investment, which we will properly do while merging).
+    val savings0 =
+      if (partSrc.isDefined && (assets.units(part.id) == 0)) this
+      else checkLeviesPeriod(date, part)
+    val (savings1, extraInvestedAmount, extraInvestedAmountFine) = partSrc match {
+      case Some(src) =>
+        val savings = savingsSrc.get
+        val srcAsset = savings.findAsset(date, src).get
+        val leviesPeriodsData = srcLeviesPeriodsData.get
+        if (hasLevies) trace(s"action=<makePayment> date=<$date> id=<${part.id}> srcId=<${src.id}> srcLevies=<$leviesPeriodsData>")
+        val savings1 = savings0.mergeLeviesPeriods(part.id, leviesPeriodsData)
+        // Note: invested amount = units * VWAP
+        val extraInvestedAmount = src.amount(savings.assets.vwaps(src.id))
+        val extraInvestedAmountFine = src.amount(srcAsset.vwap)
+        (savings1, extraInvestedAmount, extraInvestedAmountFine)
+
+      case None =>
+        val extraInvestedAmount = part.amount(part.value)
+        val extraInvestedAmountFine = extraInvestedAmount
+        (savings0, extraInvestedAmount, extraInvestedAmountFine)
+    }
+
     // Note: VWAP = invested amount / units
-    val savings0 = findAsset(date, part) match {
+    val savings2 = savings1.findAsset(date, part) match {
       case Some(currentAsset) =>
         val units = currentAsset.units + part.units
-        val vwap = scaleVWAP((currentAsset.investedAmount + srcInvestedAmountFine.getOrElse(part.amount(part.value))) / units)
+        val vwap = scaleVWAP((currentAsset.investedAmount + extraInvestedAmountFine) / units)
         // Note: keeping the given (and not existing) asset availability date
         // has the nice side effect of resetting it if the existing asset is
         // actually available for the given date.
         val asset = Asset(part.schemeId, part.fundId, part.availability, units, vwap)
-        updateAsset(date, asset)
+        savings1.updateAsset(date, asset)
 
       case None =>
-        val vwap = scaleVWAP(srcInvestedAmountFine.map(_ / part.units).getOrElse(part.value))
+        val vwap = scaleVWAP(if (partSrc.isDefined) extraInvestedAmountFine / part.units else part.value)
         val asset = Asset(part.schemeId, part.fundId, part.availability, part.units, vwap)
-        copy(assets = assets.addAsset(asset))
+        savings1.copy(assets = assets.addAsset(asset))
     }
 
     // Notes:
     // Current Savings is used to get the previous invested amount
     // savings0 already has the total number of units after operation
-    val assets0 = savings0.assets
+    val assets0 = savings2.assets
     val units = assets0.units(part.id)
-    val vwap = scaleVWAP((assets.investedAmount(part.id) + srcInvestedAmount.getOrElse(part.amount(part.value))) / units)
-    val savings = savings0.copy(assets = assets0.copy(vwaps = assets0.vwaps + (part.id -> vwap)))
+    val vwap = scaleVWAP((assets.investedAmount(part.id) + extraInvestedAmount) / units)
+    val savings = savings2.copy(assets = assets0.copy(vwaps = assets0.vwaps + (part.id -> vwap)))
 
     savings.copy(latestAssetAction = Some(date)).triggerActiveAsset(part)
   }
 
   protected def makeTransfer(date: LocalDate, partSrc: AssetPart, partDst: AssetPart, comment: Option[String]): Savings = {
-    val srcAsset = findAsset(date, partSrc).get
-    // Note: invested amount = units * VWAP
-    val srcInvestedAmountFine = partSrc.amount(srcAsset.vwap)
-    val srcInvestedAmount = partSrc.amount(assets.vwaps(partSrc.id))
-    makeRefund(date, partSrc, comment, Some(srcAsset)).makePayment(date, partDst, comment, Some(srcInvestedAmountFine), Some(srcInvestedAmount))
+    val (savings, leviesPeriodsData) = makeRefund(date, partSrc, comment)
+    savings.makePayment(date, partDst, comment, Some(partSrc), Some(this), Some(leviesPeriodsData))
   }
 
-  protected def makeRefund(date: LocalDate, part: AssetPart, comment: Option[String], srcAsset: Option[Savings.Asset] = None): Savings = {
-    val currentAsset = srcAsset.orElse(findAsset(date, part)).get
+  protected def makeRefund(date: LocalDate, part: AssetPart, comment: Option[String]): (Savings, LeviesPeriodsData) = {
+    val currentAsset = findAsset(date, part).get
+    val totalUnits = assets.units(part.id)
     val units = currentAsset.units - part.units
+    val emptied = (units == 0) && (totalUnits == part.units)
     val vwap = currentAsset.vwap
+
+    val leviesPeriodsData =
+      if (!hasLevies) LeviesPeriodsData()
+      else LeviesPeriodsData(checkLeviesPeriod(date, part).leviesData(part.id))
+    val (outgoingLevies, remainingLevies) = leviesPeriodsData.proportioned(part.units / totalUnits)
+    if (hasLevies) trace(s"action=<makeRefund> date=<$date> id=<${part.id}> totalUnits=<$totalUnits> units=<${part.units}> emptied=<$emptied> outgoingLevies=<$outgoingLevies>, remainingLevies=<$remainingLevies>")
 
     // Note: keep existing asset availability date if any, instead of using
     // given one (which may be empty if asset is actually available for the
     // given date).
+    val savings0 =
+      if (!hasLevies) this
+      else if (emptied) copy(leviesData = leviesData - part.id)
+      else copy(leviesData = leviesData + (part.id -> remainingLevies.data))
     val savings =
-      if (units <= 0) removeAsset(date, part).checkActiveAsset(part)
-      else updateAsset(date, Asset(part.schemeId, part.fundId, currentAsset.availability, units, vwap))
-    savings.copy(latestAssetAction = Some(date))
+      if (units <= 0) savings0.removeAsset(date, part).checkActiveAsset(part)
+      else savings0.updateAsset(date, Asset(part.schemeId, part.fundId, currentAsset.availability, units, vwap))
+    (savings.copy(latestAssetAction = Some(date)), outgoingLevies)
   }
 
   def findAsset(date: LocalDate, asset: AssetEntry): Option[Savings.Asset] =
@@ -753,6 +823,227 @@ case class Savings(
 
     val computedAssets = assets.list.foldLeft(AssetComputation())(process).computed
     copy(assets = assets.copy(list = computedAssets))
+  }
+
+  /**
+   * Updates asset levy periods data up to given date if necessary.
+   *
+   * If asset levy is not up to date (i.e. known for the period the given
+   * date belongs to) it is computed from first applicable period up to
+   * the current matching period.
+   */
+  protected def updateLevyPeriods(id: AssetId, levy: String, date: LocalDate, investedAmount: BigDecimal, cachedNAVs: mutable.Map[LocalDate, AssetValue]): Savings = {
+    // We expect that:
+    //   - levies periods are properly sorted
+    //   - there is no gap between periods, and last period is open-ended (must have been normalized with fake '0 rate' ones)
+    //   - we are called with increasing dates
+    // Meaning we only get to move forward for everything.
+    val totalUnits = assets.units(id)
+    val assetData = leviesData.getOrElse(id, Map.empty)
+    val levyData0 = assetData.getOrElse(levy, Nil)
+    val levyPeriods = levies.levies(levy).periods
+
+    // Check whether we have to initiate a first period data, and what are the
+    // periods to go through (excepting the first/current one).
+    val (initiateData, remainingPeriods) = levyData0.headOption match {
+      case Some(current) =>
+        // We need to go from the current period up to the last matching one
+        (None, levyPeriods.dropWhile(_ != current.period).tail.takeWhile(_.start <= date))
+
+      case None =>
+        // There is no levy period data yet.
+        // Either all previous actions preceded the first levy period, or this is
+        // the first action for this asset.
+        if (totalUnits == 0) {
+          // This is the first asset action.
+          // If a period matches the date, create a new period data with the
+          // invested amount on action date (given by caller).
+          val initiateData = levyPeriods.find { period =>
+            (period.start <= date) && period.end.forall(_ >= date)
+          }.flatMap { period =>
+            Some(LevyPeriodData(
+              period = period,
+              investedAmount = investedAmount,
+              grossGain = None
+            ))
+          }
+          // In any case, there is no other period to go to.
+          (initiateData, Nil)
+        } else {
+          // There were previous actions, but all preceding the first levy period.
+          // If the date does not precede the first period, create a new period
+          // data with the NAV on start (of period - actually the day before) date.
+          val initiateData = levyPeriods.headOption.find(_.start <= date).flatMap { period =>
+            getNAV(None, id.fundId, period.start.minusDays(1), cachedNAVs) match {
+              case Some(v) =>
+                Some(LevyPeriodData(
+                  period = period,
+                  investedAmount = scaleAmount(v.value * totalUnits),
+                  grossGain = None
+                ))
+
+              case None =>
+                // TODO: keep issue (for warning) if we don't find a NAV
+                None
+            }
+          }
+          // If the first period matched, we will need to go up to the last period
+          // which still matches.
+          val remainingPeriods =
+            if (initiateData.isEmpty) Nil
+            else levyPeriods.tail.takeWhile(_.start <= date)
+          (initiateData, remainingPeriods)
+        }
+    }
+
+    @scala.annotation.tailrec
+    def loop(data: List[LevyPeriodData], periods: List[LevyPeriod]): List[LevyPeriodData] = {
+      periods match {
+        case head :: tail =>
+          val currentPeriodData = data.head
+          // Get end of period NAV and computed fund gross amount; fallback to
+          // actual invested amount - that is consider no gain/loss for the
+          // period - if no NAV is found.
+          // Note: period end being 1 day before the next period start, it is
+          // the correct date to get the NAV for.
+          val grossAmount = getNAV(None, id.fundId, currentPeriodData.period.end.get, cachedNAVs).map { v =>
+            scaleAmount(v.value * totalUnits)
+          }.getOrElse {
+            // TODO: keep issue (for warning) if we don't find a NAV
+            currentPeriodData.investedAmount
+          }
+          // Compute gross gain, and end period.
+          val grossGain = currentPeriodData.getGrossGain(grossAmount, 1)
+          val (completedPeriod, investedAmount) = if (grossGain < 0) {
+            // This is a loss, zero this period, and keep previously invested amount for next period.
+            (currentPeriodData.zero, currentPeriodData.investedAmount)
+          } else {
+            // Complete the current period.
+            (currentPeriodData.complete(grossGain), grossAmount)
+          }
+
+          // Now open the next period.
+          val nextPeriodData = LevyPeriodData(
+            period = head,
+            investedAmount = investedAmount,
+            grossGain = None
+          )
+          trace(s"action=<updateLevyPeriods> date=<$date> id=<$id> levy=<$levy> period=<$currentPeriodData> totalUnits=<$totalUnits> grossAmount=<$grossAmount> grossGain=<$grossGain> completed=<$completedPeriod> next=<$nextPeriodData>")
+          loop(nextPeriodData :: completedPeriod :: data.tail, tail)
+
+        case _ =>
+          data
+      }
+    }
+
+    val levyData1 = initiateData.toList ::: levyData0
+    val levyData = loop(levyData1, remainingPeriods)
+    trace(s"action=<updateLevyPeriods> date=<$date> id=<$id> totalUnits=<$totalUnits> investedAmount=<$investedAmount> levy=<$levy> levyData=<$levyData0> initiateData=<$initiateData> remainingPeriods<$remainingPeriods> updated=<$levyData>")
+    if (levyData.isEmpty) this
+    else copy(leviesData = leviesData + (id -> (assetData + (levy -> levyData))))
+  }
+
+  /** Updates asset levies periods data up to given date if necessary. */
+  protected def checkLeviesPeriod(id: AssetId, date: LocalDate, investedAmount: BigDecimal): Savings = {
+    lazy val cachedNAVs = mutable.Map.empty[LocalDate, AssetValue]
+    levies.list.foldLeft(this) { (savings, levy) =>
+      savings.updateLevyPeriods(id, levy.name, date, investedAmount, cachedNAVs)
+    }
+  }
+
+  /** Updates asset levies periods data up to given date if necessary. */
+  protected def checkLeviesPeriod(date: LocalDate, part: AssetPart): Savings = {
+    checkLeviesPeriod(part.id, date, part.amount(part.value))
+  }
+
+  /**
+   * Computes actual asset levies for given date and NAV.
+   *
+   * Completes levies up to current period and compute final gain/loss.
+   */
+  def computeLevies(id: AssetId, date: LocalDate, nav: BigDecimal): LeviesPeriodsData = {
+    if (hasLevies) {
+      // Note: ensure periods are up to date.
+      val savings = checkLeviesPeriod(id, date, 0)
+      val leviesPeriodsData = savings.leviesData.getOrElse(id, Map.empty)
+      val totalUnits = assets.units(id)
+      val grossAmount = scaleAmount(totalUnits * nav)
+      val data = levies.list.flatMap { levy =>
+        val computedLevyData = leviesPeriodsData.get(levy.name).map { levyData =>
+          @scala.annotation.tailrec
+          def loop(updated: List[LevyPeriodData], periods: List[LevyPeriodData], pushedAmount: BigDecimal): List[LevyPeriodData] = {
+            val head = periods.head
+            val tail = periods.tail
+            val grossGain = head.getGrossGain + pushedAmount
+            // Keep on pushing until we remain with a gain or there is no other period to push back the loss to.
+            if ((grossGain >= 0) || tail.isEmpty) head.complete(grossGain) :: updated ::: tail
+            else loop(head.zero :: updated, tail, grossGain)
+          }
+
+          // We want to complete the current period, and push back the loss (if
+          // any) on previous periods until either we remain with a gain on a
+          // period or there is no more period to push back to.
+          // We can achieve it by getting the gross gain of the current period,
+          // zeroing the period and applying our rule starting from the current
+          // period (as if its gain/loss was pushed back): if it was really a
+          // gain it completes the period, otherwise the loss is pushed backward.
+          val currentPeriodData = levyData.head
+          val grossGain = currentPeriodData.getGrossGain(grossAmount, 1)
+          // Since updated periods may not be in order, re-sort them (from newest to oldest)
+          loop(Nil, currentPeriodData.zero :: levyData.tail, grossGain).sortBy(_.period.start).reverse
+        }
+        computedLevyData.map(levy.name -> _)
+      }.toMap
+      trace(s"action=<computeLevies> id=<$id> nav=<$nav> result=<$data>")
+      LeviesPeriodsData(data)
+    } else LeviesPeriodsData()
+  }
+
+  /**
+   * Update asset levies periods data with given ones.
+   *
+   * For each period, merges gain/loss (invested amount for current period).
+   */
+  protected def mergeLeviesPeriods(id: AssetId, leviesPeriodsData: LeviesPeriodsData): Savings = {
+    if (hasLevies) {
+      // Note: since we expect caller to have updated levies periods, we should
+      // only have gains (maybe 0) for completed (i.e. past) periods, and
+      // invested amount for current period.
+      val assetData = leviesData.getOrElse(id, Map.empty)
+      val updatedAssetData = leviesPeriodsData.data.keys.foldLeft(assetData) { (assetData, levy) =>
+        val srcLeviesData = leviesPeriodsData.data(levy)
+        val dstLeviesData = assetData.getOrElse(levy, Nil)
+        trace(s"action=<mergeLeviesPeriods> id=<$id> levy=<$levy> src=<$srcLeviesData> dst=<$dstLeviesData>")
+        // Merge all levies data, grouped by period and sorted from oldest to newest.
+        // Then compute merged data for each period.
+        val mergedPeriodsData = (dstLeviesData ::: srcLeviesData).groupBy(_.period).toList.sortBy(_._1.start).map(_._2).foldLeft(List.empty[LevyPeriodData]) {
+          case (merged, periodData) =>
+            val isComplete = periodData.head.isComplete
+            if (isComplete) {
+              // This is a past period: merge gains
+              val mergedPeriodData = periodData.reduceLeft { (period1, period2) =>
+                val grossGain1 = period1.getGrossGain
+                val grossGain2 = period2.getGrossGain
+                assert(grossGain1 >= 0)
+                assert(grossGain2 >= 0)
+                val grossGain = grossGain1 + grossGain2
+                period1.complete(grossGain)
+              }
+              mergedPeriodData :: merged
+            } else {
+              // This is the current period: merge invested amount
+              val investedAmount = periodData.map(_.investedAmount).sum
+              val mergedPeriodData = periodData.head.copy(investedAmount = investedAmount)
+              mergedPeriodData :: merged
+            }
+        }
+        // Since periods may not be in order, re-sort them (from newest to oldest)
+        assetData + (levy -> mergedPeriodsData.sortBy(_.period.start).reverse)
+      }
+
+      trace(s"action=<mergeLeviesPeriods> id=<$id> src=<$leviesPeriodsData> dst=<$assetData> merged=<$updatedAssetData>")
+      copy(leviesData = leviesData + (id -> updatedAssetData))
+    } else this
   }
 
   /**

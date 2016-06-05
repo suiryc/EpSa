@@ -2,7 +2,7 @@ package epsa.controllers
 
 import epsa.I18N
 import epsa.I18N.Strings
-import epsa.Settings.getBigDecimal
+import epsa.Settings._
 import epsa.model.Savings
 import epsa.util.{Awaits, JFXStyles}
 import java.time.LocalDate
@@ -27,8 +27,9 @@ import suiryc.scala.javafx.stage.Stages
 import suiryc.scala.javafx.util.Callback
 
 class NewAssetActionController {
+// TODO: display computed (estimated) levies upon refund; or at least estimated gain/loss ?
 
-  import epsa.Settings.{scaleAmount, scaleUnits}
+
   import NewAssetActionController._
 
   @FXML

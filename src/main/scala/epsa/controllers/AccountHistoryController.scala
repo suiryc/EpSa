@@ -572,6 +572,7 @@ class AccountHistoryController extends Logging {
       )
 
     case e: Savings.MakeRefund =>
+      // TODO: append levies estimation; or at least estimated gain/loss ?
       List(
         // $1=amount $2=fund $3=scheme
         AssetEventItem(event.date, Strings.assetEventRefundMain.format(
