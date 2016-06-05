@@ -418,6 +418,7 @@ object EditUnavailabilityPeriodsController {
 
   private def resultConverter(owner: Option[Window], controller: EditUnavailabilityPeriodsController)(buttonType: ButtonType): Boolean = {
     val dbActions = controller.dbActions
+    controller.persistView()
     if ((buttonType == ButtonType.OK) && dbActions.nonEmpty) {
       Awaits.applyDataStoreChanges(owner, dbActions)
       true

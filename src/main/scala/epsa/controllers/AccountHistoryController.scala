@@ -682,8 +682,8 @@ object AccountHistoryController {
     override val comment = Some(items.map(_.desc).mkString("\n"))
   }
 
-  /** Builds a dialog out of this controller. */
-  def buildDialog(mainController: MainController, state: State): Stage = {
+  /** Builds a stage out of this controller. */
+  def buildStage(mainController: MainController, state: State): Stage = {
     val stage = new Stage()
     stage.getIcons.setAll(Images.iconClockHistory)
     stage.setTitle(title)

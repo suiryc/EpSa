@@ -226,16 +226,16 @@ class MainController extends Logging {
     actor ! OnOptions
   }
 
-  def onNetAssetValueHistory(event: ActionEvent): Unit = {
-    actor ! OnNetAssetValueHistory(getSelectedAsset.map(_.fundId))
+  def onSavingsOnDate(event: ActionEvent): Unit = {
+    actor ! OnSavingsOnDate(None)
   }
 
   def onAccountHistory(event: ActionEvent): Unit = {
     actor ! OnAccountHistory
   }
 
-  def onSavingsOnDate(event: ActionEvent): Unit = {
-    actor ! OnSavingsOnDate(None)
+  def onNetAssetValueHistory(event: ActionEvent): Unit = {
+    actor ! OnNetAssetValueHistory(getSelectedAsset.map(_.fundId))
   }
 
   def onSavingsOnDate(date: LocalDate): Unit = {
@@ -357,9 +357,9 @@ class MainController extends Logging {
       case OnEditUnavailabilityPeriods => onEditUnavailabilityPeriods(state)
       case OnNewAssetAction(kind, asset) => onNewAssetAction(state, kind, asset)
       case OnOptions         => onOptions(state)
-      case OnNetAssetValueHistory(fundId) => onNetAssetValueHistory(state, fundId)
-      case OnAccountHistory  => onAccountHistory(state)
       case OnSavingsOnDate(date) => onSavingsOnDate(state, date)
+      case OnAccountHistory  => onAccountHistory(state)
+      case OnNetAssetValueHistory(fundId) => onNetAssetValueHistory(state, fundId)
       case OnUpToDateAssets(set) => onUpToDateAssets(state, set)
       case OnExportRawAccountHistory => onExportRawAccountHistory(state)
       case OnImportRawAccountHistory => onImportRawAccountHistory(state)
@@ -577,14 +577,14 @@ class MainController extends Logging {
     }
 
     def onAccountHistory(state: State): Unit = {
-      val stage = AccountHistoryController.buildDialog(MainController.this, state)
+      val stage = AccountHistoryController.buildStage(MainController.this, state)
       stage.initModality(Modality.NONE)
       stage.setResizable(true)
       stage.show()
     }
 
     def onNetAssetValueHistory(state: State, fundId: Option[UUID]): Unit = {
-      val dialog = NetAssetValueHistoryController.buildStage(MainController.this, state.savingsUpd, fundId, state.stage)
+      val dialog = NetAssetValueHistoryController.buildDialog(MainController.this, state.savingsUpd, fundId, state.stage)
       // Notes:
       // Don't set as modal, since we wish to display the window while still
       // interacting with the main stage.
@@ -878,11 +878,11 @@ object MainController {
 
   case object OnOptions
 
-  case class OnNetAssetValueHistory(fundId: Option[UUID])
+  case class OnSavingsOnDate(date: Option[LocalDate])
 
   case object OnAccountHistory
 
-  case class OnSavingsOnDate(date: Option[LocalDate])
+  case class OnNetAssetValueHistory(fundId: Option[UUID])
 
   case class OnUpToDateAssets(set: Boolean)
 

@@ -581,6 +581,7 @@ object EditFundsController {
   }
 
   def resultConverter(controller: EditFundsController)(buttonType: ButtonType): List[Savings.Event] = {
+    controller.persistView()
     if (buttonType != ButtonType.OK) Nil
     else controller.events
   }

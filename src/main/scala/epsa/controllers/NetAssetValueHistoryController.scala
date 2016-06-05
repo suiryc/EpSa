@@ -112,13 +112,11 @@ class NetAssetValueHistoryController {
     // when applicable.
     // We do override this behaviour and need to close the dialog ourselves
     // if applicable.
+    persistView()
     val canClose =
       if (changes.nonEmpty) Form.confirmDiscardPendingChanges(stage, event)
       else true
-    if (canClose) {
-      persistView()
-      dialog.close()
-    }
+    if (canClose) dialog.close()
   }
 
   def onFund(event: ActionEvent): Unit = {
@@ -510,8 +508,8 @@ object NetAssetValueHistoryController {
 
   def title = Strings.navHistory
 
-  /** Builds a stage out of this controller. */
-  def buildStage(mainController: MainController, savings: Savings, fundId: Option[UUID], window: Window): Dialog[Boolean] = {
+  /** Builds a dialog out of this controller. */
+  def buildDialog(mainController: MainController, savings: Savings, fundId: Option[UUID], window: Window): Dialog[Boolean] = {
     val dialog = new Dialog[Boolean]()
     val stage = Stages.getStage(dialog)
     stage.getIcons.setAll(Images.iconChartUp)
@@ -542,8 +540,10 @@ object NetAssetValueHistoryController {
     dialog
   }
 
-  private def resultConverter(mainController: MainController, windows: Window, controller: NetAssetValueHistoryController)(buttonType: ButtonType): Boolean = {
+  private def resultConverter(mainController: MainController, window: Window, controller: NetAssetValueHistoryController)(buttonType: ButtonType): Boolean = {
     import epsa.Main.Akka.dispatcher
+
+    controller.persistView()
 
     // Apply changes upon validation
     if (buttonType == ButtonType.OK) {
@@ -557,7 +557,7 @@ object NetAssetValueHistoryController {
       // Apply as many changes as possible
       val future = executeAllSequentially(stopOnError = false, actions: _*)
       // Wait for result and display issue if any
-      Awaits.orError(future, Some(windows), DataStore.writeIssueMsg())
+      Awaits.orError(future, Some(window), DataStore.writeIssueMsg())
       // Request main view to refresh (i.e. check for pending changes)
       mainController.refresh()
       true

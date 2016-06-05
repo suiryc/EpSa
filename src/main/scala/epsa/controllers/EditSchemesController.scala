@@ -576,6 +576,7 @@ object EditSchemesController {
   }
 
   private def resultConverter(controller: EditSchemesController)(buttonType: ButtonType): List[Savings.Event] = {
+    controller.persistView()
     if (buttonType != ButtonType.OK) Nil
     else controller.events
   }
