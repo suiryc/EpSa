@@ -345,21 +345,23 @@ object DataStore {
 
     protected[DataStore] def schema = entries.schema
 
+    protected[DataStore] def dbOrTemp[A](dbOpt: Option[DatabaseDef], action: DBAction[A], reset: Boolean = false): Future[A] =
+      dbOpt match {
+        case Some(db) => action(db)
+        case None =>
+          getDBTemp.flatMap { tmp =>
+            if (reset) tmp.resetActions(this)
+            tmp.addAction(this, action)
+            action(tmp.db)
+          }
+      }
+
     protected[DataStore] def deleteEntries(db: DatabaseDef): Future[Int] =
       db.run(entries.delete)
 
-    def deleteEntries()(implicit dbOpt: Option[DatabaseDef] = None): Future[Int] = {
-      dbOpt match {
-        case Some(db) => deleteEntries(db)
-        case None     =>
-          getDBTemp.flatMap { tmp =>
-            // Drop pending actions on this table since we are emptying it
-            tmp.resetActions(this)
-            tmp.addAction(this, deleteEntries)
-            deleteEntries(tmp.db)
-          }
-      }
-    }
+    def deleteEntries()(implicit dbOpt: Option[DatabaseDef] = None): Future[Int] =
+      // Drop pending actions on this table since we are emptying it
+      dbOrTemp(dbOpt, deleteEntries, reset = true)
 
     protected[DataStore] def readEntries(db: DatabaseDef): Future[Seq[Entry]] =
       db.run(entries.result)
@@ -367,10 +369,21 @@ object DataStore {
     def readEntries(): Future[Seq[Entry]] =
       getDBRead.flatMap(readEntries)
 
+    protected[DataStore] def writeEntry(db: DatabaseDef, value: Entry): Future[Unit] =
+      db.run {
+        entries += value
+      }.map(_ => ())
+
     protected[DataStore] def writeEntries(db: DatabaseDef, values: Seq[Entry]): Future[Unit] =
       db.run {
         entries ++= values
       }.map(_ => ())
+
+    def writeEntry(value: Entry)(implicit dbOpt: Option[DatabaseDef] = None): Future[Unit] =
+      dbOrTemp(dbOpt, writeEntry(_, value))
+
+    def writeEntries(values: Seq[Entry])(implicit dbOpt: Option[DatabaseDef] = None): Future[Unit] =
+      dbOrTemp(dbOpt, writeEntries(_, values))
 
   }
 
@@ -409,7 +422,7 @@ object DataStore {
         db.run(entries.sortBy(_.id).map(_.event).result)
       }
 
-    protected def writeEvents(dbOpt: Option[DatabaseDef], events: Savings.Event*): Future[Unit] = {
+    protected def writeEvents(dbOpt: Option[DatabaseDef], events: Seq[Savings.Event]): Future[Unit] = {
       def write(db: DatabaseDef): Future[Unit] =
         db.run {
           entries ++= events.map { event =>
@@ -421,18 +434,11 @@ object DataStore {
       // Note: caller actually only writes events when user requested to save
       // changes, which means it will be done directly in real database, not
       // in memory. But keep the code generic and handle both cases.
-      dbOpt match {
-        case Some(db) => write(db)
-        case None     =>
-          getDBTemp.flatMap { tmp =>
-            tmp.addAction(this, write)
-            write(tmp.db)
-          }
-      }
+      dbOrTemp(dbOpt, write)
     }
 
-    def writeEvents(events: List[Savings.Event])(implicit dbOpt: Option[DatabaseDef] = None): Future[Unit] =
-      writeEvents(dbOpt, events:_*)
+    def writeEvents(events: Seq[Savings.Event])(implicit dbOpt: Option[DatabaseDef] = None): Future[Unit] =
+      writeEvents(dbOpt, events)
 
   }
 
@@ -494,7 +500,7 @@ object DataStore {
           if (exactDate) {
             entries.filter(v => (v.fundId === fundId) && (v.date === date)).result
           } else {
-            entries.filter(v => (v.fundId === fundId) && (v.date <= date)).sortBy(_.date.desc).result
+            entries.filter(v => (v.fundId === fundId) && (v.date <= date)).sortBy(_.date.desc).take(1).result
           }
         }.map(r => getAssetValue(r).headOption)
       }
@@ -514,14 +520,7 @@ object DataStore {
           }).transactionally
         }.map(_ => ())
 
-      dbOpt match {
-        case Some(db) => write(db)
-        case None     =>
-          getDBTemp.flatMap { tmp =>
-            tmp.addAction(this, write)
-            write(tmp.db)
-          }
-      }
+      dbOrTemp(dbOpt, write)
     }
 
     def writeValues(fundId: UUID, values: Seq[Savings.AssetValue]): Future[Unit] =
@@ -596,22 +595,6 @@ object DataStore {
 
     override protected val entries = TableQuery[Entries]
 
-    def writeEntry(value: Entry)(implicit dbOpt: Option[DatabaseDef] = None): Future[Unit] = {
-      def write(db: DatabaseDef): Future[Unit] =
-        db.run {
-          entries += value
-        }.map(_ => ())
-
-      dbOpt match {
-        case Some(db) => write(db)
-        case None =>
-          getDBTemp.flatMap { tmp =>
-            tmp.addAction(this, write)
-            write(tmp.db)
-          }
-      }
-    }
-
     def updateEntry(id1: String, value: Entry)(implicit dbOpt: Option[DatabaseDef] = None): Future[Unit] = {
       def update(db: DatabaseDef): Future[Unit] =
         db.run {
@@ -621,28 +604,14 @@ object DataStore {
           )).transactionally
         }.map(_ => ())
 
-      dbOpt match {
-        case Some(db) => update(db)
-        case None =>
-          getDBTemp.flatMap { tmp =>
-            tmp.addAction(this, update)
-            update(tmp.db)
-          }
-      }
+      dbOrTemp(dbOpt, update)
     }
 
     def deleteEntry(id: String)(implicit dbOpt: Option[DatabaseDef] = None): Future[Int] = {
       def delete(db: DatabaseDef): Future[Int] =
         db.run(entries.filter(_.id === id).delete)
 
-      dbOpt match {
-        case Some(db) => delete(db)
-        case None     =>
-          getDBTemp.flatMap { tmp =>
-            tmp.addAction(this, delete)
-            delete(tmp.db)
-          }
-      }
+      dbOrTemp(dbOpt, delete)
     }
 
   }
