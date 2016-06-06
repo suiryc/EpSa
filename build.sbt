@@ -35,6 +35,7 @@ lazy val epsa = project.in(file(".")).
     scalacOptions in (Compile, doc) ++= Seq("-diagrams", "-implicits"),
     resolvers += Resolver.mavenLocal,
 
+    parallelExecution in Test := false,
     mainClass in assembly := Some("epsa.Main"),
 
     libraryDependencies ++= Seq(
@@ -59,6 +60,12 @@ lazy val epsa = project.in(file(".")).
       "suiryc"                %% "suiryc-scala-log"                  % versions("suiryc-scala"),
       "suiryc"                %% "suiryc-scala-javafx"               % versions("suiryc-scala")
     ),
+
+    assemblyMergeStrategy in assembly := {
+      case PathList("javax", "xml", xs @ _*) => MergeStrategy.first
+      case v if v.startsWith("library.properties") => MergeStrategy.discard
+      case v => MergeStrategy.defaultMergeStrategy(v)
+    },
 
     publishMavenStyle := true,
     publishTo := Some(Resolver.mavenLocal)
