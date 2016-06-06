@@ -182,6 +182,15 @@
                         </ImageView>
                      </graphic>
                   </MenuItem>
+                  <MenuItem mnemonicParsing="false" onAction="#onLevies" text="%Levies">
+                     <graphic>
+                        <ImageView pickOnBounds="true" preserveRatio="true">
+                           <image>
+                              <Image url="@../images/fugue-icons/money-coin.png" />
+                           </image>
+                        </ImageView>
+                     </graphic>
+                  </MenuItem>
                   <SeparatorMenuItem mnemonicParsing="false" />
                   <CheckMenuItem fx:id="totalsPerSchemeMenu" mnemonicParsing="false" selected="true" text="%Totals per scheme" />
                   <CheckMenuItem fx:id="totalsPerFundMenu" mnemonicParsing="false" selected="true" text="%Totals per fund" />

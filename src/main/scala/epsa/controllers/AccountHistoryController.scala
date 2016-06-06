@@ -166,7 +166,7 @@ class AccountHistoryController extends Logging {
 
     // Replay events to get history entries (main level and details).
     val root = new TreeItem[AssetEventItem]()
-    events.foldLeft(Savings()) { (savings, event) =>
+    events.foldLeft(Savings(levies = state.savingsUpd.levies)) { (savings, event) =>
       event match {
         case event: Savings.AssetEvent =>
           val eventItems = getEventItems(savings, event)
@@ -494,6 +494,7 @@ class AccountHistoryController extends Logging {
           atDates(history, savings, since, LocalDate.now)
       }
 
+    // Note: we don't set account levies here as we don't need them.
     val history = loop(Savings(), events, None, History())
     // Display warning if necessary
     if (history.issues.nonEmpty) {
@@ -611,6 +612,8 @@ class AccountHistoryController extends Logging {
       case _                     => true
     }
 
+    // Note: we don't set account levies here. User can get them by displaying
+    // account savings on the requested date.
     val savings = Savings().processEvents(history)
     val assets = savings.assets
     val details = assets.byId.keys.foldLeft(AccountDetails(0, 0)) { (details, assetId) =>

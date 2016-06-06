@@ -99,4 +99,13 @@ object Awaits {
     }
   }
 
+  def readAppSetting(owner: Option[Window], key: String): Try[Option[String]] =
+    orError(DataStore.AppSettings.readEntry(key), owner, DataStore.readIssueMsg())
+
+  def writeAppSetting(owner: Option[Window], key: String, value: String): Try[Unit] =
+    orError(DataStore.AppSettings.writeEntry((key, value)), owner, DataStore.writeIssueMsg())
+
+  def deleteAppSetting(owner: Option[Window], key: String): Try[Int] =
+    orError(DataStore.AppSettings.deleteEntry(key), owner, DataStore.writeIssueMsg())
+
 }

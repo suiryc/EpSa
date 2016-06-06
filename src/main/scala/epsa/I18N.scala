@@ -25,6 +25,8 @@ object I18N extends suiryc.scala.util.I18N("i18n.epsa") with I18NWithPreference 
     def savingsOnDateTab = getString("savings-on-date.tab")
     def accountHistory = getString("Account history")
     def navHistory = getString("Net asset value history")
+    def levies = getString("Levies")
+    def importLevies = getString("Import levies")
     def importNAVHistory = getString("Import net asset value history")
     def purgeNAVHistory = getString("Purge net asset value history")
     def options = getString("Options")

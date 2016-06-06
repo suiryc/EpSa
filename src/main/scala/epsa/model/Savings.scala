@@ -425,8 +425,6 @@ case class Savings(
   // (How it works: the fake period will be seen as a loss and thus pushed back
   // on previous periods as explained above.)
   //
-  // TODO: menu/form to select levies to apply on account
-  // TODO: save chosen levies in DataStore
   // TODO: should we try to detect missing NAV values (that should have been
   //       nearer than found ones) ?
 

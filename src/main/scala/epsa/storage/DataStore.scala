@@ -34,6 +34,7 @@ object DataStore {
     val path = {
       // See: http://stackoverflow.com/a/12733172
       val appPath = Paths.get(getClass.getProtectionDomain.getCodeSource.getLocation.toURI)
+      // We either got the application running jar (file), or the running folder
       if (Files.isDirectory(appPath)) appPath
       else appPath.getParent
     }
@@ -332,7 +333,7 @@ object DataStore {
     }
   }
 
-  protected val tables = List[DataStoreTable](EventSource, AssetHistory, UnavailabilityPeriods)
+  protected val tables = List[DataStoreTable](AppSettings, EventSource, AssetHistory, UnavailabilityPeriods)
 
   protected trait DataStoreTable {
 
@@ -371,7 +372,7 @@ object DataStore {
 
     protected[DataStore] def writeEntry(db: DatabaseDef, value: Entry): Future[Unit] =
       db.run {
-        entries += value
+        entries.insertOrUpdate(value)
       }.map(_ => ())
 
     protected[DataStore] def writeEntries(db: DatabaseDef, values: Seq[Entry]): Future[Unit] =
@@ -384,6 +385,36 @@ object DataStore {
 
     def writeEntries(values: Seq[Entry])(implicit dbOpt: Option[DatabaseDef] = None): Future[Unit] =
       dbOrTemp(dbOpt, writeEntries(_, values))
+
+  }
+
+  object AppSettings extends DataStoreTable {
+
+    override protected[DataStore] val tableName = "appSettings"
+
+    val KEY_LEVIES = "levies"
+
+    protected type Entry = (String, String)
+
+    protected class Entries(tag: Tag) extends Table[Entry](tag, tableName) {
+      def key = column[String]("key", O.PrimaryKey)
+      def value = column[String]("value")
+      def * = (key, value)
+    }
+
+    override protected val entries = TableQuery[Entries]
+
+    def readEntry(key: String): Future[Option[String]] =
+      getDBRead.flatMap { db =>
+        db.run(entries.filter(_.key === key).map(_.value).take(1).result).map(_.headOption)
+      }
+
+    def deleteEntry(key: String)(implicit dbOpt: Option[DatabaseDef] = None): Future[Int] = {
+      def delete(db: DatabaseDef): Future[Int] =
+        db.run(entries.filter(_.key === key).delete)
+
+      dbOrTemp(dbOpt, delete)
+    }
 
   }
 

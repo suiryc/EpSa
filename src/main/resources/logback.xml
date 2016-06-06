@@ -19,6 +19,7 @@
   <logger name="slick" level="INFO" />
   <logger name="slick.jdbc.JdbcBackend.statement" level="DEBUG" />
   <logger name="slick.jdbc.JdbcBackend.benchmark" level="DEBUG" />
+  <!-- <logger name="epsa.model.Savings" level="TRACE" /> -->
 
   <!-- The level of root is set to DEBUG by default -->
   <root level="DEBUG">

@@ -273,7 +273,7 @@ class SavingsViewTab(val actor: ActorRef, val dateOpt: Option[LocalDate]) extend
           case e: Savings.AssetEvent => e.date <= date
           case _                     => true
         }
-        val savings = Savings().processEvents(history)
+        val savings = Savings(levies = state.savingsUpd.levies).processEvents(history)
         val eventsNAVs = Savings.getEventsNAVs(events)
         val navs = savings.getNAVs(owner, date, eventsNAVs)
         val actualState = state.copy(

@@ -1,0 +1,35 @@
+{
+  "name": "Prélèvements sociaux français",
+  "date": "2013-01-01",
+
+  "CRDS": {
+    "periods": [{ "rate": 0.5, "start": "1996-02-01" }]
+  },
+
+  "CSG": {
+    "periods": [{ "rate": 3.4, "start": "1997-01-01" },
+                { "rate": 7.5, "start": "1998-01-01" },
+                { "rate": 8.2, "start": "2005-01-01" }]
+  },
+
+  "PSOC": {
+    "periods": [{ "rate": 2.0, "start": "1998-01-01" },
+                { "rate": 2.2, "start": "2011-01-01" },
+                { "rate": 3.4, "start": "2011-10-01" },
+                { "rate": 5.4, "start": "2012-07-01" },
+                { "rate": 4.5, "start": "2013-01-01" }]
+  },
+
+  "CNSA": {
+    "periods": [{ "rate": 0.3, "start": "2004-07-01" }]
+  },
+
+  "CRSA": {
+    "periods": [{ "rate": 1.1, "start": "2009-01-01", "end": "2012-12-31" }]
+  },
+
+  "PSOL": {
+    "periods": [{ "rate": 2.0, "start": "2013-01-01" }]
+  }
+
+}

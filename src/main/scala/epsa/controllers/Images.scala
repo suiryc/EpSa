@@ -9,6 +9,9 @@ object Images {
   lazy val iconPiggyBank =
     new Image("/images/fugue-icons/piggy-bank.png", 0.0, 0.0, true, false, false)
 
+  lazy val iconMoneyCoin =
+    new Image("/images/fugue-icons/money-coin.png", 0.0, 0.0, true, false, false)
+
   lazy val iconDisk =
     new Image("/images/fugue-icons/disk.png", 0.0, 0.0, true, false, false)
 

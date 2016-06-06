@@ -164,8 +164,8 @@ class MainController extends Logging {
     splitPaneDividerPositions() = splitPane.getDividerPositions.mkString(";")
   }
 
-  def refresh(): Unit = {
-    actor ! Refresh
+  def refresh(reload: Boolean = false): Unit = {
+    actor ! Refresh(reload)
   }
 
   def onCloseRequest(event: WindowEvent): Unit = {
@@ -236,6 +236,10 @@ class MainController extends Logging {
 
   def onNetAssetValueHistory(event: ActionEvent): Unit = {
     actor ! OnNetAssetValueHistory(getSelectedAsset.map(_.fundId))
+  }
+
+  def onLevies(event: ActionEvent): Unit = {
+    actor ! OnLevies
   }
 
   def onSavingsOnDate(date: LocalDate): Unit = {
@@ -345,7 +349,7 @@ class MainController extends Logging {
       }
 
     def receive0(state: State): Receive = {
-      case Refresh           => refresh(state)
+      case Refresh(reload)   => refresh(state, reload)
       case OnFileNew         => onFileNew(state)
       case OnFileOpen        => onFileOpen(state)
       case OnFileClose       => onFileClose(state)
@@ -360,6 +364,7 @@ class MainController extends Logging {
       case OnSavingsOnDate(date) => onSavingsOnDate(state, date)
       case OnAccountHistory  => onAccountHistory(state)
       case OnNetAssetValueHistory(fundId) => onNetAssetValueHistory(state, fundId)
+      case OnLevies          => onLevies(state)
       case OnUpToDateAssets(set) => onUpToDateAssets(state, set)
       case OnExportRawAccountHistory => onExportRawAccountHistory(state)
       case OnImportRawAccountHistory => onImportRawAccountHistory(state)
@@ -403,8 +408,38 @@ class MainController extends Logging {
       context.become(receive(state))
     }
 
-    def refresh(state: State): Unit = {
+    def refresh(state0: State, reload: Boolean = false): Unit = {
+      val state = if (reload) {
+        val owner = Some(state0.stage)
+        val levies = Awaits.readAppSetting(owner, DataStore.AppSettings.KEY_LEVIES).getOrElse(None).map { str =>
+          import spray.json._
+          import Levies.JsonProtocol._
+          str.parseJson.convertTo[Levies].normalized
+        }.getOrElse(Levies.empty)
+        Awaits.readDataStoreEvents(Some(state0.stage)) match {
+          case Success(events0) =>
+            val (events, outOfOrder) = Savings.sortEvents(events0)
+            // Cleanup datastore if necessary
+            self ! OnCleanupDataStore(outOfOrder)
+            val savingsInit = Savings(levies = levies).processEvents(events)
+            State(
+              stage = state0.stage,
+              savingsInit = savingsInit,
+              savingsUpd = savingsInit
+            )
+
+          case _ =>
+            val savingsInit = Savings(levies = levies)
+            State(
+              stage = state0.stage,
+              savingsInit = savingsInit,
+              savingsUpd = savingsInit
+            )
+        }
+      } else state0
+
       applyState(state, updateAssetsValue = true)
+      if (reload) refreshTabs(state)
     }
 
     def refreshTab(tab: TabWithState, state: State): Unit = {
@@ -595,6 +630,13 @@ class MainController extends Logging {
       dialog.show()
     }
 
+    def onLevies(state: State): Unit = {
+      val dialog = LeviesController.buildDialog(state.savingsUpd, state.stage)
+      dialog.initModality(Modality.WINDOW_MODAL)
+      dialog.setResizable(true)
+      if (dialog.showAndWait().orElse(false)) refresh(state, reload = true)
+    }
+
     def onUpToDateAssets(state: State, set: Boolean): Unit = {
       applyState(state.copy(viewUpToDateAssets = set))
     }
@@ -745,26 +787,8 @@ class MainController extends Logging {
       else true
 
     private def open(state: State): Unit = {
-      val owner = Some(state.stage)
-
-      def read() = Awaits.readDataStoreEvents(owner) match {
-        case Success(events0) =>
-          val (events, outOfOrder) = Savings.sortEvents(events0)
-          val savingsInit = Savings().processEvents(events)
-          val newState = State(
-            stage = state.stage,
-            savingsInit = savingsInit,
-            savingsUpd = savingsInit
-          )
-          applyState(newState)
-          // Cleanup datastore if necessary
-          self ! OnCleanupDataStore(outOfOrder)
-
-        case _ =>
-      }
-
-      Awaits.openDataStore(owner, change = true, save = false) match {
-        case Some(Success(())) => read()
+      Awaits.openDataStore(Some(state.stage), change = true, save = false) match {
+        case Some(Success(())) => refresh(state, reload = true)
         case _                 =>
       }
     }
@@ -854,7 +878,7 @@ object MainController {
     def refresh(data: RefreshData)
   }
 
-  case object Refresh
+  case class Refresh(reload: Boolean)
 
   case object OnFileNew
 
@@ -884,6 +908,8 @@ object MainController {
 
   case class OnNetAssetValueHistory(fundId: Option[UUID])
 
+  case object OnLevies
+
   case class OnUpToDateAssets(set: Boolean)
 
   case object OnExportRawAccountHistory
@@ -892,7 +918,7 @@ object MainController {
 
   case class OnCleanupDataStore(reorder: Boolean)
 
-  def build(state: State, reorder: Boolean = false, needRestart: Boolean = false, applicationStart: Boolean = false): Unit = {
+  def build(state: State, needRestart: Boolean = false, applicationStart: Boolean = false): Unit = {
     val stage = state.stage
     stage.getIcons.setAll(Images.iconPiggyBank)
 
@@ -924,7 +950,7 @@ object MainController {
       )
     }
 
-    if (applicationStart) controller.onCleanupDataStore(reorder)
+    if (applicationStart) controller.refresh(reload = true)
   }
 
 }
