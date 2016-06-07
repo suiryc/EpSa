@@ -148,7 +148,16 @@
                         <Insets right="5.0" />
                      </GridPane.margin>
                   </Button>
-                  <TextField fx:id="srcAmountField" editable="false" maxWidth="150.0" minWidth="60.0" GridPane.rowIndex="1" />
+                  <HBox minWidth="60.0" prefWidth="150.0" GridPane.rowIndex="1">
+                     <children>
+                        <TextField fx:id="srcAmountField" editable="false" maxWidth="150.0" minWidth="60.0" />
+                        <HBox fx:id="amountBox" alignment="CENTER_LEFT" spacing="5.0" visible="false">
+                           <padding>
+                              <Insets left="5.0" />
+                           </padding>
+                        </HBox>
+                     </children>
+                  </HBox>
                   <Button fx:id="srcEmptyButton" maxHeight="1.7976931348623157E308" mnemonicParsing="false" onAction="#onSrcEmpty" GridPane.columnIndex="1" GridPane.rowIndex="1" GridPane.rowSpan="2">
                      <graphic>
                         <ImageView pickOnBounds="true" preserveRatio="true">

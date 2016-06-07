@@ -4,7 +4,7 @@ import akka.actor.Cancellable
 import com.sun.javafx.scene.control.skin.{TreeTableViewSkin, VirtualFlow, VirtualScrollBar}
 import epsa.I18N
 import epsa.I18N.Strings
-import epsa.Settings.scalePercents
+import epsa.Settings._
 import epsa.charts._
 import epsa.controllers.MainController.State
 import epsa.model.Savings
@@ -573,14 +573,30 @@ class AccountHistoryController extends Logging {
       )
 
     case e: Savings.MakeRefund =>
-      // TODO: append levies estimation; or at least estimated gain/loss ?
+      val part = e.part
+      val totalUnits = savings.assets.units(part.id)
+      val leviesPeriodsData = savings.computeLevies(part.id, e.date, part.value)
+      val (refundLevies, _) = leviesPeriodsData.proportioned(part.units / totalUnits)
+      val currency = epsa.Settings.currency()
+      val investedAmount = scaleAmount(part.amount(savings.assets.vwaps(part.id)))
+      val grossAmount = part.amount(part.value)
+      val grossGain = grossAmount - investedAmount
+      val leviesAmount = refundLevies.amount
+      val leviesPct = scalePercents(leviesAmount * 100 / grossGain)
+      if (savings.hasLevies) trace(s"action=<refund> date=<${e.date}> id=<${part.id}> nav=<${part.value}> totalUnits=<$totalUnits> units=<${part.units}> investedAmount=<$investedAmount> grossAmount=<$grossAmount> grossGain=<$grossGain> refundLevies=<$refundLevies> leviesAmount=<${refundLevies.amount}> leviesPct=<$leviesPct>")
       List(
         // $1=amount $2=fund $3=scheme
         AssetEventItem(event.date, Strings.assetEventRefundMain.format(
-          Form.formatAmount(e.part.amount(e.part.value), currency),
-          savings.getFund(e.part.fundId).name, savings.getScheme(e.part.schemeId).name), event.comment),
+          Form.formatAmount(part.amount(part.value), currency),
+          savings.getFund(part.fundId).name, savings.getScheme(part.schemeId).name), event.comment),
         // $1=units $2=NAV
-        AssetEventItem(Strings.assetEventRefundDetails1.format(e.part.units, e.part.value))
+        AssetEventItem(Strings.assetEventRefundDetails1.format(part.units, part.value)),
+        // $1 = gross gain $2 = levies amount $3 = levies global rate
+        AssetEventItem(Strings.leviesEstimation.format(
+          Form.formatAmount(grossGain, currency),
+          Form.formatAmount(leviesAmount, currency),
+          Form.formatAmount(leviesPct, "%")
+        ))
       )
   }
 

@@ -5,6 +5,7 @@ import epsa.I18N.Strings
 import epsa.Settings._
 import epsa.model.Savings
 import epsa.util.{Awaits, JFXStyles}
+import grizzled.slf4j.Logging
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import javafx.event.ActionEvent
@@ -13,6 +14,7 @@ import javafx.fxml.{FXML, FXMLLoader}
 import javafx.geometry.{Insets, Side}
 import javafx.scene.Node
 import javafx.scene.control._
+import javafx.scene.image.ImageView
 import javafx.scene.layout.HBox
 import javafx.stage.{Modality, Stage, Window}
 import javafx.util.converter.LocalDateStringConverter
@@ -26,9 +28,7 @@ import suiryc.scala.javafx.scene.control.{DatePickers, TextFieldWithButton}
 import suiryc.scala.javafx.stage.Stages
 import suiryc.scala.javafx.util.Callback
 
-class NewAssetActionController {
-// TODO: display computed (estimated) levies upon refund; or at least estimated gain/loss ?
-
+class NewAssetActionController extends Logging {
 
   import NewAssetActionController._
 
@@ -43,6 +43,9 @@ class NewAssetActionController {
 
   @FXML
   protected var refundButton: RadioButton = _
+
+  @FXML
+  protected var amountBox: HBox = _
 
   @FXML
   protected var operationDateField: DatePicker = _
@@ -323,6 +326,12 @@ class NewAssetActionController {
     stage.getIcons.setAll(icon)
     stage.setTitle(title)
 
+    if (actionKind == AssetActionKind.Refund) {
+      computeLevies(getSrcAmount)
+    } else {
+      amountBox.getChildren.clear()
+    }
+
     val disableDst = !isDstEnabled
     dstFundField.setDisable(disableDst)
     dstAvailabilityField.setDisable(disableDst)
@@ -396,6 +405,8 @@ class NewAssetActionController {
         dstUnitsField.setText(dstUnits.toString)
       }
     }
+
+    computeLevies(value)
   }
 
   private def onSrcUnits(): Unit = {
@@ -411,7 +422,7 @@ class NewAssetActionController {
       val srcAvailability = getSrcAvailability
       val searchAsset = Savings.Asset(schemeAndFund.scheme.id, schemeAndFund.fund.id, srcAvailability, 0, 0)
       savings.computeAssets(operationDate).findAsset(operationDate, searchAsset).foreach { asset =>
-        srcAmountField.setText(asset.amount(getSrcNAV).toString)
+        // Note: setting the units will trigger amount computing and update the field
         srcUnitsField.setText(asset.units.toString)
       }
     }
@@ -440,7 +451,7 @@ class NewAssetActionController {
   }
 
   private def onNAVHistory(fund: Savings.Fund): Unit = {
-    val dialog = NetAssetValueHistoryController.buildStage(mainController, savings, Some(fund.id), stage)
+    val dialog = NetAssetValueHistoryController.buildDialog(mainController, savings, Some(fund.id), stage)
     dialog.initModality(Modality.WINDOW_MODAL)
     dialog.initOwner(stage)
     dialog.setResizable(true)
@@ -622,6 +633,45 @@ class NewAssetActionController {
         // Manually trigger src amount callback in order to recompute dst
         // units if necessary.
         if (updateSrc) onSrcAmount()
+      }
+    }
+  }
+
+  private def computeLevies(grossAmount: BigDecimal): Unit = {
+    if (actionKind == AssetActionKind.Refund) {
+      getSrcFund.foreach { fund =>
+        val amount = getSrcAmount
+        val units = getSrcUnits
+        if ((amount > 0) && (units > 0)) {
+          for {
+            operationDate <- getOperationDate
+            schemeAndFund <- getSrcFund
+            srcAvailability = getSrcAvailability
+            searchAsset = Savings.Asset(schemeAndFund.scheme.id, schemeAndFund.fund.id, srcAvailability, 0, 0)
+            asset <- savings.computeAssets(operationDate).findAsset(operationDate, searchAsset)
+          } {
+            val totalUnits = savings.assets.units(schemeAndFund.id)
+            val leviesPeriodsData = savings.computeLevies(schemeAndFund.id, operationDate, getSrcNAV)
+            val (refundLevies, _) = leviesPeriodsData.proportioned(units / totalUnits)
+            val currency = epsa.Settings.currency()
+            val investedAmount = scaleAmount((asset.amount(savings.assets.vwaps(asset.id)) * units) / asset.units)
+            val grossGain = grossAmount - investedAmount
+            val leviesAmount = refundLevies.amount
+            val leviesPct = scalePercents(leviesAmount * 100 / grossGain)
+            if (savings.hasLevies) trace(s"action=<refund> date=<$operationDate> id=<${schemeAndFund.id}> nav=<$getSrcNAV> totalUnits=<$totalUnits> units=<$units> investedAmount=<$investedAmount> grossAmount=<$grossAmount> grossGain=<$grossGain> refundLevies=<$refundLevies> leviesAmount=<${refundLevies.amount}> leviesPct=<$leviesPct>")
+            // $1 = gross gain $2 = levies amount $3 = levies global rate
+            val msg =
+              Strings.leviesEstimation.format(
+                Form.formatAmount(grossGain, currency),
+                Form.formatAmount(leviesAmount, currency),
+                Form.formatAmount(leviesPct, "%")
+              )
+            val node = new ImageView(Images.iconMoneyCoin)
+            Tooltip.install(node, new Tooltip(msg))
+            amountBox.getChildren.setAll(node)
+            amountBox.setVisible(true)
+          }
+        }
       }
     }
   }
