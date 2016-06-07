@@ -91,6 +91,38 @@ class LeviesSpec extends WordSpec with Matchers {
       actual shouldBe expected
     }
 
+    "reject overlapping periods in JSON format" in {
+      // Periods starting next to each other is allowed (even if useless)
+      buildLevies(s"""
+  "$levy1": {
+    "periods": [{ "rate": 10, "start": "2001-01-02" }, { "rate": 10, "start": "2001-01-01" }]
+  }""")
+
+      // While periods starting the same day is rejected.
+      intercept[DeserializationException] {
+        buildLevies(
+          s"""
+  "$levy1": {
+    "periods": [{ "rate": 10, "start": "2001-01-01" }, { "rate": 10, "start": "2001-01-01" }]
+  }""")
+      }
+
+      // Period end right before the next one is allowed
+      buildLevies(s"""
+  "$levy1": {
+    "periods": [{ "rate": 10, "start": "2001-01-01", "end": "2001-12-31" }, { "rate": 10, "start": "2002-01-01" }]
+  }""")
+
+      // While period ending during the same day the next one starts is rejected
+      intercept[DeserializationException] {
+        buildLevies(
+          s"""
+  "$levy1": {
+    "periods": [{ "rate": 10, "start": "2001-01-01", "end": "2002-01-01" }, { "rate": 10, "start": "2002-01-01" }]
+  }""")
+      }
+    }
+
     "handle normalizing levies periods" in {
       val actual = leviesComplex.normalized
       val expected = Levies(

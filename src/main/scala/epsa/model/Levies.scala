@@ -41,7 +41,6 @@ case class Levies(
       // As a trick, append periods in reverse order (so that it is easy to
       // get the previous period at each iteration), then reverse the
       // resulting list.
-      // TODO: sort by start date and make sure end date does not exceed next period start date ?
       val periods0 = levy.periods.foldLeft(List.empty[LevyPeriod]) { (acc, period) =>
         acc match {
           case head :: tail =>
@@ -92,8 +91,15 @@ object Levies {
 
       override def read(json: JsValue): Levy = {
         val obj = json.asJsObject
+        // Sort periods by start date
         val periods = getField(obj, FIELD_PERIODS).asInstanceOf[JsArray].elements.toList.map { v =>
           v.convertTo[LevyPeriod]
+        }.sortBy(_.start)
+        // Make sure periods start/end don't overlap
+        periods.zip(periods.drop(1)).foreach {
+          case (previous, next) =>
+            if ((next.start <= previous.start) || previous.end.exists(_ >= next.start))
+              deserializationError(s"Levy periods cannot overlap: ${obj.compactPrint}")
         }
         Levy(name = null, periods = periods)
       }
