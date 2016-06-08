@@ -30,7 +30,6 @@ import suiryc.scala.javafx.scene.control.{Dialogs, TableViews}
 import suiryc.scala.javafx.stage.{FileChoosers, Stages}
 import suiryc.scala.settings.Preference
 
-// TODO: try to display up-to-date values upon starting application while displaying modal dialog; e.g. add out-of-order action, save changes and re-open datastore
 // TODO: smart deletion of funds ?
 //         - keep the necessary data (NAV on some dates) used to compute levies
 //         - way to determine if all levies of past fund assets were paid already, so that all NAVs can really be deleted ?
@@ -437,8 +436,8 @@ class MainController extends Logging {
         }
       } else state0
 
+      // Note: applying state also refreshes tabs
       applyState(state, updateAssetsValue = true)
-      if (reload) refreshTabs(state)
     }
 
     def refreshTab(tab: TabWithState, state: State): Unit = {
