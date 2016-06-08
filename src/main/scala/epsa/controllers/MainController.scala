@@ -31,7 +31,6 @@ import suiryc.scala.javafx.stage.{FileChoosers, Stages}
 import suiryc.scala.settings.Preference
 
 // TODO: try to display up-to-date values upon starting application while displaying modal dialog; e.g. add out-of-order action, save changes and re-open datastore
-// TODO: scaleUnits on each new asset action (created or imported) to keep consistent visual numbers
 // TODO: smart deletion of funds ?
 //         - keep the necessary data (NAV on some dates) used to compute levies
 //         - way to determine if all levies of past fund assets were paid already, so that all NAVs can really be deleted ?

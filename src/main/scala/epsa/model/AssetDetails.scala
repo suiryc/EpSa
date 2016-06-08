@@ -100,7 +100,7 @@ trait AssetDetails {
     else Form.formatAvailability(asset.availability, date = availabilityBase, long)
   lazy val formatUnits =
     if ((kind != AssetDetailsKind.Standard) && (kind != AssetDetailsKind.TotalPerFund)) null
-    else units.toString
+    else scaleUnits(units).toString
   lazy val formatVWAP =
     if ((kind != AssetDetailsKind.Standard) && (kind != AssetDetailsKind.TotalPerFund)) null
     else Form.formatAmount(vwap, currency)
