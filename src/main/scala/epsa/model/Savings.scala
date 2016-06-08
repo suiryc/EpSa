@@ -535,11 +535,17 @@ case class Savings(
     partSrc: Option[AssetPart] = None, savingsSrc: Option[Savings] = None,
     srcLeviesPeriodsData: Option[LeviesPeriodsData] = None): Savings =
   {
+    val srcInvestedAmount = for {
+      src <- partSrc
+      savings <- savingsSrc
+    } yield {
+      src.amount(savings.assets.vwaps(src.id))
+    }
     // If transferring to an empty fund, don't check levies period (as it would
     // create a first investment, which we will properly do while merging).
     val savings0 =
       if (partSrc.isDefined && (assets.units(part.id) == 0)) this
-      else checkLeviesPeriod(date, part)
+      else checkLeviesPeriod(part.id, date, srcInvestedAmount.getOrElse(part.amount(part.value)))
     val (savings1, extraInvestedAmount, extraInvestedAmountFine) = partSrc match {
       case Some(src) =>
         val savings = savingsSrc.get
@@ -548,7 +554,7 @@ case class Savings(
         if (hasLevies) trace(s"action=<makePayment> date=<$date> id=<${part.id}> srcId=<${src.id}> srcLevies=<$leviesPeriodsData>")
         val savings1 = savings0.mergeLeviesPeriods(part.id, leviesPeriodsData)
         // Note: invested amount = units * VWAP
-        val extraInvestedAmount = src.amount(savings.assets.vwaps(src.id))
+        val extraInvestedAmount = srcInvestedAmount.get
         val extraInvestedAmountFine = src.amount(srcAsset.vwap)
         (savings1, extraInvestedAmount, extraInvestedAmountFine)
 
@@ -600,7 +606,7 @@ case class Savings(
 
     val leviesPeriodsData =
       if (!hasLevies) LeviesPeriodsData()
-      else LeviesPeriodsData(checkLeviesPeriod(date, part).leviesData(part.id))
+      else LeviesPeriodsData(checkLeviesPeriod(part.id, date, 0).leviesData(part.id))
     val (outgoingLevies, remainingLevies) = leviesPeriodsData.proportioned(part.units / totalUnits)
     if (hasLevies) trace(s"action=<makeRefund> date=<$date> id=<${part.id}> totalUnits=<$totalUnits> units=<${part.units}> emptied=<$emptied> outgoingLevies=<$outgoingLevies>, remainingLevies=<$remainingLevies>")
 
@@ -859,9 +865,10 @@ case class Savings(
           val initiateData = levyPeriods.find { period =>
             (period.start <= date) && period.end.forall(_ >= date)
           }.flatMap { period =>
+            // Note: invested amount will be added to this period right below
             Some(LevyPeriodData(
               period = period,
-              investedAmount = investedAmount,
+              investedAmount = 0,
               grossGain = None
             ))
           }
@@ -935,7 +942,13 @@ case class Savings(
     }
 
     val levyData1 = initiateData.toList ::: levyData0
-    val levyData = loop(levyData1, remainingPeriods)
+    val levyData2 = loop(levyData1, remainingPeriods)
+    // Now that we have updated periods, add invested amount (if any) to the
+    // current period. Caller must give '0' for actions other than payment.
+    val levyData = if ((investedAmount > 0) && levyData2.nonEmpty) {
+      val head = levyData2.head
+      head.copy(investedAmount = head.investedAmount + investedAmount) :: levyData2.tail
+    } else levyData2
     trace(s"action=<updateLevyPeriods> date=<$date> id=<$id> totalUnits=<$totalUnits> investedAmount=<$investedAmount> levy=<$levy> levyData=<$levyData0> initiateData=<$initiateData> remainingPeriods<$remainingPeriods> updated=<$levyData>")
     if (levyData.isEmpty) this
     else copy(leviesData = leviesData + (id -> (assetData + (levy -> levyData))))
@@ -947,11 +960,6 @@ case class Savings(
     levies.list.foldLeft(this) { (savings, levy) =>
       savings.updateLevyPeriods(id, levy.name, date, investedAmount, cachedNAVs)
     }
-  }
-
-  /** Updates asset levies periods data up to given date if necessary. */
-  protected def checkLeviesPeriod(date: LocalDate, part: AssetPart): Savings = {
-    checkLeviesPeriod(part.id, date, part.amount(part.value))
   }
 
   /**

@@ -283,6 +283,7 @@ class LeviesSpec extends WordSpec with Matchers {
           payment(date_b1, BigDecimal(4)),
           refund(date_a1, BigDecimal(3))
         )
+        savings.assets.units(assetId) shouldBe BigDecimal(1)
         // Invested 4 units; period started at price 5 and ended at price 15; refunded 3 units.
         // Remaining 1 unit (invested = 5) at price 20.
         //   gross = 15 at end of period, 20 after
@@ -357,6 +358,7 @@ class LeviesSpec extends WordSpec with Matchers {
           payment(date_b1, BigDecimal(4)),
           refund(date_a1, BigDecimal(3))
         )
+        savings.assets.units(assetId) shouldBe BigDecimal(1)
         // Invested 4 units; period started at price 20 and ended at price 15; refunded 3 units.
         // Remaining 1 unit (invested = 20) at price 100.
         //   gross = 15 at end of period, 100 after
@@ -406,6 +408,7 @@ class LeviesSpec extends WordSpec with Matchers {
           payment(date_b1, BigDecimal(4)),
           refund(date_p1_1, BigDecimal(3))
         )
+        savings.assets.units(assetId) shouldBe BigDecimal(1)
         // Invested 4 units; period1 started at price 10; refunded 3 units.
         // Remaining 1 unit (invested = 10) at price 15 (gross = 15; gain = 5; levies = 1)
         val actual1 = savings.computeLevies(assetId, date_p1_1, valuesMap(date_p1_1).value)
@@ -465,6 +468,7 @@ class LeviesSpec extends WordSpec with Matchers {
           payment(date_b1, BigDecimal(4)),
           refund(date_p2_1, BigDecimal(3))
         )
+        savings.assets.units(assetId) shouldBe BigDecimal(1)
         // Invested 4 units; period1 started at price 20 and ended at price 10; refunded 3 units.
         // Remaining 1 unit at price 15
         //   invested = 20 for period1, 10 for period2 (replaced by 20 from period1 due to loss)
@@ -536,6 +540,7 @@ class LeviesSpec extends WordSpec with Matchers {
           payment(date_b1, BigDecimal(4)),
           refund(date_p3_1, BigDecimal(3))
         )
+        savings.assets.units(assetId) shouldBe BigDecimal(1)
         // Invested 4 units; period1 started at price 10 and ended at price 20; period2 ended at 15; refunded 3 units.
         // Remaining 1 unit at price 25
         //   invested = 10 for period1, 20 for period2, 15 for period3 (replaced by 20 from period2 due to loss)
@@ -617,6 +622,7 @@ class LeviesSpec extends WordSpec with Matchers {
           payment(date_p2_1, BigDecimal(4)),
           refund(date_p3_1, BigDecimal(3))
         )
+        savings.assets.units(assetId) shouldBe BigDecimal(1)
         // Invested 4 units at price 15; period2 ended at price 20; refunded 3 units.
         // Remaining 1 unit at price 30
         //   invested = 15 for period2, 20 for period3
@@ -674,6 +680,8 @@ class LeviesSpec extends WordSpec with Matchers {
           payment(date_b1, BigDecimal(4)),
           transfer(date_p3_1, BigDecimal(3))
         )
+        savings.assets.units(assetId) shouldBe BigDecimal(1)
+        savings.assets.units(assetId2) shouldBe BigDecimal("2.5")
         // Invested 4 units; period1 started at price 10 and ended at price 20; period2 ended at 15; transferred 3 units.
         // Remaining 1 unit at price 25 in fund1
         //   invested = 10 for period1, 20 for period2, 15 for period3 (replaced by 20 from period2 due to loss)
@@ -690,7 +698,6 @@ class LeviesSpec extends WordSpec with Matchers {
         ))
         actual1 shouldBe expected1
         actual1.amount shouldBe BigDecimal(5)
-        savings.assets.units(assetId) shouldBe BigDecimal(1)
 
         // Remaining 2.5 (3*25=2.5*30) units at price 30 in fund2
         //   invested = 10*3 for period1, 20*3 for period2, 15*3 for period3 (replaced by 20*3 from period2 due to loss)
@@ -710,7 +717,131 @@ class LeviesSpec extends WordSpec with Matchers {
         ))
         actual2 shouldBe expected2
         actual2.amount shouldBe BigDecimal(15)
+      }
+    }
+
+    "handle multiple payments in same period" in {
+      // Same as above, but with initial payment split in multiple actions
+      val savings1 = savings0.copy(levies = levies_3)
+      val levyPeriod1 = savings1.levies.levies(levy1).periods.head
+      val levyPeriod2 = savings1.levies.levies(levy1).periods(1)
+      val levyPeriod3 = savings1.levies.levies(levy1).periods(2)
+      val levy1Start = levyPeriod1.start
+      val levy2Start = levyPeriod2.start
+      val levy3Start = levyPeriod3.start
+      val date_b1 = levy1Start.minusDays(10)
+      val date_p1_0 = levy1Start.minusDays(1)
+      val date_p2_0 = levy2Start.minusDays(1)
+      val date_p3_0 = levy3Start.minusDays(1)
+      val date_p3_1 = levy3Start.plusDays(1)
+      val values = List(
+        Savings.AssetValue(date_b1, 100),
+        Savings.AssetValue(date_p1_0, 10),
+        Savings.AssetValue(date_p2_0, 20),
+        Savings.AssetValue(date_p3_0, 15),
+        Savings.AssetValue(date_p3_1, 25)
+      )
+      val values2 = List(
+        Savings.AssetValue(date_p3_1, 30)
+      )
+      val valuesMap = values.map(v => v.date -> v).toMap
+      val values2Map = values2.map(v => v.date -> v).toMap
+
+      def payment(date: LocalDate, units: BigDecimal) =
+        Savings.MakePayment(date, Savings.AssetPart(scheme.id, fund.id, None, units, valuesMap(date).value), None)
+      def transfer(date: LocalDate, units: BigDecimal) =
+        Savings.MakeTransfer(date, Savings.AssetPart(scheme.id, fund.id, None, units, valuesMap(date).value)
+          , Savings.AssetPart(scheme.id, fund2.id, None, units * valuesMap(date).value / values2Map(date).value, values2Map(date).value), None)
+
+      usingDataStore {
+        buildNAVHistory(NAVHistory(fund.id, values), NAVHistory(fund2.id, values2))
+        val savings = savings1.processEvents(
+          payment(date_b1, BigDecimal(1)),
+          payment(date_b1, BigDecimal(1)),
+          payment(date_b1, BigDecimal(2)),
+          transfer(date_p3_1, BigDecimal(3))
+        )
+        savings.assets.units(assetId) shouldBe BigDecimal(1)
         savings.assets.units(assetId2) shouldBe BigDecimal("2.5")
+        val actual1 = savings.computeLevies(assetId, date_p3_1, valuesMap(date_p3_1).value)
+        val expected1 = LeviesPeriodsData(Map(
+          levy1 -> List(
+            LevyPeriodData(levyPeriod3, BigDecimal(20), Some(BigDecimal(5))),
+            LevyPeriodData(levyPeriod2, BigDecimal(20), Some(BigDecimal(0))),
+            LevyPeriodData(levyPeriod1, BigDecimal(10), Some(BigDecimal(10)))
+          )
+        ))
+        actual1 shouldBe expected1
+        actual1.amount shouldBe BigDecimal(5)
+
+        val actual2 = savings.computeLevies(assetId2, date_p3_1, values2Map(date_p3_1).value)
+        val expected2 = LeviesPeriodsData(Map(
+          levy1 -> List(
+            LevyPeriodData(levyPeriod3, BigDecimal(60), Some(BigDecimal(15))),
+            LevyPeriodData(levyPeriod2, BigDecimal(60), Some(BigDecimal(0))),
+            LevyPeriodData(levyPeriod1, BigDecimal(30), Some(BigDecimal(30)))
+          )
+        ))
+        actual2 shouldBe expected2
+        actual2.amount shouldBe BigDecimal(15)
+      }
+    }
+
+    "handle multiple payments in different periods" in {
+      val savings1 = savings0.copy(levies = levies_3)
+      val levyPeriod1 = savings1.levies.levies(levy1).periods.head
+      val levyPeriod2 = savings1.levies.levies(levy1).periods(1)
+      val levyPeriod3 = savings1.levies.levies(levy1).periods(2)
+      val levy1Start = levyPeriod1.start
+      val levy2Start = levyPeriod2.start
+      val levy3Start = levyPeriod3.start
+      val date_b1 = levy1Start.minusDays(10)
+      val date_p1_0 = levy1Start.minusDays(1)
+      val date_p2_0 = levy2Start.minusDays(1)
+      val date_p3_0 = levy3Start.minusDays(1)
+      val date_p3_1 = levy3Start.plusDays(1)
+      val date_p3_2 = levy3Start.plusDays(2)
+      val values = List(
+        Savings.AssetValue(date_b1, 100),
+        Savings.AssetValue(date_p1_0, 10),
+        Savings.AssetValue(date_p2_0, 20),
+        Savings.AssetValue(date_p3_0, 15),
+        Savings.AssetValue(date_p3_1, 25),
+        Savings.AssetValue(date_p3_2, 30)
+      )
+      val valuesMap = values.map(v => v.date -> v).toMap
+
+      def payment(date: LocalDate, units: BigDecimal) =
+        Savings.MakePayment(date, Savings.AssetPart(scheme.id, fund.id, None, units, valuesMap(date).value), None)
+
+      // Testing investing before period1, and having gain on period1, loss on period2, and gain or loss on period3
+      usingDataStore {
+        buildNAVHistory(NAVHistory(fund.id, values))
+        val savings = savings1.processEvents(
+          payment(date_b1, BigDecimal(1)),
+          payment(date_p3_1, BigDecimal(2))
+        )
+        savings.assets.units(assetId) shouldBe BigDecimal(3)
+        // Invested 1 unit
+        // period1 started at price 10 and ended at price 20
+        // period2 (started at price 20 and) ended at price 15
+        // (period3 started at price 15)
+        // Invested 2 units at price 25
+        // Remaining 2 units at price 30
+        //   invested = 10 for period1, 20 for period2, 15 at beginning of period3 (replaced by 20 from period2 due to loss), 70(=20+2*25) at action
+        //   gross = 20 at end of period1, 15 at end of period2, 90 at action
+        //   gain = 10 for period1, -5 for period2 (zeroed), 20 at action
+        //   levies = 2 + 0 + 12
+        val actual1 = savings.computeLevies(assetId, date_p3_2, valuesMap(date_p3_2).value)
+        val expected1 = LeviesPeriodsData(Map(
+          levy1 -> List(
+            LevyPeriodData(levyPeriod3, BigDecimal(70), Some(BigDecimal(20))),
+            LevyPeriodData(levyPeriod2, BigDecimal(20), Some(BigDecimal(0))),
+            LevyPeriodData(levyPeriod1, BigDecimal(10), Some(BigDecimal(10)))
+          )
+        ))
+        actual1 shouldBe expected1
+        actual1.amount shouldBe BigDecimal(14)
       }
     }
   }
