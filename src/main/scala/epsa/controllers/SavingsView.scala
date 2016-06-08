@@ -35,11 +35,21 @@ class SavingsView(tab: SavingsViewTab) {
 
   private val columnAmount = new TableColumn[AssetDetails, Nothing](Strings.amount)
 
-  columnAmount.getColumns.addAll(assetFields(AssetField.KEY_INVESTED_AMOUNT).column, assetFields(AssetField.KEY_GROSS_AMOUNT).column)
+  columnAmount.getColumns.addAll(
+    assetFields(AssetField.KEY_INVESTED_AMOUNT).column,
+    assetFields(AssetField.KEY_GROSS_AMOUNT).column,
+    assetFields(AssetField.KEY_LEVIES_AMOUNT).column,
+    assetFields(AssetField.KEY_NET_AMOUNT).column
+  )
 
   private val columnGain = new TableColumn[AssetDetails, Nothing](Strings.gain)
 
-  columnGain.getColumns.addAll(assetFields(AssetField.KEY_GROSS_GAIN).column, assetFields(AssetField.KEY_GROSS_GAIN_PCT).column)
+  columnGain.getColumns.addAll(
+    assetFields(AssetField.KEY_GROSS_GAIN).column,
+    assetFields(AssetField.KEY_GROSS_GAIN_PCT).column,
+    assetFields(AssetField.KEY_NET_GAIN).column,
+    assetFields(AssetField.KEY_NET_GAIN_PCT).column
+  )
 
   // Allow user to show/hide columns
   assetsTable.setTableMenuButtonVisible(true)
@@ -177,6 +187,7 @@ class SavingsView(tab: SavingsViewTab) {
       if (vwapPerAsset) None
       else savings.assets.vwaps.get(asset.id)
     StandardAssetDetails(
+      savings = savings,
       asset = asset,
       scheme = savings.getScheme(asset.schemeId),
       fund = savings.getFund(asset.fundId),
@@ -216,6 +227,7 @@ class SavingsView(tab: SavingsViewTab) {
     val sortedAssetsDetails = new SortedList(FXCollections.observableList(assetsDetails))
     sortedAssetsDetails.comparatorProperty.bind(assetsTable.comparatorProperty)
     val sortedAssetsWithTotal = new AssetDetailsWithTotal(
+      savings,
       sortedAssetsDetails,
       data.showTotalsPerScheme,
       data.showTotalsPerFund,

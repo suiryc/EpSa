@@ -2,7 +2,7 @@ package epsa.model
 
 import com.sun.javafx.collections.SourceAdapterChange
 import epsa.I18N.Strings
-import epsa.Settings.{scalePercents, scaleVWAP}
+import epsa.Settings._
 import epsa.controllers.Form
 import java.time.LocalDate
 import java.util
@@ -31,6 +31,8 @@ object AssetDetailsKind extends Enumeration {
 
 /** Asset details. */
 trait AssetDetails {
+  /** Savings. */
+  val savings: Savings
   /** Concerned asset. */
   val asset: Savings.Asset
   /** VWAP to use (if not the asset one). */
@@ -69,6 +71,27 @@ trait AssetDetails {
   lazy val grossGainPct =
     if (investedAmount == 0) Some(BigDecimal(0))
     else grossGain.map(v => scalePercents((v * 100) / investedAmount))
+  def leviesAmount =
+    if (kind != AssetDetailsKind.Standard) None
+    else nav.map { nav =>
+      val totalUnits = savings.assets.units(asset.id)
+      val leviesPeriodsData = savings.computeLevies(asset.id, availabilityBase.getOrElse(LocalDate.now), nav)
+      val (refundLevies, _) = leviesPeriodsData.proportioned(units / totalUnits)
+      refundLevies.amount
+    }
+  lazy val netAmount =
+    for {
+      grossAmount <- grossAmount
+      leviesAmount <- leviesAmount
+    } yield {
+      grossAmount - leviesAmount
+    }
+  lazy val netGain = netAmount.map { amount =>
+    amount - investedAmount
+  }
+  lazy val netGainPct =
+    if (investedAmount == 0) Some(BigDecimal(0))
+    else netGain.map(v => scalePercents((v * 100) / investedAmount))
 
   def formatAvailability(long: Boolean) =
     if ((kind != AssetDetailsKind.Standard) && (kind != AssetDetailsKind.TotalPerAvailability)) null
@@ -87,12 +110,17 @@ trait AssetDetails {
     else nav.map(Form.formatAmount(_, currency)).getOrElse(Strings.na)
   lazy val formatInvestedAmount = Form.formatAmount(investedAmount, currency)
   lazy val formatGrossAmount = grossAmount.map(Form.formatAmount(_, currency)).getOrElse(Strings.na)
+  lazy val formatLeviesAmount = leviesAmount.map(Form.formatAmount(_, currency)).getOrElse(Strings.na)
+  lazy val formatNetAmount = netAmount.map(Form.formatAmount(_, currency)).getOrElse(Strings.na)
   lazy val formatGrossGain = grossGain.map(Form.formatAmount(_, currency)).getOrElse(Strings.na)
   lazy val formatGrossGainPct = grossGainPct.map(Form.formatAmount(_, "%")).getOrElse(Strings.na)
+  lazy val formatNetGain = netGain.map(Form.formatAmount(_, currency)).getOrElse(Strings.na)
+  lazy val formatNetGainPct = netGainPct.map(Form.formatAmount(_, "%")).getOrElse(Strings.na)
 }
 
 /** Standard details. */
 case class StandardAssetDetails(
+  savings: Savings,
   asset: Savings.Asset,
   scheme: Savings.Scheme,
   fund: Savings.Fund,
@@ -106,6 +134,7 @@ case class StandardAssetDetails(
 
 /** Total (maybe partial) details. */
 case class TotalAssetDetails(
+  savings: Savings,
   asset: Savings.Asset,
   scheme: Savings.Scheme,
   fund: Savings.Fund,
@@ -114,7 +143,8 @@ case class TotalAssetDetails(
   availabilityBase: Option[LocalDate],
   kind: AssetDetailsKind.Value,
   override val investedAmount: BigDecimal,
-  override val grossAmountWarning: List[String]
+  override val grossAmountWarning: List[String],
+  override val leviesAmount: Option[BigDecimal]
 ) extends AssetDetails
 
 /**
@@ -124,6 +154,7 @@ case class TotalAssetDetails(
  * See: http://stackoverflow.com/a/30509417
  */
 class AssetDetailsWithTotal(
+  savings: Savings,
   source0: ObservableList[AssetDetails],
   showTotalsPerScheme: Boolean,
   showTotalsPerFund: Boolean,
@@ -144,11 +175,12 @@ class AssetDetailsWithTotal(
 
   private def orZero(v: Option[BigDecimal]): BigDecimal = v.getOrElse(0)
 
-  private def computeTotal(assets: List[AssetDetails], kind: AssetDetailsKind.Value,
+  private def computeTotal(savings: Savings, assets: List[AssetDetails], kind: AssetDetailsKind.Value,
                            scheme: Option[Savings.Scheme], fund: Option[Savings.Fund],
                            availability: Option[LocalDate]): AssetDetails =
   {
     val total0 = TotalAssetDetails(
+      savings = savings,
       asset = Savings.Asset(null, null, availability, units = 0, vwap = 0),
       scheme = scheme.getOrElse(Savings.Scheme(null, null, None, Nil)),
       fund = fund.getOrElse(Savings.Fund(null, null, None)),
@@ -157,7 +189,8 @@ class AssetDetailsWithTotal(
       availabilityBase = availabilityBase,
       kind = kind,
       investedAmount = 0,
-      grossAmountWarning = Nil
+      grossAmountWarning = Nil,
+      leviesAmount = None
     )
     assets.foldLeft(total0) { (acc, details) =>
       // For total per fund, units, NAV and VWAP are displayed, so we use the
@@ -179,12 +212,14 @@ class AssetDetailsWithTotal(
           if (acc.grossAmountWarning.contains(warning)) acc.grossAmountWarning
           else acc.grossAmountWarning :+ warning
         }
+      val leviesAmount = Some(orZero(acc.leviesAmount) + orZero(details.leviesAmount))
       acc.copy(
         asset = acc.asset.copy(units = units, vwap = vwap),
         date = details.date,
         nav = nav,
         investedAmount = investedAmount,
-        grossAmountWarning = grossAmountWarning
+        grossAmountWarning = grossAmountWarning,
+        leviesAmount = leviesAmount
       )
     }
   }
@@ -224,7 +259,7 @@ class AssetDetailsWithTotal(
   private val assets0 = source0.toList
 
   // The grand total
-  private val total = computeTotal(assets0, kind = AssetDetailsKind.Total, scheme = None, fund = None, availability = None)
+  private val total = computeTotal(savings, assets0, kind = AssetDetailsKind.Total, scheme = None, fund = None, availability = None)
   // Partial totals, with proper initial sorting and bound comparators.
   // Listen for changes in each group in order to propagate them (so that
   // the table rows are updated).
@@ -232,7 +267,7 @@ class AssetDetailsWithTotal(
     if (!showTotalsPerScheme) toSorted(Nil)
     else {
       val totals = toSorted(assets0.groupBy(_.scheme).map { case (scheme, assets) =>
-        computeTotal(assets, kind = AssetDetailsKind.TotalPartial, scheme = Some(scheme), fund = None, availability = None)
+        computeTotal(savings, assets, kind = AssetDetailsKind.TotalPartial, scheme = Some(scheme), fund = None, availability = None)
       }.toList.sortBy(_.scheme.name))
       totals.comparatorProperty.bind(comparatorProperty)
       totals.listen { change =>
@@ -244,7 +279,7 @@ class AssetDetailsWithTotal(
     if (!showTotalsPerFund) toSorted(Nil)
     else {
       val totals = toSorted(assets0.groupBy(_.fund).map { case (fund, assets) =>
-        computeTotal(assets, kind = AssetDetailsKind.TotalPerFund, scheme = None, fund = Some(fund), availability = None)
+        computeTotal(savings, assets, kind = AssetDetailsKind.TotalPerFund, scheme = None, fund = Some(fund), availability = None)
       }.toList.sortBy(_.fund.name))
       totals.comparatorProperty.bind(comparatorProperty)
       totals.listen { change =>
@@ -260,7 +295,7 @@ class AssetDetailsWithTotal(
       val totals = toSorted(assets0.groupBy { details =>
         Savings.resolveAvailability(details.asset.availability, availabilityBase)
       }.map { case (availability, assets) =>
-        computeTotal(assets, kind = AssetDetailsKind.TotalPerAvailability, scheme = None, fund = None, availability = availability)
+        computeTotal(savings, assets, kind = AssetDetailsKind.TotalPerAvailability, scheme = None, fund = None, availability = availability)
       }.toList.sortBy(_.asset.availability))
       totals.comparatorProperty.bind(comparatorProperty)
       totals.listen { change =>

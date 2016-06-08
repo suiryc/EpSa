@@ -578,7 +578,7 @@ class AccountHistoryController extends Logging {
       val leviesPeriodsData = savings.computeLevies(part.id, e.date, part.value)
       val (refundLevies, _) = leviesPeriodsData.proportioned(part.units / totalUnits)
       val currency = epsa.Settings.currency()
-      val investedAmount = scaleAmount(part.amount(savings.assets.vwaps(part.id)))
+      val investedAmount = part.amount(savings.assets.vwaps(part.id))
       val grossAmount = part.amount(part.value)
       val grossGain = grossAmount - investedAmount
       val leviesAmount = refundLevies.amount

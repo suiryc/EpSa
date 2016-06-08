@@ -164,8 +164,12 @@ object AssetField {
   val KEY_NAV = "nav"
   val KEY_INVESTED_AMOUNT = "investedAmount"
   val KEY_GROSS_AMOUNT = "grossAmount"
+  val KEY_LEVIES_AMOUNT = "leviesAmount"
+  val KEY_NET_AMOUNT = "netAmount"
   val KEY_GROSS_GAIN = "grossGain"
   val KEY_GROSS_GAIN_PCT = "grossGainPct"
+  val KEY_NET_GAIN = "netGain"
+  val KEY_NET_GAIN_PCT = "netGainPct"
 
   private var detailsLabels = Map.empty[String, Label]
 
@@ -174,6 +178,7 @@ object AssetField {
   // upon reloading view.
   // Order here is the one the fields will appear in the asset details pane
   // and table columns.
+  // TODO: gross and net warnings on net fields
   def fields() = List(
     AssetTextField(KEY_SCHEME, Strings.scheme, Strings.schemeColon, AssetField.formatScheme, AssetField.schemeComment),
     AssetTextField(KEY_FUND, Strings.fund, Strings.fundColon, AssetField.formatFund, AssetField.fundComment),
@@ -184,8 +189,12 @@ object AssetField {
     AssetDateField(KEY_DATE, Strings.date, Strings.dateColon, AssetField.formatDate, AssetField.date),
     AssetAmountField(KEY_INVESTED_AMOUNT, Strings.invested, Strings.investedAmountColon, AssetField.formatInvestedAmount, AssetField.investedAmount),
     AssetAmountField(KEY_GROSS_AMOUNT, Strings.gross, Strings.grossAmountColon, AssetField.formatGrossAmount, AssetField.grossAmount, AssetField.grossAmountWarning),
+    AssetAmountField(KEY_LEVIES_AMOUNT, Strings.levies, Strings.leviesAmountColon, AssetField.formatLeviesAmount, AssetField.leviesAmount/*, AssetField.grossAmountWarning && netAmountWarning*/),
+    AssetAmountField(KEY_NET_AMOUNT, Strings.net, Strings.netAmountColon, AssetField.formatNetAmount, AssetField.netAmount/*, AssetField.grossAmountWarning && netAmountWarning*/),
     AssetColoredAmountField(KEY_GROSS_GAIN, Strings.gross, Strings.grossGainColon, AssetField.formatGrossGain, AssetField.grossGain, AssetField.grossAmountWarning),
-    AssetColoredAmountField(KEY_GROSS_GAIN_PCT, Strings.grossPct, Strings.grossGainPctColon, AssetField.formatGrossGainPct, AssetField.grossGainPct, AssetField.grossAmountWarning)
+    AssetColoredAmountField(KEY_GROSS_GAIN_PCT, Strings.grossPct, Strings.grossGainPctColon, AssetField.formatGrossGainPct, AssetField.grossGainPct, AssetField.grossAmountWarning),
+    AssetColoredAmountField(KEY_NET_GAIN, Strings.net, Strings.netGainColon, AssetField.formatNetGain, AssetField.netGain/*, AssetField.grossAmountWarning && netAmountWarning*/),
+    AssetColoredAmountField(KEY_NET_GAIN_PCT, Strings.netPct, Strings.netGainPctColon, AssetField.formatNetGainPct, AssetField.netGainPct/*, AssetField.grossAmountWarning && netAmountWarning*/)
   ).map { field =>
     field.key -> field
   }.foldLeft(ListMap.empty[String, AssetField[_]])(_ + _)
@@ -225,10 +234,18 @@ object AssetField {
   def formatGrossAmount(details: AssetDetails, long: Boolean) = details.formatGrossAmount
   def grossAmount(details: AssetDetails) = details.grossAmount
   def grossAmountWarning(details: AssetDetails) = Option(details.grossAmountWarning.mkString("\n")).filterNot(_.isEmpty)
+  def formatLeviesAmount(details: AssetDetails, long: Boolean) = details.formatLeviesAmount
+  def leviesAmount(details: AssetDetails) = details.leviesAmount
+  def formatNetAmount(details: AssetDetails, long: Boolean) = details.formatNetAmount
+  def netAmount(details: AssetDetails) = details.netAmount
   def formatGrossGain(details: AssetDetails, long: Boolean) = details.formatGrossGain
   def grossGain(details: AssetDetails) = details.grossGain
   def formatGrossGainPct(details: AssetDetails, long: Boolean) = details.formatGrossGainPct
   def grossGainPct(details: AssetDetails) = details.grossGainPct
+  def formatNetGain(details: AssetDetails, long: Boolean) = details.formatNetGain
+  def netGain(details: AssetDetails) = details.netGain
+  def formatNetGainPct(details: AssetDetails, long: Boolean) = details.formatNetGainPct
+  def netGainPct(details: AssetDetails) = details.netGainPct
 
   // Note: there need to be distinct ImageView instances to display an image
   // more than once.
