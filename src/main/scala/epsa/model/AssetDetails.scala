@@ -71,8 +71,10 @@ trait AssetDetails {
   lazy val grossGainPct =
     if (investedAmount == 0) Some(BigDecimal(0))
     else grossGain.map(v => scalePercents((v * 100) / investedAmount))
+  // When showing VWAP per asset, don't display levies (and net amount/gain)
+  // as those are based on assetId VWAP.
   def leviesAmount =
-    if (kind != AssetDetailsKind.Standard) None
+    if ((kind != AssetDetailsKind.Standard) || actualVWAP.isEmpty) None
     else nav.map { nav =>
       val totalUnits = savings.assets.units(asset.id)
       val leviesPeriodsData = savings.computeLevies(asset.id, availabilityBase.getOrElse(LocalDate.now), nav)
@@ -156,6 +158,7 @@ case class TotalAssetDetails(
 class AssetDetailsWithTotal(
   savings: Savings,
   source0: ObservableList[AssetDetails],
+  vwapPerAsset: Boolean,
   showTotalsPerScheme: Boolean,
   showTotalsPerFund: Boolean,
   showTotalsPerAvailability: Boolean,
@@ -212,7 +215,11 @@ class AssetDetailsWithTotal(
           if (acc.grossAmountWarning.contains(warning)) acc.grossAmountWarning
           else acc.grossAmountWarning :+ warning
         }
-      val leviesAmount = Some(orZero(acc.leviesAmount) + orZero(details.leviesAmount))
+      // When showing VWAP per asset, don't display levies (and net amount/gain)
+      // as those are based on assetId VWAP.
+      val leviesAmount =
+        if (vwapPerAsset) None
+        else Some(orZero(acc.leviesAmount) + orZero(details.leviesAmount))
       acc.copy(
         asset = acc.asset.copy(units = units, vwap = vwap),
         date = details.date,

@@ -583,7 +583,7 @@ case class Savings(
 
     // Notes:
     // Current Savings is used to get the previous invested amount
-    // savings0 already has the total number of units after operation
+    // savings2 already has the total number of units after operation
     val assets0 = savings2.assets
     val units = assets0.units(part.id)
     val vwap = scaleVWAP((assets.investedAmount(part.id) + extraInvestedAmount) / units)

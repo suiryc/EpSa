@@ -229,6 +229,7 @@ class SavingsView(tab: SavingsViewTab) {
     val sortedAssetsWithTotal = new AssetDetailsWithTotal(
       savings,
       sortedAssetsDetails,
+      data.vwapPerAsset,
       data.showTotalsPerScheme,
       data.showTotalsPerFund,
       data.showTotalsPerAvailability,
