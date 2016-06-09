@@ -33,7 +33,7 @@ import suiryc.scala.settings.Preference
 // TODO: smart deletion of funds ?
 //         - keep the necessary data (NAV on some dates) used to compute levies
 //         - way to determine if all levies of past fund assets were paid already, so that all NAVs can really be deleted ?
-// TODO: change details pane position; set below table ? (then have NAV history graph on the right side of details)
+// TODO: add NAV history graph on the right side of details pane ?
 class MainController extends Logging {
 
   import MainController._
@@ -572,16 +572,19 @@ class MainController extends Logging {
       val columnPrefs = if (init) {
         // Add labels to show details of selected asset
         // Note: setting constraints on each row does not seem necessary
-        savingsViewTab.view.assetFields.values.zipWithIndex.foreach {
-          case (field, idx) =>
-            val label = new Label(field.detailsLabel)
-            assetDetails.getChildren.add(label)
-            GridPane.setColumnIndex(label, 0)
-            GridPane.setRowIndex(label, idx)
-            val value = field.detailsValue
-            assetDetails.getChildren.add(value)
-            GridPane.setColumnIndex(value, 1)
-            GridPane.setRowIndex(value, idx)
+        savingsViewTab.view.assetFields.values.groupBy(_.columnIdx).foreach {
+          case (columnIdx, fields) =>
+            fields.zipWithIndex.foreach {
+              case (field, idx) =>
+                val label = new Label(field.detailsLabel)
+                assetDetails.getChildren.add(label)
+                GridPane.setColumnIndex(label, columnIdx * 2)
+                GridPane.setRowIndex(label, idx)
+                val value = field.detailsValue
+                assetDetails.getChildren.add(value)
+                GridPane.setColumnIndex(value, columnIdx * 2 + 1)
+                GridPane.setRowIndex(value, idx)
+            }
         }
 
         // Update details to actual selected asset in selected tab
