@@ -31,7 +31,7 @@ class SavingsView(tab: SavingsViewTab) {
 
   val assetFields = AssetField.fields()
 
-  val assetsColumns = assetFields.mapValues(_.column).toList
+  val assetsColumns = assetFields.mapValues(_.column).view.force.toList
 
   private val columnAmount = new TableColumn[AssetDetails, Nothing](Strings.amount)
 

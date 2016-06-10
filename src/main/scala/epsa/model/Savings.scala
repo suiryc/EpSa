@@ -128,7 +128,7 @@ object Savings extends Logging {
         List(e.part.fundId -> Savings.AssetValue(e.date, e.part.value))
     }.groupBy(_._1).mapValues { v =>
       v.map(_._2).sortBy(_.date)
-    }
+    }.view.force
   }
 
   /**

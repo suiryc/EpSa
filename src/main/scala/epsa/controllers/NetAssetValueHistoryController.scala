@@ -433,7 +433,7 @@ class NetAssetValueHistoryController {
       table.setItems(FXCollections.observableList(entries))
     }
 
-    val current = result.current.groupBy(_.date).mapValues(_.head)
+    val current = result.current.groupBy(_.date).mapValues(_.head).view.force
     val updatedEntries = result.fundChanges.changed.map { changed =>
       AssetEntry(changed.date, Seq(current(changed.date).value, changed.value))
     }

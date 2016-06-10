@@ -64,7 +64,7 @@ case class Levies(
       }
       val periods = periods1.reverse
       levy.copy(periods = periods)
-    }
+    }.view.force
     copy(levies = normalizedLevies)
   }
 
