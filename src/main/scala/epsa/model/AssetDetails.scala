@@ -73,14 +73,16 @@ trait AssetDetails {
     else grossGain.map(v => scalePercents((v * 100) / investedAmount))
   // When showing VWAP per asset, don't display levies (and net amount/gain)
   // as those are based on assetId VWAP.
-  def leviesAmount =
+  lazy val leviesPeriodsData =
     if ((kind != AssetDetailsKind.Standard) || actualVWAP.isEmpty) None
     else nav.map { nav =>
       val totalUnits = savings.assets.units(asset.id)
       val leviesPeriodsData = savings.computeLevies(asset.id, availabilityBase.getOrElse(LocalDate.now), nav)
       val (refundLevies, _) = leviesPeriodsData.proportioned(units / totalUnits)
-      refundLevies.amount
+      refundLevies
     }
+  def leviesWarning = leviesPeriodsData.map(_.warnings).getOrElse(Nil)
+  def leviesAmount = leviesPeriodsData.map(_.amount)
   lazy val netAmount =
     for {
       grossAmount <- grossAmount
@@ -146,6 +148,7 @@ case class TotalAssetDetails(
   kind: AssetDetailsKind.Value,
   override val investedAmount: BigDecimal,
   override val grossAmountWarning: List[String],
+  override val leviesWarning: List[String],
   override val leviesAmount: Option[BigDecimal]
 ) extends AssetDetails
 
@@ -193,6 +196,7 @@ class AssetDetailsWithTotal(
       kind = kind,
       investedAmount = 0,
       grossAmountWarning = Nil,
+      leviesWarning = Nil,
       leviesAmount = None
     )
     assets.foldLeft(total0) { (acc, details) =>
@@ -217,6 +221,9 @@ class AssetDetailsWithTotal(
         }
       // When showing VWAP per asset, don't display levies (and net amount/gain)
       // as those are based on assetId VWAP.
+      val leviesWarning =
+        if (vwapPerAsset) Nil
+        else (acc.leviesWarning ++ details.leviesWarning).distinct
       val leviesAmount =
         if (vwapPerAsset) None
         else Some(orZero(acc.leviesAmount) + orZero(details.leviesAmount))
@@ -226,6 +233,7 @@ class AssetDetailsWithTotal(
         nav = nav,
         investedAmount = investedAmount,
         grossAmountWarning = grossAmountWarning,
+        leviesWarning = leviesWarning,
         leviesAmount = leviesAmount
       )
     }

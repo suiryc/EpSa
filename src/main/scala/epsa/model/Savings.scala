@@ -1,5 +1,6 @@
 package epsa.model
 
+import epsa.I18N.Strings
 import epsa.Settings.{scaleAmount, scaleVWAP}
 import epsa.charts.ChartSeriesData
 import epsa.util.Awaits
@@ -363,7 +364,7 @@ case class Savings(
   assets: Savings.Assets = Savings.Assets(),
   latestAssetAction: Option[LocalDate] = None,
   levies: Levies = Levies.empty,
-  leviesData: Map[Savings.AssetId, Map[String, List[LevyPeriodData]]] = Map.empty
+  leviesData: Map[Savings.AssetId, LeviesPeriodsData] = Map.empty
 ) extends Logging {
 
   import Savings._
@@ -429,6 +430,9 @@ case class Savings(
   //       nearer than found ones) ?
 
   def hasLevies: Boolean = levies.levies.nonEmpty
+
+  protected def addLeviesPeriodsData(assetId: AssetId, leviesPeriodsData: LeviesPeriodsData): Savings =
+    copy(leviesData = leviesData + (assetId -> leviesPeriodsData))
 
   def processActions(actions: (Savings => Savings.Event)*): Savings =
     actions.foldLeft(this) { (savings, action) =>
@@ -606,7 +610,7 @@ case class Savings(
 
     val leviesPeriodsData =
       if (!hasLevies) LeviesPeriodsData()
-      else LeviesPeriodsData(checkLeviesPeriod(part.id, date, 0).leviesData(part.id))
+      else checkLeviesPeriod(part.id, date, 0).leviesData(part.id)
     val (outgoingLevies, remainingLevies) = leviesPeriodsData.proportioned(part.units / totalUnits)
     if (hasLevies) trace(s"action=<makeRefund> date=<$date> id=<${part.id}> totalUnits=<$totalUnits> units=<${part.units}> emptied=<$emptied> outgoingLevies=<$outgoingLevies>, remainingLevies=<$remainingLevies>")
 
@@ -616,7 +620,7 @@ case class Savings(
     val savings0 =
       if (!hasLevies) this
       else if (emptied) copy(leviesData = leviesData - part.id)
-      else copy(leviesData = leviesData + (part.id -> remainingLevies.data))
+      else addLeviesPeriodsData(part.id, remainingLevies)
     val savings =
       if (units <= 0) savings0.removeAsset(date, part).checkActiveAsset(part)
       else savings0.updateAsset(date, Asset(part.schemeId, part.fundId, currentAsset.availability, units, vwap))
@@ -843,16 +847,16 @@ case class Savings(
     //   - we are called with increasing dates
     // Meaning we only get to move forward for everything.
     val totalUnits = assets.units(id)
-    val assetData = leviesData.getOrElse(id, Map.empty)
-    val levyData0 = assetData.getOrElse(levy, Nil)
+    val assetData = leviesData.getOrElse(id, LeviesPeriodsData())
+    val levyData0 = assetData.data.getOrElse(levy, Nil)
     val levyPeriods = levies.levies(levy).periods
 
     // Check whether we have to initiate a first period data, and what are the
     // periods to go through (excepting the first/current one).
-    val (initiateData, remainingPeriods) = levyData0.headOption match {
+    val (initiateData, warning, remainingPeriods) = levyData0.headOption match {
       case Some(current) =>
         // We need to go from the current period up to the last matching one
-        (None, levyPeriods.dropWhile(_ != current.period).tail.takeWhile(_.start <= date))
+        (None, None, levyPeriods.dropWhile(_ != current.period).tail.takeWhile(_.start <= date))
 
       case None =>
         // There is no levy period data yet.
@@ -873,36 +877,38 @@ case class Savings(
             ))
           }
           // In any case, there is no other period to go to.
-          (initiateData, Nil)
+          (initiateData, None, Nil)
         } else {
           // There were previous actions, but all preceding the first levy period.
           // If the date does not precede the first period, create a new period
           // data with the NAV on start (of period - actually the day before) date.
-          val initiateData = levyPeriods.headOption.find(_.start <= date).flatMap { period =>
-            getNAV(None, id.fundId, period.start.minusDays(1), cachedNAVs) match {
+          val (initiateData, warning) = levyPeriods.headOption.find(_.start <= date).map { period =>
+            val navDate = period.start.minusDays(1)
+            getNAV(None, id.fundId, navDate, cachedNAVs) match {
               case Some(v) =>
-                Some(LevyPeriodData(
+                val periodData = LevyPeriodData(
                   period = period,
                   investedAmount = scaleAmount(v.value * totalUnits),
                   grossGain = None
-                ))
+                )
+                (Some(periodData), None)
 
               case None =>
-                // TODO: keep issue (for warning) if we don't find a NAV
-                None
+                val warning = Strings.accountHistoryIssuesNAV.format(getFund(id.fundId).name, navDate)
+                (None, Some(warning))
             }
-          }
+          }.getOrElse((None, None))
           // If the first period matched, we will need to go up to the last period
           // which still matches.
           val remainingPeriods =
             if (initiateData.isEmpty) Nil
             else levyPeriods.tail.takeWhile(_.start <= date)
-          (initiateData, remainingPeriods)
+          (initiateData, warning, remainingPeriods)
         }
     }
 
     @scala.annotation.tailrec
-    def loop(data: List[LevyPeriodData], periods: List[LevyPeriod]): List[LevyPeriodData] = {
+    def loop(data: List[LevyPeriodData], warnings: List[String], periods: List[LevyPeriod]): (List[LevyPeriodData], List[String]) = {
       periods match {
         case head :: tail =>
           val currentPeriodData = data.head
@@ -911,11 +917,12 @@ case class Savings(
           // period - if no NAV is found.
           // Note: period end being 1 day before the next period start, it is
           // the correct date to get the NAV for.
-          val grossAmount = getNAV(None, id.fundId, currentPeriodData.period.end.get, cachedNAVs).map { v =>
-            scaleAmount(v.value * totalUnits)
+          val navDate = currentPeriodData.period.end.get
+          val (grossAmount, warning) = getNAV(None, id.fundId, navDate, cachedNAVs).map { v =>
+            (scaleAmount(v.value * totalUnits), None)
           }.getOrElse {
-            // TODO: keep issue (for warning) if we don't find a NAV
-            currentPeriodData.investedAmount
+            val warning = Strings.accountHistoryIssuesNAV.format(getFund(id.fundId).name, navDate)
+            (currentPeriodData.investedAmount, Some(warning))
           }
           // Compute gross gain, and end period.
           val grossGain = currentPeriodData.getGrossGain(grossAmount, 1)
@@ -934,24 +941,25 @@ case class Savings(
             grossGain = None
           )
           trace(s"action=<updateLevyPeriods> date=<$date> id=<$id> levy=<$levy> period=<$currentPeriodData> totalUnits=<$totalUnits> grossAmount=<$grossAmount> grossGain=<$grossGain> completed=<$completedPeriod> next=<$nextPeriodData>")
-          loop(nextPeriodData :: completedPeriod :: data.tail, tail)
+          loop(nextPeriodData :: completedPeriod :: data.tail, warnings ++ warning, tail)
 
         case _ =>
-          data
+          (data, warnings)
       }
     }
 
     val levyData1 = initiateData.toList ::: levyData0
-    val levyData2 = loop(levyData1, remainingPeriods)
+    val (levyData2, warnings0) = loop(levyData1, Nil, remainingPeriods)
+    val warnings = warning.toList ++ warnings0
     // Now that we have updated periods, add invested amount (if any) to the
     // current period. Caller must give '0' for actions other than payment.
     val levyData = if ((investedAmount > 0) && levyData2.nonEmpty) {
       val head = levyData2.head
       head.copy(investedAmount = head.investedAmount + investedAmount) :: levyData2.tail
     } else levyData2
-    trace(s"action=<updateLevyPeriods> date=<$date> id=<$id> totalUnits=<$totalUnits> investedAmount=<$investedAmount> levy=<$levy> levyData=<$levyData0> initiateData=<$initiateData> remainingPeriods<$remainingPeriods> updated=<$levyData>")
+    trace(s"action=<updateLevyPeriods> date=<$date> id=<$id> totalUnits=<$totalUnits> investedAmount=<$investedAmount> levy=<$levy> levyData=<$levyData0> initiateData=<$initiateData> remainingPeriods<$remainingPeriods> updated=<$levyData> warnings=<$warnings>")
     if (levyData.isEmpty) this
-    else copy(leviesData = leviesData + (id -> (assetData + (levy -> levyData))))
+    else addLeviesPeriodsData(id, assetData.addPeriodsData(levy, levyData).addWarnings(warnings))
   }
 
   /** Updates asset levies periods data up to given date if necessary. */
@@ -971,11 +979,11 @@ case class Savings(
     if (hasLevies) {
       // Note: ensure periods are up to date.
       val savings = checkLeviesPeriod(id, date, 0)
-      val leviesPeriodsData = savings.leviesData.getOrElse(id, Map.empty)
+      val leviesPeriodsData = savings.leviesData.getOrElse(id, LeviesPeriodsData())
       val totalUnits = assets.units(id)
       val grossAmount = scaleAmount(totalUnits * nav)
       val data = levies.list.flatMap { levy =>
-        val computedLevyData = leviesPeriodsData.get(levy.name).map { levyData =>
+        val computedLevyData = leviesPeriodsData.data.get(levy.name).map { levyData =>
           @scala.annotation.tailrec
           def loop(updated: List[LevyPeriodData], periods: List[LevyPeriodData], pushedAmount: BigDecimal): List[LevyPeriodData] = {
             val head = periods.head
@@ -1000,8 +1008,9 @@ case class Savings(
         }
         computedLevyData.map(levy.name -> _)
       }.toMap
-      trace(s"action=<computeLevies> id=<$id> nav=<$nav> result=<$data>")
-      LeviesPeriodsData(data)
+      val computed = LeviesPeriodsData(data, leviesPeriodsData.warnings)
+      trace(s"action=<computeLevies> id=<$id> nav=<$nav> computed=<$computed>")
+      computed
     } else LeviesPeriodsData()
   }
 
@@ -1015,10 +1024,10 @@ case class Savings(
       // Note: since we expect caller to have updated levies periods, we should
       // only have gains (maybe 0) for completed (i.e. past) periods, and
       // invested amount for current period.
-      val assetData = leviesData.getOrElse(id, Map.empty)
+      val assetData = leviesData.getOrElse(id, LeviesPeriodsData())
       val updatedAssetData = leviesPeriodsData.data.keys.foldLeft(assetData) { (assetData, levy) =>
         val srcLeviesData = leviesPeriodsData.data(levy)
-        val dstLeviesData = assetData.getOrElse(levy, Nil)
+        val dstLeviesData = assetData.data.getOrElse(levy, Nil)
         trace(s"action=<mergeLeviesPeriods> id=<$id> levy=<$levy> src=<$srcLeviesData> dst=<$dstLeviesData>")
         // Merge all levies data, grouped by period and sorted from oldest to newest.
         // Then compute merged data for each period.
@@ -1044,11 +1053,11 @@ case class Savings(
             }
         }
         // Since periods may not be in order, re-sort them (from newest to oldest)
-        assetData + (levy -> mergedPeriodsData.sortBy(_.period.start).reverse)
+        assetData.addPeriodsData(levy, mergedPeriodsData.sortBy(_.period.start).reverse).addWarnings(leviesPeriodsData.warnings)
       }
 
       trace(s"action=<mergeLeviesPeriods> id=<$id> src=<$leviesPeriodsData> dst=<$assetData> merged=<$updatedAssetData>")
-      copy(leviesData = leviesData + (id -> updatedAssetData))
+      addLeviesPeriodsData(id, updatedAssetData)
     } else this
   }
 

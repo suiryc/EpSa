@@ -181,13 +181,24 @@ case class LevyPeriodData(
   }
 }
 
-case class LeviesPeriodsData(data: Map[String, List[LevyPeriodData]] = Map.empty) {
+case class LeviesPeriodsData(
+  data: Map[String, List[LevyPeriodData]] = Map.empty,
+  warnings: List[String] = Nil
+) {
   def proportioned(ratio: BigDecimal): (LeviesPeriodsData, LeviesPeriodsData) =
-    data.toList.foldLeft((LeviesPeriodsData(), LeviesPeriodsData())) {
+    data.toList.foldLeft((LeviesPeriodsData(warnings = warnings), LeviesPeriodsData(warnings = warnings))) {
       case ((d1, d2), (levy, periodData)) =>
         val (p1, p2) = periodData.map(_.proportioned(ratio)).unzip
         (d1.copy(data = d1.data + (levy -> p1)), d2.copy(data = d2.data + (levy -> p2)))
     }
   def amount(levy: String): BigDecimal = data.getOrElse(levy, Nil).map(_.amount).sum
   def amount: BigDecimal = data.keys.toList.map(amount(_)).sum
+
+  def addPeriodsData(levy: String, periodsData: List[LevyPeriodData]): LeviesPeriodsData =
+    copy(data + (levy -> periodsData))
+  def addWarning(warning: String): LeviesPeriodsData =
+    if (warnings.contains(warning)) this
+    else copy(warnings = warnings :+ warning)
+  def addWarnings(warnings: List[String]): LeviesPeriodsData =
+    warnings.foldLeft(this)(_.addWarning(_))
 }

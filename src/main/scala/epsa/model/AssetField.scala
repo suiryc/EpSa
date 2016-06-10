@@ -180,7 +180,6 @@ object AssetField {
   // upon reloading view.
   // Order here is the one the fields will appear in the asset details pane
   // and table columns.
-  // TODO: gross and net warnings on net fields
   def fields() = List(
     AssetTextField(KEY_SCHEME, 0, Strings.scheme, Strings.schemeColon,
       AssetField.formatScheme, AssetField.schemeComment),
@@ -201,17 +200,17 @@ object AssetField {
     AssetAmountField(KEY_GROSS_AMOUNT, 1, Strings.gross, Strings.grossAmountColon,
       AssetField.formatGrossAmount, AssetField.grossAmount, AssetField.grossAmountWarning),
     AssetAmountField(KEY_LEVIES_AMOUNT, 1, Strings.levies, Strings.leviesAmountColon,
-      AssetField.formatLeviesAmount, AssetField.leviesAmount/*, AssetField.grossAmountWarning && netAmountWarning*/),
+      AssetField.formatLeviesAmount, AssetField.leviesAmount, AssetField.leviesWarning),
     AssetAmountField(KEY_NET_AMOUNT, 1, Strings.net, Strings.netAmountColon,
-      AssetField.formatNetAmount, AssetField.netAmount/*, AssetField.grossAmountWarning && netAmountWarning*/),
+      AssetField.formatNetAmount, AssetField.netAmount, AssetField.leviesWarning),
     AssetColoredAmountField(KEY_GROSS_GAIN, 1, Strings.gross, Strings.grossGainColon,
       AssetField.formatGrossGain, AssetField.grossGain, AssetField.grossAmountWarning),
     AssetColoredAmountField(KEY_GROSS_GAIN_PCT, 1, Strings.grossPct, Strings.grossGainPctColon,
       AssetField.formatGrossGainPct, AssetField.grossGainPct, AssetField.grossAmountWarning),
     AssetColoredAmountField(KEY_NET_GAIN, 1, Strings.net, Strings.netGainColon,
-      AssetField.formatNetGain, AssetField.netGain/*, AssetField.grossAmountWarning && netAmountWarning*/),
+      AssetField.formatNetGain, AssetField.netGain, AssetField.leviesWarning),
     AssetColoredAmountField(KEY_NET_GAIN_PCT, 1, Strings.netPct, Strings.netGainPctColon,
-      AssetField.formatNetGainPct, AssetField.netGainPct/*, AssetField.grossAmountWarning && netAmountWarning*/)
+      AssetField.formatNetGainPct, AssetField.netGainPct, AssetField.leviesWarning)
   ).map { field =>
     field.key -> field
   }.foldLeft(ListMap.empty[String, AssetField[_]])(_ + _)
@@ -251,6 +250,9 @@ object AssetField {
   def formatGrossAmount(details: AssetDetails, long: Boolean) = details.formatGrossAmount
   def grossAmount(details: AssetDetails) = details.grossAmount
   def grossAmountWarning(details: AssetDetails) = Option(details.grossAmountWarning.mkString("\n")).filterNot(_.isEmpty)
+  def leviesWarning(details: AssetDetails) = Option {
+    (details.grossAmountWarning ++ details.leviesWarning).distinct.mkString("\n")
+  }.filterNot(_.isEmpty)
   def formatLeviesAmount(details: AssetDetails, long: Boolean) = details.formatLeviesAmount
   def leviesAmount(details: AssetDetails) = details.leviesAmount
   def formatNetAmount(details: AssetDetails, long: Boolean) = details.formatNetAmount
