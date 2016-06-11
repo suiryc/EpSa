@@ -25,6 +25,7 @@ import suiryc.scala.javafx.event.EventHandler._
 import suiryc.scala.javafx.geometry.BoundsEx
 import suiryc.scala.math.BigDecimals._
 
+// TODO: possible to have finer control when keeping view on date ?
 // TODO: way to limit y range to currently viewed min/max; and way to reset to auto range
 
 trait ChartSeriesData {

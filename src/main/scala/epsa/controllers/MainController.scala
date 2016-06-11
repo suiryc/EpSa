@@ -3,6 +3,7 @@ package epsa.controllers
 import akka.actor.{Actor, ActorRef, Props}
 import epsa.I18N
 import epsa.I18N.Strings
+import epsa.charts.{ChartHandler, ChartMark, ChartMeta, ChartSettings}
 import epsa.model._
 import epsa.storage.DataStore
 import epsa.util.Awaits
@@ -14,7 +15,7 @@ import java.util.UUID
 import javafx.event.ActionEvent
 import javafx.fxml.{FXML, FXMLLoader}
 import javafx.scene.{Parent, Scene}
-import javafx.scene.layout.GridPane
+import javafx.scene.layout.{AnchorPane, GridPane}
 import javafx.scene.control._
 import javafx.scene.image.ImageView
 import javafx.scene.input.{KeyCode, KeyEvent}
@@ -33,7 +34,6 @@ import suiryc.scala.settings.Preference
 // TODO: smart deletion of funds ?
 //         - keep the necessary data (NAV on some dates) used to compute levies
 //         - way to determine if all levies of past fund assets were paid already, so that all NAVs can really be deleted ?
-// TODO: add NAV history graph on the right side of details pane ?
 class MainController extends Logging {
 
   import MainController._
@@ -78,11 +78,20 @@ class MainController extends Logging {
   protected var assetDetails: GridPane = _
 
   @FXML
+  protected var navHistoryPane: AnchorPane = _
+
+  @FXML
   protected var tabPane: TabPane = _
 
   lazy private val stage = splitPane.getScene.getWindow.asInstanceOf[Stage]
 
-  private var actor: ActorRef = _
+  private var chartHandler: ChartHandler[_] = _
+
+  private var currentChartFund: Option[Savings.Fund] = None
+
+  private var requestedChartFund: Option[Savings.Fund] = None
+
+  private[epsa] var actor: ActorRef = _
 
   def initialize(state: State): Unit = {
     // Note: make the actor name unique (with timestamp) so that it can be
@@ -120,6 +129,25 @@ class MainController extends Logging {
         refresh()
       }
     }
+
+    navHistoryPane.setVisible(false)
+    val meta = ChartMeta[ChartMark]()
+    chartHandler = new ChartHandler(
+      seriesName = "",
+      seriesValues = Nil,
+      meta = meta,
+      settings = ChartSettings.hidden.copy(
+        xLabel = Strings.date,
+        yLabel = Strings.nav,
+        ySuffix = epsa.Settings.defaultCurrency
+      )
+    )
+    val chartPane = chartHandler.chartPane
+    AnchorPane.setTopAnchor(chartPane, 0.0)
+    AnchorPane.setRightAnchor(chartPane, 0.0)
+    AnchorPane.setBottomAnchor(chartPane, 0.0)
+    AnchorPane.setLeftAnchor(chartPane, 0.0)
+    navHistoryPane.getChildren.add(chartPane)
   }
 
   /** Restores (persisted) view. */
@@ -234,6 +262,11 @@ class MainController extends Logging {
 
   def onNetAssetValueHistory(event: ActionEvent): Unit = {
     actor ! OnNetAssetValueHistory(getSelectedAsset.map(_.fundId))
+  }
+
+  def showNAVHistory(fund: Option[Savings.Fund]): Unit = {
+    requestedChartFund = fund
+    actor ! OnShowNAVHistory
   }
 
   def onLevies(event: ActionEvent): Unit = {
@@ -362,6 +395,7 @@ class MainController extends Logging {
       case OnSavingsOnDate(date) => onSavingsOnDate(state, date)
       case OnAccountHistory  => onAccountHistory(state)
       case OnNetAssetValueHistory(fundId) => onNetAssetValueHistory(state, fundId)
+      case OnShowNAVHistory  => onShowNAVHistory(state)
       case OnLevies          => onLevies(state)
       case OnUpToDateAssets(set) => onUpToDateAssets(state, set)
       case OnExportRawAccountHistory => onExportRawAccountHistory(state)
@@ -566,7 +600,7 @@ class MainController extends Logging {
 
     def addSavingsOnDateTab(dateOpt: Option[LocalDate], init: Boolean = false): SavingsViewTab = {
       val state = getState
-      val savingsViewTab = new SavingsViewTab(self, dateOpt)
+      val savingsViewTab = new SavingsViewTab(MainController.this, dateOpt)
 
       // Restore assets columns order and width
       val columnPrefs = if (init) {
@@ -629,6 +663,23 @@ class MainController extends Logging {
       dialog.initModality(Modality.NONE)
       dialog.setResizable(true)
       dialog.show()
+    }
+
+    def onShowNAVHistory(state: State): Unit = {
+      if (requestedChartFund != currentChartFund) requestedChartFund match {
+        case Some(fund) =>
+          // TODO: scroll to latest date when displaying the first non-empty series ?
+          // TODO: hide if empty series ?
+          // TODO: better view keeping ? (often misplaced by one minor tick)
+          val values = Awaits.readDataStoreNAVs(Some(state.stage), fund.id).getOrElse(Nil)
+          chartHandler.setSeriesName(fund.name)
+          chartHandler.updateSeries(values, replace = true)
+          navHistoryPane.setVisible(true)
+
+        case None =>
+          navHistoryPane.setVisible(false)
+      }
+      currentChartFund = requestedChartFund
     }
 
     def onLevies(state: State): Unit = {
@@ -908,6 +959,8 @@ object MainController {
   case object OnAccountHistory
 
   case class OnNetAssetValueHistory(fundId: Option[UUID])
+
+  case object OnShowNAVHistory
 
   case object OnLevies
 

@@ -63,7 +63,7 @@ class NetAssetValueHistoryController {
 
   private var changes = Map[Savings.Fund, Option[Seq[Savings.AssetValue]]]()
 
-  private var chartHandler: Option[ChartHandler[_]] = None
+  private var chartHandler: ChartHandler[ChartMark] = _
 
   private val probers = List(
     EsaliaInvestmentFundProber,
@@ -83,6 +83,24 @@ class NetAssetValueHistoryController {
 
     importButton.setDisable(funds.isEmpty)
     purgeButton.setDisable(funds.isEmpty)
+
+    val meta = ChartMeta[ChartMark](mouseHandler = onMouseEvent)
+    chartHandler = new ChartHandler(
+      seriesName = "",
+      seriesValues = Nil,
+      meta = meta,
+      settings = ChartSettings.hidden.copy(
+        xLabel = Strings.date,
+        yLabel = Strings.nav,
+        ySuffix = epsa.Settings.defaultCurrency
+      )
+    )
+    val chartPane = chartHandler.chartPane
+    AnchorPane.setTopAnchor(chartPane, 0.0)
+    AnchorPane.setRightAnchor(chartPane, 0.0)
+    AnchorPane.setBottomAnchor(chartPane, 0.0)
+    AnchorPane.setLeftAnchor(chartPane, 0.0)
+    historyPane.getChildren.add(chartPane)
 
     fundIdOpt.flatMap { fundId =>
       funds.find(_.id == fundId)
@@ -176,14 +194,9 @@ class NetAssetValueHistoryController {
   private def accessHistory[A](action: => Future[A], failureMsg: => String, successAction: A => Unit): Unit = {
     import suiryc.scala.javafx.concurrent.JFXExecutor.executor
 
-    // Remove previous chart if any
-    chartHandler.foreach { handler =>
-      historyPane.getChildren.remove(handler.chartPane)
-    }
-    chartHandler = None
-
     // Prepare to display progress indicator (if action takes too long)
     val showIndicator = epsa.Main.Akka.system.scheduler.scheduleOnce(500.milliseconds) {
+      progressIndicator.toFront()
       progressIndicator.setVisible(true)
     }
 
@@ -192,12 +205,14 @@ class NetAssetValueHistoryController {
       case Success(result) =>
         showIndicator.cancel()
         // Hide indicator and perform success action (e.g. display new chart)
+        progressIndicator.toBack()
         progressIndicator.setVisible(false)
         successAction(result)
 
       case Failure(ex) =>
         showIndicator.cancel()
         // Hide indicator and display issue
+        progressIndicator.toBack()
         progressIndicator.setVisible(false)
         Dialogs.error(
           owner = Some(stage),
@@ -362,7 +377,7 @@ class NetAssetValueHistoryController {
               val fundChanges = mergeHistory(updatedHistory(fund, Seq.empty), assetValues)
               changes += fund -> Some(fundChanges)
               // And refresh chart
-              chartHandler.foreach(_.updateSeries(assetValues))
+              chartHandler.updateSeries(assetValues)
             }
           }
           // Finally hide the context menu
@@ -385,24 +400,9 @@ class NetAssetValueHistoryController {
     val actualValues = updatedHistory(fund, values)
     purgeButton.setDisable(actualValues.isEmpty)
 
-    val meta = ChartMeta[ChartMark](mouseHandler = onMouseEvent)
-    val chartHandler = new ChartHandler(
-      seriesName = fund.name,
-      seriesValues = actualValues,
-      meta = meta,
-      settings = ChartSettings.hidden.copy(
-        xLabel = Strings.date,
-        yLabel = Strings.nav,
-        ySuffix = epsa.Settings.defaultCurrency
-      )
-    )
-    this.chartHandler = Some(chartHandler)
-    val chartPane = chartHandler.chartPane
-    AnchorPane.setTopAnchor(chartPane, 0.0)
-    AnchorPane.setRightAnchor(chartPane, 0.0)
-    AnchorPane.setBottomAnchor(chartPane, 0.0)
-    AnchorPane.setLeftAnchor(chartPane, 0.0)
-    historyPane.getChildren.add(chartPane)
+    chartHandler.setSeriesName(fund.name)
+    // TODO: scroll to latest date (or keep previous position) when getting from an empty series ?
+    chartHandler.updateSeries(actualValues, replace = true)
   }
 
   /** Displays history import result in dedicated window. */

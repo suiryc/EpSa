@@ -1,6 +1,5 @@
 package epsa.controllers
 
-import akka.actor.ActorRef
 import epsa.I18N.Strings
 import epsa.controllers.MainController._
 import epsa.model.{StandardAssetDetails, _}
@@ -73,8 +72,13 @@ class SavingsView(tab: SavingsViewTab) {
     if (CTRL_C.`match`(event)) Option(assetsTable.getSelectionModel.getSelectedItem).foreach(copyAssetDetailsToClipboard)
   })
 
-  def updateDetailsValue(assetDetailsOpt: Option[AssetDetails]): Unit =
+  def updateDetailsValue(assetDetailsOpt: Option[AssetDetails]): Unit = {
     assetFields.values.foreach(_.updateDetailsValue(assetDetailsOpt))
+    val fundOpt = assetDetailsOpt.filter { assetDetails =>
+      (assetDetails.kind == AssetDetailsKind.Standard) || (assetDetails.kind == AssetDetailsKind.TotalPerFund)
+    }.map(_.fund)
+    tab.mainController.showNAVHistory(fundOpt)
+  }
 
   def updateDetailsValue(): Unit = {
     val assetDetailsOpt = Option(assetsTable.getSelectionModel.getSelectedItem)
@@ -98,14 +102,14 @@ class SavingsView(tab: SavingsViewTab) {
         new ImageView(Images.iconTables))
       editScheme.setOnAction { (event: ActionEvent) =>
         Option(row.getItem).foreach { details =>
-          tab.actor ! OnEditSchemes(Some(details.asset.schemeId))
+          tab.mainController.actor ! OnEditSchemes(Some(details.asset.schemeId))
         }
       }
       val editFund = new MenuItem(Strings.editFund,
         new ImageView(Images.iconTable))
       editFund.setOnAction { (event: ActionEvent) =>
         Option(row.getItem).foreach { details =>
-          tab.actor ! OnEditFunds(Some(details.asset.fundId))
+          tab.mainController.actor ! OnEditFunds(Some(details.asset.fundId))
         }
       }
 
@@ -113,21 +117,21 @@ class SavingsView(tab: SavingsViewTab) {
         new ImageView(Images.iconTableImport))
       newPayment.setOnAction { (event: ActionEvent) =>
         Option(row.getItem).foreach { details =>
-          tab.actor ! OnNewAssetAction(AssetActionKind.Payment, Some(details.asset))
+          tab.mainController.actor ! OnNewAssetAction(AssetActionKind.Payment, Some(details.asset))
         }
       }
       val newArbitrage = new MenuItem(Strings.newTransfer,
         new ImageView(Images.iconTablesRelation))
       newArbitrage.setOnAction { (event: ActionEvent) =>
         Option(row.getItem).foreach { details =>
-          tab.actor ! OnNewAssetAction(AssetActionKind.Transfer, Some(details.asset))
+          tab.mainController.actor ! OnNewAssetAction(AssetActionKind.Transfer, Some(details.asset))
         }
       }
       val newRefund = new MenuItem(Strings.newRefund,
         new ImageView(Images.iconTableExport))
       newRefund.setOnAction { (event: ActionEvent) =>
         Option(row.getItem).foreach { details =>
-          tab.actor ! OnNewAssetAction(AssetActionKind.Refund, Some(details.asset))
+          tab.mainController.actor ! OnNewAssetAction(AssetActionKind.Refund, Some(details.asset))
         }
       }
 
@@ -135,7 +139,7 @@ class SavingsView(tab: SavingsViewTab) {
         new ImageView(Images.iconChartUp))
       navHistory.setOnAction { (event: ActionEvent) =>
         Option(row.getItem).foreach { details =>
-          tab.actor ! OnNetAssetValueHistory(Some(details.asset.fundId))
+          tab.mainController.actor ! OnNetAssetValueHistory(Some(details.asset.fundId))
         }
       }
 
@@ -254,7 +258,7 @@ class SavingsView(tab: SavingsViewTab) {
 
 }
 
-class SavingsViewTab(val actor: ActorRef, val dateOpt: Option[LocalDate]) extends TabWithState {
+class SavingsViewTab(val mainController: MainController, val dateOpt: Option[LocalDate]) extends TabWithState {
 
   val view = new SavingsView(this)
 
