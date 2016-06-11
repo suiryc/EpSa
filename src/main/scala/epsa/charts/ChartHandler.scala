@@ -27,6 +27,7 @@ import suiryc.scala.math.BigDecimals._
 
 // TODO: possible to have finer control when keeping view on date ?
 // TODO: way to limit y range to currently viewed min/max; and way to reset to auto range
+// TODO: fix zoom node position when maximizing/minimizing
 
 trait ChartSeriesData {
   val date: LocalDate
@@ -156,7 +157,7 @@ class ChartHandler[A <: ChartMark](
   yAxis.setAutoRanging(true)
 
   /** Chart series. */
-  private val series = new XYChart.Series[Number, Number]()
+  private[epsa] val series = new XYChart.Series[Number, Number]()
   setSeriesName(seriesName)
   /** Series values to display in chart. */
   private var valuesList = seriesValues.map { v =>
@@ -367,21 +368,6 @@ class ChartHandler[A <: ChartMark](
 
   refreshView(resetData = true)
 
-  // Display the latest NAV at first
-  // Note: since scrollpane content (the chart) will change a bit later, we set
-  // the H value now, which will be changed when content changes (new value will
-  // be proportional to content size change) which is when we reset it to the
-  // max again. Cancel our listener shortly after setting it in case the content
-  // is smaller than parent (in which case the H value won't change).
-  chartPane.setHvalue(chartPane.getHmax)
-  private val cancellable = chartPane.hvalueProperty.listen2 { (cancellable, v) =>
-    chartPane.setHvalue(chartPane.getHmax)
-    cancellable.cancel()
-  }
-  epsa.Main.Akka.system.scheduler.scheduleOnce(500.milliseconds) {
-    cancellable.cancel()
-  }(epsa.Main.Akka.dispatcher)
-
   def setSeriesName(name: String): Unit = series.setName(name)
 
   /** Gets, and caches, chart background bounds. */
@@ -470,7 +456,7 @@ class ChartHandler[A <: ChartMark](
     }
   }
 
-  /** Scroll to request offset (to get it on left of view). */
+  /** Scroll to requested offset (to get it on left of view). */
   private def scrollTo(offset: Long): Unit = {
     // Note: since computed offset may be lower than chart minimum value,
     // make sure the requested offset (which takes into account nodes at
@@ -478,6 +464,26 @@ class ChartHandler[A <: ChartMark](
     val hoffset = math.max(0, getX(getChartBackgroundBounds, offset))
     val hvalue = BoundsEx.computeHValue(chartPane, hoffset)
     chartPane.setHvalue(hvalue)
+  }
+
+  /** Scroll to requested date (to get it on left of view). */
+  def scrollTo(date: LocalDate, track: Boolean = false): Unit = {
+    val offset = xAxisWrapper.dateToNumber(date)
+    val hvalue = scrollTo(offset)
+
+    if (track) {
+      // Note: when tracking (because caller is also updating series data),
+      // listen to xAxis and viewport bounds changes for a limited amount of
+      // time. Re-apply scrolling upon changes.
+      val cancellable = RichObservableValue.listen2[AnyRef](
+        List(xAxis.widthProperty, chartPane.viewportBoundsProperty), { cancellable =>
+          scrollTo(offset)
+        }
+      )
+      epsa.Main.Akka.system.scheduler.scheduleOnce(500.milliseconds) {
+        cancellable.cancel()
+      }(epsa.Main.Akka.dispatcher)
+    }
   }
 
   /** Highlights requested mark. */

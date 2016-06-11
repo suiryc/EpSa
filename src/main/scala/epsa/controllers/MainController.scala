@@ -85,7 +85,7 @@ class MainController extends Logging {
 
   lazy private val stage = splitPane.getScene.getWindow.asInstanceOf[Stage]
 
-  private var chartHandler: ChartHandler[_] = _
+  private var chartHandler: ChartHandler[ChartMark] = _
 
   private var currentChartFund: Option[Savings.Fund] = None
 
@@ -668,13 +668,19 @@ class MainController extends Logging {
     def onShowNAVHistory(state: State): Unit = {
       if (requestedChartFund != currentChartFund) requestedChartFund match {
         case Some(fund) =>
-          // TODO: scroll to latest date when displaying the first non-empty series ?
-          // TODO: hide if empty series ?
           // TODO: better view keeping ? (often misplaced by one minor tick)
           val values = Awaits.readDataStoreNAVs(Some(state.stage), fund.id).getOrElse(Nil)
-          chartHandler.setSeriesName(fund.name)
-          chartHandler.updateSeries(values, replace = true)
-          navHistoryPane.setVisible(true)
+          // Only show non-empty series
+          if (values.nonEmpty) {
+            if (chartHandler.series.getData.isEmpty) {
+              chartHandler.scrollTo(values.last.date, track = true)
+            }
+            chartHandler.setSeriesName(fund.name)
+            chartHandler.updateSeries(values, replace = true)
+            navHistoryPane.setVisible(true)
+          } else {
+            navHistoryPane.setVisible(false)
+          }
 
         case None =>
           navHistoryPane.setVisible(false)
