@@ -156,7 +156,7 @@ class ChartHandler[A <: ChartMark](
 
   /** Chart series. */
   private val series = new XYChart.Series[Number, Number]()
-  series.setName(seriesName)
+  setSeriesName(seriesName)
   /** Series values to display in chart. */
   private var valuesList = seriesValues.map { v =>
     (dateToNumber(v.date), v.value)
@@ -380,6 +380,8 @@ class ChartHandler[A <: ChartMark](
   epsa.Main.Akka.system.scheduler.scheduleOnce(500.milliseconds) {
     cancellable.cancel()
   }(epsa.Main.Akka.dispatcher)
+
+  def setSeriesName(name: String): Unit = series.setName(name)
 
   /** Gets, and caches, chart background bounds. */
   private def getChartBackgroundBounds: Bounds = {
@@ -605,13 +607,20 @@ class ChartHandler[A <: ChartMark](
     }
   }
 
-  def updateSeries(seriesValues: Seq[ChartSeriesData]): Unit = {
-    valuesMap ++= seriesValues.map { v =>
-      dateToNumber(v.date) -> v.value
-    }.toMap
-    valuesList = valuesMap.toList.sortBy(_._1)
+  def updateSeries(seriesValues: Seq[ChartSeriesData], replace: Boolean = false): Unit = {
     val viewedBounds = getChartBackgroundViewedBounds()
     val offset = getX(getChartBackgroundBounds, viewedBounds.getMinX)
+    if (replace) {
+      valuesList = seriesValues.map { v =>
+        (dateToNumber(v.date), v.value)
+      }.sortBy(_._1)
+      valuesMap = valuesList.toMap
+    } else {
+      valuesMap ++= seriesValues.map { v =>
+        dateToNumber(v.date) -> v.value
+      }.toMap
+      valuesList = valuesMap.toList.sortBy(_._1)
+    }
     refreshView(resetData = true, offset)
   }
 
