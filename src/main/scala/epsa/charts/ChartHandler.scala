@@ -26,7 +26,6 @@ import suiryc.scala.javafx.geometry.{BoundsEx, ScrollOffsetPosition}
 import suiryc.scala.math.BigDecimals._
 
 // TODO: way to limit y range to currently viewed min/max; and way to reset to auto range
-// TODO: fix zoom node position when maximizing/minimizing
 
 trait ChartSeriesData {
   val date: LocalDate
@@ -340,8 +339,8 @@ class ChartHandler[A <: ChartMark](
   chart.setOnScroll(onScroll _)
 
   // Place zoom node at top center of view
-  RichObservableValue.listen(
-    List(chart.widthProperty, chartPane.widthProperty, chartPane.hvalueProperty, zoomNode.widthProperty),
+  RichObservableValue.listen[AnyRef](
+    List(chart.widthProperty, chartPane.widthProperty, chartPane.hvalueProperty, chartPane.viewportBoundsProperty, zoomNode.widthProperty),
     {
       // Don't use cached bounds as these were get while zoom is being applied
       // (but content not yet resized actually).
