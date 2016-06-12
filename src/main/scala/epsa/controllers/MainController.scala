@@ -668,15 +668,14 @@ class MainController extends Logging {
     def onShowNAVHistory(state: State): Unit = {
       if (requestedChartFund != currentChartFund) requestedChartFund match {
         case Some(fund) =>
-          // TODO: better view keeping ? (often misplaced by one minor tick)
           val values = Awaits.readDataStoreNAVs(Some(state.stage), fund.id).getOrElse(Nil)
           // Only show non-empty series
           if (values.nonEmpty) {
             if (chartHandler.series.getData.isEmpty) {
-              chartHandler.scrollTo(values.last.date, track = true)
+              chartHandler.centerOnDate(values.last.date, track = true)
             }
             chartHandler.setSeriesName(fund.name)
-            chartHandler.updateSeries(values, replace = true)
+            chartHandler.updateSeries(values, replace = true, keepCenter = false)
             navHistoryPane.setVisible(true)
           } else {
             navHistoryPane.setVisible(false)

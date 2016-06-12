@@ -410,7 +410,7 @@ class NetAssetValueHistoryController {
         AnchorPane.setRightAnchor(chartPane, 0.0)
         AnchorPane.setBottomAnchor(chartPane, 0.0)
         AnchorPane.setLeftAnchor(chartPane, 0.0)
-        chartHandler.scrollTo(values.last.date, track = true)
+        chartHandler.centerOnDate(values.last.date, track = true)
       } else {
         chartHandler.setSeriesName(fund.name)
         chartHandler.updateSeries(values, replace = true)
