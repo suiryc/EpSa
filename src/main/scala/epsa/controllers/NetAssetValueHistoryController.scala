@@ -84,24 +84,6 @@ class NetAssetValueHistoryController {
     importButton.setDisable(funds.isEmpty)
     purgeButton.setDisable(funds.isEmpty)
 
-    val meta = ChartMeta[ChartMark](mouseHandler = onMouseEvent)
-    chartHandler = new ChartHandler(
-      seriesName = "",
-      seriesValues = Nil,
-      meta = meta,
-      settings = ChartSettings.hidden.copy(
-        xLabel = Strings.date,
-        yLabel = Strings.nav,
-        ySuffix = epsa.Settings.defaultCurrency
-      )
-    )
-    val chartPane = chartHandler.chartPane
-    AnchorPane.setTopAnchor(chartPane, 0.0)
-    AnchorPane.setRightAnchor(chartPane, 0.0)
-    AnchorPane.setBottomAnchor(chartPane, 0.0)
-    AnchorPane.setLeftAnchor(chartPane, 0.0)
-    historyPane.getChildren.add(chartPane)
-
     fundIdOpt.flatMap { fundId =>
       funds.find(_.id == fundId)
     }.orElse(entries.flatten.headOption).foreach { fund =>
@@ -400,9 +382,41 @@ class NetAssetValueHistoryController {
     val actualValues = updatedHistory(fund, values)
     purgeButton.setDisable(actualValues.isEmpty)
 
-    chartHandler.setSeriesName(fund.name)
-    // TODO: scroll to latest date (or keep previous position) when getting from an empty series ?
-    chartHandler.updateSeries(actualValues, replace = true)
+    if (actualValues.isEmpty) {
+      historyPane.setVisible(false)
+    } else {
+      // Note: showing the dialog while creating the chart without values and
+      // then updating series data (initial fund selection) right away tends to
+      // lock up JavaFX (requiring to kill the application), especially when
+      // changing the series name (which triggers chart legend updating).
+      // So wait for the first series data to show (initial func selection) to
+      // create the chart, which prevents the lock up (or at least significantly
+      // lowers the chances for it to happen).
+      if (chartHandler == null) {
+        val meta = ChartMeta[ChartMark](mouseHandler = onMouseEvent)
+        chartHandler = new ChartHandler(
+          seriesName = fund.name,
+          seriesValues = values,
+          meta = meta,
+          settings = ChartSettings.hidden.copy(
+            xLabel = Strings.date,
+            yLabel = Strings.nav,
+            ySuffix = epsa.Settings.defaultCurrency
+          )
+        )
+        val chartPane = chartHandler.chartPane
+        historyPane.getChildren.add(chartPane)
+        AnchorPane.setTopAnchor(chartPane, 0.0)
+        AnchorPane.setRightAnchor(chartPane, 0.0)
+        AnchorPane.setBottomAnchor(chartPane, 0.0)
+        AnchorPane.setLeftAnchor(chartPane, 0.0)
+        chartHandler.scrollTo(values.last.date, track = true)
+      } else {
+        chartHandler.setSeriesName(fund.name)
+        chartHandler.updateSeries(values, replace = true)
+      }
+      historyPane.setVisible(true)
+    }
   }
 
   /** Displays history import result in dedicated window. */
