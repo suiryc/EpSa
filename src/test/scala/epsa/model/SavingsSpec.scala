@@ -450,6 +450,19 @@ class SavingsSpec extends WordSpec with Matchers {
         Nil
       )
     }
+
+    "keep track of latest asset action" in {
+      val scheme = savings2.schemes.head
+      val fund = savings2.funds.head
+      val date = LocalDate.now.minusDays(10)
+      // Out-of-order actions should be handled
+      val savings = savings2.processEvents(
+        Savings.MakePayment(date.plusDays(1), Savings.AssetPart(scheme.id, fund.id, None, BigDecimal(1), BigDecimal(1)), None),
+        Savings.MakePayment(date.plusDays(4), Savings.AssetPart(scheme.id, fund.id, None, BigDecimal(1), BigDecimal(1)), None),
+        Savings.MakePayment(date.plusDays(1), Savings.AssetPart(scheme.id, fund.id, None, BigDecimal(1), BigDecimal(1)), None)
+      )
+      savings.latestAssetAction shouldBe Some(date.plusDays(4))
+    }
   }
 
   "Savings (de)serialization" should {

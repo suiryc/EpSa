@@ -535,6 +535,14 @@ case class Savings(
       .triggerActiveFund(part.fundId, assets.byId.keys.exists(_.fundId == part.fundId))
   }
 
+  protected def updateLatestAssetAction(date: LocalDate): Savings = {
+    val newDate = latestAssetAction match {
+      case Some(latestDate) => if (date > latestDate) date else latestDate
+      case None             => date
+    }
+    copy(latestAssetAction = Some(newDate))
+  }
+
   protected def makePayment(date: LocalDate, part: AssetPart, comment: Option[String],
     partSrc: Option[AssetPart] = None, savingsSrc: Option[Savings] = None,
     srcLeviesPeriodsData: Option[LeviesPeriodsData] = None): Savings =
@@ -593,7 +601,7 @@ case class Savings(
     val vwap = scaleVWAP((assets.investedAmount(part.id) + extraInvestedAmount) / units)
     val savings = savings2.copy(assets = assets0.copy(vwaps = assets0.vwaps + (part.id -> vwap)))
 
-    savings.copy(latestAssetAction = Some(date)).triggerActiveAsset(part)
+    savings.updateLatestAssetAction(date).triggerActiveAsset(part)
   }
 
   protected def makeTransfer(date: LocalDate, partSrc: AssetPart, partDst: AssetPart, comment: Option[String]): Savings = {
@@ -624,7 +632,7 @@ case class Savings(
     val savings =
       if (units <= 0) savings0.removeAsset(date, part).checkActiveAsset(part)
       else savings0.updateAsset(date, Asset(part.schemeId, part.fundId, currentAsset.availability, units, vwap))
-    (savings.copy(latestAssetAction = Some(date)), outgoingLevies)
+    (savings.updateLatestAssetAction(date), outgoingLevies)
   }
 
   def findAsset(date: LocalDate, asset: AssetEntry): Option[Savings.Asset] =
