@@ -97,9 +97,9 @@ trait AssetDetails {
     if (investedAmount == 0) Some(BigDecimal(0))
     else netGain.map(v => scalePercents((v * 100) / investedAmount))
 
-  def formatAvailability(long: Boolean) =
+  lazy val formatAvailability =
     if ((kind != AssetDetailsKind.Standard) && (kind != AssetDetailsKind.TotalPerAvailability)) null
-    else Form.formatAvailability(asset.availability, date = availabilityBase, long)
+    else Form.formatAvailability(asset.availability, date = availabilityBase)
   lazy val formatUnits =
     if ((kind != AssetDetailsKind.Standard) && (kind != AssetDetailsKind.TotalPerFund)) null
     else scaleUnits(units).toString

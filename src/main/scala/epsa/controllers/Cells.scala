@@ -24,7 +24,7 @@ class SchemeAndFundCell extends ListCell[Option[SchemeAndFund]] with CellWithSep
 }
 
 class AvailabilityListCell(baseOpt: Option[LocalDate]) extends ListCellEx[Option[LocalDate]] {
-  override protected def itemText(item: Option[LocalDate]) = Form.formatAvailability(item, baseOpt, long = false)
+  override protected def itemText(item: Option[LocalDate]) = Form.formatAvailability(item, baseOpt)
 }
 
 class UnavailabilityPeriodCell extends ListCellEx[Savings.UnavailabilityPeriod] {

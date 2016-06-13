@@ -29,7 +29,7 @@ trait AssetField[A] {
   /** Field warning if any. */
   val warning: (AssetDetails) => Option[String] = { _ => None }
   /** How to format field value. */
-  val format: (AssetDetails, Boolean) => String
+  val format: (AssetDetails) => String
 
   /** The details pane label (where value is displayed). */
   // Note: the label is cached so that all tabs (savings on various dates)
@@ -52,7 +52,7 @@ trait AssetField[A] {
   val column: TableColumn[AssetDetails, A]
 
   def updateDetailsValue(assetDetailsOpt: Option[AssetDetails]): Unit = {
-    detailsValue.setText(assetDetailsOpt.map(format(_, true)).orNull)
+    detailsValue.setText(assetDetailsOpt.map(format).orNull)
     setupGraphicNode(
       buildGraphicNode(assetDetailsOpt, comment, AssetField.tooltipHint),
       buildGraphicNode(assetDetailsOpt, warning, AssetField.tooltipWarning)
@@ -81,31 +81,31 @@ trait AssetField[A] {
 
 /** Asset field with formatted text value to display. */
 case class AssetTextField(key: String, columnIdx: Int, tableLabel: String, detailsLabel: String,
-  format: (AssetDetails, Boolean) => String,
+  format: (AssetDetails) => String,
   override val comment: (AssetDetails) => Option[String] = { _ => None }
 ) extends AssetField[String] {
   val column = new TableColumn[AssetDetails, String](tableLabel)
   column.setCellValueFactory(Callback { data =>
-    new SimpleStringProperty(format(data.getValue, false))
+    new SimpleStringProperty(format(data.getValue))
   })
 }
 
 /** Asset field with date to display. */
 case class AssetDateField(key: String, columnIdx: Int, tableLabel: String, detailsLabel: String,
-  format: (AssetDetails, Boolean) => String,
+  format: (AssetDetails) => String,
   value: (AssetDetails) => Option[LocalDate]
 ) extends AssetField[AssetDetails] {
   val column = new TableColumn[AssetDetails, AssetDetails](tableLabel)
   column.setCellValueFactory(Callback { data =>
     new SimpleObjectProperty(data.getValue)
   })
-  column.setCellFactory(Callback { new FormatCell[AssetDetails, AssetDetails](v => format(v, false)) })
+  column.setCellFactory(Callback { new FormatCell[AssetDetails, AssetDetails](format) })
   column.setComparator(AssetField.dateComparator(value))
 }
 
 /** Asset field with amount to display. */
 case class AssetAmountField(key: String, columnIdx: Int, tableLabel: String, detailsLabel: String,
-  format: (AssetDetails, Boolean) => String,
+  format: (AssetDetails) => String,
   value: (AssetDetails) => Option[BigDecimal],
   override val warning: (AssetDetails) => Option[String] = { _ => None }
 ) extends AssetField[AssetDetails] {
@@ -115,7 +115,7 @@ case class AssetAmountField(key: String, columnIdx: Int, tableLabel: String, det
   })
   val warning0 = warning
   column.setCellFactory(Callback {
-    new FormatCell[AssetDetails, AssetDetails](v => format(v, false)) with WarningCell[AssetDetails] {
+    new FormatCell[AssetDetails, AssetDetails](format) with WarningCell[AssetDetails] {
       override def warning(v: AssetDetails) = warning0(v)
     }
   })
@@ -124,7 +124,7 @@ case class AssetAmountField(key: String, columnIdx: Int, tableLabel: String, det
 
 /** Asset field with (colored) amount to display. */
 case class AssetColoredAmountField(key: String, columnIdx: Int, tableLabel: String, detailsLabel: String,
-  format: (AssetDetails, Boolean) => String,
+  format: (AssetDetails) => String,
   value: (AssetDetails) => Option[BigDecimal],
   override val warning: (AssetDetails) => Option[String] = { _ => None }
 ) extends AssetField[AssetDetails] {
@@ -135,7 +135,7 @@ case class AssetColoredAmountField(key: String, columnIdx: Int, tableLabel: Stri
   val value0 = value
   val warning0 = warning
   column.setCellFactory(Callback {
-    new FormatCell[AssetDetails, AssetDetails](v => format(v, false)) with ColoredCell[AssetDetails] with WarningCell[AssetDetails] {
+    new FormatCell[AssetDetails, AssetDetails](format) with ColoredCell[AssetDetails] with WarningCell[AssetDetails] {
       override def value(v: AssetDetails) = value0(v)
       override def warning(v: AssetDetails) = warning0(v)
     }
@@ -231,39 +231,39 @@ object AssetField {
     }
   }
 
-  def formatScheme(details: AssetDetails, long: Boolean) = details.scheme.name
+  def formatScheme(details: AssetDetails) = details.scheme.name
   def schemeComment(details: AssetDetails) = details.scheme.comment
-  def formatFund(details: AssetDetails, long: Boolean) = details.fund.name
+  def formatFund(details: AssetDetails) = details.fund.name
   def fundComment(details: AssetDetails) = details.fund.comment
-  def formatAvailability(details: AssetDetails, long: Boolean) = details.formatAvailability(long)
+  def formatAvailability(details: AssetDetails) = details.formatAvailability
   def availability(details: AssetDetails) = details.availability
-  def formatUnits(details: AssetDetails, long: Boolean) = details.formatUnits
+  def formatUnits(details: AssetDetails) = details.formatUnits
   def units(details: AssetDetails) = Some(details.units)
-  def formatVWAP(details: AssetDetails, long: Boolean) = details.formatVWAP
+  def formatVWAP(details: AssetDetails) = details.formatVWAP
   def vwap(details: AssetDetails) = Some(details.vwap)
-  def formatDate(details: AssetDetails, long: Boolean) = details.formatDate
+  def formatDate(details: AssetDetails) = details.formatDate
   def date(details: AssetDetails) = details.date
-  def formatNAV(details: AssetDetails, long: Boolean) = details.formatNAV
+  def formatNAV(details: AssetDetails) = details.formatNAV
   def nav(details: AssetDetails) = details.nav
-  def formatInvestedAmount(details: AssetDetails, long: Boolean) = details.formatInvestedAmount
+  def formatInvestedAmount(details: AssetDetails) = details.formatInvestedAmount
   def investedAmount(details: AssetDetails) = Some(details.investedAmount)
-  def formatGrossAmount(details: AssetDetails, long: Boolean) = details.formatGrossAmount
+  def formatGrossAmount(details: AssetDetails) = details.formatGrossAmount
   def grossAmount(details: AssetDetails) = details.grossAmount
   def grossAmountWarning(details: AssetDetails) = Option(details.grossAmountWarning.mkString("\n")).filterNot(_.isEmpty)
   def leviesWarning(details: AssetDetails) = Option {
     (details.grossAmountWarning ++ details.leviesWarning).distinct.mkString("\n")
   }.filterNot(_.isEmpty)
-  def formatLeviesAmount(details: AssetDetails, long: Boolean) = details.formatLeviesAmount
+  def formatLeviesAmount(details: AssetDetails) = details.formatLeviesAmount
   def leviesAmount(details: AssetDetails) = details.leviesAmount
-  def formatNetAmount(details: AssetDetails, long: Boolean) = details.formatNetAmount
+  def formatNetAmount(details: AssetDetails) = details.formatNetAmount
   def netAmount(details: AssetDetails) = details.netAmount
-  def formatGrossGain(details: AssetDetails, long: Boolean) = details.formatGrossGain
+  def formatGrossGain(details: AssetDetails) = details.formatGrossGain
   def grossGain(details: AssetDetails) = details.grossGain
-  def formatGrossGainPct(details: AssetDetails, long: Boolean) = details.formatGrossGainPct
+  def formatGrossGainPct(details: AssetDetails) = details.formatGrossGainPct
   def grossGainPct(details: AssetDetails) = details.grossGainPct
-  def formatNetGain(details: AssetDetails, long: Boolean) = details.formatNetGain
+  def formatNetGain(details: AssetDetails) = details.formatNetGain
   def netGain(details: AssetDetails) = details.netGain
-  def formatNetGainPct(details: AssetDetails, long: Boolean) = details.formatNetGainPct
+  def formatNetGainPct(details: AssetDetails) = details.formatNetGainPct
   def netGainPct(details: AssetDetails) = details.netGainPct
 
   // Note: there need to be distinct ImageView instances to display an image

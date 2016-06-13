@@ -198,14 +198,14 @@ class SavingsView(tab: SavingsViewTab) {
       date = state.assetsValue.get(asset.fundId).map(_.date),
       nav = state.assetsValue.get(asset.fundId).map(_.value),
       actualVWAP,
-      availabilityBase = tab.dateOpt
+      availabilityBase = tab.getDateOpt(state)
     )
   }
 
   /** Copy asset details to clipboard. */
   private def copyAssetDetailsToClipboard(details: AssetDetails): Unit = {
     val text = assetFields.values.flatMap { field =>
-      Option(field.format(details, true)) match {
+      Option(field.format(details)) match {
         case Some(value) => Some(s"${field.detailsLabel} $value")
         case None        => None
       }
@@ -220,9 +220,8 @@ class SavingsView(tab: SavingsViewTab) {
     val savings = data.state.savingsUpd
 
     // Then update table content: takes care of added/removed entries
-    val assets =
-      if (!data.state.viewUpToDateAssets) savings.assets.list
-      else savings.computeAssets(tab.dateOpt.getOrElse(LocalDate.now)).assets.list
+    val dateOpt = tab.getDateOpt(data.state)
+    val assets = savings.computeAssets(dateOpt.getOrElse(LocalDate.now)).assets.list
     // Get details and sort by scheme, fund then availability by default
     // See: http://stackoverflow.com/a/10027682
     val assetsDetails = assets.map(getAssetDetails(data.state, _, data.vwapPerAsset)).sortBy { details =>
@@ -237,7 +236,7 @@ class SavingsView(tab: SavingsViewTab) {
       data.showTotalsPerScheme,
       data.showTotalsPerFund,
       data.showTotalsPerAvailability,
-      availabilityBase = tab.dateOpt
+      availabilityBase = dateOpt
     )
     // Bind (and first set) our total comparator to the table comparator
     sortedAssetsWithTotal.comparatorProperty.setValue(assetsTable.getComparator)
@@ -262,24 +261,28 @@ class SavingsViewTab(val mainController: MainController, val dateOpt: Option[Loc
 
   val view = new SavingsView(this)
 
-  private val (title, closable) = dateOpt match {
-    case Some(date) => (Strings.savingsOnDateTab.format(date), true)
-    case None       => (Strings.savings, false)
-  }
-
   private val anchorPane = new AnchorPane()
   anchorPane.getChildren.add(view.assetsTable)
   AnchorPane.setTopAnchor(view.assetsTable, 10.0)
   AnchorPane.setRightAnchor(view.assetsTable, 10.0)
   AnchorPane.setBottomAnchor(view.assetsTable, 10.0)
   AnchorPane.setLeftAnchor(view.assetsTable, 10.0)
-  val tab = new Tab(title)
-  tab.setClosable(closable)
+  val tab = new Tab()
+  tab.setClosable(dateOpt.isDefined)
   tab.setContent(anchorPane)
   tab.setUserData(this)
 
+  private[epsa] def getDateOpt(state: State): Option[LocalDate] =
+    if (dateOpt.isDefined) dateOpt
+    else if (state.viewUpToDateAssets) None
+    else state.savingsUpd.latestAssetAction
+
   override def refresh(data: RefreshData): Unit = {
     val state = data.state
+    getDateOpt(data.state) match {
+      case Some(date) => tab.setText(Strings.savingsOnDateTab.format(date))
+      case None       => tab.setText(Strings.savings)
+    }
     val actualData = dateOpt match {
       case Some(date) =>
         // Compute actual state from account history up to requested date

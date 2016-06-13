@@ -13,7 +13,7 @@ object Form {
   def textOrNone(v: String): Option[String] =
     Option(v).map(_.trim).find(_.nonEmpty)
 
-  def formatAvailability(availability: Option[LocalDate], date: Option[LocalDate], long: Boolean): String =
+  def formatAvailability(availability: Option[LocalDate], date: Option[LocalDate]): String =
     availability.map { avail =>
       Savings.resolveAvailability(availability, date) match {
         case Some(_) =>
@@ -21,8 +21,7 @@ object Form {
 
         case None =>
           // Actually available
-          Strings.available +
-            (if (long) s" ($avail)" else "")
+          Strings.available
       }
     }.getOrElse(Strings.available)
 
