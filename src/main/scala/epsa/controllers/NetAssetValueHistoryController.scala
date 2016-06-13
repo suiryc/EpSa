@@ -396,7 +396,7 @@ class NetAssetValueHistoryController {
         val meta = ChartMeta[ChartMark](mouseHandler = onMouseEvent)
         chartHandler = new ChartHandler(
           seriesName = fund.name,
-          seriesValues = values,
+          seriesValues = actualValues,
           meta = meta,
           settings = ChartSettings.hidden.copy(
             xLabel = Strings.date,
@@ -410,10 +410,10 @@ class NetAssetValueHistoryController {
         AnchorPane.setRightAnchor(chartPane, 0.0)
         AnchorPane.setBottomAnchor(chartPane, 0.0)
         AnchorPane.setLeftAnchor(chartPane, 0.0)
-        chartHandler.centerOnDate(values.last.date, track = true)
+        chartHandler.centerOnDate(actualValues.last.date, track = true)
       } else {
         chartHandler.setSeriesName(fund.name)
-        chartHandler.updateSeries(values, replace = true)
+        chartHandler.updateSeries(actualValues, replace = true)
       }
       historyPane.setVisible(true)
     }
