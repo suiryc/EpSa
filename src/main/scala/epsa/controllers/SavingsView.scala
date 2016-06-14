@@ -88,7 +88,7 @@ class SavingsView(tab: SavingsViewTab) {
   /**
    * Creates a new Asset table view row.
    *
-   * Binds menu context to edit asset scheme/fund.
+   * Binds context menu when applicable.
    */
   private def newAssetRow(): TableRow[AssetDetails] = {
     val row = new TableRow[AssetDetails]()
@@ -182,13 +182,14 @@ class SavingsView(tab: SavingsViewTab) {
     Option(assetsTable.getSelectionModel.getSelectedItem).map(_.asset)
 
   /** Gets (computes) given asset details. */
-  private def getAssetDetails(state: State, asset: Savings.Asset, vwapPerAsset: Boolean): AssetDetails = {
+  private def getAssetDetails(asset: Savings.Asset, data: RefreshData): AssetDetails = {
+    val state = data.state
     val savings = state.savingsUpd
 
     // Note: it is expected that we have an asset because there is an invested
     // amount. So there is no need to try to prevent division by 0.
     val actualVWAP =
-      if (vwapPerAsset) None
+      if (data.vwapPerAsset) None
       else savings.assets.vwaps.get(asset.id)
     StandardAssetDetails(
       savings = savings,
@@ -198,7 +199,7 @@ class SavingsView(tab: SavingsViewTab) {
       date = state.assetsValue.get(asset.fundId).map(_.date),
       nav = state.assetsValue.get(asset.fundId).map(_.value),
       actualVWAP,
-      availabilityBase = tab.getDateOpt(state)
+      availabilityBase = tab.getDateOpt(data)
     )
   }
 
@@ -220,11 +221,11 @@ class SavingsView(tab: SavingsViewTab) {
     val savings = data.state.savingsUpd
 
     // Then update table content: takes care of added/removed entries
-    val dateOpt = tab.getDateOpt(data.state)
+    val dateOpt = tab.getDateOpt(data)
     val assets = savings.computeAssets(dateOpt.getOrElse(LocalDate.now)).assets.list
     // Get details and sort by scheme, fund then availability by default
     // See: http://stackoverflow.com/a/10027682
-    val assetsDetails = assets.map(getAssetDetails(data.state, _, data.vwapPerAsset)).sortBy { details =>
+    val assetsDetails = assets.map(getAssetDetails(_, data)).sortBy { details =>
       (details.scheme.name, details.fund.name, details.asset.availability)
     }
     val sortedAssetsDetails = new SortedList(FXCollections.observableList(assetsDetails))
@@ -272,14 +273,17 @@ class SavingsViewTab(val mainController: MainController, val dateOpt: Option[Loc
   tab.setContent(anchorPane)
   tab.setUserData(this)
 
-  private[epsa] def getDateOpt(state: State): Option[LocalDate] =
+  def getDateOpt(savings: Savings, upToDateAssets: Boolean): Option[LocalDate] =
     if (dateOpt.isDefined) dateOpt
-    else if (state.viewUpToDateAssets) None
-    else state.savingsUpd.latestAssetAction
+    else if (upToDateAssets) None
+    else savings.latestAssetAction
+
+  private[epsa] def getDateOpt(data: RefreshData): Option[LocalDate] =
+    getDateOpt(data.state.savingsUpd, data.upToDateAssets)
 
   override def refresh(data: RefreshData): Unit = {
     val state = data.state
-    getDateOpt(data.state) match {
+    getDateOpt(data) match {
       case Some(date) => tab.setText(Strings.savingsOnDateTab.format(date))
       case None       => tab.setText(Strings.savings)
     }

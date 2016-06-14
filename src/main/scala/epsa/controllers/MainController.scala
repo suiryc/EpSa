@@ -31,6 +31,7 @@ import suiryc.scala.javafx.scene.control.{Dialogs, TableViews}
 import suiryc.scala.javafx.stage.{FileChoosers, Stages}
 import suiryc.scala.settings.Preference
 
+// TODO: add 'save as' menu entry, enabled when there are pending changes
 // TODO: smart deletion of funds ?
 //         - keep the necessary data (NAV on some dates) used to compute levies
 //         - way to determine if all levies of past fund assets were paid already, so that all NAVs can really be deleted ?
@@ -69,6 +70,9 @@ class MainController extends Logging {
   protected var vwapPerAssetMenu: CheckMenuItem = _
 
   @FXML
+  protected var upToDateAssetsMenu: CheckMenuItem = _
+
+  @FXML
   protected var toolsExportRawAccountHistoryMenu: MenuItem = _
 
   @FXML
@@ -80,6 +84,8 @@ class MainController extends Logging {
   @FXML
   protected var navHistoryPane: AnchorPane = _
 
+  // TODO: allow to re-arrange tabs order
+  // Wait for implementation in JavaFX ? https://bugs.openjdk.java.net/browse/JDK-8092098
   @FXML
   protected var tabPane: TabPane = _
 
@@ -118,7 +124,8 @@ class MainController extends Logging {
         (totalsPerSchemeMenu, totalsPerScheme),
         (totalsPerFundMenu, totalsPerFund),
         (totalsPerAvailabilityMenu, totalsPerAvailability),
-        (vwapPerAssetMenu, vwapPerAsset)
+        (vwapPerAssetMenu, vwapPerAsset),
+        (upToDateAssetsMenu, upToDateAssets)
       )
     } {
       // First select menu according to saved settings
@@ -281,10 +288,6 @@ class MainController extends Logging {
     stage.toFront()
   }
 
-  def onUpToDateAssets(event: ActionEvent): Unit = {
-    actor ! OnUpToDateAssets(event.getSource.asInstanceOf[CheckMenuItem].isSelected)
-  }
-
   def onExportRawAccountHistory(event: ActionEvent = null): Unit = {
     actor ! OnExportRawAccountHistory
   }
@@ -397,7 +400,6 @@ class MainController extends Logging {
       case OnNetAssetValueHistory(fundId) => onNetAssetValueHistory(state, fundId)
       case OnShowNAVHistory  => onShowNAVHistory(state)
       case OnLevies          => onLevies(state)
-      case OnUpToDateAssets(set) => onUpToDateAssets(state, set)
       case OnExportRawAccountHistory => onExportRawAccountHistory(state)
       case OnImportRawAccountHistory => onImportRawAccountHistory(state)
       case OnCleanupDataStore(reorder) => onCleanupDataStore(state, reorder)
@@ -479,8 +481,14 @@ class MainController extends Logging {
     }
 
     def refreshTab(tab: TabWithState, state: State): Unit = {
-      val refreshData = RefreshData(state, vwapPerAssetMenu.isSelected, totalsPerSchemeMenu.isSelected,
-        totalsPerFundMenu.isSelected, totalsPerAvailabilityMenu.isSelected)
+      val refreshData = RefreshData(
+        state = state,
+        showTotalsPerScheme = totalsPerSchemeMenu.isSelected,
+        showTotalsPerFund = totalsPerFundMenu.isSelected,
+        showTotalsPerAvailability = totalsPerAvailabilityMenu.isSelected,
+        vwapPerAsset = vwapPerAssetMenu.isSelected,
+        upToDateAssets = upToDateAssetsMenu.isSelected
+      )
       tab.refresh(refreshData)
     }
 
@@ -698,10 +706,6 @@ class MainController extends Logging {
       if (dialog.showAndWait().orElse(false)) refresh(state, reload = true, keepPending = true)
     }
 
-    def onUpToDateAssets(state: State, set: Boolean): Unit = {
-      applyState(state.copy(viewUpToDateAssets = set))
-    }
-
     def onExportRawAccountHistory(state: State): Unit = {
       val events0 = Awaits.readDataStoreEvents(Some(state.stage)).getOrElse(Nil) ++ state.eventsUpd
       val (events, _) = Savings.sortEvents(events0)
@@ -903,12 +907,13 @@ object MainController {
 
   private val vwapPerAsset = Preference.from("vwap.per-asset", false)
 
+  private val upToDateAssets = Preference.from("up-to-date-assets", false)
+
   case class State(
     stage: Stage,
     savingsInit: Savings = Savings(),
     eventsUpd: List[Savings.Event] = Nil,
     savingsUpd: Savings = Savings(),
-    viewUpToDateAssets: Boolean = true,
     assetsValue: Map[UUID, Savings.AssetValue] = Map.empty
   ) {
 
@@ -932,8 +937,14 @@ object MainController {
 
   }
 
-  case class RefreshData(state: State, vwapPerAsset: Boolean, showTotalsPerScheme: Boolean,
-    showTotalsPerFund: Boolean, showTotalsPerAvailability: Boolean)
+  case class RefreshData(
+    state: State,
+    showTotalsPerScheme: Boolean,
+    showTotalsPerFund: Boolean,
+    showTotalsPerAvailability: Boolean,
+    vwapPerAsset: Boolean,
+    upToDateAssets: Boolean
+  )
 
   trait TabWithState {
     def refresh(data: RefreshData)
@@ -972,8 +983,6 @@ object MainController {
   case object OnShowNAVHistory
 
   case object OnLevies
-
-  case class OnUpToDateAssets(set: Boolean)
 
   case object OnExportRawAccountHistory
 
