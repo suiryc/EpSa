@@ -190,8 +190,8 @@ class MainController extends Logging {
     splitPaneDividerPositions() = splitPane.getDividerPositions.mkString(";")
   }
 
-  def refresh(reload: Boolean = false): Unit = {
-    actor ! Refresh(reload)
+  def refresh(reload: Boolean = false, keepPending: Boolean = false): Unit = {
+    actor ! Refresh(reload = reload, keepPending = keepPending)
   }
 
   def onCloseRequest(event: WindowEvent): Unit = {
@@ -380,7 +380,7 @@ class MainController extends Logging {
       }
 
     def receive0(state: State): Receive = {
-      case Refresh(reload)   => refresh(state, reload)
+      case Refresh(reload, keepPending) => refresh(state, reload, keepPending)
       case OnFileNew         => onFileNew(state)
       case OnFileOpen        => onFileOpen(state)
       case OnFileClose       => onFileClose(state)
@@ -440,7 +440,7 @@ class MainController extends Logging {
       context.become(receive(state))
     }
 
-    def refresh(state0: State, reload: Boolean = false): Unit = {
+    def refresh(state0: State, reload: Boolean = false, keepPending: Boolean = false): Unit = {
       val state = if (reload) {
         val owner = Some(state0.stage)
         val levies = Awaits.readAppSetting(owner, DataStore.AppSettings.KEY_LEVIES).getOrElse(None).map { str =>
@@ -452,11 +452,15 @@ class MainController extends Logging {
           case Success(events0) =>
             val (events, outOfOrder) = Savings.sortEvents(events0)
             // Cleanup datastore if necessary
-            self ! OnCleanupDataStore(outOfOrder)
-            val savingsInit = Savings(levies = levies).processEvents(events)
+            MainController.this.onCleanupDataStore(outOfOrder)
+            val eventsUpd =
+              if (keepPending) state0.eventsUpd
+              else Nil
+            val savingsInit = Savings(levies = levies).processEvents(events ++ eventsUpd)
             State(
               stage = state0.stage,
               savingsInit = savingsInit,
+              eventsUpd = eventsUpd,
               savingsUpd = savingsInit
             )
 
@@ -691,7 +695,7 @@ class MainController extends Logging {
       val dialog = LeviesController.buildDialog(state.savingsUpd, state.stage)
       dialog.initModality(Modality.WINDOW_MODAL)
       dialog.setResizable(true)
-      if (dialog.showAndWait().orElse(false)) refresh(state, reload = true)
+      if (dialog.showAndWait().orElse(false)) refresh(state, reload = true, keepPending = true)
     }
 
     def onUpToDateAssets(state: State, set: Boolean): Unit = {
@@ -845,7 +849,7 @@ class MainController extends Logging {
 
     private def open(state: State): Unit = {
       Awaits.openDataStore(Some(state.stage), change = true, save = false) match {
-        case Some(Success(())) => refresh(state, reload = true)
+        case Some(Success(())) => refresh(state, reload = true, keepPending = false)
         case _                 =>
       }
     }
@@ -935,7 +939,7 @@ object MainController {
     def refresh(data: RefreshData)
   }
 
-  case class Refresh(reload: Boolean)
+  case class Refresh(reload: Boolean, keepPending: Boolean)
 
   case object OnFileNew
 
@@ -1009,7 +1013,7 @@ object MainController {
       )
     }
 
-    if (applicationStart) controller.refresh(reload = true)
+    if (applicationStart) controller.refresh(reload = true, keepPending = false)
   }
 
 }
