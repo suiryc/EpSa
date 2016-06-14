@@ -149,18 +149,7 @@ class AccountHistoryController extends Logging {
     })
 
     // Keep link between top-level items (history entries) and associated row.
-    historyTable.setRowFactory(Callback {
-      val row = new TreeTableRow[AssetEventItem]()
-      row.itemProperty.listen { (_, oldItem, newItem) =>
-        // Beware to check that the old item was still using our row before
-        // resetting as sometimes it was already changed: upon sorting by
-        // column(s), items are usually swapped, meaning we see item A being
-        // replaced by B in one row then B being replaced by A in another row.
-        Option(oldItem).filter(_.row.contains(row)).foreach(_.row = None)
-        Option(newItem).foreach(_.row = Some(row))
-      }
-      row
-    })
+    historyTable.setRowFactory(Callback { newEventRow() })
 
     historyTable.getColumns.addAll(columnEventDate, columnEventDesc)
 
@@ -293,6 +282,44 @@ class AccountHistoryController extends Logging {
 
   def onCloseRequest(event: WindowEvent): Unit = {
     persistView()
+  }
+
+  /**
+   * Creates a new history table row.
+   *
+   * Binds context menu when applicable.
+   */
+  private def newEventRow(): TreeTableRow[AssetEventItem] = {
+    val row = new TreeTableRow[AssetEventItem]()
+
+    row.itemProperty.listen { (_, oldItem, newItem) =>
+      // Beware to check that the old item was still using our row before
+      // resetting as sometimes it was already changed: upon sorting by
+      // column(s), items are usually swapped, meaning we see item A being
+      // replaced by B in one row then B being replaced by A in another row.
+      Option(oldItem).filter(_.row.contains(row)).foreach(_.row = None)
+      Option(newItem).foreach { item =>
+        item.row = Some(row)
+        // Set context menu to show savings on event date
+        item.date match {
+          case Some(date) =>
+            val contextMenu = new ContextMenu()
+            val savingsOnDate = new MenuItem(Strings.savingsOnDate,
+              new ImageView(Images.iconCalendarDay))
+            savingsOnDate.setOnAction { (event: ActionEvent) =>
+              // Request main window to show savings on selected date
+              mainController.onSavingsOnDate(date)
+            }
+            contextMenu.getItems.addAll(savingsOnDate)
+            row.setContextMenu(contextMenu)
+
+          case None =>
+            row.setContextMenu(null)
+        }
+      }
+    }
+
+    row
   }
 
   private def onMarkEvent(event: ChartMarkEvent.Value, mark: HistoryMark): Unit = {
