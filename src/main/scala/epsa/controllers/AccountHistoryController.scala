@@ -541,6 +541,7 @@ class AccountHistoryController extends Logging {
       AnchorPane.setBottomAnchor(pane, 0.0)
       AnchorPane.setLeftAnchor(pane, 0.0)
       this.chartHandler = Some(chartHandler)
+      chartHandler.centerOnDate(grossHistory.last.date, track = true)
     }
   }
 
