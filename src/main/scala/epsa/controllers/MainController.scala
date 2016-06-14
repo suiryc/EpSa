@@ -415,7 +415,10 @@ class MainController extends Logging {
       val savings = oldState.savingsUpd.processEvents(events)
       val newAssetsValue =
         if (!updateAssetsValue) oldState.assetsValue
-        else savings.getNAVs(Some(oldState.stage), LocalDate.now)
+        else {
+          val date = toDateSavingsViewTab.getDateOpt(savings, upToDateAssetsMenu.isSelected).getOrElse(LocalDate.now)
+          savings.getNAVs(Some(oldState.stage), date)
+        }
       val state = oldState.copy(eventsUpd = newEvents, savingsUpd = savings, assetsValue = newAssetsValue)
       val dirty = state.hasPendingChanges
 
