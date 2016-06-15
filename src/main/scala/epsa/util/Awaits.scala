@@ -41,6 +41,9 @@ object Awaits {
   def readDataStoreEvents(owner: Option[Window]): Try[Seq[Savings.Event]] =
     orError(DataStore.EventSource.readEvents(), owner, DataStore.readIssueMsg())
 
+  def purgeDataStoreEvents(owner: Option[Window]): Try[Int] =
+    orError(DataStore.EventSource.deleteEntries(), owner, DataStore.writeIssueMsg())
+
   def saveDataStoreChanges(owner: Option[Window], events: List[Savings.Event]): Try[Unit] = {
     // Note: we are supposed to have a real database opened by now. So we have
     // to first apply any pending changes from temporary database, then write

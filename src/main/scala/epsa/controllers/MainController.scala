@@ -405,7 +405,7 @@ class MainController extends Logging {
       case OnCleanupDataStore(reorder) => onCleanupDataStore(state, reorder)
     }
 
-    def processEvents(oldState: State, events: List[Savings.Event], updateAssetsValue: Boolean = false): Unit = {
+    def processEvents(oldState: State, events: List[Savings.Event], updateAssetsValue: Boolean = false): State = {
       // Time to delete Net asset value history upon deleting fund
       events.collect {
         case Savings.DeleteFund(fundId) => DataStore.AssetHistory.deleteValues(fundId)
@@ -443,6 +443,7 @@ class MainController extends Logging {
       state.stage.setTitle(title)
 
       context.become(receive(state))
+      state
     }
 
     def refresh(state0: State, reload: Boolean = false, keepPending: Boolean = false): Unit = {
@@ -791,6 +792,7 @@ class MainController extends Logging {
             import Savings.JsonProtocol._
             val history = Source.fromFile(file, "UTF-8").mkString.parseJson.asJsObject.fields("history").asInstanceOf[JsArray]
             val events = history.elements.toList.map(_.convertTo[Savings.Event])
+            // Note: there is no need to reorder events since 'processEvents' will do it
             Some(events)
           } catch {
             case ex: Exception =>
@@ -805,9 +807,11 @@ class MainController extends Logging {
           }
         }.foreach { events =>
           accountHistoryPath() = selectedFile.toPath
-          // Close data store (to start from zero) and apply events as pending changes
-          DataStore.close()
-          processEvents(state.zero, events)
+          // Purge events history, and replay imported history
+          Awaits.purgeDataStoreEvents(Some(state.stage))
+          val newState = processEvents(state.zero(Savings(levies = state.savingsUpd.levies)), events)
+          // Then cleanup data store (no need to reorder as we did it already)
+          onCleanupDataStore(newState, reorder = false)
         }
       }
     }
@@ -930,11 +934,11 @@ object MainController {
       copy(eventsUpd = Nil, savingsUpd = savingsInit)
 
     /** Resets state to zero. */
-    def zero: State =
+    def zero(savings: Savings = Savings()): State =
       copy(
-        savingsInit = Savings(),
+        savingsInit = savings,
         eventsUpd = Nil,
-        savingsUpd = Savings(),
+        savingsUpd = savings,
         assetsValue = Map.empty
       )
 
