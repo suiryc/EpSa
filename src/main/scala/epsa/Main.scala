@@ -44,7 +44,7 @@ class Main extends Application {
     I18N.loadLocale()
 
     def startController(): Unit = {
-      // Notre: actual state (account events) will be built by controller.
+      // Note: actual state (account events) will be built by controller.
       val savingsInit = Savings()
       val state = MainController.State(
         stage = stage,
@@ -56,7 +56,7 @@ class Main extends Application {
 
     // Note: if stage has no Scene, have it owns a Dialog fails.
     // In any case, we have yet to build and show the stage.
-    Awaits.openDataStore(None, change = false, save = false)
+    Awaits.openDataStore(None)
     // If we failed to read events, user was warned.
     startController()
   }

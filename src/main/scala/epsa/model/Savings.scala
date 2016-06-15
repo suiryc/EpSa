@@ -13,6 +13,10 @@ import spray.json._
 import suiryc.scala.math.Ordered._
 import suiryc.scala.spray.json.JsonFormats
 
+// TODO: add fake '0 rate' period before any levies initial period ?
+//       to take care of actual loss between initial investment and first levy period
+//       otherwise we can have a loss (compared to initial investment) and still have levies to pay because there was a relative gain between the first period start and the refund date
+
 /** Savings helpers. */
 object Savings extends Logging {
 

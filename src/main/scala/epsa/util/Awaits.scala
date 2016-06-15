@@ -25,7 +25,13 @@ object Awaits {
     r
   }
 
-  def openDataStore(owner: Option[Window], change: Boolean, save: Boolean): Option[Try[Unit]] =
+  def openDataStore(owner: Option[Window], change: Boolean = false, save: Boolean = false, loadTmp: Boolean = false): Option[Try[Unit]] = {
+    // First copy real DB to tmp one if requested
+    if (save && loadTmp) {
+      orError(DataStore.getDBTemp, owner, DataStore.readIssueMsg(loadTmp))
+    }
+
+    // Then open database
     DataStore.open(owner, change, save).map { future =>
       orError(future, owner, {
         // Note: if changing, we don't know what path we tried to open, but
@@ -34,6 +40,7 @@ object Awaits {
         else DataStore.readIssueMsg(!change)
       })
     }
+  }
 
   def hasDataStoreEvents(owner: Option[Window]): Try[Boolean] =
     orError(DataStore.EventSource.hasEvents(), owner, DataStore.readIssueMsg())
@@ -44,11 +51,14 @@ object Awaits {
   def purgeDataStoreEvents(owner: Option[Window]): Try[Int] =
     orError(DataStore.EventSource.deleteEntries(), owner, DataStore.writeIssueMsg())
 
-  def saveDataStoreChanges(owner: Option[Window], events: List[Savings.Event]): Try[Unit] = {
+  def saveDataStoreChanges(owner: Option[Window], fullDb: Boolean, events: List[Savings.Event]): Try[Unit] = {
     // Note: we are supposed to have a real database opened by now. So we have
     // to first apply any pending changes from temporary database, then write
     // pending events in real database directly.
-    val actions = Seq(Action(DataStore.saveChanges())) ++ (if (events.nonEmpty) {
+    val dbSave =
+      if (fullDb) Action(DataStore.save())
+      else Action(DataStore.saveChanges())
+    val actions = Seq(dbSave) ++ (if (events.nonEmpty) {
       Some(Action(DataStore.EventSource.writeEvents(events)(Some(DataStore.getRealDB.db))))
     } else {
       None

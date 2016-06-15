@@ -31,7 +31,6 @@ import suiryc.scala.javafx.scene.control.{Dialogs, TableViews}
 import suiryc.scala.javafx.stage.{FileChoosers, Stages}
 import suiryc.scala.settings.Preference
 
-// TODO: add 'save as' menu entry, enabled when there are pending changes
 // TODO: smart deletion of funds ?
 //         - keep the necessary data (NAV on some dates) used to compute levies
 //         - way to determine if all levies of past fund assets were paid already, so that all NAVs can really be deleted ?
@@ -44,6 +43,9 @@ class MainController extends Logging {
 
   @FXML
   protected var fileSaveMenu: MenuItem = _
+
+  @FXML
+  protected var fileSaveAsMenu: MenuItem = _
 
   @FXML
   protected var editUndoMenu: MenuItem = _
@@ -220,7 +222,11 @@ class MainController extends Logging {
   }
 
   def onFileSave(event: ActionEvent): Unit = {
-    actor ! OnFileSave
+    actor ! OnFileSave(saveAs = false)
+  }
+
+  def onFileSaveAs(event: ActionEvent): Unit = {
+    actor ! OnFileSave(saveAs = true)
   }
 
   def onExit(event: ActionEvent): Unit = {
@@ -387,7 +393,7 @@ class MainController extends Logging {
       case OnFileNew         => onFileNew(state)
       case OnFileOpen        => onFileOpen(state)
       case OnFileClose       => onFileClose(state)
-      case OnFileSave        => onFileSave(state)
+      case OnFileSave(saveAs) => onFileSave(state, saveAs)
       case OnExit            => onExit(state)
       case OnEditUndo        => onEditUndo(state)
       case OnEditSchemes(id) => onEditSchemes(state, id.flatMap(state.savingsUpd.findScheme))
@@ -430,6 +436,8 @@ class MainController extends Logging {
 
       fileCloseMenu.setDisable(DataStore.dbOpened.isEmpty)
       fileSaveMenu.setDisable(!dirty)
+      // Don't enable 'Save as' if there is no physical DB yet.
+      fileSaveAsMenu.setDisable(!dirty || DataStore.dbOpened.isEmpty)
       editUndoMenu.setDisable(!dirty)
       viewNetAssetValueHistoryMenu.setDisable(state.savingsUpd.funds.isEmpty)
       val hasHistory = Awaits.hasDataStoreEvents(Some(oldState.stage)).getOrElse(false) || state.eventsUpd.nonEmpty
@@ -522,8 +530,8 @@ class MainController extends Logging {
       }
     }
 
-    def onFileSave(state: State): Unit = {
-      if (save(state)) {
+    def onFileSave(state: State, saveAs: Boolean): Unit = {
+      if (save(state, saveAs)) {
         // Update state
         val newState = state.copy(savingsInit = state.savingsUpd, eventsUpd = Nil)
 
@@ -850,7 +858,7 @@ class MainController extends Logging {
         val buttonSave = alert.getDialogPane.lookupButton(buttonSaveType)
         buttonSave.asInstanceOf[Button].setGraphic(new ImageView(Images.iconDisk))
         buttonSave.addEventFilter(ActionEvent.ACTION, { (event: ActionEvent) =>
-          if (!save(state, Some(Stages.getStage(alert)))) event.consume()
+          if (!save(state, owner = Some(Stages.getStage(alert)))) event.consume()
         })
 
         val r = alert.showAndWait()
@@ -859,27 +867,31 @@ class MainController extends Logging {
       else true
 
     private def open(state: State): Unit = {
-      Awaits.openDataStore(Some(state.stage), change = true, save = false) match {
+      Awaits.openDataStore(Some(state.stage), change = true) match {
         case Some(Success(())) => refresh(state, reload = true, keepPending = false)
         case _                 =>
       }
     }
 
-    private def save(state: State, owner0: Option[Window] = None): Boolean = {
-      // Note: make sure to not both lock JavaFX (e.g. waiting for a Future) and
-      // try to use it (e.g. Dialog to show upon issue).
+    private def save(state: State, saveAs: Boolean = false, owner: Option[Window] = None): Boolean = {
+      // Notes:
+      // Make sure to not both lock JavaFX (e.g. waiting for a Future) and try
+      // to use it (e.g. Dialog to show upon issue).
       // For simplicity, we waits for result and display issue after receiving
       // it.
-      val owner = owner0.orElse(Some(state.stage))
+      // When 'saving as', we need to make sure the current real DB content has
+      // been copied to tmp before opening the (new) physical DB to save the
+      // content.
+      val actualOwner = owner.orElse(Some(state.stage))
 
       def save() =
-        Awaits.saveDataStoreChanges(owner, state.eventsUpd).isSuccess
+        Awaits.saveDataStoreChanges(actualOwner, fullDb = saveAs, state.eventsUpd).isSuccess
 
       DataStore.dbOpened match {
-        case Some(name) => save()
-        case None       =>
+        case Some(name) if !saveAs => save()
+        case _                     =>
           // Data store not opened yet: open then save
-          Awaits.openDataStore(owner, change = true, save = true) match {
+          Awaits.openDataStore(actualOwner, change = true, save = true, loadTmp = true) match {
             case Some(Success(())) => save()
             case _                 => false
           }
@@ -965,7 +977,7 @@ object MainController {
 
   case object OnFileClose
 
-  case object OnFileSave
+  case class OnFileSave(saveAs: Boolean)
 
   case object OnExit
 

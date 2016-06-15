@@ -109,7 +109,7 @@ object DataStore {
    *
    * Builds it (with physical one content if any) if necessary.
    */
-  protected def getDBTemp: Future[DBTemp] =
+  def getDBTemp: Future[DBTemp] =
     dbTempOpt match {
       case Some(v) => Future.successful(v)
       case None    => buildTempDB()
@@ -210,6 +210,22 @@ object DataStore {
         // Nothing to do since there are no changes to apply
         closeTempDB()
         Future.successful(())
+    }
+  }
+
+  /** Saves temporary DB to physical one. */
+  def save(): Future[Unit] = {
+    dbRealOpt match {
+      case Some(dbInfo) =>
+        getDBTemp.flatMap { tmp =>
+          copyDB(tmp.db, dbInfo.db)
+        }.andThen {
+          case _ => closeTempDB()
+        }
+
+      case None =>
+        // There is nothing to save because there is no real db opened!
+        throw new Exception("Cannot save data store because there is none opened yet")
     }
   }
 
