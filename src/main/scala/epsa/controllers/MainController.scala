@@ -416,6 +416,8 @@ class MainController extends Logging {
       events.collect {
         case Savings.DeleteFund(fundId) => DataStore.AssetHistory.deleteValues(fundId)
       }
+      // TODO: also flatten events (need to take care of asset actions - see sorting)
+      // TODO: then upon importing/exporting (and also loading ?), sort *and* flatten
       val (newEvents0, _) = Savings.sortEvents(oldState.eventsUpd ::: events)
       val newEvents = newEvents0.toList
       val savings = oldState.savingsUpd.processEvents(events)

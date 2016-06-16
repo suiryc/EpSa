@@ -42,13 +42,36 @@ object Savings extends Logging {
    * @return sorted events
    */
   def sortEvents(events: Seq[Event]): (Seq[Event], Boolean) = {
+    // Notes:
+    // The idea is simple: first we split events in groups of consecutive
+    // pure events + asset actions, then we move events when applicable (based
+    // on actions date, taking care of associated scheme/fund creation if
+    // necessary), and that's it.
+    //
+    // We thus take care of the most important needs: re-group actions per date,
+    // and move associated scheme/fund creation/association when applicable.
+    // But we don't care about lone scheme/fund updating, nor do we try to
+    // insert creations/associations at the right 'date'.
+    // e.g. if there is a group of actions spanning over a year, followed by a
+    // fund creation&association and an action for that fund which predates the
+    // previous group of actions date range end, we move the action into that
+    // group and the fund creation&association too: it thus appears the fund
+    // was created *before* all those actions in the events history (that is
+    // one year before it may actually have). The right thing would be to split
+    // the group of actions in 2 based on the moved action date, but it's not
+    // really worth the hassle (the code is already complex enough as it is).
+
     case class DateRange(min: LocalDate, max: LocalDate)
     case class SortingEvents(prefix: Seq[Event], assetEvents: Seq[AssetEvent]) {
+      def isEmpty = prefix.isEmpty && assetEvents.isEmpty
       lazy val dateRange: Option[DateRange] = {
         val eventsDates = assetEvents.map(_.date)
         if (eventsDates.isEmpty) None
         else Some(DateRange(eventsDates.min, eventsDates.max))
       }
+      def addEvents(events: Seq[Event]): SortingEvents = copy(prefix = prefix ++ events)
+      def addAssetEvents(events: Seq[AssetEvent]): SortingEvents = copy(assetEvents = assetEvents ++ events)
+      def sortAssetEvents: SortingEvents = copy(assetEvents = assetEvents.sortBy(_.date))
     }
 
     // Splits events into consecutive groups of pure Events and AssetEvents
@@ -69,13 +92,80 @@ object Savings extends Logging {
         v.prefix ++ v.assetEvents
       }
 
+    // Gets asset ids for which there were actions
+    def getIds(event: AssetEvent): Set[AssetId] =
+      event match {
+        case e: MakePayment  => Set(e.part.id)
+        case e: MakeTransfer => Set(e.partSrc.id, e.partDst.id)
+        case e: MakeRefund   => Set(e.part.id)
+      }
+
+    // Gets scheme ids for which we will need to move create/update events.
+    // We need it when there was a creation.
+    def getNeededSchemes(sortings: Seq[SortingEvents], ids: Set[AssetId]): Set[UUID] =
+      ids.map(_.schemeId).filter { schemeId =>
+        sortings.flatMap(_.prefix).exists {
+          case e: CreateScheme => schemeId == e.schemeId
+          case _               => false
+        }
+      }
+
+    // Gets fund ids for which we will need to move create/update events.
+    // We need it when there was a creation.
+    def getNeededFunds(sortings: Seq[SortingEvents], ids: Set[AssetId]): Set[UUID] =
+      ids.map(_.fundId).filter { fundId =>
+        sortings.flatMap(_.prefix).exists {
+          case e: CreateFund    => fundId == e.fundId
+          case _                => false
+        }
+      }
+
+    // Gets whether we need to move an asset event
+    def extractNeeded(event: Event, ids: Set[AssetId], schemeIds: Set[UUID], fundIds: Set[UUID]): Boolean =
+      event match {
+        case e: CreateScheme  => schemeIds.contains(e.schemeId)
+        case e: UpdateScheme  => schemeIds.contains(e.schemeId)
+        case e: CreateFund    => fundIds.contains(e.fundId)
+        case e: UpdateFund    => fundIds.contains(e.fundId)
+        case e: AssociateFund => ids.contains(e.id)
+        case _                => false
+      }
+
+    // Move Events from one group to another if necessary, that is if the
+    // source groups contain asset events that match our criteria.
+    def extractCreations(to: SortingEvents, from: Seq[SortingEvents], movedIds: Set[AssetId]): (SortingEvents, Seq[SortingEvents]) = {
+      val schemeIds = getNeededSchemes(from, movedIds)
+      val fundIds = getNeededFunds(from, movedIds)
+      from.foldLeft(to, Seq.empty[SortingEvents]) {
+        case ((accTo, accSortings), sorting) =>
+          val (extracted, remaining) = sorting.prefix.partition(extractNeeded(_, movedIds, schemeIds, fundIds))
+          val accTo2 = accTo.addEvents(extracted)
+          val accSorting2 = (accSortings :+ sorting.copy(prefix = remaining)).filterNot(_.isEmpty)
+          (accTo2, accSorting2)
+      }
+    }
+
     // Move AssetEvents from one group to another if necessary, that is if the
-    // source group contains dates predating maximal date of destination group.
-    def extract(to: SortingEvents, from: SortingEvents): (SortingEvents, SortingEvents) =
+    // source groups contain dates predating maximal date of destination group.
+    def extractActions(to: SortingEvents, from: Seq[SortingEvents]): (SortingEvents, Seq[SortingEvents]) =
       to.dateRange match {
-        case Some(dateRange) if from.dateRange.exists(_.min < dateRange.max) =>
-          val (extracted, remaining) = from.assetEvents.partition(_.date < dateRange.max)
-          (to.copy(assetEvents = to.assetEvents ++ extracted), from.copy(assetEvents = remaining))
+        case Some(dateRange) =>
+          from.foldLeft(to, Seq.empty[SortingEvents]) {
+            case ((accTo, accSortings), sorting) =>
+              if (sorting.dateRange.exists(_.min < dateRange.max)) {
+                // Extract actions and move them to head group
+                val (extracted, remaining) = sorting.assetEvents.partition(_.date < dateRange.max)
+                // Don't forget to sort actions by date in updated group
+                val accTo2 = accTo.addAssetEvents(extracted).sortAssetEvents
+                // Drop empty groups in remaining ones
+                val accSortings2 = (accSortings :+ sorting.copy(assetEvents = remaining)).filterNot(_.isEmpty)
+                // Then moved associated events (scheme/fund creation/update) when needed
+                val movedIds = accTo2.assetEvents.filter(sorting.assetEvents.contains).flatMap(getIds).toSet
+                extractCreations(accTo2, accSortings2, movedIds)
+              } else {
+                (accTo, accSortings :+ sorting)
+              }
+          }
 
         case _ =>
           (to, from)
@@ -87,14 +177,10 @@ object Savings extends Logging {
     @scala.annotation.tailrec
     def sort(sortings: Seq[SortingEvents], sorted: Seq[SortingEvents]): Seq[SortingEvents] =
       sortings.headOption match {
-        case Some(sorting) =>
-          val (sorting2, sortings2) = sortings.tail.foldLeft(sorting, Seq.empty[SortingEvents]) {
-            case ((accSorting, accSortings), from) =>
-              val (accSorting2, from2) = extract(accSorting, from)
-              (accSorting2, accSortings :+ from2)
-          }
-          val sorting3 = sorting2.copy(assetEvents = sorting2.assetEvents.sortBy(_.date))
-          sort(sortings2, sorted :+ sorting3)
+        case Some(head) =>
+          val tail = sortings.tail
+          val (head2, tail2) = extractActions(head, tail)
+          sort(tail2, sorted :+ head2)
 
         case None =>
           sorted
@@ -283,9 +369,15 @@ object Savings extends Logging {
 
   case class AssociateFund(schemeId: UUID, fundId: UUID)
     extends Event
+  {
+    def id = AssetId(schemeId, fundId)
+  }
 
   case class DissociateFund(schemeId: UUID, fundId: UUID)
     extends Event
+  {
+    def id = AssetId(schemeId, fundId)
+  }
 
   case class MakePayment(date: LocalDate, part: AssetPart, comment: Option[String])
     extends AssetEvent
