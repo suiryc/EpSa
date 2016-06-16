@@ -32,12 +32,14 @@ case class Levies(
   lazy val list = levies.values.toList
 
   lazy val normalized: Levies = {
+    val startDate = levies.flatMap(_._2.periods.map(_.start)).min
     val normalizedLevies = levies.mapValues { levy =>
       // If a period has no end and is followed by another period, set its
       // end to the start of the next period.
       // If a period has an end and the next one does not start the next day,
-      // introduce a '0 rate' fake period inbetween. Also add a fake period
-      // without end if the last period has an end.
+      // introduce a '0 rate' fake period in-between. Also add a fake period
+      // without end if the last period has an end, and a fake first period
+      // for levies to all start on the same date.
       // As a trick, append periods in reverse order (so that it is easy to
       // get the previous period at each iteration), then reverse the
       // resulting list.
@@ -48,13 +50,18 @@ case class Levies(
               // end previous period
               period :: head.copy(end = Some(period.start.minusDays(1))) :: tail
             } else if (head.end.get.plusDays(1) < period.start) {
-              // Add fake period inbetween
+              // Add fake period in-between
               period :: LevyPeriod(rate = 0, start = head.end.get.plusDays(1), end = Some(period.start.minusDays(1))) :: acc
             } else {
               period :: acc
             }
           case _ =>
-            period :: acc
+            if (period.start > startDate) {
+              // Add fake first period
+              period :: LevyPeriod(rate = 0, start = startDate, end = Some(period.start.minusDays(1))) :: acc
+            } else {
+              period :: acc
+            }
         }
       }
       // Add fake period after last ending

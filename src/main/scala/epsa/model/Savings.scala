@@ -13,10 +13,6 @@ import spray.json._
 import suiryc.scala.math.Ordered._
 import suiryc.scala.spray.json.JsonFormats
 
-// TODO: add fake '0 rate' period before any levies initial period ?
-//       to take care of actual loss between initial investment and first levy period
-//       otherwise we can have a loss (compared to initial investment) and still have levies to pay because there was a relative gain between the first period start and the refund date
-
 /** Savings helpers. */
 object Savings extends Logging {
 
@@ -429,6 +425,14 @@ case class Savings(
   //     ended), the amount due is lowered accordingly
   // (How it works: the fake period will be seen as a loss and thus pushed back
   // on previous periods as explained above.)
+  // Since there may be multiple levies not starting at the same date, taking
+  // into account there should not be levies amount to pay for a particular levy
+  // if it started after the others but there was a loss since then, a fake
+  // period is also placed first when necessary, so that all levies start at the
+  // same date.
+  // (Note: should this actually extend before any levies to take into account
+  // the real initial invested amount instead of the 'perceived' invested amount
+  // at the start of all levies ?)
   //
   // TODO: should we try to detect missing NAV values (that should have been
   //       nearer than found ones) ?
