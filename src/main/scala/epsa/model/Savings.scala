@@ -743,12 +743,14 @@ case class Savings(
     // In order, we have:
     // 1. deleted schemes (with funds dissociation)
     // 2. deleted funds (with remaining dissociations)
-    // 3. created schemes (possibly disabled)
-    // 4. created funds (possibly disabled)
-    // 5. funds associated to created schemes
-    // 6. created funds remaining associations
-    // 7. remaining schemes updates
-    // 8. remaining funds updates
+    // 3. remaining schemes updates
+    // 4. remaining funds updates
+    // 5. created schemes (possibly disabled)
+    // 6. created funds (possibly disabled)
+    // 7. funds associated to created schemes
+    // 8. created funds remaining associations
+    // Note: for consistency, it is better to update funds before creating new
+    // ones (as created ones may re-use a renamed existing one).
     val flattenedEvents = schemesDeleted.toList.flatMap { schemeId =>
       getScheme(schemeId).funds.map { fundId =>
         Savings.DissociateFund(schemeId, fundId)
@@ -759,24 +761,6 @@ case class Savings(
       }.map { scheme =>
         Savings.DissociateFund(scheme.id, fundId)
       } :+ Savings.DeleteFund(fundId)
-    } ::: schemesCreatedOrdered.map { scheme =>
-      Savings.CreateScheme(scheme.id, scheme.name, scheme.comment)
-    } ::: schemesCreatedOrdered.filter(_.disabled).map { scheme =>
-      Savings.UpdateScheme(scheme).copy(disabled = scheme.disabled)
-    } ::: fundsCreatedOrdered.map { fund =>
-      Savings.CreateFund(fund.id, fund.name, fund.comment)
-    } ::: fundsCreatedOrdered.filter(_.disabled).map { fund =>
-      Savings.UpdateFund(fund).copy(disabled = fund.disabled)
-    } ::: schemesCreatedOrdered.flatMap { scheme =>
-      scheme.funds.map { fundId =>
-        Savings.AssociateFund(scheme.id, fundId)
-      }
-    } ::: fundsCreatedOrdered.flatMap { fund =>
-      newSavings.schemes.filter { scheme =>
-        scheme.funds.contains(fund.id) && !schemesCreated.contains(scheme.id)
-      }.map { scheme =>
-        Savings.AssociateFund(scheme.id, fund.id)
-      }
     } ::: schemesRemainingOrdered.flatMap { newScheme =>
       val oldScheme = getScheme(newScheme.id)
       val event1 =
@@ -801,6 +785,24 @@ case class Savings(
       else Some(Savings.UpdateFund(newFund.id, newFund.name, newFund.comment, newFund.disabled))
       // Note: association/dissociation to old, new or remaining schemes have
       // been taken care of already.
+    } ::: schemesCreatedOrdered.map { scheme =>
+      Savings.CreateScheme(scheme.id, scheme.name, scheme.comment)
+    } ::: schemesCreatedOrdered.filter(_.disabled).map { scheme =>
+      Savings.UpdateScheme(scheme).copy(disabled = scheme.disabled)
+    } ::: fundsCreatedOrdered.map { fund =>
+      Savings.CreateFund(fund.id, fund.name, fund.comment)
+    } ::: fundsCreatedOrdered.filter(_.disabled).map { fund =>
+      Savings.UpdateFund(fund).copy(disabled = fund.disabled)
+    } ::: schemesCreatedOrdered.flatMap { scheme =>
+      scheme.funds.map { fundId =>
+        Savings.AssociateFund(scheme.id, fundId)
+      }
+    } ::: fundsCreatedOrdered.flatMap { fund =>
+      newSavings.schemes.filter { scheme =>
+        scheme.funds.contains(fund.id) && !schemesCreated.contains(scheme.id)
+      }.map { scheme =>
+        Savings.AssociateFund(scheme.id, fund.id)
+      }
     }
 
     // Ensure flattening is OK
