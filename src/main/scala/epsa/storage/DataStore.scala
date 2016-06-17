@@ -362,23 +362,28 @@ object DataStore {
 
     protected[DataStore] def schema = entries.schema
 
-    protected[DataStore] def dbOrTemp[A](dbOpt: Option[DatabaseDef], action: DBAction[A], reset: Boolean = false): Future[A] =
-      dbOpt match {
-        case Some(db) => action(db)
-        case None =>
-          getDBTemp.flatMap { tmp =>
-            if (reset) tmp.resetActions(this)
-            tmp.addAction(this, action)
-            action(tmp.db)
-          }
+    protected[DataStore] def newAction[A](action: DBAction[A], reset: Boolean = false, add: Boolean = true): Future[A] =
+      getDBTemp.flatMap { tmp =>
+        if (reset) tmp.resetActions(this)
+        if (add) tmp.addAction(this, action)
+        action(tmp.db)
       }
 
     protected[DataStore] def deleteEntries(db: DatabaseDef): Future[Int] =
       db.run(entries.delete)
 
-    def deleteEntries()(implicit dbOpt: Option[DatabaseDef] = None): Future[Int] =
-      // Drop pending actions on this table since we are emptying it
-      dbOrTemp(dbOpt, deleteEntries, reset = true)
+    def deleteEntries(): Future[Int] = {
+      // We register action only if there was data to begin with, which
+      // is not the case if there is no real db (yet) or real db had no
+      // data.
+      val hadData = dbRealOpt.map { dbReal =>
+        dbReal.db.run(entries.take(1).result).map(_.nonEmpty)
+      }.getOrElse(Future.successful(false))
+      hadData.flatMap { v =>
+        // Drop pending actions on this table since we are emptying it
+        newAction(deleteEntries, reset = true, add = v)
+      }
+    }
 
     protected[DataStore] def readEntries(db: DatabaseDef): Future[Seq[Entry]] =
       db.run(entries.result)
@@ -396,11 +401,15 @@ object DataStore {
         entries ++= values
       }.map(_ => ())
 
-    def writeEntry(value: Entry)(implicit dbOpt: Option[DatabaseDef] = None): Future[Unit] =
-      dbOrTemp(dbOpt, writeEntry(_, value))
+    def writeEntry(value: Entry): Future[Unit] =
+      newAction(writeEntry(_, value))
 
-    def writeEntries(values: Seq[Entry])(implicit dbOpt: Option[DatabaseDef] = None): Future[Unit] =
-      dbOrTemp(dbOpt, writeEntries(_, values))
+    def writeEntries(values: Seq[Entry]): Future[Unit] = {
+      // Don't do anything (and especially don't create a new pending action)
+      // if there are no entries to write.
+      if (values.isEmpty) Future.successful(())
+      else newAction(writeEntries(_, values))
+    }
 
   }
 
@@ -425,11 +434,11 @@ object DataStore {
         db.run(entries.filter(_.key === key).map(_.value).take(1).result).map(_.headOption)
       }
 
-    def deleteEntry(key: String)(implicit dbOpt: Option[DatabaseDef] = None): Future[Int] = {
+    def deleteEntry(key: String): Future[Int] = {
       def delete(db: DatabaseDef): Future[Int] =
         db.run(entries.filter(_.key === key).delete)
 
-      dbOrTemp(dbOpt, delete)
+      newAction(delete)
     }
 
   }
@@ -469,23 +478,11 @@ object DataStore {
         db.run(entries.sortBy(_.id).map(_.event).result)
       }
 
-    protected def writeEvents(dbOpt: Option[DatabaseDef], events: Seq[Savings.Event]): Future[Unit] = {
-      def write(db: DatabaseDef): Future[Unit] =
-        db.run {
-          entries ++= events.map { event =>
-            // Note: "auto increment" field value will be ignored
-            (0L, event, Timestamp.from(Instant.now))
-          }
-        }.map(_ => ())
-
-      // Note: caller actually only writes events when user requested to save
-      // changes, which means it will be done directly in real database, not
-      // in memory. But keep the code generic and handle both cases.
-      dbOrTemp(dbOpt, write)
-    }
-
-    def writeEvents(events: Seq[Savings.Event])(implicit dbOpt: Option[DatabaseDef] = None): Future[Unit] =
-      writeEvents(dbOpt, events)
+    def writeEvents(events: Seq[Savings.Event]): Future[Unit] =
+      writeEntries(events.map { event =>
+        // Note: "auto increment" field value will be ignored
+        (0L, event, Timestamp.from(Instant.now))
+      })
 
   }
 
@@ -552,7 +549,7 @@ object DataStore {
         }.map(r => getAssetValue(r).headOption)
       }
 
-    def writeValues(fundId: UUID, values: Savings.AssetValue*)(implicit dbOpt: Option[DatabaseDef] = None): Future[Unit] = {
+    def writeValues(fundId: UUID, values: Seq[Savings.AssetValue]): Future[Unit] = {
       // Note: we may have to update existing values, not only insert.
       // The easiest way to do that is to call 'insertOrUpdate' for every entry
       // to process, then group all those actions in a DBIO.sequence to run,
@@ -567,35 +564,30 @@ object DataStore {
           }).transactionally
         }.map(_ => ())
 
-      dbOrTemp(dbOpt, write)
+      // Don't do anything (and especially don't create a new pending action)
+      // if there are no entries to write.
+      if (values.isEmpty) Future.successful(())
+      else newAction(write)
     }
 
-    def writeValues(fundId: UUID, values: Seq[Savings.AssetValue]): Future[Unit] =
-      writeValues(fundId, values:_*)
+    def writeValues(fundId: UUID, values: Savings.AssetValue*)(implicit d: DummyImplicit): Future[Unit] =
+      writeValues(fundId, values)
 
-    def deleteValues(fundId: UUID)(implicit dbOpt: Option[DatabaseDef] = None): Future[Int] = {
+    def deleteValues(fundId: UUID): Future[Int] = {
       def delete(db: DatabaseDef): Future[Int] =
         db.run(entries.filter(_.fundId === fundId).delete)
 
-      dbOpt match {
-        case Some(db) => delete(db)
-        case None     =>
-          getDBTemp.flatMap { tmp =>
-            // Note: caller is expected to call us *because* there are data to
-            // delete. If needed, we could still check we really have entries
-            // with 'db.run(entries.length.result)'.
-
-            // We register action only if there was data to begin with, which
-            // is not the case if there is no real db (yet) or real db had no
-            // data for this fund.
-            val hadData = dbRealOpt.map { dbReal =>
-              dbReal.db.run(entries.filter(_.fundId === fundId).length.result).map(_ > 0)
-            }.getOrElse(Future.successful(false))
-            hadData.flatMap { v =>
-              if (v) tmp.addAction(this, delete)
-              delete(tmp.db)
-            }
-          }
+      getDBTemp.flatMap { tmp =>
+        // We register action only if there was data to begin with, which
+        // is not the case if there is no real db (yet) or real db had no
+        // data for this fund.
+        val hadData = dbRealOpt.map { dbReal =>
+          dbReal.db.run(entries.filter(_.fundId === fundId).take(1).result).map(_.nonEmpty)
+        }.getOrElse(Future.successful(false))
+        hadData.flatMap { v =>
+          if (v) tmp.addAction(this, delete)
+          delete(tmp.db)
+        }
       }
     }
 
@@ -642,7 +634,7 @@ object DataStore {
 
     override protected val entries = TableQuery[Entries]
 
-    def updateEntry(id1: String, value: Entry)(implicit dbOpt: Option[DatabaseDef] = None): Future[Unit] = {
+    def updateEntry(id1: String, value: Entry): Future[Unit] = {
       def update(db: DatabaseDef): Future[Unit] =
         db.run {
           DBIO.sequence(List(
@@ -651,14 +643,14 @@ object DataStore {
           )).transactionally
         }.map(_ => ())
 
-      dbOrTemp(dbOpt, update)
+      newAction(update)
     }
 
-    def deleteEntry(id: String)(implicit dbOpt: Option[DatabaseDef] = None): Future[Int] = {
+    def deleteEntry(id: String): Future[Int] = {
       def delete(db: DatabaseDef): Future[Int] =
         db.run(entries.filter(_.id === id).delete)
 
-      dbOrTemp(dbOpt, delete)
+      newAction(delete)
     }
 
   }
