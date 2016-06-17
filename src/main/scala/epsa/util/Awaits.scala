@@ -48,23 +48,19 @@ object Awaits {
   def readDataStoreEvents(owner: Option[Window]): Try[Seq[Savings.Event]] =
     orError(DataStore.EventSource.readEvents(), owner, DataStore.readIssueMsg())
 
+  def writeDataStoreEvents(owner: Option[Window], events: Seq[Savings.Event]): Try[Unit] =
+    orError(DataStore.EventSource.writeEvents(events), owner, DataStore.writeIssueMsg())
+
   def purgeDataStoreEvents(owner: Option[Window]): Try[Int] =
     orError(DataStore.EventSource.deleteEntries(), owner, DataStore.writeIssueMsg())
 
-  def saveDataStoreChanges(owner: Option[Window], fullDb: Boolean, events: List[Savings.Event]): Try[Unit] = {
-    // Note: we are supposed to have a real database opened by now. So we have
-    // to first apply any pending changes from temporary database, then write
-    // pending events in real database directly.
+  def saveDataStoreChanges(owner: Option[Window], fullDb: Boolean): Try[Unit] = {
+    // Note: we are supposed to have a real database opened by now.
+    // We can now apply any pending changes from temporary database.
     val dbSave =
-      if (fullDb) Action(DataStore.save())
-      else Action(DataStore.saveChanges())
-    val actions = Seq(dbSave) ++ (if (events.nonEmpty) {
-      Some(Action(DataStore.EventSource.writeEvents(events)(Some(DataStore.getRealDB.db))))
-    } else {
-      None
-    }).toSeq
-    val f = RichFuture.executeAllSequentially(stopOnError = true, actions).map(_ => ())
-    orError(f, owner, DataStore.writeIssueMsg(real = true))
+      if (fullDb) DataStore.save()
+      else DataStore.saveChanges()
+    orError(dbSave, owner, DataStore.writeIssueMsg(real = true))
   }
 
   def applyDataStoreChanges(owner: Option[Window], actions: List[RichFuture.Action[Unit, AnyVal]]): Try[Unit] = {
