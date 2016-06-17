@@ -11,6 +11,7 @@ import scala.util.{Failure, Success, Try}
 import suiryc.scala.concurrent.RichFuture
 import suiryc.scala.concurrent.RichFuture.Action
 import suiryc.scala.javafx.scene.control.Dialogs
+import suiryc.scala.math.Ordered._
 
 object Awaits {
 
@@ -47,6 +48,24 @@ object Awaits {
 
   def readDataStoreEvents(owner: Option[Window]): Try[Seq[Savings.Event]] =
     orError(DataStore.EventSource.readEvents(), owner, DataStore.readIssueMsg())
+
+  def getEventsHistory(owner: Option[Window], extra: Seq[Savings.Event] = Nil, upTo: Option[LocalDate] = None): Seq[Savings.Event] = {
+    val events0 = readDataStoreEvents(owner).getOrElse(Nil)
+    val events1 =
+      if (extra.isEmpty) events0
+      else events0 ++ extra
+    val events2 = Savings.sortEvents(events1)._1
+    upTo match {
+      case Some(date) =>
+        events2.takeWhile {
+          case e: Savings.AssetEvent => e.date <= date
+          case _ => true
+        }
+
+      case None =>
+        events2
+    }
+  }
 
   def writeDataStoreEvents(owner: Option[Window], events: Seq[Savings.Event]): Try[Unit] =
     orError(DataStore.EventSource.writeEvents(events), owner, DataStore.writeIssueMsg())

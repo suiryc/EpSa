@@ -730,8 +730,7 @@ class MainController extends Logging {
     }
 
     def onExportRawAccountHistory(state: State): Unit = {
-      val events0 = Awaits.readDataStoreEvents(Some(state.stage)).getOrElse(Nil)
-      val (events, _) = Savings.sortEvents(events0)
+      val events = Awaits.getEventsHistory(Some(state.stage))
       import spray.json._
       import Savings.JsonProtocol._
       val eventsJson = events.map(_.toJson)

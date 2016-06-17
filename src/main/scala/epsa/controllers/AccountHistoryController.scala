@@ -104,9 +104,8 @@ class AccountHistoryController extends Logging {
     this.mainController = mainController
     this.stage = stage
 
-    // Sort events
-    val events0 = Awaits.readDataStoreEvents(Some(stage)).getOrElse(Nil)
-    events = Savings.sortEvents(events0)._1
+    // Get&sort events
+    events = Awaits.getEventsHistory(Some(stage))
 
     // Known NAVs through account history events.
     // This can complete data store NAVs, especially for old (now deleted) funds.
