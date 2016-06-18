@@ -45,11 +45,10 @@ class Main extends Application {
 
     def startController(): Unit = {
       // Note: actual state (account events) will be built by controller.
-      val savingsInit = Savings()
+      val savings = Savings()
       val state = MainController.State(
         stage = stage,
-        savingsInit = savingsInit,
-        savingsUpd = savingsInit
+        savings = savings
       )
       MainController.build(state, applicationStart = true)
     }

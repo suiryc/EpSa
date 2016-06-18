@@ -154,7 +154,7 @@ class AccountHistoryController extends Logging {
 
     // Replay events to get history entries (main level and details).
     val root = new TreeItem[AssetEventItem]()
-    events.foldLeft(Savings(levies = state.savingsUpd.levies)) { (savings, event) =>
+    events.foldLeft(Savings(levies = state.savings.levies)) { (savings, event) =>
       event match {
         case event: Savings.AssetEvent =>
           val eventItems = getEventItems(savings, event)

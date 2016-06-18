@@ -184,7 +184,7 @@ class SavingsView(tab: SavingsViewTab) {
   /** Gets (computes) given asset details. */
   private def getAssetDetails(asset: Savings.Asset, data: RefreshData): AssetDetails = {
     val state = data.state
-    val savings = state.savingsUpd
+    val savings = state.savings
 
     // Note: it is expected that we have an asset because there is an invested
     // amount. So there is no need to try to prevent division by 0.
@@ -218,7 +218,7 @@ class SavingsView(tab: SavingsViewTab) {
   }
 
   def displaySavings(data: RefreshData): Unit = {
-    val savings = data.state.savingsUpd
+    val savings = data.state.savings
 
     // Then update table content: takes care of added/removed entries
     val dateOpt = tab.getDateOpt(data)
@@ -279,7 +279,7 @@ class SavingsViewTab(val mainController: MainController, val dateOpt: Option[Loc
     else savings.latestAssetAction
 
   private[epsa] def getDateOpt(data: RefreshData): Option[LocalDate] =
-    getDateOpt(data.state.savingsUpd, data.upToDateAssets)
+    getDateOpt(data.state.savings, data.upToDateAssets)
 
   override def refresh(data: RefreshData): Unit = {
     val state = data.state
@@ -292,12 +292,11 @@ class SavingsViewTab(val mainController: MainController, val dateOpt: Option[Loc
         // Compute actual state from account history up to requested date
         val owner = Some(state.stage)
         val history = Awaits.getEventsHistory(owner, upTo = Some(date))
-        val savings = Savings(levies = state.savingsUpd.levies).processEvents(history)
+        val savings = Savings(levies = state.savings.levies).processEvents(history)
         val eventsNAVs = Savings.getEventsNAVs(history)
         val navs = savings.getNAVs(owner, date, eventsNAVs)
         val actualState = state.copy(
-          savingsInit = savings,
-          savingsUpd = savings,
+          savings = savings,
           assetsValue = navs
         )
         data.copy(state = actualState)

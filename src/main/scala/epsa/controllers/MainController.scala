@@ -399,8 +399,8 @@ class MainController extends Logging {
       case OnFileSave(saveAs) => onFileSave(state, saveAs)
       case OnExit            => onExit(state)
       case OnEditUndo        => onEditUndo(state)
-      case OnEditSchemes(id) => onEditSchemes(state, id.flatMap(state.savingsUpd.findScheme))
-      case OnEditFunds(id)   => onEditFunds(state, id.flatMap(state.savingsUpd.findFund))
+      case OnEditSchemes(id) => onEditSchemes(state, id.flatMap(state.savings.findScheme))
+      case OnEditFunds(id)   => onEditFunds(state, id.flatMap(state.savings.findFund))
       case OnEditUnavailabilityPeriods => onEditUnavailabilityPeriods(state)
       case OnNewAssetAction(kind, asset) => onNewAssetAction(state, kind, asset)
       case OnOptions         => onOptions(state)
@@ -424,10 +424,10 @@ class MainController extends Logging {
       // the event(s) in the datastore.
       // But don't bother if there is actually no event to save&process.
       val savings =
-        if (events.isEmpty) oldState.savingsUpd
+        if (events.isEmpty) oldState.savings
         else {
           Awaits.writeDataStoreEvents(Some(oldState.stage), events)
-          oldState.savingsUpd.processEvents(events)
+          oldState.savings.processEvents(events)
         }
       // Then update state
       val newAssetsValue =
@@ -436,7 +436,7 @@ class MainController extends Logging {
           val date = toDateSavingsViewTab.getDateOpt(savings, upToDateAssetsMenu.isSelected).getOrElse(LocalDate.now)
           savings.getNAVs(Some(oldState.stage), date)
         }
-      val state = oldState.copy(savingsUpd = savings, assetsValue = newAssetsValue)
+      val state = oldState.copy(savings = savings, assetsValue = newAssetsValue)
       val dirty = state.hasPendingChanges
 
       // First update state associated to assets table: takes care of
@@ -450,7 +450,7 @@ class MainController extends Logging {
       // Don't enable 'Save as' if there is no physical DB yet.
       fileSaveAsMenu.setDisable(!dirty || DataStore.dbOpened.isEmpty)
       editUndoMenu.setDisable(!dirty)
-      viewNetAssetValueHistoryMenu.setDisable(state.savingsUpd.funds.isEmpty)
+      viewNetAssetValueHistoryMenu.setDisable(state.savings.funds.isEmpty)
       val hasHistory = Awaits.hasDataStoreEvents(Some(oldState.stage)).getOrElse(false)
       viewSavingsOnDateMenu.setDisable(!hasHistory)
       viewAccountHistoryMenu.setDisable(!hasHistory)
@@ -483,19 +483,17 @@ class MainController extends Logging {
             val (events, outOfOrder) = Savings.sortEvents(events0)
             // Cleanup datastore if necessary
             MainController.this.onCleanupDataStore(outOfOrder)
-            val savingsInit = Savings(levies = levies).processEvents(events)
+            val savings = Savings(levies = levies).processEvents(events)
             State(
               stage = state0.stage,
-              savingsInit = savingsInit,
-              savingsUpd = savingsInit
+              savings = savings
             )
 
           case _ =>
-            val savingsInit = Savings(levies = levies)
+            val savings = Savings(levies = levies)
             State(
               stage = state0.stage,
-              savingsInit = savingsInit,
-              savingsUpd = savingsInit
+              savings = savings
             )
         }
       } else state0
@@ -543,12 +541,9 @@ class MainController extends Logging {
     }
 
     def onFileSave(state: State, saveAs: Boolean): Unit = {
-      if (save(state, saveAs)) {
-        // Update state
-        val newState = state.copy(savingsInit = state.savingsUpd)
-
-        applyState(newState)
-      }
+      // Note: upon successful saving, we need to refresh the view (so that the
+      // visual hint about pending changes disappears).
+      if (save(state, saveAs)) applyState(state)
       // else: either it was cancelled by user, or it failed (and user was
       // notified).
     }
@@ -572,12 +567,12 @@ class MainController extends Logging {
 
       if (resp.contains(ButtonType.OK)) {
         DataStore.undoChanges()
-        applyState(state.resetPendingChanges, updateAssetsValue = true)
+        refresh(state, reload = true)
       }
     }
 
     def onEditSchemes(state: State, edit: Option[Savings.Scheme]): Unit = {
-      val dialog = EditSchemesController.buildDialog(Some(state.stage), state.savingsUpd, edit)
+      val dialog = EditSchemesController.buildDialog(Some(state.stage), state.savings, edit)
       dialog.initModality(Modality.WINDOW_MODAL)
       dialog.setResizable(true)
       val events = dialog.showAndWait().orElse(Nil)
@@ -585,7 +580,7 @@ class MainController extends Logging {
     }
 
     def onEditFunds(state: State, edit: Option[Savings.Fund]): Unit = {
-      val dialog = EditFundsController.buildDialog(Some(state.stage), state.savingsUpd, edit)
+      val dialog = EditFundsController.buildDialog(Some(state.stage), state.savings, edit)
       dialog.initModality(Modality.WINDOW_MODAL)
       dialog.setResizable(true)
       val events = dialog.showAndWait().orElse(Nil)
@@ -600,12 +595,12 @@ class MainController extends Logging {
     }
 
     def onNewAssetAction(state: State, kind: AssetActionKind.Value, asset: Option[Savings.Asset]): Unit = {
-      val dialog = NewAssetActionController.buildDialog(Some(state.stage), MainController.this, state.savingsUpd, kind, asset)
+      val dialog = NewAssetActionController.buildDialog(Some(state.stage), MainController.this, state.savings, kind, asset)
       dialog.initModality(Modality.WINDOW_MODAL)
       dialog.setResizable(true)
       val event = dialog.showAndWait().orElse(None)
       if (event.isDefined) {
-        if (state.savingsUpd.latestAssetAction.exists(event.get.date < _)) {
+        if (state.savings.latestAssetAction.exists(event.get.date < _)) {
           // This new event predates latest asset action. We need to reorder
           // history as processing it may fail with current savings (assets not
           // existing anymore due to availability dates reached in-between).
@@ -613,13 +608,12 @@ class MainController extends Logging {
           // First read (and order) history and apply new event
           val events = Awaits.getEventsHistory(Some(state.stage), extra = event.toSeq).toList
           // Then process events to get up to date savings
-          val savingsUpd = Savings(levies = state.savingsUpd.levies).processEvents(events)
+          val savingsUpd = Savings(levies = state.savings.levies).processEvents(events)
           // Purge current history
           Awaits.purgeDataStoreEvents(Some(state.stage))
-          // And rewrite reordered history (but keep original savings to
-          // properly handle 'undo' request).
+          // And rewrite reordered history.
           Awaits.writeDataStoreEvents(Some(state.stage), events)
-          val state2 = state.copy(savingsUpd = savingsUpd)
+          val state2 = state.copy(savings = savingsUpd)
           // Now we can refresh the view
           refresh(state2)
         } else {
@@ -709,7 +703,7 @@ class MainController extends Logging {
     }
 
     def onNetAssetValueHistory(state: State, fundId: Option[UUID]): Unit = {
-      val dialog = NetAssetValueHistoryController.buildDialog(MainController.this, state.savingsUpd, fundId, state.stage)
+      val dialog = NetAssetValueHistoryController.buildDialog(MainController.this, state.savings, fundId, state.stage)
       // Notes:
       // Don't set as modal, since we wish to display the window while still
       // interacting with the main stage.
@@ -743,7 +737,7 @@ class MainController extends Logging {
     }
 
     def onLevies(state: State): Unit = {
-      val dialog = LeviesController.buildDialog(state.savingsUpd, state.stage)
+      val dialog = LeviesController.buildDialog(state.savings, state.stage)
       dialog.initModality(Modality.WINDOW_MODAL)
       dialog.setResizable(true)
       if (dialog.showAndWait().orElse(false)) refresh(state, reload = true)
@@ -847,7 +841,7 @@ class MainController extends Logging {
           accountHistoryPath() = selectedFile.toPath
           // Purge events history, and replay imported history
           Awaits.purgeDataStoreEvents(Some(state.stage))
-          val newState = processEvents(state.zero(Savings(levies = state.savingsUpd.levies)), events)
+          val newState = processEvents(state.zero(Savings(levies = state.savings.levies)), events)
           // Then cleanup data store (no need to reorder as we did it already)
           onCleanupDataStore(newState, reorder = false)
         }
@@ -855,7 +849,7 @@ class MainController extends Logging {
     }
 
     def onCleanupDataStore(state: State, reorder: Boolean): Unit = {
-      Awaits.cleanupDataStore(Some(state.stage), state.savingsUpd.funds.map(_.id), reorder)
+      Awaits.cleanupDataStore(Some(state.stage), state.savings.funds.map(_.id), reorder)
       refresh(state)
     }
 
@@ -953,11 +947,9 @@ object MainController {
 
   private val upToDateAssets = Preference.from("up-to-date-assets", false)
 
-  // TODO: drop savingsInit ? ('undo' will need to reload history)
   case class State(
     stage: Stage,
-    savingsInit: Savings = Savings(),
-    savingsUpd: Savings = Savings(),
+    savings: Savings = Savings(),
     assetsValue: Map[UUID, Savings.AssetValue] = Map.empty
   ) {
 
@@ -966,15 +958,10 @@ object MainController {
     def hasPendingChanges: Boolean =
       DataStore.hasPendingChanges
 
-    /** Resets pending changes. */
-    def resetPendingChanges: State =
-      copy(savingsUpd = savingsInit)
-
     /** Resets state to zero. */
     def zero(savings: Savings = Savings()): State =
       copy(
-        savingsInit = savings,
-        savingsUpd = savings,
+        savings = savings,
         assetsValue = Map.empty
       )
 
