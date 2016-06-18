@@ -29,6 +29,7 @@ import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.javafx.event.EventHandler._
 import suiryc.scala.javafx.scene.control.{Dialogs, TableViews}
 import suiryc.scala.javafx.stage.{FileChoosers, Stages}
+import suiryc.scala.math.Ordered._
 import suiryc.scala.settings.Preference
 
 // TODO: take care of asset actions (see sorting) upon flattening events
@@ -604,8 +605,27 @@ class MainController extends Logging {
       dialog.setResizable(true)
       val event = dialog.showAndWait().orElse(None)
       if (event.isDefined) {
-        // Refresh NAVs as there may be new assets
-        processEvents(state, event.toList, updateAssetsValue = true)
+        if (state.savingsUpd.latestAssetAction.exists(event.get.date < _)) {
+          // This new event predates latest asset action. We need to reorder
+          // history as processing it may fail with current savings (assets not
+          // existing anymore due to availability dates reached in-between).
+
+          // First read (and order) history and apply new event
+          val events = Awaits.getEventsHistory(Some(state.stage), extra = event.toSeq).toList
+          // Then process events to get up to date savings
+          val savingsUpd = Savings(levies = state.savingsUpd.levies).processEvents(events)
+          // Purge current history
+          Awaits.purgeDataStoreEvents(Some(state.stage))
+          // And rewrite reordered history (but keep original savings to
+          // properly handle 'undo' request).
+          Awaits.writeDataStoreEvents(Some(state.stage), events)
+          val state2 = state.copy(savingsUpd = savingsUpd)
+          // Now we can refresh the view
+          refresh(state2)
+        } else {
+          // Refresh NAVs as there may be new assets
+          processEvents(state, event.toList, updateAssetsValue = true)
+        }
       }
     }
 

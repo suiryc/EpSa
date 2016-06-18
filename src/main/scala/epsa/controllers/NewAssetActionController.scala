@@ -20,7 +20,7 @@ import javafx.stage.{Modality, Stage, Window}
 import javafx.util.converter.LocalDateStringConverter
 import scala.collection.JavaConversions._
 import suiryc.scala.javafx.stage.Stages.StageLocation
-import suiryc.scala.math.Ordering._
+import suiryc.scala.math.Ordered._
 import suiryc.scala.settings.Preference
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.event.EventHandler._
@@ -117,6 +117,10 @@ class NewAssetActionController extends Logging {
 
   private var savings: Savings = _
 
+  private var actualSavings: Savings = _
+
+  private var actualSavingsDate: LocalDate = _
+
   private var actionKind: AssetActionKind.Value = _
 
   private var recursionLevel = 0
@@ -189,7 +193,7 @@ class NewAssetActionController extends Logging {
           override def updateItem(item: LocalDate, empty: Boolean): Unit = {
             super.updateItem(item, empty)
             getOperationDate.foreach { operationDate =>
-              val unavailable = !empty && item.isBefore(operationDate)
+              val unavailable = !empty && (item < operationDate)
               setDisable(unavailable)
               // Note: ideally we would like to set a tooltip explaining why a
               // date is not available; but this is not possible on a disabled
@@ -421,7 +425,7 @@ class NewAssetActionController extends Logging {
     } {
       val srcAvailability = getSrcAvailability
       val searchAsset = Savings.Asset(schemeAndFund.scheme.id, schemeAndFund.fund.id, srcAvailability, 0, 0)
-      savings.computeAssets(operationDate).findAsset(operationDate, searchAsset).foreach { asset =>
+      getSavings(operationDate).findAsset(operationDate, searchAsset).foreach { asset =>
         // Note: setting the units will trigger amount computing and update the field
         srcUnitsField.setText(asset.units.toString)
       }
@@ -572,7 +576,7 @@ class NewAssetActionController extends Logging {
         // Note: get availabilities for selected scheme&fund, sorted by date (with
         // immediate availability first).
         val availabilities = getSrcFund.map { schemeAndFund =>
-          savings.computeAssets(date).assets.byId.getOrElse(schemeAndFund.id, Nil).map(_.availability).distinct.sortBy { opt =>
+          getSavings(date).assets.byId.getOrElse(schemeAndFund.id, Nil).map(_.availability).distinct.sortBy { opt =>
             opt.getOrElse(LocalDate.ofEpochDay(0))
           }
         }.getOrElse(Nil)
@@ -648,7 +652,7 @@ class NewAssetActionController extends Logging {
             schemeAndFund <- getSrcFund
             srcAvailability = getSrcAvailability
             searchAsset = Savings.Asset(schemeAndFund.scheme.id, schemeAndFund.fund.id, srcAvailability, 0, 0)
-            asset <- savings.computeAssets(operationDate).findAsset(operationDate, searchAsset)
+            asset <- getSavings(operationDate).findAsset(operationDate, searchAsset)
           } {
             val totalUnits = savings.assets.units(schemeAndFund.id)
             val leviesPeriodsData = savings.computeLevies(schemeAndFund.id, operationDate, getSrcNAV)
@@ -679,7 +683,7 @@ class NewAssetActionController extends Logging {
   private def checkForm(): Option[Savings.AssetEvent] = {
     val operationDate = operationDateField.getValue
     val opDateSelected = Option(operationDate).isDefined
-    val opDateAnterior = opDateSelected && savings.latestAssetAction.exists(_.isAfter(operationDate))
+    val opDateAnterior = opDateSelected && savings.latestAssetAction.exists(operationDate < _)
     // Selecting a date of operation anterior to the latest asset action date is allowed even if discouraged
     val opDateOk = opDateSelected
     val warningMsgOpt = savings.latestAssetAction.map(Strings.anteriorOpDate.format(_))
@@ -695,7 +699,7 @@ class NewAssetActionController extends Logging {
     val srcAvailabilitySelected =
       (isPayment && Option(srcAvailabilityField.getValue).isDefined) ||
       (!isPayment && Option(srcAvailabilityField2.getValue).isDefined)
-    val srcAvailabilityAnterior = opDateSelected && srcAvailability.exists(_.isBefore(operationDate))
+    val srcAvailabilityAnterior = opDateSelected && srcAvailability.exists(_ < operationDate)
     val srcNAV = getSrcNAV
     val srcNAVValued = srcNAV > 0
     val srcUnits = getSrcUnits
@@ -703,7 +707,7 @@ class NewAssetActionController extends Logging {
     lazy val srcAsset = Savings.AssetPart(srcFund.scheme.id, srcFund.fund.id, srcAvailability, srcUnits, getSrcNAV)
     val srcAvailableAsset =
       if (isPayment || !opDateSelected || !srcSelected || !srcAvailabilitySelected) None
-      else savings.computeAssets(operationDate).findAsset(operationDate, srcAsset)
+      else getSavings(operationDate).findAsset(operationDate, srcAsset)
     val srcUnitsPrompt = srcAvailableAsset match {
       case Some(asset) => Some(s"≤${asset.units}")
       case None        => None
@@ -753,7 +757,7 @@ class NewAssetActionController extends Logging {
       getSrcAvailability.isEmpty || dstAvailability.isDefined
     }
     val dstAvailabilityAnterior = dstNeeded && {
-      opDateSelected && dstAvailability.exists(_.isBefore(operationDate))
+      opDateSelected && dstAvailability.exists(_ < operationDate)
     }
     lazy val dsnNAV = getDstNAV
     val dstNAVValued = !dstNeeded || (dsnNAV > 0)
@@ -824,6 +828,24 @@ class NewAssetActionController extends Logging {
   private def getOperationDate: Option[LocalDate] =
     Option(operationDateField.getValue)
 
+  private def getSavings(operationDate: LocalDate): Savings = {
+    // If operation date predates latest asset action, we need to get
+    // actual savings on the operation date (as availabilities may have
+    // been resolved by the following operations).
+    // Cache the computed assets for better efficiency.
+    if (actualSavingsDate == operationDate) actualSavings
+    else {
+      val savings0 =
+        if (savings.latestAssetAction.exists(operationDate < _)) {
+          val history = Awaits.getEventsHistory(Some(stage), upTo = Some(operationDate))
+          Savings().processEvents(history)
+        } else savings
+      actualSavings = savings0.computeAssets(operationDate)
+      actualSavingsDate = operationDate
+      actualSavings
+    }
+  }
+
   private def getSrcFund: Option[SchemeAndFund] =
     Option(srcFundField.getValue).flatten
 
@@ -881,9 +903,9 @@ object NewAssetActionController {
 
   /** Builds a dialog out of this controller. */
   def buildDialog(owner: Option[Window], mainController: MainController, savings: Savings,
-    kind: AssetActionKind.Value, asset: Option[Savings.Asset]): Dialog[Option[Savings.Event]] =
+    kind: AssetActionKind.Value, asset: Option[Savings.Asset]): Dialog[Option[Savings.AssetEvent]] =
   {
-    val dialog = new Dialog[Option[Savings.Event]]()
+    val dialog = new Dialog[Option[Savings.AssetEvent]]()
     // Note: initializing owner resets dialog icon, so set the icon afterwards
     owner.foreach(dialog.initOwner)
     // Icon and title are changed according to chosen asset action
