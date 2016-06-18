@@ -5,8 +5,8 @@ import epsa.model.Savings
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
-import java.sql.{Date, Timestamp}
-import java.time.{Instant, LocalDate, Month}
+import java.sql.Date
+import java.time.{LocalDate, Month}
 import java.util.UUID
 import javafx.stage.{FileChooser, Window}
 import org.h2.engine.Constants
@@ -457,13 +457,12 @@ object DataStore {
       { s => s.parseJson.convertTo[Savings.Event] }
     )
 
-    protected type Entry = (Long, Savings.Event, Timestamp)
+    protected type Entry = (Long, Savings.Event)
 
     protected class Entries(tag: Tag) extends Table[Entry](tag, tableName) {
       def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
       def event = column[Savings.Event]("event")
-      def createdAt = column[Timestamp]("created_at")
-      def * = (id, event, createdAt)
+      def * = (id, event)
     }
 
     override protected val entries = TableQuery[Entries]
@@ -481,7 +480,7 @@ object DataStore {
     def writeEvents(events: Seq[Savings.Event]): Future[Unit] =
       writeEntries(events.map { event =>
         // Note: "auto increment" field value will be ignored
-        (0L, event, Timestamp.from(Instant.now))
+        (0L, event)
       })
 
   }
