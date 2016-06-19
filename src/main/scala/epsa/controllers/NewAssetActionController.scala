@@ -652,7 +652,8 @@ class NewAssetActionController extends Logging {
             schemeAndFund <- getSrcFund
             srcAvailability = getSrcAvailability
             searchAsset = Savings.Asset(schemeAndFund.scheme.id, schemeAndFund.fund.id, srcAvailability, 0, 0)
-            asset <- getSavings(operationDate).findAsset(operationDate, searchAsset)
+            savings = getSavings(operationDate)
+            asset <- savings.findAsset(operationDate, searchAsset)
           } {
             val totalUnits = savings.assets.units(schemeAndFund.id)
             val leviesPeriodsData = savings.computeLevies(schemeAndFund.id, operationDate, getSrcNAV)
@@ -838,7 +839,7 @@ class NewAssetActionController extends Logging {
       val savings0 =
         if (savings.latestAssetAction.exists(operationDate < _)) {
           val history = Awaits.getEventsHistory(Some(stage), upTo = Some(operationDate))
-          Savings().processEvents(history)
+          Savings(levies = savings.levies).processEvents(history)
         } else savings
       actualSavings = savings0.computeAssets(operationDate)
       actualSavingsDate = operationDate
