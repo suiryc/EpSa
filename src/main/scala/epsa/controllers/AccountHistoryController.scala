@@ -13,7 +13,7 @@ import epsa.util.JFXStyles.AnimationHighlighter
 import grizzled.slf4j.Logging
 import java.time.LocalDate
 import java.util.UUID
-import javafx.beans.property.{SimpleObjectProperty, SimpleStringProperty}
+import javafx.beans.property.SimpleObjectProperty
 import javafx.event.ActionEvent
 import javafx.fxml.{FXML, FXMLLoader}
 import javafx.scene.Scene
@@ -76,7 +76,7 @@ class AccountHistoryController extends Logging {
 
   private val historyChartContextMenu = new ContextMenu()
 
-  private val columnEventDate = new TreeTableColumn[AssetEventItem, String](Strings.date)
+  private val columnEventDate = new TreeTableColumn[AssetEventItem, AssetEventItem](Strings.date)
 
   private val columnEventDesc = new TreeTableColumn[AssetEventItem, AssetEventItem](Strings.event)
 
@@ -120,8 +120,22 @@ class AccountHistoryController extends Logging {
     showAccountDetails(LocalDate.now)
 
     columnEventDate.setCellValueFactory(Callback { data =>
-      new SimpleStringProperty(data.getValue.valueProperty().get().date.map(_.toString).orNull)
+      new SimpleObjectProperty(data.getValue.valueProperty().get())
     })
+    columnEventDate.setCellFactory(Callback {
+      new TreeTableCell[AssetEventItem, AssetEventItem] {
+        override def updateItem(item: AssetEventItem, empty: Boolean): Unit = {
+          super.updateItem(item, empty)
+          if (empty) setText(null)
+          else setText(item.date.map(_.toString).orNull)
+        }
+      }
+    })
+    // Note: since we have the (sorted) event index as first field of
+    // AssetEventItem we have a natural ordering by history.
+
+    // There is no meaning to sort on event description, so disable it.
+    columnEventDesc.setSortable(false)
     columnEventDesc.setCellValueFactory(Callback { data =>
       new SimpleObjectProperty(data.getValue.valueProperty().get())
     })
@@ -144,7 +158,7 @@ class AccountHistoryController extends Logging {
               setGraphic(null)
           }
         }
-      }:TreeTableCell[AssetEventItem, AssetEventItem]
+      }
     })
 
     // Keep link between top-level items (history entries) and associated row.
@@ -154,20 +168,16 @@ class AccountHistoryController extends Logging {
 
     // Replay events to get history entries (main level and details).
     val root = new TreeItem[AssetEventItem]()
-    events.foldLeft(Savings(levies = state.savings.levies)) { (savings, event) =>
-      event match {
-        case event: Savings.AssetEvent =>
-          val eventItems = getEventItems(savings, event)
-          val treeItem = new TreeItem[AssetEventItem](eventItems.head)
-          eventItems.tail.foreach { eventItem =>
-            treeItem.getChildren.add(new TreeItem[AssetEventItem](eventItem))
-          }
-          root.getChildren.add(treeItem)
-          savings.processEvent(event)
-
-        case _ =>
-          savings.processEvent(event)
+    events.zipWithIndex.foldLeft(Savings(levies = state.savings.levies)) { case (savings, (event, index)) =>
+      val eventItems = getEventItems(savings, event, index)
+      if (eventItems.nonEmpty) {
+        val treeItem = new TreeItem[AssetEventItem](eventItems.head)
+        eventItems.tail.foreach { eventItem =>
+          treeItem.getChildren.add(new TreeItem[AssetEventItem](eventItem))
+        }
+        root.getChildren.add(treeItem)
       }
+      savings.processEvent(event)
     }
     // Note: changing root clears the table sort order. Fortunately we do
     // set the order upon restoring view which is done later.
@@ -180,8 +190,18 @@ class AccountHistoryController extends Logging {
     }
 
     // Now build (async) the account history chart.
+    // And display any unexpected issue.
     Future {
       buildHistory(state, events, showIndicator)
+    }.onFailure {
+      case ex: Exception =>
+      Dialogs.error(
+        owner = Some(stage),
+        title = Some(title),
+        headerText = Some(Strings.unexpectedIssue),
+        contentText = None,
+        ex = Some(ex)
+      )
     }
   }
 
@@ -536,8 +556,9 @@ class AccountHistoryController extends Logging {
     val grossHistory = history.data.map { data =>
       ChartSeriesData(data.date, data.grossAmount)
     }
-    val marks = historyTable.getRoot.getChildren.toList.map(_.getValue).groupBy(_.date.get).map { case (date, items) =>
-      date -> HistoryMark(date, items)
+    // Converts useful history events (root items with date) into marks.
+    val marks = historyTable.getRoot.getChildren.toList.map(_.getValue).filter(_.date.isDefined).groupBy(_.date.get).map {
+      case (date, items) => date -> HistoryMark(date, items)
     }
     val meta = ChartMeta(
       marks = marks,
@@ -571,30 +592,30 @@ class AccountHistoryController extends Logging {
     }
   }
 
-  private def getEventItems(savings: Savings, event: Savings.AssetEvent): List[AssetEventItem] = event match {
+  private def getEventItems(savings: Savings, event: Savings.Event, index: Int): List[AssetEventItem] = event match {
     case e: Savings.MakePayment =>
       List(
         // $1=amount $2=fund $3=scheme
-        AssetEventItem(event.date, Strings.assetEventPaymentMain.format(
+        AssetEventItem(index, e.date, Strings.assetEventPaymentMain.format(
           Form.formatAmount(e.part.amount(e.part.value), currency),
-          savings.getFund(e.part.fundId).name, savings.getScheme(e.part.schemeId).name), event.comment),
+          savings.getFund(e.part.fundId).name, savings.getScheme(e.part.schemeId).name), e.comment),
         // $1=units $2=NAV $3=availability
-        AssetEventItem(Strings.assetEventPaymentDetails1.format(e.part.units, e.part.value,
+        AssetEventItem(index, Strings.assetEventPaymentDetails1.format(e.part.units, e.part.value,
           Form.formatAvailability(e.part.availability, Some(e.date))))
       )
 
     case e: Savings.MakeTransfer =>
       List(
         // $1=src amount $2=src fund $3=src scheme $4=dst fund $5=dst scheme
-        AssetEventItem(event.date, Strings.assetEventTransferMain.format(
+        AssetEventItem(index, e.date, Strings.assetEventTransferMain.format(
           Form.formatAmount(e.partSrc.amount(e.partSrc.value), currency),
           savings.getFund(e.partSrc.fundId).name, savings.getScheme(e.partSrc.schemeId).name,
-          savings.getFund(e.partDst.fundId).name, savings.getScheme(e.partDst.schemeId).name), event.comment),
+          savings.getFund(e.partDst.fundId).name, savings.getScheme(e.partDst.schemeId).name), e.comment),
         // $1=src units $2=src NAV $3=src availability
-        AssetEventItem(Strings.assetEventTransferDetails1.format(e.partSrc.units, e.partSrc.value,
+        AssetEventItem(index, Strings.assetEventTransferDetails1.format(e.partSrc.units, e.partSrc.value,
           Form.formatAvailability(e.partSrc.availability, Some(e.date)))),
         // $1=dst units $2=dst NAV $3=dst amount $4=dst availability
-        AssetEventItem(Strings.assetEventTransferDetails2.format(e.partDst.units, e.partDst.value,
+        AssetEventItem(index, Strings.assetEventTransferDetails2.format(e.partDst.units, e.partDst.value,
           Form.formatAmount(e.partDst.amount(e.partDst.value), currency),
           Form.formatAvailability(e.partDst.availability, Some(e.date))))
       )
@@ -613,18 +634,37 @@ class AccountHistoryController extends Logging {
       if (savings.hasLevies) trace(s"action=<refund> date=<${e.date}> id=<${part.id}> nav=<${part.value}> totalUnits=<$totalUnits> units=<${part.units}> investedAmount=<$investedAmount> grossAmount=<$grossAmount> grossGain=<$grossGain> refundLevies=<$refundLevies> leviesAmount=<${refundLevies.amount}> leviesPct=<$leviesPct>")
       List(
         // $1=amount $2=fund $3=scheme
-        AssetEventItem(event.date, Strings.assetEventRefundMain.format(
+        AssetEventItem(index, e.date, Strings.assetEventRefundMain.format(
           Form.formatAmount(part.amount(part.value), currency),
-          savings.getFund(part.fundId).name, savings.getScheme(part.schemeId).name), event.comment),
+          savings.getFund(part.fundId).name, savings.getScheme(part.schemeId).name), e.comment),
         // $1=units $2=NAV
-        AssetEventItem(Strings.assetEventRefundDetails1.format(part.units, part.value)),
+        AssetEventItem(index, Strings.assetEventRefundDetails1.format(part.units, part.value)),
         // $1 = gross gain $2 = levies amount $3 = levies global rate
-        AssetEventItem(Strings.leviesEstimation.format(
+        AssetEventItem(index, Strings.leviesEstimation.format(
           Form.formatAmount(grossGain, currency),
           Form.formatAmount(leviesAmount, currency),
           Form.formatAmount(leviesPct, "%")
         ))
       )
+
+    case e: Savings.UpdateScheme =>
+      val oldName = savings.getScheme(e.schemeId).name
+      val newName = e.name
+      if (newName != oldName) {
+        // $1=old name $2=new name
+        List(AssetEventItem(index, Strings.assetEventSchemeRenamed.format(oldName, newName)))
+      } else Nil
+
+    case e: Savings.UpdateFund =>
+      val oldName = savings.getFund(e.fundId).name
+      val newName = e.name
+      if (newName != oldName) {
+        // $1=old name $2=new name
+        List(AssetEventItem(index, Strings.assetEventFundRenamed.format(oldName, newName)))
+      } else Nil
+
+    case _ =>
+      Nil
   }
 
   private def onHistoryEntry(itemOpt: Option[TreeItem[AssetEventItem]]): Unit = {
@@ -700,17 +740,17 @@ object AccountHistoryController {
 
   def title = Strings.accountHistory
 
-  case class AssetEventItem(date: Option[LocalDate], desc: String, comment: Option[String]) {
+  case class AssetEventItem(index: Int, date: Option[LocalDate], desc: String, comment: Option[String]) {
     var row: Option[TreeTableRow[AssetEventItem]] = None
   }
 
   object AssetEventItem {
 
-    def apply(date: LocalDate, desc: String, comment: Option[String]): AssetEventItem =
-      AssetEventItem(Some(date), desc, comment)
+    def apply(index: Int, date: LocalDate, desc: String, comment: Option[String]): AssetEventItem =
+      AssetEventItem(index, Some(date), desc, comment)
 
-    def apply(desc: String): AssetEventItem =
-      AssetEventItem(None, desc, None)
+    def apply(index: Int, desc: String): AssetEventItem =
+      AssetEventItem(index, None, desc, None)
 
   }
 
