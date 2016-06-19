@@ -10,7 +10,9 @@ import java.time.{LocalDate, Month}
 import java.util.UUID
 import javafx.stage.{FileChooser, Window}
 import org.h2.engine.Constants
+import scala.concurrent.Await
 import scala.concurrent.Future
+import scala.concurrent.duration._
 import slick.driver.H2Driver.api._
 import slick.driver.H2Driver.backend.DatabaseDef
 import slick.jdbc.meta.MTable
@@ -30,7 +32,7 @@ object DataStore {
 
   protected val dbPathPref = Preference.from("datastore.path", null:Path)
 
-  protected[epsa] val defaultPath = dbPathPref.option.getOrElse {
+  protected[epsa] def defaultPath = dbPathPref.option.getOrElse {
     val path = {
       // See: http://stackoverflow.com/a/12733172
       val appPath = Paths.get(getClass.getProtectionDomain.getCodeSource.getLocation.toURI)
@@ -257,7 +259,22 @@ object DataStore {
 
   /** Closes temporary database. */
   protected def closeTempDB(): Unit = {
-    dbTempOpt.foreach(_.db.close())
+    dbTempOpt.foreach { tmp =>
+      // We really want to forget the in-memory DB, which is not the case by
+      // simply calling 'close' because we had to set 'DB_CLOSE_DELAY' to '-1'.
+      // There are various ways it can be achieved:
+      // 1. Purging our tables
+      // 2. Changing DB_CLOSE_DELAY to 0 before closing: 'SET DB_CLOSE_DELAY 0'
+      // 3. Dropping all objects: 'DROP ALL OBJECTS'
+      // Note: shutting down the DB does not purge the in-memory content.
+      //
+      // Tested with some real data (dozens of events, thousands of NAVs):
+      // 1. ~100ms (250ms the first time)
+      // 2. ~1ms (10ms the first time)
+      // 3. 2-3ms (15ms the first time)
+      Await.result(tmp.db.run(sql"SET DB_CLOSE_DELAY 0".as[String]), 10.seconds)
+      tmp.db.close()
+    }
     dbTempOpt = None
   }
 
