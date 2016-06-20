@@ -16,12 +16,18 @@ case class LevyPeriod(
   rate: BigDecimal,
   start: LocalDate,
   end: Option[LocalDate]
-)
+) {
+  override def toString: String =
+    s"Period($start->${end.getOrElse("")} @ $rate%)"
+}
 
 case class Levy(
   name: String,
   periods: List[LevyPeriod]
-)
+) {
+  override def toString: String =
+    s"Levy($name,${periods.mkString(",")})"
+}
 
 case class Levies(
   name: String,
@@ -74,6 +80,9 @@ case class Levies(
     }.view.force
     copy(levies = normalizedLevies)
   }
+
+  override def toString: String =
+    s"Levies($name,$date,${levies.mkString(",")})"
 
 }
 
@@ -186,6 +195,8 @@ case class LevyPeriodData(
     (copy(investedAmount = invested._1, grossGain = gain.map(_._1)),
       copy(investedAmount = invested._2, grossGain = gain.map(_._2)))
   }
+  override def toString: String =
+    s"PeriodData($period,$investedAmount${grossGain.map(v => s",$v").getOrElse("")})"
 }
 
 case class LeviesPeriodsData(
@@ -208,4 +219,6 @@ case class LeviesPeriodsData(
     else copy(warnings = warnings :+ warning)
   def addWarnings(warnings: List[String]): LeviesPeriodsData =
     warnings.foldLeft(this)(_.addWarning(_))
+  override def toString: String =
+    s"PeriodsData(${data.mkString(",")})"
 }

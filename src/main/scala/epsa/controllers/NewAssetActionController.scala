@@ -663,7 +663,7 @@ class NewAssetActionController extends Logging {
             val grossGain = grossAmount - investedAmount
             val leviesAmount = refundLevies.amount
             val leviesPct = scalePercents(leviesAmount * 100 / grossGain)
-            if (savings.hasLevies) trace(s"action=<refund> date=<$operationDate> id=<${schemeAndFund.id}> nav=<$getSrcNAV> totalUnits=<$totalUnits> units=<$units> investedAmount=<$investedAmount> grossAmount=<$grossAmount> grossGain=<$grossGain> refundLevies=<$refundLevies> leviesAmount=<${refundLevies.amount}> leviesPct=<$leviesPct>")
+            if (savings.hasLevies) trace(s"action=<refund> date=<$operationDate> id=<${schemeAndFund.id.debugString(savings)}> nav=<$getSrcNAV> totalUnits=<$totalUnits> units=<$units> investedAmount=<$investedAmount> grossAmount=<$grossAmount> grossGain=<$grossGain> refundLevies=<$refundLevies> leviesAmount=<${refundLevies.amount}> leviesPct=<$leviesPct>")
             // $1 = gross gain $2 = levies amount $3 = levies global rate
             val msg =
               Strings.leviesEstimation.format(
