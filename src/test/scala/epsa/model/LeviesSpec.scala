@@ -660,7 +660,7 @@ class LeviesSpec extends WordSpec with Matchers {
       }
     }
 
-    "handle transfer" in {
+    "handle transfer to new fund" in {
       val savings1 = savings0.copy(levies = levies_1_3)
       val levyPeriod1 = savings1.levies.levies(levy1).periods.head
       val levyPeriod2 = savings1.levies.levies(levy1).periods(1)
@@ -736,6 +736,73 @@ class LeviesSpec extends WordSpec with Matchers {
         ))
         actual2 shouldBe expected2
         actual2.amount shouldBe BigDecimal(15)
+      }
+    }
+
+    "handle transfer to fund with asset" in {
+      val savings1 = savings0.copy(levies = levies_1_3)
+      val levyPeriod1 = savings1.levies.levies(levy1).periods.head
+      val levyPeriod2 = savings1.levies.levies(levy1).periods(1)
+      val levyPeriod3 = savings1.levies.levies(levy1).periods(2)
+      val levy1Start = levyPeriod1.start
+      val levy2Start = levyPeriod2.start
+      val levy3Start = levyPeriod3.start
+      val date_b1 = levy1Start.minusDays(10)
+      val date_p1_0 = levy1Start.minusDays(1)
+      val date_p2_0 = levy2Start.minusDays(1)
+      val date_p3_0 = levy3Start.minusDays(1)
+      val date_p3_1 = levy3Start.plusDays(1)
+      val values = List(
+        Savings.AssetValue(date_b1, BigDecimal(100)),
+        Savings.AssetValue(date_p1_0, BigDecimal(10)),
+        Savings.AssetValue(date_p2_0, BigDecimal(20)),
+        Savings.AssetValue(date_p3_0, 15),
+        Savings.AssetValue(date_p3_1, 25)
+      )
+      val values2 = List(
+        Savings.AssetValue(date_b1, BigDecimal(100)),
+        Savings.AssetValue(date_p1_0, BigDecimal(20)),
+        Savings.AssetValue(date_p2_0, 25),
+        Savings.AssetValue(date_p3_0, 20),
+        Savings.AssetValue(date_p3_1, 30)
+      )
+      val valuesMap = values.map(v => v.date -> v).toMap
+      val values2Map = values2.map(v => v.date -> v).toMap
+
+      def payment(date: LocalDate, units: BigDecimal) =
+        Savings.MakePayment(date, Savings.AssetPart(scheme.id, fund.id, None, units, valuesMap(date).value), None)
+      def payment2(date: LocalDate, units: BigDecimal) =
+        Savings.MakePayment(date, Savings.AssetPart(scheme.id, fund2.id, None, units, values2Map(date).value), None)
+      def transfer(date: LocalDate, units: BigDecimal) =
+        Savings.MakeTransfer(date, Savings.AssetPart(scheme.id, fund.id, None, units, valuesMap(date).value)
+          , Savings.AssetPart(scheme.id, fund2.id, None, units * valuesMap(date).value / values2Map(date).value, values2Map(date).value), None)
+
+      usingDataStore {
+        buildNAVHistory(NAVHistory(fund.id, values), NAVHistory(fund2.id, values2))
+        val savings = savings1.processEvents(
+          payment(date_b1, BigDecimal(3)),
+          payment2(date_b1, BigDecimal(1)),
+          transfer(date_p3_1, BigDecimal(3))
+        )
+        savings.assets.units(assetId) shouldBe BigDecimal(0)
+        savings.assets.units(assetId2) shouldBe BigDecimal("3.5")
+        // Invested 3 units in fund1; period1 started at price 10 and ended at price 20; period2 ended at 15; transferred 3 units.
+        // Invested 1 unit in fund1; period1 started at price 20 and ended at price 25; period2 ended at price 20.
+        // Remaining 3.5 = 1 (payment) + 2.5 (transferred; 3*25=2.5*30) units at price 30 in fund2
+        //   invested = 20+10*3=50 for period1, 25+20*3=85 for period2, 20+15*3=65 for period3 (replaced by 25+20*3=85 from period2 due to loss in both funds)
+        //   gross = 25+20*3=75 at end of period1, 20+15*3=65 at end of period2, 30*3.5=105 at action
+        //   gain = 5+10*3=35 for period1, -5-5*3=-20 for period2 (zeroed), 10+30-20=20 at action
+        //   levies = 35@20% + 0 + 20@60% = 7 + 0 + 12 = 19
+        val actual = savings.computeLevies(assetId2, date_p3_1, values2Map(date_p3_1).value)
+        val expected = LeviesPeriodsData(Map(
+          levy1 -> List(
+            LevyPeriodData(levyPeriod3, BigDecimal(85), Some(BigDecimal(20))),
+            LevyPeriodData(levyPeriod2, BigDecimal(85), Some(BigDecimal(0))),
+            LevyPeriodData(levyPeriod1, BigDecimal(50), Some(BigDecimal(35)))
+          )
+        ))
+        actual shouldBe expected
+        actual.amount shouldBe BigDecimal(19)
       }
     }
 

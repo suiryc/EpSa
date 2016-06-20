@@ -657,17 +657,11 @@ case class Savings(
     partSrc: Option[AssetPart] = None, savingsSrc: Option[Savings] = None,
     srcLeviesPeriodsData: Option[LeviesPeriodsData] = None): Savings =
   {
-    val srcInvestedAmount = for {
-      src <- partSrc
-      savings <- savingsSrc
-    } yield {
-      src.amount(savings.assets.vwaps(src.id))
-    }
-    // If transferring to an empty fund, don't check levies period (as it would
-    // create a first investment, which we will properly do while merging).
+    // If transferring, don't set invested amount as we will properly do it
+    // while merging.
     val savings0 =
-      if (partSrc.isDefined && (assets.units(part.id) == 0)) this
-      else checkLeviesPeriod(part.id, date, srcInvestedAmount.getOrElse(part.amount(part.value)))
+      if (partSrc.isDefined) checkLeviesPeriod(part.id, date, 0)
+      else checkLeviesPeriod(part.id, date, part.amount(part.value))
     val (savings1, extraInvestedAmount, extraInvestedAmountFine) = partSrc match {
       case Some(src) =>
         val savings = savingsSrc.get
@@ -676,7 +670,7 @@ case class Savings(
         if (hasLevies) trace(s"action=<makePayment> date=<$date> id=<${part.id.debugString(savings)}> srcId=<${src.id.debugString(savings)}> srcLevies=<$leviesPeriodsData>")
         val savings1 = savings0.mergeLeviesPeriods(part.id, leviesPeriodsData)
         // Note: invested amount = units * VWAP
-        val extraInvestedAmount = srcInvestedAmount.get
+        val extraInvestedAmount = src.amount(savings.assets.vwaps(src.id))
         val extraInvestedAmountFine = src.amount(srcAsset.vwap)
         (savings1, extraInvestedAmount, extraInvestedAmountFine)
 
@@ -1155,14 +1149,16 @@ case class Savings(
           case (merged, periodData) =>
             val isComplete = periodData.head.isComplete
             if (isComplete) {
-              // This is a past period: merge gains
+              // This is a past period: merge gains, and for consistency also
+              // merge invested amounts.
               val mergedPeriodData = periodData.reduceLeft { (period1, period2) =>
                 val grossGain1 = period1.getGrossGain
                 val grossGain2 = period2.getGrossGain
                 assert(grossGain1 >= 0)
                 assert(grossGain2 >= 0)
                 val grossGain = grossGain1 + grossGain2
-                period1.complete(grossGain)
+                val investedAmount = period1.investedAmount + period2.investedAmount
+                period1.copy(investedAmount = investedAmount).complete(grossGain)
               }
               mergedPeriodData :: merged
             } else {
