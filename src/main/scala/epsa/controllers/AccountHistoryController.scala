@@ -2,7 +2,7 @@ package epsa.controllers
 
 import akka.actor.Cancellable
 import com.sun.javafx.scene.control.skin.{TreeTableViewSkin, VirtualFlow, VirtualScrollBar}
-import epsa.I18N
+import epsa.{I18N, Settings}
 import epsa.I18N.Strings
 import epsa.Settings._
 import epsa.charts._
@@ -37,6 +37,8 @@ import suiryc.scala.javafx.util.Callback
 import suiryc.scala.math.Ordered._
 import suiryc.scala.math.Ordering._
 import suiryc.scala.settings.Preference
+
+// TODO: cache savings to prevent recomputing from zero when moving mouse between 2 events
 
 class AccountHistoryController extends Logging {
 
@@ -631,7 +633,8 @@ class AccountHistoryController extends Logging {
       val grossGain = grossAmount - investedAmount
       val leviesAmount = refundLevies.amount
       val leviesPct = scalePercents(leviesAmount * 100 / grossGain)
-      if (savings.hasLevies) trace(s"action=<refund> date=<${e.date}> id=<${part.id}> nav=<${part.value}> totalUnits=<$totalUnits> units=<${part.units}> investedAmount=<$investedAmount> grossAmount=<$grossAmount> grossGain=<$grossGain> refundLevies=<$refundLevies> leviesAmount=<${refundLevies.amount}> leviesPct=<$leviesPct>")
+      if (savings.hasLevies && Settings.debug(Debug.LeviesComputation))
+        info(s"action=<refund> date=<${e.date}> id=<${part.id}> nav=<${part.value}> totalUnits=<$totalUnits> units=<${part.units}> investedAmount=<$investedAmount> grossAmount=<$grossAmount> grossGain=<$grossGain> refundLevies=<$refundLevies> leviesAmount=<${refundLevies.amount}> leviesPct=<$leviesPct>")
       List(
         // $1=amount $2=fund $3=scheme
         AssetEventItem(index, e.date, Strings.assetEventRefundMain.format(

@@ -1,7 +1,8 @@
 package epsa.model
 
 import epsa.I18N.Strings
-import epsa.Settings.{scaleAmount, scaleVWAP}
+import epsa.Settings
+import epsa.Settings.{Debug, scaleAmount, scaleVWAP}
 import epsa.charts.ChartSeriesData
 import epsa.util.Awaits
 import grizzled.slf4j.Logging
@@ -248,7 +249,8 @@ object Savings extends Logging {
   {
     cache.get(date).orElse {
       val nav = getNAV(owner, fund.id, date)
-      trace(s"action=<getNAV> id=<${fund.name}> date=<$date> nav=<$nav>")
+      if (Settings.debug(Debug.LeviesComputation))
+        info(s"action=<getNAV> id=<${fund.name}> date=<$date> nav=<$nav>")
       nav.foreach { v =>
         cache(date) = v
       }
@@ -275,8 +277,8 @@ object Savings extends Logging {
   }
 
   case class AssetId(schemeId: UUID, fundId: UUID) {
-    def debugString(savings: Savings): String =
-      s"${savings.getFund(fundId).name} / ${savings.getScheme(schemeId).name}"
+    def toString(savings: Savings): String =
+      Settings.toString(this, s"${savings.getFund(fundId).name} / ${savings.getScheme(schemeId).name}")
   }
 
   case class Assets(list: List[Asset] = Nil, vwaps: Map[AssetId, BigDecimal] = Map.empty) {
@@ -321,15 +323,15 @@ object Savings extends Logging {
   {
     def amount(value: BigDecimal): BigDecimal = scaleAmount(units * value)
     lazy val investedAmount: BigDecimal = amount(vwap)
-    def debugString(savings: Savings): String =
-      s"Asset(${id.debugString(savings)},$units,$vwap,${availability.getOrElse("")})"
+    def toString(savings: Savings): String =
+      Settings.toString(this, s"Asset(${id.toString(savings)},$units,$vwap,${availability.getOrElse("")})")
   }
 
   /** Asset value: holds asset value at a given date. */
   case class AssetValue(date: LocalDate, value: BigDecimal)
-    extends ChartSeriesData
+    extends ChartSeriesData with DebugString
   {
-    override def toString: String = s"$value@$date"
+    override protected def debugString: String = s"$value@$date"
   }
 
   case class AssetValueHistory(name: Option[String], values: List[Savings.AssetValue] = Nil)
@@ -338,8 +340,8 @@ object Savings extends Logging {
     extends AssetEntry
   {
     def amount(value: BigDecimal) = scaleAmount(units * value)
-    def debugString(savings: Savings): String =
-      s"Asset(${id.debugString(savings)},$units,$value,${availability.getOrElse("")})"
+    def toString(savings: Savings): String =
+      Settings.toString(this, s"Asset(${id.toString(savings)},$units,$value,${availability.getOrElse("")})")
   }
 
   case class UnavailabilityPeriod(id: String, years: Int, month: Option[Month])
@@ -667,7 +669,8 @@ case class Savings(
         val savings = savingsSrc.get
         val srcAsset = savings.findAsset(date, src).get
         val leviesPeriodsData = srcLeviesPeriodsData.get
-        if (hasLevies) trace(s"action=<makePayment> date=<$date> id=<${part.id.debugString(savings)}> srcId=<${src.id.debugString(savings)}> srcLevies=<$leviesPeriodsData>")
+        if (hasLevies && Settings.debug(Debug.LeviesComputation))
+          info(s"action=<makePayment> date=<$date> id=<${part.id.toString(savings)}> srcId=<${src.id.toString(savings)}> srcLevies=<$leviesPeriodsData>")
         val savings1 = savings0.mergeLeviesPeriods(part.id, leviesPeriodsData)
         // Note: invested amount = units * VWAP
         val extraInvestedAmount = src.amount(savings.assets.vwaps(src.id))
@@ -724,7 +727,8 @@ case class Savings(
       if (!hasLevies) LeviesPeriodsData()
       else checkLeviesPeriod(part.id, date, 0).leviesData(part.id)
     val (outgoingLevies, remainingLevies) = leviesPeriodsData.proportioned(part.units / totalUnits)
-    if (hasLevies) trace(s"action=<makeRefund> date=<$date> id=<${part.id.debugString(this)}> totalUnits=<$totalUnits> units=<${part.units}> emptied=<$emptied> outgoingLevies=<$outgoingLevies>, remainingLevies=<$remainingLevies>")
+    if (hasLevies && Settings.debug(Debug.LeviesComputation))
+      info(s"action=<makeRefund> date=<$date> id=<${part.id.toString(this)}> totalUnits=<$totalUnits> units=<${part.units}> emptied=<$emptied> outgoingLevies=<$outgoingLevies>, remainingLevies=<$remainingLevies>")
 
     // Note: keep existing asset availability date if any, instead of using
     // given one (which may be empty if asset is actually available for the
@@ -1054,7 +1058,8 @@ case class Savings(
             investedAmount = investedAmount,
             grossGain = None
           )
-          trace(s"action=<updateLevyPeriods> date=<$date> id=<${id.debugString(this)}> levy=<$levy> period=<$currentPeriodData> totalUnits=<$totalUnits> grossAmount=<$grossAmount> grossGain=<$grossGain> completed=<$completedPeriod> next=<$nextPeriodData>")
+          if (Settings.debug(Debug.LeviesComputation))
+            info(s"action=<updateLevyPeriods> date=<$date> id=<${id.toString(this)}> levy=<$levy> period=<$currentPeriodData> totalUnits=<$totalUnits> grossAmount=<$grossAmount> grossGain=<$grossGain> completed=<$completedPeriod> next=<$nextPeriodData>")
           loop(nextPeriodData :: completedPeriod :: data.tail, warnings ++ warning, tail)
 
         case _ =>
@@ -1071,7 +1076,8 @@ case class Savings(
       val head = levyData2.head
       head.copy(investedAmount = head.investedAmount + investedAmount) :: levyData2.tail
     } else levyData2
-    trace(s"action=<updateLevyPeriods> date=<$date> id=<${id.debugString(this)}> totalUnits=<$totalUnits> investedAmount=<$investedAmount> levy=<$levy> levyData=<$levyData0> initiateData=<$initiateData> remainingPeriods<$remainingPeriods> updated=<$levyData> warnings=<$warnings>")
+    if (Settings.debug(Debug.LeviesComputation))
+      info(s"action=<updateLevyPeriods> date=<$date> id=<${id.toString(this)}> totalUnits=<$totalUnits> investedAmount=<$investedAmount> levy=<$levy> levyData=<$levyData0> initiateData=<$initiateData> remainingPeriods<$remainingPeriods> updated=<$levyData> warnings=<$warnings>")
     if (levyData.isEmpty) this
     else addLeviesPeriodsData(id, assetData.addPeriodsData(levy, levyData).addWarnings(warnings))
   }
@@ -1123,7 +1129,8 @@ case class Savings(
         computedLevyData.map(levy.name -> _)
       }.toMap
       val computed = LeviesPeriodsData(data, leviesPeriodsData.warnings)
-      trace(s"action=<computeLevies> id=<${id.debugString(this)}> nav=<$nav> computed=<$computed>")
+      if (Settings.debug(Debug.LeviesComputation))
+        info(s"action=<computeLevies> id=<${id.toString(this)}> nav=<$nav> computed=<$computed>")
       computed
     } else LeviesPeriodsData()
   }
@@ -1142,7 +1149,8 @@ case class Savings(
       val updatedAssetData = leviesPeriodsData.data.keys.foldLeft(assetData) { (assetData, levy) =>
         val srcLeviesData = leviesPeriodsData.data(levy)
         val dstLeviesData = assetData.data.getOrElse(levy, Nil)
-        trace(s"action=<mergeLeviesPeriods> id=<${id.debugString(this)}> levy=<$levy> src=<$srcLeviesData> dst=<$dstLeviesData>")
+        if (Settings.debug(Debug.LeviesComputation))
+          info(s"action=<mergeLeviesPeriods> id=<${id.debugString(this)}> levy=<$levy> src=<$srcLeviesData> dst=<$dstLeviesData>")
         // Merge all levies data, grouped by period and sorted from oldest to newest.
         // Then compute merged data for each period.
         val mergedPeriodsData = (dstLeviesData ::: srcLeviesData).groupBy(_.period).toList.sortBy(_._1.start).map(_._2).foldLeft(List.empty[LevyPeriodData]) {
@@ -1172,7 +1180,8 @@ case class Savings(
         assetData.addPeriodsData(levy, mergedPeriodsData.sortBy(_.period.start).reverse).addWarnings(leviesPeriodsData.warnings)
       }
 
-      trace(s"action=<mergeLeviesPeriods> id=<${id.debugString(this)}> src=<$leviesPeriodsData> dst=<$assetData> merged=<$updatedAssetData>")
+      if (Settings.debug(Debug.LeviesComputation))
+        info(s"action=<mergeLeviesPeriods> id=<${id.toString(this)}> src=<$leviesPeriodsData> dst=<$assetData> merged=<$updatedAssetData>")
       addLeviesPeriodsData(id, updatedAssetData)
     } else this
   }

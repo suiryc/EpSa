@@ -9,10 +9,18 @@ import javafx.stage.Stage
 
 object Main {
 
+  import Settings.Debug
+
   val name = "EpSa"
 
   def main(args: Array[String]): Unit = {
-    (new Main).launch()
+    val parser = new scopt.OptionParser[Unit](name) {
+      opt[String]("debug").unbounded.foreach { v =>
+        Settings.debugParams ++= v.split(',').toList.map(Debug.withName).toSet
+      }
+    }
+
+    if (parser.parse(args)) (new Main).launch()
   }
 
   object Akka {

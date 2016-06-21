@@ -1,6 +1,7 @@
 package epsa
 
 import java.util.prefs.Preferences
+import scala.runtime.ScalaRunTime
 import suiryc.scala.settings.Preference
 import suiryc.scala.settings.Preference._
 
@@ -8,6 +9,12 @@ import suiryc.scala.settings.Preference._
 object Settings {
 
   implicit val prefs = Preferences.userRoot.node("suiryc.epsa").node("epsa")
+
+  var debugParams: Set[Debug.Value] = Set.empty
+  def debug(v: Debug.Value) = debugParams.contains(v)
+  def toString(product: Product, str: => String): String =
+    if (debug(Debug.OriginalToString)) ScalaRunTime._toString(product)
+    else str
 
   val preferredCurrencies = List("€", "$", "£", "￥", "฿")
   val defaultCurrency = preferredCurrencies.head
@@ -53,6 +60,21 @@ object Settings {
     // its scale down by 1, a value below 1000 down by 2, etc.
     val scale = scala.math.max(0, percentsScale - (v.abs.intValue.toString.length - 1))
     v.setScale(scale, percentsRounding)
+  }
+
+  case object Debug extends Enumeration {
+    val OriginalToString = Value("original-tostring")
+    val LeviesComputation = Value("levies-computation")
+  }
+
+  trait DebugString { product: Product =>
+    protected def debugString: String
+    // Note: default scala 'toString' variant for 'Product' instances (e.g.
+    // case classes) is available through 'ScalaRunTime._toString'
+    // See: http://stackoverflow.com/a/27467406
+    override def toString: String =
+      if (debug(Debug.OriginalToString)) ScalaRunTime._toString(product)
+      else debugString
   }
 
 }

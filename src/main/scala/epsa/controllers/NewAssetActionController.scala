@@ -1,6 +1,6 @@
 package epsa.controllers
 
-import epsa.I18N
+import epsa.{I18N, Settings}
 import epsa.I18N.Strings
 import epsa.Settings._
 import epsa.model.Savings
@@ -663,14 +663,18 @@ class NewAssetActionController extends Logging {
             val grossGain = grossAmount - investedAmount
             val leviesAmount = refundLevies.amount
             val leviesPct = scalePercents(leviesAmount * 100 / grossGain)
-            if (savings.hasLevies) trace(s"action=<refund> date=<$operationDate> id=<${schemeAndFund.id.debugString(savings)}> nav=<$getSrcNAV> totalUnits=<$totalUnits> units=<$units> investedAmount=<$investedAmount> grossAmount=<$grossAmount> grossGain=<$grossGain> refundLevies=<$refundLevies> leviesAmount=<${refundLevies.amount}> leviesPct=<$leviesPct>")
+            if (savings.hasLevies && Settings.debug(Debug.LeviesHistory))
+              info(s"action=<refund> date=<$operationDate> id=<${schemeAndFund.id.debugString(savings)}> nav=<$getSrcNAV> totalUnits=<$totalUnits> units=<$units> investedAmount=<$investedAmount> grossAmount=<$grossAmount> grossGain=<$grossGain> refundLevies=<$refundLevies> leviesAmount=<${refundLevies.amount}> leviesPct=<$leviesPct>")
+            val warnings =
+              if (refundLevies.warnings.isEmpty) ""
+              else refundLevies.warnings.mkString("\n\n", "\n", "")
             // $1 = gross gain $2 = levies amount $3 = levies global rate
             val msg =
               Strings.leviesEstimation.format(
                 Form.formatAmount(grossGain, currency),
                 Form.formatAmount(leviesAmount, currency),
                 Form.formatAmount(leviesPct, "%")
-              )
+              ) + warnings
             val node = new ImageView(Images.iconMoneyCoin)
             Tooltip.install(node, new Tooltip(msg))
             amountBox.getChildren.setAll(node)

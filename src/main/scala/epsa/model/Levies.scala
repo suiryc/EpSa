@@ -1,6 +1,7 @@
 package epsa.model
 
-import epsa.Settings.{scaleAmount, splitAmount}
+import epsa.Settings
+import epsa.Settings.{Debug, DebugString, scaleAmount, splitAmount}
 import java.time.LocalDate
 import scala.collection.immutable.ListMap
 import spray.json._
@@ -16,16 +17,16 @@ case class LevyPeriod(
   rate: BigDecimal,
   start: LocalDate,
   end: Option[LocalDate]
-) {
-  override def toString: String =
+) extends DebugString {
+  override protected def debugString: String =
     s"Period($start->${end.getOrElse("")} @ $rate%)"
 }
 
 case class Levy(
   name: String,
   periods: List[LevyPeriod]
-) {
-  override def toString: String =
+) extends DebugString {
+  override protected def debugString: String =
     s"Levy($name,${periods.mkString(",")})"
 }
 
@@ -33,7 +34,7 @@ case class Levies(
   name: String,
   date: LocalDate,
   levies: Map[String, Levy]
-) {
+) extends DebugString {
 
   lazy val list = levies.values.toList
 
@@ -81,7 +82,7 @@ case class Levies(
     copy(levies = normalizedLevies)
   }
 
-  override def toString: String =
+  override protected def debugString: String =
     s"Levies($name,$date,${levies.mkString(",")})"
 
 }
@@ -160,7 +161,7 @@ case class LevyPeriodData(
   period: LevyPeriod,
   investedAmount: BigDecimal,
   grossGain: Option[BigDecimal]
-) {
+) extends DebugString {
   def isComplete = grossGain.isDefined
   def getGrossGain: BigDecimal = {
     assert(isComplete)
@@ -195,14 +196,14 @@ case class LevyPeriodData(
     (copy(investedAmount = invested._1, grossGain = gain.map(_._1)),
       copy(investedAmount = invested._2, grossGain = gain.map(_._2)))
   }
-  override def toString: String =
+  override protected def debugString: String =
     s"PeriodData($period,$investedAmount${grossGain.map(v => s",$v").getOrElse("")})"
 }
 
 case class LeviesPeriodsData(
   data: Map[String, List[LevyPeriodData]] = Map.empty,
   warnings: List[String] = Nil
-) {
+) extends DebugString {
   def proportioned(ratio: BigDecimal): (LeviesPeriodsData, LeviesPeriodsData) =
     data.toList.foldLeft((LeviesPeriodsData(warnings = warnings), LeviesPeriodsData(warnings = warnings))) {
       case ((d1, d2), (levy, periodData)) =>
@@ -219,6 +220,6 @@ case class LeviesPeriodsData(
     else copy(warnings = warnings :+ warning)
   def addWarnings(warnings: List[String]): LeviesPeriodsData =
     warnings.foldLeft(this)(_.addWarning(_))
-  override def toString: String =
+  override protected def debugString: String =
     s"PeriodsData(${data.mkString(",")})"
 }
