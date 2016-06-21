@@ -399,13 +399,13 @@ class LeviesSpec extends WordSpec with Matchers {
       val savings1 = savings0.copy(levies = levies_1_3)
       val levyPeriod1 = savings1.levies.levies(levy1).periods.head
       val levyPeriod2 = savings1.levies.levies(levy1).periods(1)
-      val levy1Start = levyPeriod1.start
-      val levy2Start = levyPeriod2.start
-      val date_b1 = levy1Start.minusDays(10)
-      val date_p1_0 = levy1Start.minusDays(1)
-      val date_p1_1 = levy1Start.plusDays(1)
-      val date_p2_0 = levy2Start.minusDays(1)
-      val date_p2_1 = levy2Start.plusDays(1)
+      val levyStart1 = levyPeriod1.start
+      val levyStart2 = levyPeriod2.start
+      val date_b1 = levyStart1.minusDays(10)
+      val date_p1_0 = levyStart1.minusDays(1)
+      val date_p1_1 = levyStart1.plusDays(1)
+      val date_p2_0 = levyStart2.minusDays(1)
+      val date_p2_1 = levyStart2.plusDays(1)
       val values = List(
         Savings.AssetValue(date_b1, 100),
         Savings.AssetValue(date_p1_0, 10),
@@ -459,13 +459,13 @@ class LeviesSpec extends WordSpec with Matchers {
       val savings1 = savings0.copy(levies = levies_1_3)
       val levyPeriod1 = savings1.levies.levies(levy1).periods.head
       val levyPeriod2 = savings1.levies.levies(levy1).periods(1)
-      val levy1Start = levyPeriod1.start
-      val levy2Start = levyPeriod2.start
-      val date_b1 = levy1Start.minusDays(10)
-      val date_p1_0 = levy1Start.minusDays(1)
-      val date_p2_0 = levy2Start.minusDays(1)
-      val date_p2_1 = levy2Start.plusDays(1)
-      val date_p2_2 = levy2Start.plusDays(2)
+      val levyStart1 = levyPeriod1.start
+      val levyStart2 = levyPeriod2.start
+      val date_b1 = levyStart1.minusDays(10)
+      val date_p1_0 = levyStart1.minusDays(1)
+      val date_p2_0 = levyStart2.minusDays(1)
+      val date_p2_1 = levyStart2.plusDays(1)
+      val date_p2_2 = levyStart2.plusDays(2)
       val values = List(
         Savings.AssetValue(date_b1, 100),
         Savings.AssetValue(date_p1_0, 20),
@@ -526,16 +526,16 @@ class LeviesSpec extends WordSpec with Matchers {
       val levyPeriod1 = savings1.levies.levies(levy1).periods.head
       val levyPeriod2 = savings1.levies.levies(levy1).periods(1)
       val levyPeriod3 = savings1.levies.levies(levy1).periods(2)
-      val levy1Start = levyPeriod1.start
-      val levy2Start = levyPeriod2.start
-      val levy3Start = levyPeriod3.start
-      val date_b1 = levy1Start.minusDays(10)
-      val date_p1_0 = levy1Start.minusDays(1)
-      val date_p2_0 = levy2Start.minusDays(1)
-      val date_p3_0 = levy3Start.minusDays(1)
-      val date_p3_1 = levy3Start.plusDays(1)
-      val date_p3_2 = levy3Start.plusDays(2)
-      val date_p3_3 = levy3Start.plusDays(3)
+      val levyStart1 = levyPeriod1.start
+      val levyStart2 = levyPeriod2.start
+      val levyStart3 = levyPeriod3.start
+      val date_b1 = levyStart1.minusDays(10)
+      val date_p1_0 = levyStart1.minusDays(1)
+      val date_p2_0 = levyStart2.minusDays(1)
+      val date_p3_0 = levyStart3.minusDays(1)
+      val date_p3_1 = levyStart3.plusDays(1)
+      val date_p3_2 = levyStart3.plusDays(2)
+      val date_p3_3 = levyStart3.plusDays(3)
       val values = List(
         Savings.AssetValue(date_b1, 100),
         Savings.AssetValue(date_p1_0, 10),
@@ -615,12 +615,12 @@ class LeviesSpec extends WordSpec with Matchers {
       val savings1 = savings0.copy(levies = levies_1_3)
       val levyPeriod2 = savings1.levies.levies(levy1).periods(1)
       val levyPeriod3 = savings1.levies.levies(levy1).periods(2)
-      val levy2Start = levyPeriod2.start
-      val levy3Start = levyPeriod3.start
-      val date_p2_0 = levy2Start.minusDays(1)
-      val date_p2_1 = levy2Start.plusDays(1)
-      val date_p3_0 = levy3Start.minusDays(1)
-      val date_p3_1 = levy3Start.plusDays(1)
+      val levyStart2 = levyPeriod2.start
+      val levyStart3 = levyPeriod3.start
+      val date_p2_0 = levyStart2.minusDays(1)
+      val date_p2_1 = levyStart2.plusDays(1)
+      val date_p3_0 = levyStart3.minusDays(1)
+      val date_p3_1 = levyStart3.plusDays(1)
       val values = List(
         Savings.AssetValue(date_p2_0, 10),
         Savings.AssetValue(date_p2_1, 15),
@@ -665,14 +665,14 @@ class LeviesSpec extends WordSpec with Matchers {
       val levyPeriod1 = savings1.levies.levies(levy1).periods.head
       val levyPeriod2 = savings1.levies.levies(levy1).periods(1)
       val levyPeriod3 = savings1.levies.levies(levy1).periods(2)
-      val levy1Start = levyPeriod1.start
-      val levy2Start = levyPeriod2.start
-      val levy3Start = levyPeriod3.start
-      val date_b1 = levy1Start.minusDays(10)
-      val date_p1_0 = levy1Start.minusDays(1)
-      val date_p2_0 = levy2Start.minusDays(1)
-      val date_p3_0 = levy3Start.minusDays(1)
-      val date_p3_1 = levy3Start.plusDays(1)
+      val levyStart1 = levyPeriod1.start
+      val levyStart2 = levyPeriod2.start
+      val levyStart3 = levyPeriod3.start
+      val date_b1 = levyStart1.minusDays(10)
+      val date_p1_0 = levyStart1.minusDays(1)
+      val date_p2_0 = levyStart2.minusDays(1)
+      val date_p3_0 = levyStart3.minusDays(1)
+      val date_p3_1 = levyStart3.plusDays(1)
       val values = List(
         Savings.AssetValue(date_b1, 100),
         Savings.AssetValue(date_p1_0, 10),
@@ -744,14 +744,14 @@ class LeviesSpec extends WordSpec with Matchers {
       val levyPeriod1 = savings1.levies.levies(levy1).periods.head
       val levyPeriod2 = savings1.levies.levies(levy1).periods(1)
       val levyPeriod3 = savings1.levies.levies(levy1).periods(2)
-      val levy1Start = levyPeriod1.start
-      val levy2Start = levyPeriod2.start
-      val levy3Start = levyPeriod3.start
-      val date_b1 = levy1Start.minusDays(10)
-      val date_p1_0 = levy1Start.minusDays(1)
-      val date_p2_0 = levy2Start.minusDays(1)
-      val date_p3_0 = levy3Start.minusDays(1)
-      val date_p3_1 = levy3Start.plusDays(1)
+      val levyStart1 = levyPeriod1.start
+      val levyStart2 = levyPeriod2.start
+      val levyStart3 = levyPeriod3.start
+      val date_b1 = levyStart1.minusDays(10)
+      val date_p1_0 = levyStart1.minusDays(1)
+      val date_p2_0 = levyStart2.minusDays(1)
+      val date_p3_0 = levyStart3.minusDays(1)
+      val date_p3_1 = levyStart3.plusDays(1)
       val values = List(
         Savings.AssetValue(date_b1, BigDecimal(100)),
         Savings.AssetValue(date_p1_0, BigDecimal(10)),
@@ -787,7 +787,7 @@ class LeviesSpec extends WordSpec with Matchers {
         savings.assets.units(assetId) shouldBe BigDecimal(0)
         savings.assets.units(assetId2) shouldBe BigDecimal("3.5")
         // Invested 3 units in fund1; period1 started at price 10 and ended at price 20; period2 ended at 15; transferred 3 units.
-        // Invested 1 unit in fund1; period1 started at price 20 and ended at price 25; period2 ended at price 20.
+        // Invested 1 unit in fund2; period1 started at price 20 and ended at price 25; period2 ended at price 20.
         // Remaining 3.5 = 1 (payment) + 2.5 (transferred; 3*25=2.5*30) units at price 30 in fund2
         //   invested = 20+10*3=50 for period1, 25+20*3=85 for period2, 20+15*3=65 for period3 (replaced by 25+20*3=85 from period2 due to loss in both funds)
         //   gross = 25+20*3=75 at end of period1, 20+15*3=65 at end of period2, 30*3.5=105 at action
@@ -812,14 +812,14 @@ class LeviesSpec extends WordSpec with Matchers {
       val levyPeriod1 = savings1.levies.levies(levy1).periods.head
       val levyPeriod2 = savings1.levies.levies(levy1).periods(1)
       val levyPeriod3 = savings1.levies.levies(levy1).periods(2)
-      val levy1Start = levyPeriod1.start
-      val levy2Start = levyPeriod2.start
-      val levy3Start = levyPeriod3.start
-      val date_b1 = levy1Start.minusDays(10)
-      val date_p1_0 = levy1Start.minusDays(1)
-      val date_p2_0 = levy2Start.minusDays(1)
-      val date_p3_0 = levy3Start.minusDays(1)
-      val date_p3_1 = levy3Start.plusDays(1)
+      val levyStart1 = levyPeriod1.start
+      val levyStart2 = levyPeriod2.start
+      val levyStart3 = levyPeriod3.start
+      val date_b1 = levyStart1.minusDays(10)
+      val date_p1_0 = levyStart1.minusDays(1)
+      val date_p2_0 = levyStart2.minusDays(1)
+      val date_p3_0 = levyStart3.minusDays(1)
+      val date_p3_1 = levyStart3.plusDays(1)
       val values = List(
         Savings.AssetValue(date_b1, 100),
         Savings.AssetValue(date_p1_0, 10),
@@ -878,15 +878,15 @@ class LeviesSpec extends WordSpec with Matchers {
       val levyPeriod1 = savings1.levies.levies(levy1).periods.head
       val levyPeriod2 = savings1.levies.levies(levy1).periods(1)
       val levyPeriod3 = savings1.levies.levies(levy1).periods(2)
-      val levy1Start = levyPeriod1.start
-      val levy2Start = levyPeriod2.start
-      val levy3Start = levyPeriod3.start
-      val date_b1 = levy1Start.minusDays(10)
-      val date_p1_0 = levy1Start.minusDays(1)
-      val date_p2_0 = levy2Start.minusDays(1)
-      val date_p3_0 = levy3Start.minusDays(1)
-      val date_p3_1 = levy3Start.plusDays(1)
-      val date_p3_2 = levy3Start.plusDays(2)
+      val levyStart1 = levyPeriod1.start
+      val levyStart2 = levyPeriod2.start
+      val levyStart3 = levyPeriod3.start
+      val date_b1 = levyStart1.minusDays(10)
+      val date_p1_0 = levyStart1.minusDays(1)
+      val date_p2_0 = levyStart2.minusDays(1)
+      val date_p3_0 = levyStart3.minusDays(1)
+      val date_p3_1 = levyStart3.plusDays(1)
+      val date_p3_2 = levyStart3.plusDays(2)
       val values = List(
         Savings.AssetValue(date_b1, 100),
         Savings.AssetValue(date_p1_0, 10),
@@ -1124,6 +1124,71 @@ class LeviesSpec extends WordSpec with Matchers {
         ))
         actual3 shouldBe expected3
         actual3.amount shouldBe BigDecimal(15)
+      }
+    }
+
+    "handle 2 levies and transfer to fund with asset" in {
+      val savings1 = savings0.copy(levies = levies_2)
+      val levy1Period1 = savings1.levies.levies(levy1).periods.head
+      val levy2Period1 = savings1.levies.levies(levy2).periods.head
+      val levy2Period2 = savings1.levies.levies(levy2).periods(1)
+      val levy1Start = levy1Period1.start
+      val levy2Start = levy2Period2.start
+      val date_b1 = levy1Start.minusDays(10)
+      val date_p1_0 = levy1Start.minusDays(1)
+      val date_p2_0 = levy2Start.minusDays(1)
+      val date_p2_1 = levy2Start.plusDays(1)
+      val values = List(
+        Savings.AssetValue(date_b1, 100),
+        Savings.AssetValue(date_p1_0, 10),
+        Savings.AssetValue(date_p2_0, 20),
+        Savings.AssetValue(date_p2_1, 30)
+      )
+      val values2 = List(
+        Savings.AssetValue(date_b1, 100),
+        Savings.AssetValue(date_p1_0, 50),
+        Savings.AssetValue(date_p2_0, 55),
+        Savings.AssetValue(date_p2_1, 60)
+      )
+      val valuesMap = values.map(v => v.date -> v).toMap
+      val values2Map = values2.map(v => v.date -> v).toMap
+
+      def payment(date: LocalDate, units: BigDecimal) =
+        Savings.MakePayment(date, Savings.AssetPart(scheme.id, fund.id, None, units, valuesMap(date).value), None)
+      def payment2(date: LocalDate, units: BigDecimal) =
+        Savings.MakePayment(date, Savings.AssetPart(scheme.id, fund2.id, None, units, values2Map(date).value), None)
+      def transfer(date: LocalDate, units: BigDecimal) =
+        Savings.MakeTransfer(date, Savings.AssetPart(scheme.id, fund.id, None, units, valuesMap(date).value)
+          , Savings.AssetPart(scheme.id, fund2.id, None, units * valuesMap(date).value / values2Map(date).value, values2Map(date).value), None)
+
+      usingDataStore {
+        buildNAVHistory(NAVHistory(fund.id, values), NAVHistory(fund2.id, values2))
+        val savings = savings1.processEvents(
+          payment(date_b1, BigDecimal(1)),
+          payment2(date_b1, BigDecimal(1)),
+          transfer(date_p2_1, BigDecimal(1))
+        )
+        savings.assets.units(assetId) shouldBe BigDecimal(0)
+        savings.assets.units(assetId2) shouldBe BigDecimal("1.5")
+        // Invested 1 unit in fund1, and 1 unit in fund2
+        // levy1 period1 started at price 10
+        // levy2 period1 started at price 50 and ended at price 55
+        // Transferred 1 unit to fund2
+        // Remaining 1.5 = 1 (payment) + 0.5 (transferred; 1*30=0.5*60) units at price 60 in fund2
+        //   invested = 50+10=60 for period1, 55+20=75 for levy2 period2
+        //   gross = 55+20=75 at end of levy2 fake period1, 1.5*60=90 at action
+        //   gain = 30 for levy1 period1, 15 for levy2 fake period1, 15 for levy2 period2
+        //   levies = 30@10% + 15@0% + 15@20% = 3 + 0 + 3 = 6
+        val actual = savings.computeLevies(assetId2, date_p2_1, values2Map(date_p2_1).value)
+        val expected = LeviesPeriodsData(Map(
+          levy1 -> List(LevyPeriodData(levy1Period1, BigDecimal(60), Some(BigDecimal(30)))),
+          levy2 -> List(
+            LevyPeriodData(levy2Period2, BigDecimal(75), Some(BigDecimal(15))),
+            LevyPeriodData(levy2Period1, BigDecimal(60), Some(BigDecimal(15)))
+          )
+        ))
+        actual shouldBe expected
+        actual.amount shouldBe BigDecimal(6)
       }
     }
   }
