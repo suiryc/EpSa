@@ -65,6 +65,7 @@ object Settings {
   case object Debug extends Enumeration {
     val OriginalToString = Value("original-tostring")
     val LeviesComputation = Value("levies-computation")
+    val LeviesHistory = Value("levies-history")
   }
 
   trait DebugString { product: Product =>
@@ -75,6 +76,29 @@ object Settings {
     override def toString: String =
       if (debug(Debug.OriginalToString)) ScalaRunTime._toString(product)
       else debugString
+  }
+
+  case class DebugInfo(info: List[String] = Nil, source: List[DebugInfo] = Nil) extends DebugString {
+    override protected def debugString: String = {
+      @scala.annotation.tailrec
+      def loop(acc: String, remaining: List[(Int, DebugInfo)]): String = {
+        remaining match {
+          case head :: tail =>
+            val (level, debug) = head
+            val prefix = "  " * level
+            val acc2 = if (debug.info.isEmpty) acc
+              else {
+                (if (acc.isEmpty) "" else s"$acc\n") +
+                  debug.info.mkString(s"$prefix-> ", s"\n$prefix + ", "")
+              }
+            loop(acc2, debug.source.map((level + 1) -> _) ::: tail)
+
+          case Nil =>
+            acc
+        }
+      }
+      loop("", List(0 -> this))
+    }
   }
 
 }

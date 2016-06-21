@@ -202,19 +202,47 @@ case class LevyPeriodData(
 
 case class LeviesPeriodsData(
   data: Map[String, List[LevyPeriodData]] = Map.empty,
+  debugInfo: Settings.DebugInfo = Settings.DebugInfo(),
   warnings: List[String] = Nil
 ) extends DebugString {
-  def proportioned(ratio: BigDecimal): (LeviesPeriodsData, LeviesPeriodsData) =
-    data.toList.foldLeft((LeviesPeriodsData(warnings = warnings), LeviesPeriodsData(warnings = warnings))) {
-      case ((d1, d2), (levy, periodData)) =>
-        val (p1, p2) = periodData.map(_.proportioned(ratio)).unzip
-        (d1.copy(data = d1.data + (levy -> p1)), d2.copy(data = d2.data + (levy -> p2)))
-    }
+  def proportioned(ratio: BigDecimal): (LeviesPeriodsData, LeviesPeriodsData) = {
+    @scala.annotation.tailrec
+    def loop(periodsData1: LeviesPeriodsData, periodsData2: LeviesPeriodsData,
+      remaining: List[(String, List[LevyPeriodData])]): (LeviesPeriodsData, LeviesPeriodsData) =
+      remaining match {
+        case head :: tail =>
+          val (levy, periodData) = head
+          val (p1, p2) = periodData.map(_.proportioned(ratio)).unzip
+          val d1 = periodsData1.copy(data = periodsData1.data + (levy -> p1))
+          val d2 = periodsData2.copy(data = periodsData2.data + (levy -> p2))
+          val d1Debugs =
+            if (!Settings.debug(Debug.LeviesHistory)) Nil
+            else periodData.zip(p1).map { case (p, proportioned) =>
+              s"levy=<$levy>: proportioned period=<${p.period}> ratio=<$ratio> main invested amount=<${p.investedAmount}->${proportioned.investedAmount}>${proportioned.grossGain.map(v => s" and gross gain/loss=<${p.getGrossGain}->$v>").getOrElse("")}"
+            }
+          val d2Debugs =
+            if (!Settings.debug(Debug.LeviesHistory)) Nil
+            else periodData.zip(p2).map { case (p, proportioned) =>
+              s"levy=<$levy>: proportioned period=<${p.period}> ratio=<$ratio> remaining invested amount=<${p.investedAmount}->${proportioned.investedAmount}>${proportioned.grossGain.map(v => s" and gross gain/loss=<${p.getGrossGain}->$v>").getOrElse("")}"
+            }
+          loop(d1.addDebugs(d1Debugs), d2.addDebugs(d2Debugs), tail)
+
+        case Nil =>
+          (periodsData1, periodsData2)
+      }
+    loop(
+      LeviesPeriodsData(debugInfo = debugInfo, warnings = warnings),
+      LeviesPeriodsData(debugInfo = debugInfo, warnings = warnings),
+      data.toList
+    )
+  }
   def amount(levy: String): BigDecimal = data.getOrElse(levy, Nil).map(_.amount).sum
   def amount: BigDecimal = data.keys.toList.map(amount(_)).sum
 
   def addPeriodsData(levy: String, periodsData: List[LevyPeriodData]): LeviesPeriodsData =
-    copy(data + (levy -> periodsData))
+    copy(data = data + (levy -> periodsData))
+  def addDebugs(debug: List[String]): LeviesPeriodsData =
+    copy(debugInfo = debugInfo.copy(info = debug ::: debugInfo.info))
   def addWarning(warning: String): LeviesPeriodsData =
     if (warnings.contains(warning)) this
     else copy(warnings = warnings :+ warning)

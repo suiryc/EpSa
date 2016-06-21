@@ -663,8 +663,13 @@ class NewAssetActionController extends Logging {
             val grossGain = grossAmount - investedAmount
             val leviesAmount = refundLevies.amount
             val leviesPct = scalePercents(leviesAmount * 100 / grossGain)
-            if (savings.hasLevies && Settings.debug(Debug.LeviesHistory))
-              info(s"action=<refund> date=<$operationDate> id=<${schemeAndFund.id.debugString(savings)}> nav=<$getSrcNAV> totalUnits=<$totalUnits> units=<$units> investedAmount=<$investedAmount> grossAmount=<$grossAmount> grossGain=<$grossGain> refundLevies=<$refundLevies> leviesAmount=<${refundLevies.amount}> leviesPct=<$leviesPct>")
+            if (savings.hasLevies) {
+              lazy val msg = s"action=<refund> date=<$operationDate> id=<${schemeAndFund.id.toString(savings)}> nav=<$getSrcNAV> totalUnits=<$totalUnits> units=<$units> investedAmount=<$investedAmount> grossAmount=<$grossAmount> grossGain=<$grossGain> refundLevies=<$refundLevies> leviesAmount=<${refundLevies.amount}> leviesPct=<$leviesPct>"
+              if (Settings.debug(Debug.LeviesHistory))
+                info(s"$msg debugInfo=<\n${refundLevies.debugInfo}\n>")
+              else if (Settings.debug(Debug.LeviesComputation))
+                info(msg)
+            }
             val warnings =
               if (refundLevies.warnings.isEmpty) ""
               else refundLevies.warnings.mkString("\n\n", "\n", "")
