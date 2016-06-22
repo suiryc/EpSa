@@ -103,7 +103,7 @@
                </GridPane.margin>
                <children>
                   <DatePicker fx:id="srcAvailabilityField" minWidth="110.0" />
-                  <Button fx:id="unavailabilityPeriodButton" maxHeight="1.7976931348623157E308" mnemonicParsing="false" onAction="#onLatestDate">
+                  <Button fx:id="srcUnavailabilityPeriodButton" maxHeight="1.7976931348623157E308" mnemonicParsing="false">
                      <graphic>
                         <ImageView pickOnBounds="true" preserveRatio="true">
                            <image>
@@ -185,7 +185,26 @@
                </GridPane.margin>
             </Label>
             <ComboBox fx:id="dstFundField" maxWidth="1.7976931348623157E308" GridPane.columnIndex="2" GridPane.rowIndex="2" />
-            <DatePicker fx:id="dstAvailabilityField" minWidth="110.0" GridPane.columnIndex="2" GridPane.rowIndex="3" />
+            <HBox spacing="5.0" GridPane.columnIndex="2" GridPane.rowIndex="3">
+               <children>
+                  <DatePicker fx:id="dstAvailabilityField" minWidth="110.0" />
+                  <Button fx:id="dstUnavailabilityPeriodButton" maxHeight="1.7976931348623157E308" mnemonicParsing="false">
+                     <graphic>
+                        <ImageView pickOnBounds="true" preserveRatio="true">
+                           <image>
+                              <Image url="@../images/fugue-icons/calendar-month.png" />
+                           </image>
+                        </ImageView>
+                     </graphic>
+                     <tooltip>
+                        <Tooltip text="%Unavailability period" />
+                     </tooltip>
+                  </Button>
+               </children>
+               <GridPane.margin>
+                  <Insets />
+               </GridPane.margin>
+            </HBox>
             <GridPane hgap="5.0" vgap="10.0" GridPane.columnIndex="2" GridPane.rowIndex="4" GridPane.rowSpan="3">
                <columnConstraints>
                   <ColumnConstraints hgrow="NEVER" maxWidth="1.7976931348623157E308" />

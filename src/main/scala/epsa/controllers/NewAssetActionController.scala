@@ -63,7 +63,7 @@ class NewAssetActionController extends Logging {
   protected var srcAvailabilityField: DatePicker = _
 
   @FXML
-  protected var unavailabilityPeriodButton: Button = _
+  protected var srcUnavailabilityPeriodButton: Button = _
 
   @FXML
   protected var srcAvailabilityField2: ComboBox[Option[LocalDate]] = _
@@ -88,6 +88,9 @@ class NewAssetActionController extends Logging {
 
   @FXML
   protected var dstAvailabilityField: DatePicker = _
+
+  @FXML
+  protected var dstUnavailabilityPeriodButton: Button = _
 
   @FXML
   protected var dstNAVField: TextFieldWithButton = _
@@ -148,6 +151,48 @@ class NewAssetActionController extends Logging {
     transferButton.setUserData(AssetActionKind.Transfer)
     refundButton.setUserData(AssetActionKind.Refund)
 
+    // Setup funds buttons.
+    // Some things must be set before first selecting (toggle) operation kind
+    // as we will then disable destination fields when applicable.
+    for (field <- List(srcNAVButton, srcEmptyButton, dstNAVButton, dstUnitsAutoButton)) {
+      // Disable by default; will be enabled when a fund is selected
+      field.setDisable(true)
+      // Reset padding of button; by default uses 8 on each horizontal side
+      // and 4 on each vertical side, which gives a rectangle. We will use
+      // 4 on each side to get a square to display our square icon inside.
+      field.setPadding(new Insets(4))
+    }
+    latestDateButton.setPadding(new Insets(4))
+    latestDateButton.setDisable(savings.latestAssetAction.isEmpty)
+    for ((button, field) <- List(
+      (srcUnavailabilityPeriodButton, srcAvailabilityField),
+      (dstUnavailabilityPeriodButton, dstAvailabilityField)
+    )) {
+      button.setPadding(new Insets(4))
+      button.setDisable(unavailabilityPeriods.isEmpty)
+      // Apply selected unavailability period when requested
+      if (unavailabilityPeriods.nonEmpty) {
+        val contextMenu = new ContextMenu()
+        unavailabilityPeriods.foreach { period =>
+          val menuItem = new MenuItem(period.id)
+          menuItem.setOnAction { (_: ActionEvent) =>
+            getOperationDate.foreach { date =>
+              val (month, dayOfMonth) = period.month match {
+                case Some(v) => (v, 1)
+                case None    => (date.getMonth, date.getDayOfMonth)
+              }
+              val availability = date.plusYears(period.years).withMonth(month.getValue).withDayOfMonth(dayOfMonth)
+              field.setValue(availability)
+            }
+          }
+          contextMenu.getItems.add(menuItem)
+        }
+        button.setOnAction { (event: ActionEvent) =>
+          contextMenu.show(button, Side.RIGHT, 0, 0)
+        }
+      }
+    }
+
     // Listen to action kind change
     actionKindGroup.selectedToggleProperty.listen(onToggleKind())
     // Select initial toggle button
@@ -204,41 +249,6 @@ class NewAssetActionController extends Logging {
           }
         }:DateCell
       })
-    }
-
-    // Setup funds buttons
-    for (field <- List(srcNAVButton, srcEmptyButton, dstNAVButton, dstUnitsAutoButton)) {
-      // Disable by default; will be enabled when a fund is selected
-      field.setDisable(true)
-      // Reset padding of button; by default uses 8 on each horizontal side
-      // and 4 on each vertical side, which gives a rectangle. We will use
-      // 4 on each side to get a square to display our square icon inside.
-      field.setPadding(new Insets(4))
-    }
-    latestDateButton.setPadding(new Insets(4))
-    latestDateButton.setDisable(savings.latestAssetAction.isEmpty)
-    unavailabilityPeriodButton.setPadding(new Insets(4))
-    unavailabilityPeriodButton.setDisable(unavailabilityPeriods.isEmpty)
-    // Apply selected unavailability period when requested
-    if (unavailabilityPeriods.nonEmpty) {
-      val contextMenu = new ContextMenu()
-      unavailabilityPeriods.foreach { period =>
-        val menuItem = new MenuItem(period.id)
-        menuItem.setOnAction { (_: ActionEvent) =>
-          getOperationDate.foreach { date =>
-            val (month, dayOfMonth) = period.month match {
-              case Some(v) => (v, 1)
-              case None    => (date.getMonth, date.getDayOfMonth)
-            }
-            val availability = date.plusYears(period.years).withMonth(month.getValue).withDayOfMonth(dayOfMonth)
-            srcAvailabilityField.setValue(availability)
-          }
-        }
-        contextMenu.getItems.add(menuItem)
-      }
-      unavailabilityPeriodButton.setOnAction { (event: ActionEvent) =>
-        contextMenu.show(unavailabilityPeriodButton, Side.RIGHT, 0, 0)
-      }
     }
 
     // Setup NAV history buttons
@@ -339,6 +349,7 @@ class NewAssetActionController extends Logging {
     val disableDst = !isDstEnabled
     dstFundField.setDisable(disableDst)
     dstAvailabilityField.setDisable(disableDst)
+    if (Option(dstUnavailabilityPeriodButton.getOnAction).isDefined) dstUnavailabilityPeriodButton.setDisable(disableDst)
     dstNAVField.setDisable(disableDst)
     dstAmountField.setDisable(disableDst)
     dstUnitsField.setDisable(disableDst)
