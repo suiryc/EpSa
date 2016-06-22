@@ -223,12 +223,14 @@ class EditSchemesController {
       import CheckBoxListCellWithInfo._
 
       override def getInfo(item0: Option[SelectableFund]): CellInfo = {
-        // Note: we are only called when there is an actual item.
+        // Notes:
+        // We are only called when there is an actual item.
+        // The 'checked' status was set beforehand if applicable.
         val item = item0.get
         CellInfo(
           text = item.fund.name,
           observable = item.check,
-          checked = edit.exists(_.funds.contains(item.fund.id)),
+          checked = item.check.get,
           locked = edit.exists(scheme => savings.hasAsset(scheme.id, item.fund.id))
         )
       }
@@ -400,9 +402,6 @@ class EditSchemesController {
 
     // Update editing fields if we are selecting a new scheme
     newEdit.filterNot(edit.contains).foreach { scheme =>
-      // Note: we need to temporarily disable editing before updating selected
-      // funds due to some checking.
-      edit = None
       updateEditFields(scheme)
     }
     // If scheme was de-selected, we still want refresh funds view
@@ -471,6 +470,12 @@ class EditSchemesController {
     commentField.setText(scheme.comment.orNull)
     // Refresh ListView in order to re-create cells with appropriate content
     // (checkbox selection, etc).
+    // Note: we also set the 'checked' status for each item, so that it is
+    // properly taken into account (even for the cells not visible in the
+    // current view).
+    fundsField.getItems.toList.flatten.foreach { item =>
+      item.check.set(scheme.funds.contains(item.fund.id))
+    }
     fundsField.refresh()
   }
 

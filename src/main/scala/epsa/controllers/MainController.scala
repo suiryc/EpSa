@@ -32,6 +32,9 @@ import suiryc.scala.javafx.stage.{FileChoosers, Stages}
 import suiryc.scala.math.Ordered._
 import suiryc.scala.settings.Preference
 
+// TODO: place text on right side of cell for amounts ?
+// TODO: format amounts with space for thousands etc ?
+// TODO: way to re-select previously selected date for 'savings on date' ?
 // TODO: take care of asset actions (see sorting) upon flattening events
 // TODO: then upon importing/exporting (and also loading ?), sort *and* flatten
 // TODO: smart deletion of funds ?
@@ -844,7 +847,7 @@ class MainController extends Logging {
           accountHistoryPath() = selectedFile.toPath
           // Purge events history, and replay imported history
           Awaits.purgeDataStoreEvents(Some(state.stage))
-          val newState = processEvents(state.zero(Savings(levies = state.savings.levies)), events)
+          val newState = processEvents(state.zero(Savings(levies = state.savings.levies)), events, updateAssetsValue = true)
           // Then cleanup data store (no need to reorder as we did it already)
           onCleanupDataStore(newState, reorder = false)
         }

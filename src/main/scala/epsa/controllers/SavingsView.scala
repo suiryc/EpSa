@@ -240,7 +240,7 @@ class SavingsView(tab: SavingsViewTab) {
       availabilityBase = dateOpt
     )
     // Bind (and first set) our total comparator to the table comparator
-    sortedAssetsWithTotal.comparatorProperty.setValue(assetsTable.getComparator)
+    sortedAssetsWithTotal.comparatorProperty.set(assetsTable.getComparator)
     sortedAssetsWithTotal.comparatorProperty.bind(assetsTable.comparatorProperty)
     // It is better (up to JavaFX 8) to unbind the previous SortedList
     // comparator if any. The previous list will eventually get GCed, but not
