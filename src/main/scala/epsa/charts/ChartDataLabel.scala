@@ -18,7 +18,7 @@ class ChartDataLabel[A](
   xLabel: String,
   xFormatter: A => String,
   yLabel: String,
-  ySuffix: String
+  yFormatter: BigDecimal => String
 ) extends VBox {
 
   /** Reference data. */
@@ -66,7 +66,7 @@ class ChartDataLabel[A](
    * current data is lower, green if greater, black if equal.
    */
   def setData(data: ChartData[A]): Unit = {
-    dataText.setText(s"$xLabel: ${xFormatter(data.x)}\n$yLabel: ${data.y}$ySuffix")
+    dataText.setText(s"$xLabel: ${xFormatter(data.x)}\n$yLabel: ${yFormatter(data.y)}")
     refData.foreach { refData =>
       val delta: BigDecimal = if (refData.y.compare(java.math.BigDecimal.ZERO) != 0) {
         (data.y - refData.y) * 100 / refData.y

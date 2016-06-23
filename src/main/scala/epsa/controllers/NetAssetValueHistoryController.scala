@@ -2,7 +2,7 @@ package epsa.controllers
 
 import epsa.I18N
 import epsa.I18N.Strings
-import epsa.Settings.getBigDecimal
+import epsa.Settings.{formatCompactNumber, parseNumber}
 import epsa.charts._
 import epsa.model.Savings
 import epsa.storage.DataStore
@@ -328,7 +328,7 @@ class NetAssetValueHistoryController {
         val header = new CustomMenuItem(new Label(data.date.toString), false)
         header.getStyleClass.addAll(JFXStyles.CLASS_HEADER, JFXStyles.CLASS_NO_SELECT)
 
-        val text = data.value.toString
+        val text = formatCompactNumber(data.value)
         val menuTextField = new TextFieldWithButton("text-field-with-refresh-button")
         val editNAV = new CustomMenuItem(menuTextField, false)
         // Set text, and reset it when requested
@@ -340,7 +340,7 @@ class NetAssetValueHistoryController {
         menuTextField.buttonDisableProperty.bind(menuTextField.textField.textProperty.isEqualTo(text))
 
         // Check edited value is OK
-        def getUserNAV = getBigDecimal(menuTextField.getText)
+        def getUserNAV = parseNumber(menuTextField.getText)
         menuTextField.textField.textProperty.listen { _ =>
           val navOk = getUserNAV > 0
           JFXStyles.toggleError(menuTextField, !navOk,
@@ -352,7 +352,7 @@ class NetAssetValueHistoryController {
         // Save edited value if applicable when requested
         menuTextField.textField.setOnAction { (_: ActionEvent) =>
           val nav = getUserNAV
-          if ((menuTextField.getText != text) && (nav > 0)) {
+          if ((menuTextField.getText != text) && (nav > 0) && (nav != data.value)) {
             getFund.foreach { fund =>
               val assetValues = Seq(Savings.AssetValue(data.date, nav))
               // Compute fund changes (all changes relatively to initial history)

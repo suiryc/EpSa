@@ -103,8 +103,8 @@ case class AssetDateField(key: String, columnIdx: Int, tableLabel: String, detai
   column.setComparator(AssetField.dateComparator(value))
 }
 
-/** Asset field with amount to display. */
-case class AssetAmountField(key: String, columnIdx: Int, tableLabel: String, detailsLabel: String,
+/** Asset field with number to display. */
+case class AssetNumberField(key: String, columnIdx: Int, tableLabel: String, detailsLabel: String,
   format: (AssetDetails) => String,
   value: (AssetDetails) => Option[BigDecimal],
   override val warning: (AssetDetails) => Option[String] = { _ => None }
@@ -120,11 +120,11 @@ case class AssetAmountField(key: String, columnIdx: Int, tableLabel: String, det
       override def warning(v: AssetDetails) = warning0(v)
     }
   })
-  column.setComparator(AssetField.amountComparator(value))
+  column.setComparator(AssetField.numberComparator(value))
 }
 
-/** Asset field with (colored) amount to display. */
-case class AssetColoredAmountField(key: String, columnIdx: Int, tableLabel: String, detailsLabel: String,
+/** Asset field with (colored) number to display. */
+case class AssetColoredNumberField(key: String, columnIdx: Int, tableLabel: String, detailsLabel: String,
   format: (AssetDetails) => String,
   value: (AssetDetails) => Option[BigDecimal],
   override val warning: (AssetDetails) => Option[String] = { _ => None }
@@ -142,7 +142,7 @@ case class AssetColoredAmountField(key: String, columnIdx: Int, tableLabel: Stri
       override def warning(v: AssetDetails) = warning0(v)
     }
   })
-  column.setComparator(AssetField.amountComparator(value))
+  column.setComparator(AssetField.numberComparator(value))
 
   override def updateDetailsValue(assetDetailsOpt: Option[AssetDetails]): Unit = {
     super.updateDetailsValue(assetDetailsOpt)
@@ -189,29 +189,29 @@ object AssetField {
       AssetField.formatFund, AssetField.fundComment),
     AssetDateField(KEY_AVAILABILITY, 0, Strings.availability, Strings.availabilityColon,
       AssetField.formatAvailability, AssetField.availability),
-    AssetAmountField(KEY_UNITS, 0, Strings.units, Strings.unitsColon,
+    AssetNumberField(KEY_UNITS, 0, Strings.units, Strings.unitsColon,
       AssetField.formatUnits, AssetField.units),
-    AssetAmountField(KEY_VWAP, 0, Strings.vwap, Strings.vwapColon,
+    AssetNumberField(KEY_VWAP, 0, Strings.vwap, Strings.vwapColon,
       AssetField.formatVWAP, AssetField.vwap),
-    AssetAmountField(KEY_NAV, 0, Strings.nav, Strings.navColon,
+    AssetNumberField(KEY_NAV, 0, Strings.nav, Strings.navColon,
       AssetField.formatNAV, AssetField.nav),
     AssetDateField(KEY_DATE, 0, Strings.date, Strings.dateColon,
       AssetField.formatDate, AssetField.date),
-    AssetAmountField(KEY_INVESTED_AMOUNT, 1, Strings.invested, Strings.investedAmountColon,
+    AssetNumberField(KEY_INVESTED_AMOUNT, 1, Strings.invested, Strings.investedAmountColon,
       AssetField.formatInvestedAmount, AssetField.investedAmount),
-    AssetAmountField(KEY_GROSS_AMOUNT, 1, Strings.gross, Strings.grossAmountColon,
+    AssetNumberField(KEY_GROSS_AMOUNT, 1, Strings.gross, Strings.grossAmountColon,
       AssetField.formatGrossAmount, AssetField.grossAmount, AssetField.grossAmountWarning),
-    AssetAmountField(KEY_LEVIES_AMOUNT, 1, Strings.levies, Strings.leviesAmountColon,
+    AssetNumberField(KEY_LEVIES_AMOUNT, 1, Strings.levies, Strings.leviesAmountColon,
       AssetField.formatLeviesAmount, AssetField.leviesAmount, AssetField.leviesWarning),
-    AssetAmountField(KEY_NET_AMOUNT, 1, Strings.net, Strings.netAmountColon,
+    AssetNumberField(KEY_NET_AMOUNT, 1, Strings.net, Strings.netAmountColon,
       AssetField.formatNetAmount, AssetField.netAmount, AssetField.leviesWarning),
-    AssetColoredAmountField(KEY_GROSS_GAIN, 1, Strings.gross, Strings.grossGainColon,
+    AssetColoredNumberField(KEY_GROSS_GAIN, 1, Strings.gross, Strings.grossGainColon,
       AssetField.formatGrossGain, AssetField.grossGain, AssetField.grossAmountWarning),
-    AssetColoredAmountField(KEY_GROSS_GAIN_PCT, 1, Strings.grossPct, Strings.grossGainPctColon,
+    AssetColoredNumberField(KEY_GROSS_GAIN_PCT, 1, Strings.grossPct, Strings.grossGainPctColon,
       AssetField.formatGrossGainPct, AssetField.grossGainPct, AssetField.grossAmountWarning),
-    AssetColoredAmountField(KEY_NET_GAIN, 1, Strings.net, Strings.netGainColon,
+    AssetColoredNumberField(KEY_NET_GAIN, 1, Strings.net, Strings.netGainColon,
       AssetField.formatNetGain, AssetField.netGain, AssetField.leviesWarning),
-    AssetColoredAmountField(KEY_NET_GAIN_PCT, 1, Strings.netPct, Strings.netGainPctColon,
+    AssetColoredNumberField(KEY_NET_GAIN_PCT, 1, Strings.netPct, Strings.netGainPctColon,
       AssetField.formatNetGainPct, AssetField.netGainPct, AssetField.leviesWarning)
   ).map { field =>
     field.key -> field
@@ -220,7 +220,7 @@ object AssetField {
   val bigDecimalComparator = Comparators.optionComparator[BigDecimal]
   val localDateComparator = Comparators.optionComparator[LocalDate]
 
-  def amountComparator(value: AssetDetails => Option[BigDecimal]): Comparator[AssetDetails] = {
+  def numberComparator(value: AssetDetails => Option[BigDecimal]): Comparator[AssetDetails] = {
     new Comparator[AssetDetails] {
       override def compare(o1: AssetDetails, o2: AssetDetails): Int =
         bigDecimalComparator.compare(value(o1), value(o2))

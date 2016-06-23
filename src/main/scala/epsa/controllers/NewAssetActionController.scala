@@ -417,7 +417,7 @@ class NewAssetActionController extends Logging {
       val dstNAV = getDstNAV
       if (dstNAV > 0) {
         val dstUnits = scaleUnits(value / dstNAV)
-        dstUnitsField.setText(dstUnits.toString)
+        dstUnitsField.setText(formatCompactNumber(dstUnits))
       }
     }
 
@@ -438,7 +438,7 @@ class NewAssetActionController extends Logging {
       val searchAsset = Savings.Asset(schemeAndFund.scheme.id, schemeAndFund.fund.id, srcAvailability, 0, 0)
       getSavings(operationDate).findAsset(operationDate, searchAsset).foreach { asset =>
         // Note: setting the units will trigger amount computing and update the field
-        srcUnitsField.setText(asset.units.toString)
+        srcUnitsField.setText(formatCompactNumber(asset.units))
       }
     }
   }
@@ -476,7 +476,7 @@ class NewAssetActionController extends Logging {
   private def computeAmount(units: BigDecimal, nav: BigDecimal, amountField: TextField): Unit = {
     if ((units > 0) && (nav > 0)) {
       val amount = scaleAmount(units * nav)
-      amountField.setText(amount.toString)
+      amountField.setText(formatCompactNumber(amount))
     }
   }
 
@@ -618,10 +618,10 @@ class NewAssetActionController extends Logging {
         val navOpt = Awaits.readDataStoreNAV(Some(stage), fund.id, operationDate).getOrElse(None)
         navOpt match {
           case Some(nav) =>
-            val text = nav.value.toString
+            val text = formatCompactNumber(nav.value)
             field.setUserData(nav)
             field.setText(text)
-            field.textField.setTooltip(new Tooltip(s"${Strings.date}: ${nav.date}\n${Strings.nav}: ${Form.formatAmount(nav.value, epsa.Settings.currency())}"))
+            field.textField.setTooltip(new Tooltip(s"${Strings.date}: ${nav.date}\n${Strings.nav}: ${formatNumber(nav.value, epsa.Settings.currency())}"))
             field.setOnButtonAction { (event: ActionEvent) =>
               field.setText(text)
             }
@@ -687,9 +687,9 @@ class NewAssetActionController extends Logging {
             // $1 = gross gain $2 = levies amount $3 = levies global rate
             val msg =
               Strings.leviesEstimation.format(
-                Form.formatAmount(grossGain, currency),
-                Form.formatAmount(leviesAmount, currency),
-                Form.formatAmount(leviesPct, "%")
+                formatNumber(grossGain, currency),
+                formatNumber(leviesAmount, currency),
+                formatNumber(leviesPct, "%")
               ) + warnings
             val node = new ImageView(Images.iconMoneyCoin)
             Tooltip.install(node, new Tooltip(msg))
@@ -878,25 +878,25 @@ class NewAssetActionController extends Logging {
   }
 
   private def getSrcNAV: BigDecimal =
-    getBigDecimal(srcNAVField.getText)
+    parseNumber(srcNAVField.getText)
 
   private def getSrcAmount: BigDecimal =
-    getBigDecimal(srcAmountField.getText)
+    parseNumber(srcAmountField.getText)
 
   private def getSrcUnits: BigDecimal =
-    getBigDecimal(srcUnitsField.getText)
+    parseNumber(srcUnitsField.getText)
 
   private def getDstFund: Option[SchemeAndFund] =
     Option(dstFundField.getValue).flatten
 
   private def getDstNAV: BigDecimal =
-    getBigDecimal(dstNAVField.getText)
+    parseNumber(dstNAVField.getText)
 
   private def getDstAmount: BigDecimal =
-    getBigDecimal(dstAmountField.getText)
+    parseNumber(dstAmountField.getText)
 
   private def getDstUnits: BigDecimal =
-    getBigDecimal(dstUnitsField.getText)
+    parseNumber(dstUnitsField.getText)
 
   private def breakRecursion[A](f: => A): Unit =
     if (recursionLevel == 0) {

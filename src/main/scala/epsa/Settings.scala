@@ -1,7 +1,11 @@
 package epsa
 
+import java.math.{BigDecimal => jBigDecimal}
+import java.text.{DecimalFormat, NumberFormat, ParsePosition}
+import java.util.Locale
 import java.util.prefs.Preferences
 import scala.runtime.ScalaRunTime
+import suiryc.scala.concurrent.ThreadLocalEx
 import suiryc.scala.settings.Preference
 import suiryc.scala.settings.Preference._
 
@@ -15,6 +19,31 @@ object Settings {
   def toString(product: Product, str: => String): String =
     if (debug(Debug.OriginalToString)) ScalaRunTime._toString(product)
     else str
+
+  // Get decimal format
+  // Note: as suggested by the API, wrap inside a ThreadLocal to handle
+  // concurrent accesses.
+  private val decimalFormat = ThreadLocalEx {
+    val df = try {
+      NumberFormat.getInstance(Locale.getDefault).asInstanceOf[DecimalFormat]
+    } catch {
+      case ex: Exception => new DecimalFormat()
+    }
+
+    // We want to get BigDecimal upon parsing and we will manage rounding.
+    // So a maximum of 6 fraction digits should be enough.
+    df.setParseBigDecimal(true)
+    df.setMaximumFractionDigits(6)
+    df
+  }
+
+
+  // Decimal format without grouping (useful to fill editable fields).
+  private val decimalCompactFormat = ThreadLocalEx {
+    val df = decimalFormat.get.clone().asInstanceOf[DecimalFormat]
+    df.setGroupingUsed(false)
+    df
+  }
 
   val preferredCurrencies = List("€", "$", "£", "￥", "฿")
   val defaultCurrency = preferredCurrencies.head
@@ -36,12 +65,6 @@ object Settings {
   val percentsScale = 2
   val percentsRounding = BigDecimal.RoundingMode.HALF_EVEN
 
-  def getBigDecimal(str: String): BigDecimal = try {
-    Option(str).map(BigDecimal(_)).getOrElse(BigDecimal(0))
-  } catch {
-    case ex: Exception => BigDecimal(0)
-  }
-
   def splitAmount(amount: BigDecimal, ratio: BigDecimal): BigDecimal =
     scaleAmount(amount * ratio)
 
@@ -60,6 +83,31 @@ object Settings {
     // its scale down by 1, a value below 1000 down by 2, etc.
     val scale = scala.math.max(0, percentsScale - (v.abs.intValue.toString.length - 1))
     v.setScale(scale, percentsRounding)
+  }
+
+  def formatCompactNumber(v: BigDecimal): String = decimalCompactFormat.get.format(v)
+
+  def formatNumber(v: BigDecimal): String = decimalFormat.get.format(v)
+
+  def formatNumber(v: BigDecimal, suffix: String): String = {
+    val f = formatNumber(v)
+    Option(suffix).find(!_.isEmpty).map { s =>
+      s"$f $s"
+    }.getOrElse(f)
+  }
+
+  def parseNumber(str: String): BigDecimal = try {
+    val pos = new ParsePosition(0)
+    Option(str).map { s =>
+      // First try to parse using locale format
+      val parsed = decimalCompactFormat.get.parse(s, pos)
+      // Upon failure, or if the whole string was not parsed, fallback to
+      // standard BigDecimal parsing.
+      if ((parsed != null) && (pos.getIndex == s.length)) BigDecimal(parsed.asInstanceOf[jBigDecimal])
+      else BigDecimal(s)
+    }.getOrElse(BigDecimal(0))
+  } catch {
+    case ex: Exception => BigDecimal(0)
   }
 
   case object Debug extends Enumeration {

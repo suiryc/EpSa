@@ -1,7 +1,7 @@
 package epsa.charts
 
-import epsa.Settings.scalePercents
-import epsa.controllers.{Form, Images}
+import epsa.Settings.{formatNumber, scalePercents}
+import epsa.controllers.Images
 import epsa.util.JFXStyles
 import epsa.util.JFXStyles.AnimationHighlighter
 import java.time.LocalDate
@@ -229,13 +229,13 @@ class ChartHandler[A <: ChartMark](
   // Don't allow focus
   zoomNode.setFocusTraversable(false)
   xZoomProperty.listen { v =>
-    zoomNode.setText(Form.formatAmount(scalePercents(v * 100), "%"))
+    zoomNode.setText(formatNumber(scalePercents(v * 100), "%"))
   }
   xZoom = BigDecimal(1)
   private val contextMenu = new ContextMenu()
   private def loop(zoom: BigDecimal): Unit =
     if (zoom <= xZoomMax) {
-      val menuItem = new MenuItem(Form.formatAmount(scalePercents(zoom * 100), "%"))
+      val menuItem = new MenuItem(formatNumber(scalePercents(zoom * 100), "%"))
       menuItem.setOnAction { (_: ActionEvent) =>
         // Stay on view center after zooming
         val viewedBounds = getChartBackgroundViewedBounds()
@@ -292,7 +292,7 @@ class ChartHandler[A <: ChartMark](
     xLabel = settings.xLabel,
     xFormatter = v => numberToDate(v).format(dateFormatter),
     yLabel = settings.yLabel,
-    ySuffix = settings.ySuffix
+    yFormatter = v => formatNumber(v, settings.ySuffix)
   )
   labelNAV.getStylesheets.add(getClass.getResource("/css/main.css").toExternalForm)
   labelNAV.getStyleClass.add("chart-data-hover")

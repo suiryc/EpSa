@@ -599,10 +599,11 @@ class AccountHistoryController extends Logging {
       List(
         // $1=amount $2=fund $3=scheme
         AssetEventItem(index, e.date, Strings.assetEventPaymentMain.format(
-          Form.formatAmount(e.part.amount(e.part.value), currency),
+          formatNumber(e.part.amount(e.part.value), currency),
           savings.getFund(e.part.fundId).name, savings.getScheme(e.part.schemeId).name), e.comment),
         // $1=units $2=NAV $3=availability
-        AssetEventItem(index, Strings.assetEventPaymentDetails1.format(e.part.units, e.part.value,
+        AssetEventItem(index, Strings.assetEventPaymentDetails1.format(
+          formatNumber(e.part.units), formatNumber(e.part.value, currency),
           Form.formatAvailability(e.part.availability, Some(e.date))))
       )
 
@@ -610,15 +611,17 @@ class AccountHistoryController extends Logging {
       List(
         // $1=src amount $2=src fund $3=src scheme $4=dst fund $5=dst scheme
         AssetEventItem(index, e.date, Strings.assetEventTransferMain.format(
-          Form.formatAmount(e.partSrc.amount(e.partSrc.value), currency),
+          formatNumber(e.partSrc.amount(e.partSrc.value), currency),
           savings.getFund(e.partSrc.fundId).name, savings.getScheme(e.partSrc.schemeId).name,
           savings.getFund(e.partDst.fundId).name, savings.getScheme(e.partDst.schemeId).name), e.comment),
         // $1=src units $2=src NAV $3=src availability
-        AssetEventItem(index, Strings.assetEventTransferDetails1.format(e.partSrc.units, e.partSrc.value,
+        AssetEventItem(index, Strings.assetEventTransferDetails1.format(
+          formatNumber(e.partSrc.units), formatNumber(e.partSrc.value, currency),
           Form.formatAvailability(e.partSrc.availability, Some(e.date)))),
         // $1=dst units $2=dst NAV $3=dst amount $4=dst availability
-        AssetEventItem(index, Strings.assetEventTransferDetails2.format(e.partDst.units, e.partDst.value,
-          Form.formatAmount(e.partDst.amount(e.partDst.value), currency),
+        AssetEventItem(index, Strings.assetEventTransferDetails2.format(
+          formatNumber(e.partDst.units), formatNumber(e.partDst.value, currency),
+          formatNumber(e.partDst.amount(e.partDst.value), currency),
           Form.formatAvailability(e.partDst.availability, Some(e.date))))
       )
 
@@ -638,15 +641,16 @@ class AccountHistoryController extends Logging {
       List(
         // $1=amount $2=fund $3=scheme
         AssetEventItem(index, e.date, Strings.assetEventRefundMain.format(
-          Form.formatAmount(part.amount(part.value), currency),
+          formatNumber(part.amount(part.value), currency),
           savings.getFund(part.fundId).name, savings.getScheme(part.schemeId).name), e.comment),
         // $1=units $2=NAV
-        AssetEventItem(index, Strings.assetEventRefundDetails1.format(part.units, part.value)),
+        AssetEventItem(index, Strings.assetEventRefundDetails1.format(
+          formatNumber(part.units), formatNumber(part.value, currency))),
         // $1 = gross gain $2 = levies amount $3 = levies global rate
         AssetEventItem(index, Strings.leviesEstimation.format(
-          Form.formatAmount(grossGain, currency),
-          Form.formatAmount(leviesAmount, currency),
-          Form.formatAmount(leviesPct, "%")
+          formatNumber(grossGain, currency),
+          formatNumber(leviesAmount, currency),
+          formatNumber(leviesPct, "%")
         ))
       )
 
@@ -710,7 +714,7 @@ class AccountHistoryController extends Logging {
     }
 
     def coloredAmount(label: Label, value: BigDecimal, suffix: String): Unit = {
-      label.setText(Form.formatAmount(value, suffix))
+      label.setText(formatNumber(value, suffix))
       if (value == 0) JFXStyles.toggleNeutral(label)
       else if (value > 0) JFXStyles.togglePositive(label)
       else JFXStyles.toggleNegative(label)
@@ -718,8 +722,8 @@ class AccountHistoryController extends Logging {
 
     val currency = epsa.Settings.currency()
     dateLabel.setText(date.toString)
-    investedAmountLabel.setText(Form.formatAmount(details.investedAmount, currency))
-    grossAmountLabel.setText(Form.formatAmount(details.grossAmount, currency))
+    investedAmountLabel.setText(formatNumber(details.investedAmount, currency))
+    grossAmountLabel.setText(formatNumber(details.grossAmount, currency))
     coloredAmount(grossGainLabel, details.grossGain, currency)
     coloredAmount(grossGainPctLabel, details.grossGainPct, "%")
   }

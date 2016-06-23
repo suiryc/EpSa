@@ -32,7 +32,6 @@ import suiryc.scala.javafx.stage.{FileChoosers, Stages}
 import suiryc.scala.math.Ordered._
 import suiryc.scala.settings.Preference
 
-// TODO: format amounts with space for thousands etc ?
 // TODO: way to re-select previously selected date for 'savings on date' ?
 // TODO: take care of asset actions (see sorting) upon flattening events
 // TODO: then upon importing/exporting (and also loading ?), sort *and* flatten

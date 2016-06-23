@@ -102,24 +102,24 @@ trait AssetDetails {
     else Form.formatAvailability(asset.availability, date = availabilityBase)
   lazy val formatUnits =
     if ((kind != AssetDetailsKind.Standard) && (kind != AssetDetailsKind.TotalPerFund)) null
-    else scaleUnits(units).toString
+    else formatNumber(scaleUnits(units))
   lazy val formatVWAP =
     if ((kind != AssetDetailsKind.Standard) && (kind != AssetDetailsKind.TotalPerFund)) null
-    else Form.formatAmount(vwap, currency)
+    else formatNumber(vwap, currency)
   lazy val formatDate =
     if ((kind != AssetDetailsKind.Standard) && (kind != AssetDetailsKind.TotalPerFund)) null
     else date.map(_.toString).getOrElse(Strings.na)
   lazy val formatNAV =
     if ((kind != AssetDetailsKind.Standard) && (kind != AssetDetailsKind.TotalPerFund)) null
-    else nav.map(Form.formatAmount(_, currency)).getOrElse(Strings.na)
-  lazy val formatInvestedAmount = Form.formatAmount(investedAmount, currency)
-  lazy val formatGrossAmount = grossAmount.map(Form.formatAmount(_, currency)).getOrElse(Strings.na)
-  lazy val formatLeviesAmount = leviesAmount.map(Form.formatAmount(_, currency)).getOrElse(Strings.na)
-  lazy val formatNetAmount = netAmount.map(Form.formatAmount(_, currency)).getOrElse(Strings.na)
-  lazy val formatGrossGain = grossGain.map(Form.formatAmount(_, currency)).getOrElse(Strings.na)
-  lazy val formatGrossGainPct = grossGainPct.map(Form.formatAmount(_, "%")).getOrElse(Strings.na)
-  lazy val formatNetGain = netGain.map(Form.formatAmount(_, currency)).getOrElse(Strings.na)
-  lazy val formatNetGainPct = netGainPct.map(Form.formatAmount(_, "%")).getOrElse(Strings.na)
+    else nav.map(formatNumber(_, currency)).getOrElse(Strings.na)
+  lazy val formatInvestedAmount = formatNumber(investedAmount, currency)
+  lazy val formatGrossAmount = grossAmount.map(formatNumber(_, currency)).getOrElse(Strings.na)
+  lazy val formatLeviesAmount = leviesAmount.map(formatNumber(_, currency)).getOrElse(Strings.na)
+  lazy val formatNetAmount = netAmount.map(formatNumber(_, currency)).getOrElse(Strings.na)
+  lazy val formatGrossGain = grossGain.map(formatNumber(_, currency)).getOrElse(Strings.na)
+  lazy val formatGrossGainPct = grossGainPct.map(formatNumber(_, "%")).getOrElse(Strings.na)
+  lazy val formatNetGain = netGain.map(formatNumber(_, currency)).getOrElse(Strings.na)
+  lazy val formatNetGainPct = netGainPct.map(formatNumber(_, "%")).getOrElse(Strings.na)
 }
 
 /** Standard details. */
