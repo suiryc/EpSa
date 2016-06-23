@@ -116,6 +116,7 @@ case class AssetAmountField(key: String, columnIdx: Int, tableLabel: String, det
   val warning0 = warning
   column.setCellFactory(Callback {
     new FormatCell[AssetDetails, AssetDetails](format) with WarningCell[AssetDetails] {
+      getStyleClass.add(JFXStyles.CLASS_VALUE_NUMBER)
       override def warning(v: AssetDetails) = warning0(v)
     }
   })
@@ -136,6 +137,7 @@ case class AssetColoredAmountField(key: String, columnIdx: Int, tableLabel: Stri
   val warning0 = warning
   column.setCellFactory(Callback {
     new FormatCell[AssetDetails, AssetDetails](format) with ColoredCell[AssetDetails] with WarningCell[AssetDetails] {
+      getStyleClass.add(JFXStyles.CLASS_VALUE_NUMBER)
       override def value(v: AssetDetails) = value0(v)
       override def warning(v: AssetDetails) = warning0(v)
     }

@@ -59,7 +59,7 @@ trait ColoredCell[A] extends Cell[A] {
 }
 
 trait WarningCell[A] extends Cell[A] {
-  // Display graphic on the right side
+  // Display graphic on the right side (may be overridden in CSS)
   setContentDisplay(ContentDisplay.RIGHT)
 
   def warning(a: A): Option[String]

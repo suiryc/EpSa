@@ -11,6 +11,10 @@ import suiryc.scala.javafx.event.EventHandler._
 
 object JFXStyles {
 
+  val CLASS_HEADER = "header"
+  val CLASS_NO_SELECT = "no-select"
+  val CLASS_VALUE_NUMBER = "value-number"
+
   private val warningClass = PseudoClass.getPseudoClass("warning")
 
   private val errorClass = PseudoClass.getPseudoClass("error")

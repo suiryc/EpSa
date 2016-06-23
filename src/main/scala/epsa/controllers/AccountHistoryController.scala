@@ -373,7 +373,7 @@ class AccountHistoryController extends Logging {
       case ChartEvent.RightClicked =>
         // Refresh context menu with new item (for currently selected date)
         val header = new CustomMenuItem(new Label(data.date.toString), false)
-        header.getStyleClass.addAll("header", "no-select")
+        header.getStyleClass.addAll(JFXStyles.CLASS_HEADER, JFXStyles.CLASS_NO_SELECT)
         val savingsOnDate = new MenuItem(Strings.savingsOnDate,
           new ImageView(Images.iconCalendarDay))
         savingsOnDate.setOnAction { (event: ActionEvent) =>

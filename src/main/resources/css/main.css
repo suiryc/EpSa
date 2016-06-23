@@ -1,6 +1,12 @@
 /* Center text (which applies to multilines) and not only label for column headers. */
 .table-view .column-header .label {
-  -fx-text-alignment: CENTER;
+  -fx-text-alignment: center;
+}
+
+/* Display number values on the right side, and have graphic content (like warning icon) on the left side. */
+.table-view .table-row-cell .value-number {
+  -fx-alignment: center-right;
+  -fx-content-display: left;
 }
 
 /* Dedicated 'sum' row style.
@@ -98,4 +104,9 @@
 
 .custom-menu-item.no-select:focused > .label {
   -fx-text-fill: -fx-text-base-color;
+}
+
+/* And use darker background for header custom menu items. */
+.custom-menu-item.header, .custom-menu-item.header:focused {
+  -fx-background-color: derive(-fx-control-inner-background, -10%);
 }
