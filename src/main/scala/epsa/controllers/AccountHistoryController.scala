@@ -133,8 +133,7 @@ class AccountHistoryController extends Logging {
         }
       }
     })
-    // Note: since we have the (sorted) event index as first field of
-    // AssetEventItem we have a natural ordering by history.
+    // Note: AssetEventItem defines its own ordering.
 
     // There is no meaning to sort on event description, so disable it.
     columnEventDesc.setSortable(false)
@@ -747,8 +746,13 @@ object AccountHistoryController {
 
   def title = Strings.accountHistory
 
-  case class AssetEventItem(index: Int, date: Option[LocalDate], desc: String, comment: Option[String]) {
+  case class AssetEventItem(index: Int, date: Option[LocalDate], desc: String, comment: Option[String]) extends Ordered[AssetEventItem] {
     var row: Option[TreeTableRow[AssetEventItem]] = None
+
+    // Define order for items: by index then date
+    // As a side effect this gives Comparable implementation for Java sorting.
+    import scala.math.Ordered.orderingToOrdered
+    override def compare(that: AssetEventItem): Int = (index, date) compare (that.index, that.date)
   }
 
   object AssetEventItem {
