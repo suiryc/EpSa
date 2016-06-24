@@ -12,13 +12,13 @@ import java.io.PrintWriter
 import java.nio.file.Path
 import java.time.LocalDate
 import java.util.UUID
-import javafx.event.ActionEvent
+import javafx.event.{ActionEvent, EventTarget}
 import javafx.fxml.{FXML, FXMLLoader}
-import javafx.scene.{Parent, Scene}
+import javafx.scene.{Node, Parent, Scene}
 import javafx.scene.layout.{AnchorPane, GridPane}
 import javafx.scene.control._
 import javafx.scene.image.ImageView
-import javafx.scene.input.{KeyCode, KeyEvent}
+import javafx.scene.input.{KeyCode, KeyEvent, MouseEvent}
 import javafx.stage._
 import scala.collection.JavaConversions._
 import scala.util.Success
@@ -32,7 +32,6 @@ import suiryc.scala.javafx.stage.{FileChoosers, Stages}
 import suiryc.scala.math.Ordered._
 import suiryc.scala.settings.Preference
 
-// TODO: way to re-select previously selected date for 'savings on date' ?
 // TODO: take care of asset actions (see sorting) upon flattening events
 // TODO: then upon importing/exporting (and also loading ?), sort *and* flatten
 // TODO: smart deletion of funds ?
@@ -346,10 +345,41 @@ class MainController extends Logging {
       val popup = skin.getPopupContent
       popup.applyCss()
 
+      def onDate(stage: Stage): Unit = {
+        addSavingsOnDateTab(Some(picker.getValue))
+        stage.close()
+      }
+
       // Cancel request (close stage) on ESC
+      // Show savings for selected date on ENTER
       def keyFilter(stage: Stage)(event: KeyEvent): Unit = {
         if (event.getCode == KeyCode.ESCAPE) {
           stage.close()
+          event.consume()
+        } else if (event.getCode == KeyCode.ENTER) {
+          onDate(stage)
+          event.consume()
+        }
+      }
+      // Show savings for already selected date if clicked again
+      def mouseFilter(stage: Stage)(event: MouseEvent): Unit = {
+        @scala.annotation.tailrec
+        def matches(target: EventTarget): Boolean =
+          target match {
+            case cell: DateCell =>
+              // Currently selected date has the "selected" class style
+              cell.getStyleClass.contains("selected")
+
+            case node: Node =>
+              // Since the cell has children, also pick clicks on them
+              val parent = node.getParent
+              (parent != null) && matches(parent)
+
+            case _ =>
+              false
+          }
+        if (matches(event.getTarget)) {
+          onDate(stage)
           event.consume()
         }
       }
@@ -357,10 +387,10 @@ class MainController extends Logging {
         splitPane.getScene.getWindow,
         { (stage: Stage) =>
           picker.setOnAction { (_: ActionEvent) =>
-            addSavingsOnDateTab(Some(picker.getValue))
-            stage.close()
+            onDate(stage)
           }
           stage.addEventFilter(KeyEvent.KEY_PRESSED, keyFilter(stage) _)
+          stage.addEventFilter(MouseEvent.MOUSE_CLICKED, mouseFilter(stage) _)
           popup
         }
       )
