@@ -72,7 +72,6 @@ object Savings extends Logging {
       }
       def addEvents(events: Seq[Event]): SortingEvents = copy(prefix = prefix ++ events)
       def addAssetEvents(events: Seq[AssetEvent]): SortingEvents = copy(assetEvents = assetEvents ++ events)
-      def sortAssetEvents: SortingEvents = copy(assetEvents = assetEvents.sortBy(_.date))
     }
 
     // Splits events into consecutive groups of pure Events and AssetEvents
@@ -90,7 +89,9 @@ object Savings extends Logging {
     // Rejoins groups of consecutive Events and AssetEvents
     def join(sortings: Seq[SortingEvents]): Seq[Event] =
       sortings.flatMap { v =>
-        v.prefix ++ v.assetEvents
+        // Finally sort asset events by date, as they may be out of order due
+        // to original order in the same group or reordering groups.
+        v.prefix ++ v.assetEvents.sortBy(_.date)
       }
 
     // Gets asset ids for which there were actions
@@ -156,11 +157,10 @@ object Savings extends Logging {
               if (sorting.dateRange.exists(_.min < dateRange.max)) {
                 // Extract actions and move them to head group
                 val (extracted, remaining) = sorting.assetEvents.partition(_.date < dateRange.max)
-                // Don't forget to sort actions by date in updated group
-                val accTo2 = accTo.addAssetEvents(extracted).sortAssetEvents
+                val accTo2 = accTo.addAssetEvents(extracted)
                 // Drop empty groups in remaining ones
                 val accSortings2 = (accSortings :+ sorting.copy(assetEvents = remaining)).filterNot(_.isEmpty)
-                // Then moved associated events (scheme/fund creation/update) when needed
+                // Then move associated events (scheme/fund creation/update) when needed
                 val movedIds = accTo2.assetEvents.filter(sorting.assetEvents.contains).flatMap(getIds).toSet
                 extractCreations(accTo2, accSortings2, movedIds)
               } else {

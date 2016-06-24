@@ -644,6 +644,9 @@ class SavingsSpec extends WordSpec with Matchers {
       val g7e3 = Savings.UpdateScheme(g3e1mg1.schemeId, g3e1mg1.name, None, disabled = false)
       val g7e4 = Savings.UpdateFund(g5e1mg1.fundId, g5e1mg1.name, None, disabled = false)
       val g8e1mg3 = Savings.MakePayment(date0.plusDays(20), Savings.AssetPart(schemeId, fundId, None, 23, 23), None)
+      // Those events should remain in this group but be reordered
+      val g8e2 = Savings.MakePayment(date0.plusDays(22), Savings.AssetPart(schemeId, fundId, None, 24, 24), None)
+      val g8e3 = Savings.MakePayment(date0.plusDays(21), Savings.AssetPart(schemeId, fundId, None, 25, 25), None)
 
       val events = List[Savings.Event](
         g1e1, g1e2, g1e3,
@@ -653,13 +656,14 @@ class SavingsSpec extends WordSpec with Matchers {
         g5e1mg1, g5e2mg1, g5e3mg1, g5e4mg1,
         g6e1mg2, g6e2mg2, g6e3mg2,
         g7e1, g7e2, g7e3, g7e4,
-        g8e1mg3
+        g8e1mg3, g8e2, g8e3
       )
       val eventsExpected = List[Savings.Event](
         g1e1, g1e2, g1e3, g3e1mg1, g5e1mg1, g5e2mg1, g5e3mg1, g5e4mg1,
         g6e1mg2, g2e3, g4e2mg2, g2e5, g4e1mg2, g6e2mg2, g6e3mg2, g2e1, g2e2, g2e4,
         g4e1, g8e1mg3, g4e2,
-        g7e1, g7e2, g7e3, g7e4
+        g7e1, g7e2, g7e3, g7e4,
+        g8e3, g8e2
       )
       val (eventsSorted, outOfOrder) = Savings.sortEvents(events)
       eventsSorted should not be events
