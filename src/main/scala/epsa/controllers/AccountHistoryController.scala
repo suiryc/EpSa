@@ -38,8 +38,6 @@ import suiryc.scala.math.Ordered._
 import suiryc.scala.math.Ordering._
 import suiryc.scala.settings.Preference
 
-// TODO: cache savings to prevent recomputing from zero when moving mouse between 2 events
-
 class AccountHistoryController extends Logging {
 
   import AccountHistoryController._
@@ -100,6 +98,10 @@ class AccountHistoryController extends Logging {
 
   // NAVs deduced from history events
   private var eventsNAVs: Map[UUID, Seq[Savings.AssetValue]] = Map.empty
+
+  private var cachedSavings: Savings = _
+
+  private var cachedSavingsBaseDate: LocalDate = _
 
   def initialize(mainController: MainController, stage: Stage, state: State): Unit = {
     import epsa.Main.Akka.dispatcher
@@ -685,6 +687,34 @@ class AccountHistoryController extends Logging {
   }
 
   private def showAccountDetails(date: LocalDate): Unit = {
+    @scala.annotation.tailrec
+    def findBaseDate(base: LocalDate, events: Seq[Savings.Event]): LocalDate =
+      events.headOption match {
+        case Some(head: Savings.AssetEvent) =>
+          if (head.date > date) base
+          else findBaseDate(head.date, events.tail)
+
+        case Some(_) =>
+          findBaseDate(base, events.tail)
+
+        case None =>
+          base
+      }
+
+    val baseDate = findBaseDate(LocalDate.now, events)
+    if (baseDate != cachedSavingsBaseDate) {
+      val history = events.takeWhile {
+        case e: Savings.AssetEvent => e.date <= date
+        case _                     => true
+      }
+
+      // Note: we don't set account levies here. User can get them by displaying
+      // account savings on the requested date.
+      cachedSavings = Savings().processEvents(history)
+      cachedSavingsBaseDate = baseDate
+    }
+    val savings = cachedSavings
+
     case class AccountDetails(investedAmount: BigDecimal, grossAmount: BigDecimal) {
       def grossGain = grossAmount - investedAmount
       def grossGainPct =
@@ -696,14 +726,6 @@ class AccountHistoryController extends Logging {
     def getNAV(fundId: UUID): Option[Savings.AssetValue] =
       Savings.getNAV(Some(stage), fundId, date, eventsNAVs)
 
-    val history = events.takeWhile {
-      case e: Savings.AssetEvent => e.date <= date
-      case _                     => true
-    }
-
-    // Note: we don't set account levies here. User can get them by displaying
-    // account savings on the requested date.
-    val savings = Savings().processEvents(history)
     val assets = savings.assets
     val details = assets.byId.keys.foldLeft(AccountDetails(0, 0)) { (details, assetId) =>
       details.copy(
