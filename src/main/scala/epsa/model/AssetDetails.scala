@@ -223,7 +223,7 @@ class AssetDetailsWithTotal(
       // as those are based on assetId VWAP.
       val leviesWarning =
         if (vwapPerAsset) Nil
-        else (acc.leviesWarning ++ details.leviesWarning).distinct
+        else (acc.leviesWarning ::: details.leviesWarning).distinct
       val leviesAmount =
         if (vwapPerAsset) None
         else Some(orZero(acc.leviesAmount) + orZero(details.leviesAmount))

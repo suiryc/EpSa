@@ -94,7 +94,7 @@ class AccountHistoryController extends Logging {
   private var chartHandler: Option[ChartHandler[HistoryMark]] = None
 
   // Full history events
-  private var events: Seq[Savings.Event] = Seq.empty
+  private var events: List[Savings.Event] = Nil
 
   // NAVs deduced from history events
   private var eventsNAVs: Map[UUID, Seq[Savings.AssetValue]] = Map.empty
@@ -393,7 +393,7 @@ class AccountHistoryController extends Logging {
     }
   }
 
-  private def buildHistory(state: State, events: Seq[Savings.Event], showIndicator: Cancellable): Unit = {
+  private def buildHistory(state: State, events: List[Savings.Event], showIndicator: Cancellable): Unit = {
     // Cached data store NAVs, and index in sequence (for more efficient search)
     var assetsNAVs = Map[UUID, Seq[Savings.AssetValue]]()
     var assetsNAVIdxs = Map[UUID, Int]()
@@ -523,7 +523,7 @@ class AccountHistoryController extends Logging {
 
     // Computes history data from history events.
     @scala.annotation.tailrec
-    def loop(savings: Savings, events: Seq[Savings.Event], since: Option[LocalDate], history: History): History =
+    def loop(savings: Savings, events: List[Savings.Event], since: Option[LocalDate], history: History): History =
       events.headOption match {
         case Some(event: Savings.AssetEvent) =>
           // Update history since last asset event

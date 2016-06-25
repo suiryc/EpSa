@@ -32,8 +32,6 @@ import suiryc.scala.javafx.stage.{FileChoosers, Stages}
 import suiryc.scala.math.Ordered._
 import suiryc.scala.settings.Preference
 
-// TODO: take care of asset actions (see sorting) upon flattening events
-// TODO: then upon importing/exporting (and also loading ?), sort *and* flatten
 // TODO: smart deletion of funds ?
 //         - keep the necessary data (NAV on some dates) used to compute levies
 //         - way to determine if all levies of past fund assets were paid already, so that all NAVs can really be deleted ?
@@ -306,11 +304,11 @@ class MainController extends Logging {
   }
 
   def onCleanupDataStore(event: ActionEvent): Unit = {
-    actor ! OnCleanupDataStore(reorder = false)
+    actor ! OnCleanupDataStore(normalize = false)
   }
 
-  def onCleanupDataStore(reorder: Boolean): Unit = {
-    actor ! OnCleanupDataStore(reorder)
+  def onCleanupDataStore(normalize: Boolean): Unit = {
+    actor ! OnCleanupDataStore(normalize)
   }
 
   private def getState: State = {
@@ -442,7 +440,7 @@ class MainController extends Logging {
       case OnLevies          => onLevies(state)
       case OnExportRawAccountHistory => onExportRawAccountHistory(state)
       case OnImportRawAccountHistory => onImportRawAccountHistory(state)
-      case OnCleanupDataStore(reorder) => onCleanupDataStore(state, reorder)
+      case OnCleanupDataStore(normalize) => onCleanupDataStore(state, normalize)
     }
 
     def processEvents(oldState: State, events: List[Savings.Event], updateAssetsValue: Boolean = false): State = {
@@ -515,9 +513,9 @@ class MainController extends Logging {
       }.getOrElse(Levies.empty)
       val state = Awaits.readDataStoreEvents(Some(state0.stage)) match {
         case Success(events0) =>
-          val (events, outOfOrder) = Savings.sortEvents(events0)
+          val (events, modified) = Savings.normalizeEvents(events0)
           // Cleanup datastore if necessary
-          MainController.this.onCleanupDataStore(outOfOrder)
+          MainController.this.onCleanupDataStore(modified)
           val savings = Savings(levies = levies).processEvents(events)
           State(
             stage = state0.stage,
@@ -640,7 +638,7 @@ class MainController extends Logging {
           // existing anymore due to availability dates reached in-between).
 
           // First read (and order) history and apply new event
-          val events = Awaits.getEventsHistory(Some(state.stage), extra = event.toSeq).toList
+          val events = Awaits.getEventsHistory(Some(state.stage), extra = event.toList)
           // Then process events to get up to date savings
           val savingsUpd = Savings(levies = state.savings.levies).processEvents(events)
           // Purge current history
@@ -877,13 +875,13 @@ class MainController extends Logging {
           Awaits.purgeDataStoreEvents(Some(state.stage))
           val newState = processEvents(state.zero(Savings(levies = state.savings.levies)), events, updateAssetsValue = true)
           // Then cleanup data store (no need to reorder as we did it already)
-          onCleanupDataStore(newState, reorder = false)
+          onCleanupDataStore(newState, normalize = false)
         }
       }
     }
 
-    def onCleanupDataStore(state: State, reorder: Boolean): Unit = {
-      Awaits.cleanupDataStore(Some(state.stage), state.savings.funds.map(_.id), reorder)
+    def onCleanupDataStore(state: State, normalize: Boolean): Unit = {
+      Awaits.cleanupDataStore(Some(state.stage), state.savings.funds.map(_.id), normalize)
       // Note: don't bother reloading or refreshing tabs since history was
       // already sorted when populating them.
       // We still need to refresh the dirty state for potential new pending
@@ -1056,7 +1054,7 @@ object MainController {
 
   case object OnImportRawAccountHistory
 
-  case class OnCleanupDataStore(reorder: Boolean)
+  case class OnCleanupDataStore(normalize: Boolean)
 
   def build(state: State, needRestart: Boolean = false, applicationStart: Boolean = false): Unit = {
     val stage = state.stage

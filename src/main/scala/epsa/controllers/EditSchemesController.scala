@@ -385,9 +385,9 @@ class EditSchemesController {
         val oldFunds = scheme.funds.toSet
         val newFunds = getSelectedFunds.map(_.id).toSet
 
-        val newEvents = event1.toList ++ (oldFunds -- newFunds).toList.map { fundId =>
+        val newEvents = event1.toList ::: (oldFunds -- newFunds).toList.map { fundId =>
           Savings.DissociateFund(scheme.id, fundId)
-        } ++ (newFunds -- oldFunds).toList.sorted.map { fundId =>
+        } ::: (newFunds -- oldFunds).toList.sorted.map { fundId =>
           Savings.AssociateFund(scheme.id, fundId)
         }
 
@@ -424,11 +424,11 @@ class EditSchemesController {
    * Updates current list of events to take into account: flattens them to
    * filter unnecessary ones.
    */
-  private def applyEvents(newEvents: Seq[Savings.Event]): Unit = {
+  private def applyEvents(newEvents: List[Savings.Event]): Unit = {
     edit = None
     resetEditFields()
     savings = savings.processEvents(newEvents)
-    events = savings0.flattenEvents(events ++ newEvents)
+    events = savings0.flattenEvents(events ::: newEvents)
     buttonOk.setDisable(events.isEmpty)
     updateSchemes()
     // Note: we may delete associated funds, so refresh the list view too.

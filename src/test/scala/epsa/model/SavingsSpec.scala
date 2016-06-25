@@ -604,15 +604,56 @@ class SavingsSpec extends WordSpec with Matchers {
     }
   }
 
-  "Savings" should {
-    "have Event sorting" in {
-      // Actions should be re-grouped by date and sorted
+  "Savings Event normalizing" should {
+    "do nothing if events are already properly ordered" in {
       val date0 = LocalDate.now.minusDays(60)
       val g1e1 = savings0.createSchemeEvent("scheme 1")
       val g1e2 = savings0.createFundEvent("fund 1")
       val schemeId = g1e1.schemeId
+      val schemeName = g1e1.name
       val fundId = g1e2.fundId
+      val fundName = g1e2.name
+      val g1e3 = Savings.AssociateFund(schemeId, fundId)
+      val g2e1 = Savings.MakePayment(date0.plusDays(10), Savings.AssetPart(schemeId, fundId, None, 11, 11), None)
+      val g2e2 = Savings.MakePayment(date0.plusDays(10), Savings.AssetPart(schemeId, fundId, None, 12, 12), None)
+      val g2e3 = Savings.MakePayment(date0.plusDays(11), Savings.AssetPart(schemeId, fundId, None, 13, 13), None)
+      val g2e4 = Savings.MakePayment(date0.plusDays(20), Savings.AssetPart(schemeId, fundId, None, 14, 14), None)
 
+      val g3e1 = Savings.UpdateScheme(schemeId, schemeName + " - new", None, disabled = false)
+      val g3e2 = Savings.UpdateFund(fundId, fundName + " - new", None, disabled = false)
+      val g4e1 = Savings.MakePayment(date0.plusDays(20), Savings.AssetPart(schemeId, fundId, None, 15, 15), None)
+      val g4e2 = Savings.MakePayment(date0.plusDays(21), Savings.AssetPart(schemeId, fundId, None, 16, 16), None)
+
+      val g5e1 = Savings.UpdateScheme(schemeId, schemeName, None, disabled = false)
+      val g5e2 = Savings.UpdateFund(fundId, fundName, None, disabled = false)
+      val g6e1 = Savings.MakePayment(date0.plusDays(21), Savings.AssetPart(schemeId, fundId, None, 17, 17), None)
+      val g6e2 = Savings.MakePayment(date0.plusDays(21), Savings.AssetPart(schemeId, fundId, None, 18, 18), None)
+
+      val events = List[Savings.Event](
+        g1e1, g1e2, g1e3,
+        g2e1, g2e2, g2e3, g2e4,
+        g3e1, g3e2,
+        g4e1, g4e2,
+        g5e1, g5e2,
+        g6e1, g6e2
+      )
+
+      val (normalized, modified) = Savings.normalizeEvents(events)
+      normalized shouldBe events
+      modified shouldBe false
+    }
+
+    "handle grouping/sorting actions by date and flattening other events" in {
+      // Actions should be re-grouped by date and sorted
+      // Non-action events should be moved and flattened as necessary (note
+      // flattening also reorders events).
+      val date0 = LocalDate.now.minusDays(60)
+      val g1e1 = savings0.createSchemeEvent("scheme 1")
+      val g1e2 = savings0.createFundEvent("fund 1")
+      val schemeId = g1e1.schemeId
+      val schemeName = g1e1.name
+      val fundId = g1e2.fundId
+      val fundName = g1e2.name
       val g1e3 = Savings.AssociateFund(schemeId, fundId)
       val g2e1 = Savings.MakePayment(date0.plusDays(20), Savings.AssetPart(schemeId, fundId, None, 11, 11), None)
       val g2e2 = Savings.MakePayment(date0.plusDays(20), Savings.AssetPart(schemeId, fundId, None, 12, 12), None)
@@ -622,6 +663,10 @@ class SavingsSpec extends WordSpec with Matchers {
 
       // This event should be moved because an associated asset action will be moved before
       val g3e1mg1 = savings0.createSchemeEvent("scheme 2")
+      val scheme2Id = g3e1mg1.schemeId
+      val scheme2Name = g3e1mg1.name
+      val g3e2 = Savings.UpdateScheme(schemeId, schemeName + " - new", None, disabled = false)
+      val g3e3 = Savings.UpdateFund(fundId, fundName + " - new", None, disabled = false)
       val g4e1 = Savings.MakePayment(date0.plusDays(20), Savings.AssetPart(schemeId, fundId, None, 16, 16), None)
       val g4e2 = Savings.MakePayment(date0.plusDays(21), Savings.AssetPart(schemeId, fundId, None, 17, 17), None)
       val g4e1mg2 = Savings.MakePayment(date0.plusDays(15), Savings.AssetPart(schemeId, fundId, None, 18, 18), None)
@@ -629,20 +674,27 @@ class SavingsSpec extends WordSpec with Matchers {
 
       // Those events should also be moved because an associated asset action will be moved before
       val g5e1mg1 = savings0.createFundEvent("fund 2")
-      val g5e2mg1 = Savings.AssociateFund(g3e1mg1.schemeId, g5e1mg1.fundId)
-      val g5e3mg1 = Savings.UpdateScheme(g3e1mg1.schemeId, g3e1mg1.name + " - new", None, disabled = false)
-      val g5e4mg1 = Savings.UpdateFund(g5e1mg1.fundId, g5e1mg1.name + " - new", None, disabled = false)
+      val fund2Id = g5e1mg1.fundId
+      val fund2Name = g5e1mg1.name
+      val g5e2mg1 = Savings.AssociateFund(scheme2Id, fund2Id)
+      // Those events will be flattened (scheme&fund creation moved in the same group)
+      val g5e3mg1 = Savings.UpdateScheme(scheme2Id, scheme2Name + " - new", None, disabled = false)
+      val g5e4mg1 = Savings.UpdateFund(fund2Id, fund2Name + " - new", None, disabled = false)
+      // Those event won't be moved, but will be flattened with those from the next group
+      val g5e5 = Savings.UpdateScheme(schemeId, schemeName, None, disabled = false)
+      val g5e6 = Savings.UpdateFund(fundId, fundName, None, disabled = false)
       val g6e1mg2 = Savings.MakePayment(date0.plusDays(5), Savings.AssetPart(schemeId, fundId, None, 20, 20), None)
       val g6e2mg2 = Savings.MakePayment(date0.plusDays(16), Savings.AssetPart(schemeId, fundId, None, 21, 21), None)
-      val g6e3mg2 = Savings.MakePayment(date0.plusDays(16), Savings.AssetPart(g3e1mg1.schemeId, g5e1mg1.fundId, None, 22, 22), None)
+      val g6e3mg2 = Savings.MakePayment(date0.plusDays(16), Savings.AssetPart(scheme2Id, fund2Id, None, 22, 22), None)
 
       // Those events should not be moved because either
       //   * no asset action will be moved before
       //   * an asset action will be moved, but not before the asset creation
-      val g7e1 = Savings.UpdateScheme(schemeId, g1e1.name + " - new", None, disabled = false)
-      val g7e2 = Savings.UpdateFund(fundId, g1e2.name + " - new", None, disabled = false)
-      val g7e3 = Savings.UpdateScheme(g3e1mg1.schemeId, g3e1mg1.name, None, disabled = false)
-      val g7e4 = Savings.UpdateFund(g5e1mg1.fundId, g5e1mg1.name, None, disabled = false)
+      // Those events should be merged with the ones from the previous group
+      val g7e1 = Savings.UpdateScheme(schemeId, schemeName + " - new", None, disabled = false)
+      val g7e2 = Savings.UpdateFund(fundId, fundName + " - new", None, disabled = false)
+      val g7e3 = Savings.UpdateScheme(scheme2Id, scheme2Name, None, disabled = false)
+      val g7e4 = Savings.UpdateFund(fund2Id, fund2Name, None, disabled = false)
       val g8e1mg3 = Savings.MakePayment(date0.plusDays(20), Savings.AssetPart(schemeId, fundId, None, 23, 23), None)
       // Those events should remain in this group but be reordered
       val g8e2 = Savings.MakePayment(date0.plusDays(22), Savings.AssetPart(schemeId, fundId, None, 24, 24), None)
@@ -651,24 +703,25 @@ class SavingsSpec extends WordSpec with Matchers {
       val events = List[Savings.Event](
         g1e1, g1e2, g1e3,
         g2e1, g2e2, g2e3, g2e4, g2e5,
-        g3e1mg1,
+        g3e1mg1, g3e2, g3e3,
         g4e1, g4e2, g4e1mg2, g4e2mg2,
-        g5e1mg1, g5e2mg1, g5e3mg1, g5e4mg1,
+        g5e1mg1, g5e2mg1, g5e3mg1, g5e4mg1, g5e5, g5e6,
         g6e1mg2, g6e2mg2, g6e3mg2,
         g7e1, g7e2, g7e3, g7e4,
         g8e1mg3, g8e2, g8e3
       )
       val eventsExpected = List[Savings.Event](
-        g1e1, g1e2, g1e3, g3e1mg1, g5e1mg1, g5e2mg1, g5e3mg1, g5e4mg1,
+        g1e1, g3e1mg1.copy(name = g5e3mg1.name), g1e2, g5e1mg1.copy(name = g5e4mg1.name), g1e3, g5e2mg1,
         g6e1mg2, g2e3, g4e2mg2, g2e5, g4e1mg2, g6e2mg2, g6e3mg2, g2e1, g2e2, g2e4,
+        g3e2, g3e3,
         g4e1, g8e1mg3, g4e2,
-        g7e1, g7e2, g7e3, g7e4,
+        g7e3, g7e4,
         g8e3, g8e2
       )
-      val (eventsSorted, outOfOrder) = Savings.sortEvents(events)
-      eventsSorted should not be events
-      eventsSorted shouldBe eventsExpected
-      outOfOrder shouldBe true
+      val (normalized, modified) = Savings.normalizeEvents(events)
+      normalized should not be events
+      normalized shouldBe eventsExpected
+      modified shouldBe true
     }
   }
 

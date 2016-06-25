@@ -253,7 +253,7 @@ object AssetField {
   def grossAmount(details: AssetDetails) = details.grossAmount
   def grossAmountWarning(details: AssetDetails) = Option(details.grossAmountWarning.mkString("\n")).filterNot(_.isEmpty)
   def leviesWarning(details: AssetDetails) = Option {
-    (details.grossAmountWarning ++ details.leviesWarning).distinct.mkString("\n")
+    (details.grossAmountWarning ::: details.leviesWarning).distinct.mkString("\n")
   }.filterNot(_.isEmpty)
   def formatLeviesAmount(details: AssetDetails) = details.formatLeviesAmount
   def leviesAmount(details: AssetDetails) = details.leviesAmount

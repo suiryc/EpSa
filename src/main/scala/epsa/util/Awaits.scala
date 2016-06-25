@@ -46,15 +46,15 @@ object Awaits {
   def hasDataStoreEvents(owner: Option[Window]): Try[Boolean] =
     orError(DataStore.EventSource.hasEvents(), owner, DataStore.readIssueMsg())
 
-  def readDataStoreEvents(owner: Option[Window]): Try[Seq[Savings.Event]] =
-    orError(DataStore.EventSource.readEvents(), owner, DataStore.readIssueMsg())
+  def readDataStoreEvents(owner: Option[Window]): Try[List[Savings.Event]] =
+    orError(DataStore.EventSource.readEvents(), owner, DataStore.readIssueMsg()).map(_.toList)
 
-  def getEventsHistory(owner: Option[Window], extra: Seq[Savings.Event] = Nil, upTo: Option[LocalDate] = None): Seq[Savings.Event] = {
+  def getEventsHistory(owner: Option[Window], extra: List[Savings.Event] = Nil, upTo: Option[LocalDate] = None): List[Savings.Event] = {
     val events0 = readDataStoreEvents(owner).getOrElse(Nil)
     val events1 =
       if (extra.isEmpty) events0
-      else events0 ++ extra
-    val events2 = Savings.sortEvents(events1)._1
+      else events0 ::: extra
+    val events2 = Savings.normalizeEvents(events1)._1
     upTo match {
       case Some(date) =>
         events2.takeWhile {
@@ -99,14 +99,14 @@ object Awaits {
   def readDataStoreUnavailabilityPeriods(owner: Option[Window]): Try[Seq[Savings.UnavailabilityPeriod]] =
     orError(DataStore.UnavailabilityPeriods.readEntries(), owner, DataStore.readIssueMsg())
 
-  def cleanupDataStore(owner: Option[Window], fundIds: List[UUID], reorder: Boolean): Unit = {
-    if (reorder) {
+  def cleanupDataStore(owner: Option[Window], fundIds: List[UUID], normalize: Boolean): Unit = {
+    if (normalize) {
       val events0 = readDataStoreEvents(owner).getOrElse(Nil)
-      val (events, outOfOrder) = Savings.sortEvents(events0)
-      if (outOfOrder) {
+      val (events, modified) = Savings.normalizeEvents(events0)
+      if (modified) {
         val actions = List(
           Action(DataStore.EventSource.deleteEntries()),
-          Action(DataStore.EventSource.writeEvents(events.toList))
+          Action(DataStore.EventSource.writeEvents(events))
         )
         val f = RichFuture.executeAllSequentially(stopOnError = true, actions).map(_ => ())
         orError(f, owner, DataStore.writeIssueMsg()) match {

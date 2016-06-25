@@ -35,19 +35,23 @@ object Savings extends Logging {
   }
 
   /**
-   * Sorts events.
+   * Normalize events.
    *
-   * Regroups asset events by date when necessary.
+   * Regroups asset events by date when necessary, and flatten non-asset actions
+   * when possible.
    *
-   * @param events events to sort
-   * @return sorted events
+   * @param events events to normalize
+   * @return normalized events
    */
-  def sortEvents(events: Seq[Event]): (Seq[Event], Boolean) = {
+  def normalizeEvents(events: List[Event]): (List[Event], Boolean) = {
     // Notes:
-    // The idea is simple: first we split events in groups of consecutive
-    // pure events + asset actions, then we move events when applicable (based
-    // on actions date, taking care of associated scheme/fund creation if
-    // necessary), and that's it.
+    // The idea is simple:
+    // 1. Events are split in groups of consecutive pure events + asset actions
+    // 2. Events are moved when applicable (based on actions date, taking care
+    // of associated scheme/fund creation if necessary)
+    // 3. Groups are joined back, and for each group
+    // 3.1. Pure events are flattened
+    // 3.2. Asset actions are sorted by date
     //
     // We thus take care of the most important needs: re-group actions per date,
     // and move associated scheme/fund creation/association when applicable.
@@ -63,36 +67,56 @@ object Savings extends Logging {
     // really worth the hassle (the code is already complex enough as it is).
 
     case class DateRange(min: LocalDate, max: LocalDate)
-    case class SortingEvents(prefix: Seq[Event], assetEvents: Seq[AssetEvent]) {
+    case class SortingEvents(prefix: List[Event], assetEvents: List[AssetEvent]) {
       def isEmpty = prefix.isEmpty && assetEvents.isEmpty
       lazy val dateRange: Option[DateRange] = {
         val eventsDates = assetEvents.map(_.date)
         if (eventsDates.isEmpty) None
         else Some(DateRange(eventsDates.min, eventsDates.max))
       }
-      def addEvents(events: Seq[Event]): SortingEvents = copy(prefix = prefix ++ events)
-      def addAssetEvents(events: Seq[AssetEvent]): SortingEvents = copy(assetEvents = assetEvents ++ events)
+      def addEvents(events: List[Event]): SortingEvents = copy(prefix = prefix ::: events)
+      def addAssetEvents(events: List[AssetEvent]): SortingEvents = copy(assetEvents = assetEvents ::: events)
     }
 
     // Splits events into consecutive groups of pure Events and AssetEvents
     @scala.annotation.tailrec
-    def split(events: Seq[Event], sortings: Seq[SortingEvents]): Seq[SortingEvents] = {
+    def split(events: List[Event], sortings: List[SortingEvents]): List[SortingEvents] = {
       if (events.isEmpty) sortings
       else {
         val (prefix, suffix0) = events.span(!_.isInstanceOf[AssetEvent])
         val (assetEvents0, suffix) = suffix0.span(_.isInstanceOf[AssetEvent])
-        val assetEvents = assetEvents0.asInstanceOf[Seq[AssetEvent]]
+        val assetEvents = assetEvents0.asInstanceOf[List[AssetEvent]]
         split(suffix, sortings :+ SortingEvents(prefix, assetEvents))
       }
     }
 
     // Rejoins groups of consecutive Events and AssetEvents
-    def join(sortings: Seq[SortingEvents]): Seq[Event] =
-      sortings.flatMap { v =>
-        // Finally sort asset events by date, as they may be out of order due
-        // to original order in the same group or reordering groups.
-        v.prefix ++ v.assetEvents.sortBy(_.date)
-      }
+    def join(sortings: List[SortingEvents]): List[Event] = {
+      @scala.annotation.tailrec
+      def loop(joined: List[Event], savings: Savings, remaining: List[SortingEvents]): List[Event] =
+        remaining match {
+          case head :: tail =>
+            if (head.assetEvents.isEmpty && tail.nonEmpty) {
+              // Merge head with next group as it only contains pure events
+              val head2 = tail.head
+              val tail2 = tail.tail
+              loop(joined, savings, head2.copy(prefix = head.prefix ::: head2.prefix) :: tail2)
+            } else {
+              // Flatten pure events
+              val prefix = savings.flattenEvents(head.prefix)
+              // Finally sort asset events by date, as they may be out of order due
+              // to original order in the same group or reordering groups.
+              val joined2 = joined ::: prefix ::: head.assetEvents.sortBy(_.date)
+              val savings2 = savings.processEvents(prefix)
+              loop(joined2, savings2, tail)
+            }
+
+          case Nil =>
+            joined
+        }
+
+      loop(Nil, Savings(), sortings)
+    }
 
     // Gets asset ids for which there were actions
     def getIds(event: AssetEvent): Set[AssetId] =
@@ -114,7 +138,7 @@ object Savings extends Logging {
 
     // Gets fund ids for which we will need to move create/update events.
     // We need it when there was a creation.
-    def getNeededFunds(sortings: Seq[SortingEvents], ids: Set[AssetId]): Set[UUID] =
+    def getNeededFunds(sortings: List[SortingEvents], ids: Set[AssetId]): Set[UUID] =
       ids.map(_.fundId).filter { fundId =>
         sortings.flatMap(_.prefix).exists {
           case e: CreateFund    => fundId == e.fundId
@@ -135,10 +159,10 @@ object Savings extends Logging {
 
     // Move Events from one group to another if necessary, that is if the
     // source groups contain asset events that match our criteria.
-    def extractCreations(to: SortingEvents, from: Seq[SortingEvents], movedIds: Set[AssetId]): (SortingEvents, Seq[SortingEvents]) = {
+    def extractCreations(to: SortingEvents, from: List[SortingEvents], movedIds: Set[AssetId]): (SortingEvents, List[SortingEvents]) = {
       val schemeIds = getNeededSchemes(from, movedIds)
       val fundIds = getNeededFunds(from, movedIds)
-      from.foldLeft(to, Seq.empty[SortingEvents]) {
+      from.foldLeft(to, List.empty[SortingEvents]) {
         case ((accTo, accSortings), sorting) =>
           val (extracted, remaining) = sorting.prefix.partition(extractNeeded(_, movedIds, schemeIds, fundIds))
           val accTo2 = accTo.addEvents(extracted)
@@ -149,10 +173,10 @@ object Savings extends Logging {
 
     // Move AssetEvents from one group to another if necessary, that is if the
     // source groups contain dates predating maximal date of destination group.
-    def extractActions(to: SortingEvents, from: Seq[SortingEvents]): (SortingEvents, Seq[SortingEvents]) =
+    def extractActions(to: SortingEvents, from: List[SortingEvents]): (SortingEvents, List[SortingEvents]) =
       to.dateRange match {
         case Some(dateRange) =>
-          from.foldLeft(to, Seq.empty[SortingEvents]) {
+          from.foldLeft(to, List.empty[SortingEvents]) {
             case ((accTo, accSortings), sorting) =>
               if (sorting.dateRange.exists(_.min < dateRange.max)) {
                 // Extract actions and move them to head group
@@ -176,14 +200,13 @@ object Savings extends Logging {
     // remaining groups if necessary.
     // As the final step in each group, sort AssetEvents by date.
     @scala.annotation.tailrec
-    def sort(sortings: Seq[SortingEvents], sorted: Seq[SortingEvents]): Seq[SortingEvents] =
-      sortings.headOption match {
-        case Some(head) =>
-          val tail = sortings.tail
+    def sort(sortings: List[SortingEvents], sorted: List[SortingEvents]): List[SortingEvents] =
+      sortings match {
+        case head :: tail =>
           val (head2, tail2) = extractActions(head, tail)
           sort(tail2, sorted :+ head2)
 
-        case None =>
+        case Nil =>
           sorted
       }
 
@@ -879,9 +902,9 @@ case class Savings(
       val fundsAssociatedOrdered = newScheme.funds.filter(fundsAssociated.contains)
       val fundsDissociated = (oldFunds -- newFunds) -- fundsDeleted
 
-      event1.toList ++ fundsDissociated.toList.map { fundId =>
+      event1.toList ::: fundsDissociated.toList.map { fundId =>
         Savings.DissociateFund(oldScheme.id, fundId)
-      } ++ fundsAssociatedOrdered.map { fundId =>
+      } ::: fundsAssociatedOrdered.map { fundId =>
         Savings.AssociateFund(oldScheme.id, fundId)
       }
     } ::: fundsRemainingOrdered.flatMap { newFund =>
@@ -1088,7 +1111,7 @@ case class Savings(
             else Some(s"action date=<$date> levy=<$levy>: opening period=<$head> with invested amount=<$investedAmount>")
           if (Settings.debug(Debug.LeviesComputation))
             info(s"action=<updateLevyPeriods> date=<$date> id=<${id.toString(this)}> levy=<$levy> period=<$currentPeriodData> totalUnits=<$totalUnits> grossAmount=<$grossAmount> grossGain=<$grossGain> completed=<$completedPeriod> next=<$nextPeriodData>")
-          loop(nextPeriodData :: completedPeriod :: data.tail, debug.toList ::: debug1 ::: debugs, warnings ++ warning, tail)
+          loop(nextPeriodData :: completedPeriod :: data.tail, debug.toList ::: debug1 ::: debugs, warnings ::: warning.toList, tail)
 
         case _ =>
           (data, debugs, warnings)
