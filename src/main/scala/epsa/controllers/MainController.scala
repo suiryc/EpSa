@@ -632,6 +632,8 @@ class MainController extends Logging {
       dialog.setResizable(true)
       val event = dialog.showAndWait().orElse(None)
       if (event.isDefined) {
+        // Get back to main tab (so that we can see the new action result)
+        tabPane.getSelectionModel.select(toDateSavingsViewTab.tab)
         if (state.savings.latestAssetAction.exists(event.get.date < _)) {
           // This new event predates latest asset action. We need to reorder
           // history as processing it may fail with current savings (assets not
