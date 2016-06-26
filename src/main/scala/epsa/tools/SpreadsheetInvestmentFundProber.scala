@@ -34,9 +34,10 @@ object SpreadsheetInvestmentFundProber extends InvestmentFundProber {
 
   private def probeExcel(path: Path): Option[Savings.AssetValueHistory] = {
     Some(WorkbookFactory.create(path.toFile)).filter { book =>
-      // There should only be one sheet
-      book.getNumberOfSheets == 1
+      // There should be at least one sheet
+      book.getNumberOfSheets > 0
     }.map { book =>
+      // We only care for the first sheet
       book.getSheetAt(0)
     }.filter { sheet =>
       // There should ba at least one row
@@ -68,9 +69,10 @@ object SpreadsheetInvestmentFundProber extends InvestmentFundProber {
 
   private def probeOpenDocument(path: Path): Option[Savings.AssetValueHistory] = {
     Some(SpreadsheetDocument.loadDocument(path.toFile)).filter { doc =>
-      // There should only be one sheet
-      doc.getSheetCount == 1
+      // There should be at least one sheet
+      doc.getSheetCount > 0
     }.map { doc =>
+      // We only care for the first sheet
       doc.getSheetByIndex(0)
     }.filter { table =>
       // There should ba at least one row, and at least 2 columns
