@@ -13,6 +13,7 @@ import org.h2.engine.Constants
 import scala.concurrent.Await
 import scala.concurrent.Future
 import scala.concurrent.duration._
+import scala.util.Success
 import slick.driver.H2Driver.api._
 import slick.driver.H2Driver.backend.DatabaseDef
 import slick.jdbc.meta.MTable
@@ -43,7 +44,11 @@ object DataStore {
     path.resolve(s"default$dbExtension")
   }
 
-  protected type DBAction[A] = DatabaseDef => Future[A]
+  protected[storage] type DBAction[A] = DatabaseDef => Future[A]
+
+  protected case class DBChange[A](action: DBAction[A]) {
+    var applied: Boolean = false
+  }
 
   /**
    * Temporary database.
@@ -54,25 +59,25 @@ object DataStore {
   protected case class DBTemp(db: DatabaseDef) {
 
     /** Changes applied since creation. */
-    var changes = Map[DataStoreTable, Seq[DBAction[_]]]()
+    var changes = Map[DataStoreTable, Seq[DBChange[_]]]()
 
     def hasPendingChanges = changes.nonEmpty
 
-    def resetActions(table: DataStoreTable): Unit =
+    def resetChanges(table: DataStoreTable): Unit =
       changes -= table
 
     def addAction[A](table: DataStoreTable, action: DBAction[A]): Unit =
-      changes += table -> (changes.getOrElse(table, Nil) :+ action)
+      changes += table -> (changes.getOrElse(table, Nil) :+ DBChange(action))
 
   }
 
   /** Real database. */
-  protected case class DBInfo(db: DatabaseDef, path: Path)
+  protected[storage] case class DBInfo(db: DatabaseDef, path: Path)
 
   /** Temporary (in-memory) DB. */
   protected var dbTempOpt: Option[DBTemp] = None
   /** Real (physical) DB. */
-  protected var dbRealOpt: Option[DBInfo] = None
+  protected[storage] var dbRealOpt: Option[DBInfo] = None
 
   /** Gets name (to display) from database path. */
   protected def getName(path: Path): String = {
@@ -174,7 +179,8 @@ object DataStore {
 
   /** Builds temporary DB out of physical one. */
   protected def buildTempDB(): Future[DBTemp] = {
-    dbOpen().flatMap { tmp =>
+    dbOpen("temporary").flatMap { tmp =>
+      dbTempOpt = Some(tmp)
       val copy = dbRealOpt match {
         case Some(dbInfo) => copyDB(dbInfo.db, tmp.db)
         case None         => Future.successful(())
@@ -190,22 +196,35 @@ object DataStore {
     dbTempOpt match {
       case Some(tmp) if tmp.hasPendingChanges =>
         val real = getRealDB
-        val actions = tmp.changes.map {
-          case (table, dbActions) =>
-            // Execute table changes sequentially.
-            val actions = dbActions.map { action =>
-              Action(action(real.db))
-            }
-            Action {
-              RichFuture.executeAllSequentially(stopOnError = true, actions:_*).map(_ => ()).recover {
+        val actions = tmp.changes.flatMap {
+          case (table, dbChanges) =>
+            dbChanges.map { change =>
+              Action(change.action(real.db).recover {
+                // Wrap issue to indicate which table was not updated
                 case ex: Exception =>
                   throw new Exception(s"Could not apply changes in table[${table.tableName}]", ex)
-              }
+              }.andThen {
+                case Success(_) =>
+                  // Upon success, indicate the change as applied
+                  change.applied = true
+              })
             }
         }.toSeq
-        // Execute tables changes sequentially, then close temporary db.
-        RichFuture.executeAllSequentially(stopOnError = true, actions:_*).map(_ => ()).andThen {
-          case _ => closeTempDB()
+        // Execute tables changes sequentially.
+        RichFuture.executeAllSequentially(stopOnError = true, actions).map(_ => ()).andThen {
+          case Success(_) =>
+            // Upon success close temporary db
+            closeTempDB()
+
+          case _ =>
+            // Upon failure, only keep the changes that were not applied.
+            // It should be safe since we try to apply changes sequentially.
+            tmp.changes = tmp.changes.flatMap {
+              case (table, dbChanges) =>
+                val remaining = dbChanges.dropWhile(_.applied)
+                if (remaining.isEmpty) None
+                else Some(table -> remaining)
+            }
         }
 
       case _ =>
@@ -327,19 +346,13 @@ object DataStore {
   }
 
   /** Opens temporary database. */
-  protected def dbOpen(): Future[DBTemp] = {
+  protected[storage] def dbOpen(name: String): Future[DBTemp] = {
     // Note: by default in-memory db disappears when the last connection to it
     // is closed (which appears to be once a query is done). So we need to
     // prevent it with 'DB_CLOSE_DELAY=-1'.
     // See: http://stackoverflow.com/a/5936988
-    val ref = Database.forURL("jdbc:h2:mem:temporary;DB_CLOSE_DELAY=-1", driver = "org.h2.Driver")
-    dbOpen(ref).map { _ =>
-      // Automatically keep in mind the new DB
-      val dbTempNew = DBTemp(ref)
-      dbTempOpt = Some(dbTempNew)
-
-      dbTempNew
-    }
+    val ref = Database.forURL(s"jdbc:h2:mem:$name;DB_CLOSE_DELAY=-1", driver = "org.h2.Driver")
+    dbOpen(ref).map(DBTemp)
   }
 
   /**
@@ -379,9 +392,9 @@ object DataStore {
 
     protected[DataStore] def schema = entries.schema
 
-    protected[DataStore] def newAction[A](action: DBAction[A], reset: Boolean = false, add: Boolean = true): Future[A] =
+    protected[storage] def newAction[A](action: DBAction[A], reset: Boolean = false, add: Boolean = true): Future[A] =
       getDBTemp.flatMap { tmp =>
-        if (reset) tmp.resetActions(this)
+        if (reset) tmp.resetChanges(this)
         if (add) tmp.addAction(this, action)
         action(tmp.db)
       }
@@ -402,13 +415,13 @@ object DataStore {
       }
     }
 
-    protected[DataStore] def readEntries(db: DatabaseDef): Future[Seq[Entry]] =
+    protected[storage] def readEntries(db: DatabaseDef): Future[Seq[Entry]] =
       db.run(entries.result)
 
     def readEntries(): Future[Seq[Entry]] =
       getDBRead.flatMap(readEntries)
 
-    protected[DataStore] def writeEntry(db: DatabaseDef, value: Entry): Future[Unit] =
+    protected[storage] def writeEntry(db: DatabaseDef, value: Entry): Future[Unit] =
       db.run {
         entries.insertOrUpdate(value)
       }.map(_ => ())
