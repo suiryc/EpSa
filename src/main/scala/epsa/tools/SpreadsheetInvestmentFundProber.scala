@@ -84,7 +84,15 @@ object SpreadsheetInvestmentFundProber extends InvestmentFundProber {
       val valueCellIdx = 1
 
       val dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
-      val values = table.getRowList.toList.map { row =>
+      // Note: use iterator and only keep rows which date cell si not empty.
+      // Otherwise in some case we get 1048576 rows (and some functions like
+      // 'row.getCellCount' get stuck).
+      // See:
+      //  https://issues.apache.org/jira/browse/ODFTOOLKIT-378
+      //  https://issues.apache.org/jira/browse/ODFTOOLKIT-388
+      val values = table.getRowIterator.takeWhile { row =>
+        Option(row.getCellByIndex(dateCellIdx).getDisplayText).exists(_.trim.nonEmpty)
+      }.toList.map { row =>
         val date = try {
           // Try as a date
           row.getCellByIndex(dateCellIdx).getDateValue.toInstant.atZone(ZoneId.systemDefault).toLocalDate
