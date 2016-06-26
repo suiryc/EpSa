@@ -19,11 +19,27 @@ lazy val versions = Map[String, String](
 
 
 lazy val epsa = project.in(file(".")).
+  enablePlugins(BuildInfoPlugin, GitVersioning).
   settings(
     organization := "suiryc",
     name := "EpSa",
+    // Note: if we want to let sbt-git generate the version, we need to comment
+    // "version", uncomment "git.baseVersion" and remove "-SNAPSHOT" (sbt-git
+    // will append it if necessary).
     version := versions("epsa"),
+    //git.baseVersion := versions("epsa"),
     scalaVersion := versions("scala"),
+
+    buildInfoKeys := Seq[BuildInfoKey](
+      name,
+      version,
+      git.gitHeadCommit,
+      scalaVersion,
+      sbtVersion
+    ),
+    buildInfoPackage := "epsa",
+    buildInfoObject := "Info",
+    buildInfoUsePackageAsPath := true,
 
     scalacOptions ++= Seq(
       "-deprecation",

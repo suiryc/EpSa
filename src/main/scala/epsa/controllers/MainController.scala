@@ -495,7 +495,8 @@ class MainController extends Logging {
 
       val title = DataStore.dbOpened.map { name =>
         s"[$name${if (dirty) " *" else ""}] - "
-      }.getOrElse(if (dirty) " * - " else "") + epsa.Main.name
+      }.getOrElse(if (dirty) " * - " else "") +
+        epsa.Main.versionedName
       state.stage.setTitle(title)
     }
 

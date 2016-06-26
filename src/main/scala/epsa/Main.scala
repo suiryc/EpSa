@@ -11,12 +11,23 @@ object Main {
 
   import Settings.Debug
 
-  val name = "EpSa"
+  val versionedName = s"${epsa.Info.name} ${epsa.Info.version}" +
+    epsa.Info.gitHeadCommit.map(v => s" ($v)").getOrElse("")
 
   def main(args: Array[String]): Unit = {
-    val parser = new scopt.OptionParser[Unit](name) {
+    val parser = new scopt.OptionParser[Unit](getClass.getCanonicalName) {
+      head(versionedName)
+      help("help")
       opt[String]("debug").unbounded.foreach { v =>
         Settings.debugParams ++= v.split(',').toList.map(Debug.withName).toSet
+      }
+      opt[Unit]("version").foreach { _ =>
+        println(
+          s"""$versionedName
+             |scalaVersion: ${Info.scalaVersion}
+             |sbtVersion: ${Info.sbtVersion}
+           """.stripMargin)
+        sys.exit(0)
       }
     }
 
