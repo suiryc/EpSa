@@ -85,9 +85,19 @@ object Settings {
     v.setScale(scale, percentsRounding)
   }
 
-  def formatCompactNumber(v: BigDecimal): String = decimalCompactFormat.get.format(v)
+  private def formatNumber(df: DecimalFormat, v: BigDecimal): String = {
+    // Change minimum fraction digits to match the BigDecimal scale so that
+    // all formatted numbers look consistent.
+    // Those not explicitly scaled are not affected, those we scaled (e.g.
+    // units, amounts or percents) will all have the same number of decimals
+    // displayed (even trailing 0s).
+    df.setMinimumFractionDigits(v.scale)
+    df.format(v)
+  }
 
-  def formatNumber(v: BigDecimal): String = decimalFormat.get.format(v)
+  def formatCompactNumber(v: BigDecimal): String = formatNumber(decimalCompactFormat.get, v)
+
+  def formatNumber(v: BigDecimal): String = formatNumber(decimalFormat.get, v)
 
   def formatNumber(v: BigDecimal, suffix: String): String = {
     val f = formatNumber(v)
