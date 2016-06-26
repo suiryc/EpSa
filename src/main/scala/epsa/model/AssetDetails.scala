@@ -293,9 +293,9 @@ class AssetDetailsWithTotal(
   private val totalPerFund =
     if (!showTotalsPerFund) toSorted(Nil)
     else {
-      val totals = toSorted(assets0.groupBy(_.fund).map { case (fund, assets) =>
-        computeTotal(savings, assets, kind = AssetDetailsKind.TotalPerFund, scheme = None, fund = Some(fund), availability = None)
-      }.toList.sortBy(_.fund.name))
+      val totals = toSorted(assets0.groupBy(v => (v.scheme, v.fund)).map { case ((scheme, fund), assets) =>
+        computeTotal(savings, assets, kind = AssetDetailsKind.TotalPerFund, scheme = Some(scheme), fund = Some(fund), availability = None)
+      }.toList.sortBy(v => (v.scheme.name, v.fund.name)))
       totals.comparatorProperty.bind(comparatorProperty)
       totals.listen { change =>
         adaptChange(change, getSource.size + totalPerScheme.size)
