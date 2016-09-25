@@ -22,7 +22,8 @@ import suiryc.scala.javafx.beans.value.RichObservableValue
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.javafx.event.EventHandler._
-import suiryc.scala.javafx.geometry.{BoundsEx, ScrollOffsetPosition}
+import suiryc.scala.javafx.geometry.BoundsEx
+import suiryc.scala.javafx.scene.control.{ScrollOffsetPosition, Scrolls}
 import suiryc.scala.math.BigDecimals._
 
 // TODO: way to limit y range to currently viewed min/max; and way to reset to auto range
@@ -665,7 +666,7 @@ class ChartHandler[A <: ChartMark](
   private def centerOnXIdx(xIdx: Double, track: Boolean = false): Unit = {
     changeView(track) {
       val hoffset = getX(getChartBackgroundBounds, xIdx)
-      val hvalue = BoundsEx.computeHValue(chartPane, hoffset, ScrollOffsetPosition.Middle)
+      val hvalue = Scrolls.computeHValue(chartPane, hoffset, ScrollOffsetPosition.Middle)
       chartPane.setHvalue(hvalue)
     }
   }
