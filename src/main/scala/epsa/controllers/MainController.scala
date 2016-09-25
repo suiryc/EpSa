@@ -35,6 +35,7 @@ import suiryc.scala.settings.Preference
 // TODO: smart deletion of funds ?
 //         - keep the necessary data (NAV on some dates) used to compute levies
 //         - way to determine if all levies of past fund assets were paid already, so that all NAVs can really be deleted ?
+// TODO: use scala-logging
 class MainController extends Logging {
 
   import MainController._
