@@ -17,7 +17,7 @@ import javafx.event.ActionEvent
 import javafx.fxml.{FXML, FXMLLoader}
 import javafx.scene.{Parent, Scene}
 import javafx.scene.control._
-import javafx.scene.input.MouseEvent
+import javafx.scene.input.{InputEvent, MouseEvent}
 import javafx.scene.layout.AnchorPane
 import javafx.stage._
 import scala.collection.JavaConversions._
@@ -333,7 +333,7 @@ class NetAssetValueHistoryController {
         val editNAV = new CustomMenuItem(menuTextField, false)
         // Set text, and reset it when requested
         menuTextField.setText(text)
-        menuTextField.setOnButtonAction { (event: ActionEvent) =>
+        menuTextField.setOnButtonAction { (event: InputEvent) =>
           menuTextField.setText(text)
         }
         // Bind so that changing value allows to reset it

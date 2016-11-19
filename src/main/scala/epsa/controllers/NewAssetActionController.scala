@@ -15,6 +15,7 @@ import javafx.geometry.{Insets, Side}
 import javafx.scene.Node
 import javafx.scene.control._
 import javafx.scene.image.ImageView
+import javafx.scene.input.InputEvent
 import javafx.scene.layout.HBox
 import javafx.stage.{Modality, Stage, Window}
 import javafx.util.converter.LocalDateStringConverter
@@ -622,7 +623,7 @@ class NewAssetActionController extends Logging {
             field.setUserData(nav)
             field.setText(text)
             field.textField.setTooltip(new Tooltip(s"${Strings.date}: ${nav.date}\n${Strings.nav}: ${formatNumber(nav.value, epsa.Settings.currency())}"))
-            field.setOnButtonAction { (event: ActionEvent) =>
+            field.setOnButtonAction { (event: InputEvent) =>
               field.setText(text)
             }
             // Bind so that changing value allows to reset it
