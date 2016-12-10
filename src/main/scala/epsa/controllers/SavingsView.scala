@@ -7,17 +7,13 @@ import epsa.util.{Awaits, JFXStyles}
 import java.time.LocalDate
 import javafx.collections.FXCollections
 import javafx.collections.transformation.SortedList
-import javafx.event.ActionEvent
 import javafx.scene.control.{SeparatorMenuItem, _}
 import javafx.scene.image.ImageView
 import javafx.scene.input._
 import javafx.scene.layout.AnchorPane
-import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
 import suiryc.scala.javafx.beans.value.RichObservableValue._
-import suiryc.scala.javafx.event.EventHandler._
 import suiryc.scala.javafx.scene.control.TableViews
-import suiryc.scala.javafx.util.Callback
-import suiryc.scala.math.Ordered._
 import suiryc.scala.math.Ordering.localDateOrdering
 
 class SavingsView(tab: SavingsViewTab) {
@@ -28,9 +24,9 @@ class SavingsView(tab: SavingsViewTab) {
 
   val assetsTable = new TableView[AssetDetails]()
 
-  val assetFields = AssetField.fields()
+  val assetFields: Map[String, AssetField[_]] = AssetField.fields()
 
-  val assetsColumns = assetFields.mapValues(_.column).view.force.toList
+  val assetsColumns: List[(String, TableColumn[AssetDetails, _])] = assetFields.mapValues(_.column).view.force.toList
 
   private val columnAmount = new TableColumn[AssetDetails, Nothing](Strings.amount)
 
@@ -58,17 +54,17 @@ class SavingsView(tab: SavingsViewTab) {
   // sort policy does explicitly check for a SortedList which comparator is
   // bound to the table one.
   // Since we will ensure it, override the sort policy.
-  assetsTable.setSortPolicy(Callback { true })
+  assetsTable.setSortPolicy(_ => true)
 
   // Note: Asset gives scheme/fund UUID. Since State is immutable (and is
   // changed when applying events in controller) we must delegate scheme/fund
   // lookup to the controller.
-  assetsTable.setRowFactory(Callback { newAssetRow() })
+  assetsTable.setRowFactory(_ => newAssetRow())
 
   assetsTable.getSelectionModel.selectedItemProperty.listen(updateDetailsValue())
 
   // Handle 'Ctrl-c' to copy asset information.
-  assetsTable.addEventHandler(KeyEvent.KEY_PRESSED, { (event: KeyEvent) =>
+  assetsTable.addEventHandler(KeyEvent.KEY_PRESSED, (event: KeyEvent) => {
     if (CTRL_C.`match`(event)) Option(assetsTable.getSelectionModel.getSelectedItem).foreach(copyAssetDetailsToClipboard)
   })
 
@@ -100,14 +96,14 @@ class SavingsView(tab: SavingsViewTab) {
       val menu = new ContextMenu()
       val editScheme = new MenuItem(Strings.editScheme,
         new ImageView(Images.iconTables))
-      editScheme.setOnAction { (event: ActionEvent) =>
+      editScheme.setOnAction { _ =>
         Option(row.getItem).foreach { details =>
           tab.mainController.actor ! OnEditSchemes(Some(details.asset.schemeId))
         }
       }
       val editFund = new MenuItem(Strings.editFund,
         new ImageView(Images.iconTable))
-      editFund.setOnAction { (event: ActionEvent) =>
+      editFund.setOnAction { _ =>
         Option(row.getItem).foreach { details =>
           tab.mainController.actor ! OnEditFunds(Some(details.asset.fundId))
         }
@@ -115,21 +111,21 @@ class SavingsView(tab: SavingsViewTab) {
 
       val newPayment = new MenuItem(Strings.newPayment,
         new ImageView(Images.iconTableImport))
-      newPayment.setOnAction { (event: ActionEvent) =>
+      newPayment.setOnAction { _ =>
         Option(row.getItem).foreach { details =>
           tab.mainController.actor ! OnNewAssetAction(AssetActionKind.Payment, Some(details.asset))
         }
       }
       val newArbitrage = new MenuItem(Strings.newTransfer,
         new ImageView(Images.iconTablesRelation))
-      newArbitrage.setOnAction { (event: ActionEvent) =>
+      newArbitrage.setOnAction { _ =>
         Option(row.getItem).foreach { details =>
           tab.mainController.actor ! OnNewAssetAction(AssetActionKind.Transfer, Some(details.asset))
         }
       }
       val newRefund = new MenuItem(Strings.newRefund,
         new ImageView(Images.iconTableExport))
-      newRefund.setOnAction { (event: ActionEvent) =>
+      newRefund.setOnAction { _ =>
         Option(row.getItem).foreach { details =>
           tab.mainController.actor ! OnNewAssetAction(AssetActionKind.Refund, Some(details.asset))
         }
@@ -137,7 +133,7 @@ class SavingsView(tab: SavingsViewTab) {
 
       val navHistory = new MenuItem(NetAssetValueHistoryController.title,
         new ImageView(Images.iconChartUp))
-      navHistory.setOnAction { (event: ActionEvent) =>
+      navHistory.setOnAction { _ =>
         Option(row.getItem).foreach { details =>
           tab.mainController.actor ! OnNetAssetValueHistory(Some(details.asset.fundId))
         }
@@ -215,6 +211,7 @@ class SavingsView(tab: SavingsViewTab) {
     val content = new ClipboardContent()
     content.putString(text)
     clipboard.setContent(content)
+    ()
   }
 
   def displaySavings(data: RefreshData): Unit = {
@@ -228,7 +225,7 @@ class SavingsView(tab: SavingsViewTab) {
     val assetsDetails = assets.map(getAssetDetails(_, data)).sortBy { details =>
       (details.scheme.name, details.fund.name, details.asset.availability)
     }
-    val sortedAssetsDetails = new SortedList(FXCollections.observableList(assetsDetails))
+    val sortedAssetsDetails = new SortedList(FXCollections.observableList(assetsDetails.asJava))
     sortedAssetsDetails.comparatorProperty.bind(assetsTable.comparatorProperty)
     val sortedAssetsWithTotal = new AssetDetailsWithTotal(
       savings,

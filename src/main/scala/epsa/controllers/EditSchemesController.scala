@@ -13,17 +13,15 @@ import javafx.scene.control._
 import javafx.scene.image.ImageView
 import javafx.scene.input.{KeyCode, KeyEvent, MouseEvent}
 import javafx.stage.{Stage, Window}
-import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
 import suiryc.scala.RichOption._
 import suiryc.scala.javafx.beans.value.RichObservableValue
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.concurrent.JFXSystem
-import suiryc.scala.javafx.event.EventHandler._
 import suiryc.scala.javafx.event.Events
 import suiryc.scala.javafx.scene.control.{CheckBoxListCellWithInfo, CheckBoxListCellWithSeparator, Dialogs}
 import suiryc.scala.javafx.stage.Stages
 import suiryc.scala.javafx.stage.Stages.StageLocation
-import suiryc.scala.javafx.util.Callback
 import suiryc.scala.settings.Preference
 
 class EditSchemesController {
@@ -86,7 +84,7 @@ class EditSchemesController {
     buttonOk.setDisable(true)
 
     // Initialize schemes list view
-    schemesField.setCellFactory(Callback { newSchemeCell _ })
+    schemesField.setCellFactory(newSchemeCell _)
     updateSchemes()
     // Handle scheme selection changes
     schemesField.getSelectionModel.selectedItemProperty.listen(onSelectedScheme())
@@ -99,7 +97,7 @@ class EditSchemesController {
 
     // Initialize funds list view
     // Use CheckBox ListCell elements to populate its content.
-    fundsField.setCellFactory(Callback { newFundCell() })
+    fundsField.setCellFactory(_ => newFundCell())
     // Prevent item selection
     fundsField.getSelectionModel.selectedIndexProperty.listen {
       JFXSystem.runLater(fundsField.getSelectionModel.clearSelection())
@@ -348,14 +346,14 @@ class EditSchemesController {
       val label = root.lookup("#labelField").asInstanceOf[Label]
       label.setText(Strings.deleteAssociatedFunds)
       val resourcesField = root.lookup("#resourcesField").asInstanceOf[ListView[Option[Savings.Fund]]]
-      resourcesField.setCellFactory(Callback { new FundCell })
+      resourcesField.setCellFactory(_ => new FundCell)
       resourcesField.getSelectionModel.setSelectionMode(SelectionMode.MULTIPLE)
       val entries = Form.buildOptions(funds.filter(!_.disabled), funds.filter(_.disabled))
-      resourcesField.setItems(FXCollections.observableList(entries))
+      resourcesField.setItems(FXCollections.observableList(entries.asJava))
       resourcesField.getSelectionModel.selectAll()
 
       if (!alert.showAndWait().contains(ButtonType.OK)) Nil
-      else resourcesField.getSelectionModel.getSelectedItems.toList.flatten.map { fund =>
+      else resourcesField.getSelectionModel.getSelectedItems.asScala.toList.flatten.map { fund =>
         Savings.DeleteFund(fund.id)
       }
     }
@@ -448,14 +446,14 @@ class EditSchemesController {
     schemesField.getSelectionModel.clearSelection()
     val schemes = savings.getSchemes(associated = None)
     val entries = Form.buildOptions(schemes.filter(!_.disabled), schemes.filter(_.disabled))
-    schemesField.setItems(FXCollections.observableList(entries))
+    schemesField.setItems(FXCollections.observableList(entries.asJava))
   }
 
   /** Updates the list of funds. */
   private def updateFunds(): Unit = {
     val funds = savings.getFunds(associated = false).map(SelectableFund)
     val entries = Form.buildOptions(funds.filter(!_.fund.disabled), funds.filter(_.fund.disabled))
-    fundsField.setItems(FXCollections.observableList(entries))
+    fundsField.setItems(FXCollections.observableList(entries.asJava))
   }
 
   /**
@@ -473,7 +471,7 @@ class EditSchemesController {
     // Note: we also set the 'checked' status for each item, so that it is
     // properly taken into account (even for the cells not visible in the
     // current view).
-    fundsField.getItems.toList.flatten.foreach { item =>
+    fundsField.getItems.asScala.toList.flatten.foreach { item =>
       item.check.set(scheme.funds.contains(item.fund.id))
     }
     fundsField.refresh()
@@ -543,7 +541,7 @@ class EditSchemesController {
     Option(schemesField.getSelectionModel.getSelectedItem).flatten
 
   private def getSelectedFunds: List[Savings.Fund] =
-    fundsField.getItems.toList.flatten.filter(_.check.get).map(_.fund)
+    fundsField.getItems.asScala.toList.flatten.filter(_.check.get).map(_.fund)
 
 }
 
@@ -574,7 +572,7 @@ object EditSchemesController {
       controller.restoreView()
     }
 
-    dialog.setResultConverter(Callback { resultConverter(controller) _ })
+    dialog.setResultConverter(resultConverter(controller) _)
     Stages.trackMinimumDimensions(Stages.getStage(dialog))
 
     dialog

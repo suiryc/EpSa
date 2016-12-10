@@ -36,7 +36,7 @@ case class Levies(
   levies: Map[String, Levy]
 ) extends DebugString {
 
-  lazy val list = levies.values.toList
+  lazy val list: List[Levy] = levies.values.toList
 
   lazy val normalized: Levies = {
     val startDate = levies.flatMap(_._2.periods.map(_.start)).min
@@ -73,8 +73,8 @@ case class Levies(
       }
       // Add fake period after last ending
       val periods1 = periods0 match {
-        case head :: tail if head.end.isDefined => LevyPeriod(rate = 0, start = head.end.get.plusDays(1), end = None) :: periods0
-        case _                                  => periods0
+        case head :: _ if head.end.isDefined => LevyPeriod(rate = 0, start = head.end.get.plusDays(1), end = None) :: periods0
+        case _                               => periods0
       }
       val periods = periods1.reverse
       levy.copy(periods = periods)
@@ -99,7 +99,7 @@ object Levies {
         case None        => deserializationError(s"Missing '$field'")
       }
 
-    implicit val levyPeriodFormat = jsonFormat3(LevyPeriod)
+    implicit val levyPeriodFormat: RootJsonFormat[LevyPeriod] = jsonFormat3(LevyPeriod)
 
     implicit object LevyJsonFormat extends JsonFormat[Levy] {
 
@@ -162,7 +162,7 @@ case class LevyPeriodData(
   investedAmount: BigDecimal,
   grossGain: Option[BigDecimal]
 ) extends DebugString {
-  def isComplete = grossGain.isDefined
+  def isComplete: Boolean = grossGain.isDefined
   def getGrossGain: BigDecimal = {
     assert(isComplete)
     splitAmount(grossGain.getOrElse(0), 1)
@@ -237,7 +237,7 @@ case class LeviesPeriodsData(
     )
   }
   def amount(levy: String): BigDecimal = data.getOrElse(levy, Nil).map(_.amount).sum
-  def amount: BigDecimal = data.keys.toList.map(amount(_)).sum
+  def amount: BigDecimal = data.keys.toList.map(amount).sum
 
   def addPeriodsData(levy: String, periodsData: List[LevyPeriodData]): LeviesPeriodsData =
     copy(data = data + (levy -> periodsData))

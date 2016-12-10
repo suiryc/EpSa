@@ -15,19 +15,16 @@ import javafx.geometry.{Insets, Side}
 import javafx.scene.Node
 import javafx.scene.control._
 import javafx.scene.image.ImageView
-import javafx.scene.input.InputEvent
 import javafx.scene.layout.HBox
 import javafx.stage.{Modality, Stage, Window}
 import javafx.util.converter.LocalDateStringConverter
-import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
 import suiryc.scala.javafx.stage.Stages.StageLocation
 import suiryc.scala.math.Ordered._
 import suiryc.scala.settings.Preference
 import suiryc.scala.javafx.beans.value.RichObservableValue._
-import suiryc.scala.javafx.event.EventHandler._
 import suiryc.scala.javafx.scene.control.{DatePickers, TextFieldWithButton}
 import suiryc.scala.javafx.stage.Stages
-import suiryc.scala.javafx.util.Callback
 
 class NewAssetActionController extends Logging {
 
@@ -182,13 +179,13 @@ class NewAssetActionController extends Logging {
                 case Some(v) => (v, 1)
                 case None    => (date.getMonth, date.getDayOfMonth)
               }
-              val availability = date.plusYears(period.years).withMonth(month.getValue).withDayOfMonth(dayOfMonth)
+              val availability = date.plusYears(period.years.toLong).withMonth(month.getValue).withDayOfMonth(dayOfMonth)
               field.setValue(availability)
             }
           }
           contextMenu.getItems.add(menuItem)
         }
-        button.setOnAction { (event: ActionEvent) =>
+        button.setOnAction { _ =>
           contextMenu.show(button, Side.RIGHT, 0, 0)
         }
       }
@@ -210,7 +207,7 @@ class NewAssetActionController extends Logging {
     // (what is shown as selected) and the content (list of choices).
     for (field <- List(srcFundField, dstFundField)) {
       field.setButtonCell(new SchemeAndFundCell)
-      field.setCellFactory(Callback { new SchemeAndFundCell })
+      field.setCellFactory(_ => new SchemeAndFundCell)
     }
 
     // Listen to availability date changes
@@ -221,7 +218,7 @@ class NewAssetActionController extends Logging {
     // Note: we set the availability combobox format now and change it later
     // if operation date if changed.
     srcAvailabilityField2.setButtonCell(new AvailabilityListCell(None))
-    srcAvailabilityField2.setCellFactory(Callback { new AvailabilityListCell(None) })
+    srcAvailabilityField2.setCellFactory(_ => new AvailabilityListCell(None))
 
     // Force date format (to match the one of LocalDate in other views) in date picker fields
     val dateFormat = "yyyy-MM-dd"
@@ -234,7 +231,7 @@ class NewAssetActionController extends Logging {
     }
     // Override availability date pickers to disable dates anterior to operation date.
     for (field <- List(srcAvailabilityField, dstAvailabilityField)) {
-      field.setDayCellFactory(Callback { _ =>
+      field.setDayCellFactory(_ => {
         new DateCell {
           override def updateItem(item: LocalDate, empty: Boolean): Unit = {
             super.updateItem(item, empty)
@@ -255,7 +252,7 @@ class NewAssetActionController extends Logging {
     // Setup NAV history buttons
     for (field <- List(srcNAVButton, dstNAVButton)) {
       field.setTooltip(new Tooltip(NetAssetValueHistoryController.title))
-      field.setOnAction { (event: ActionEvent) =>
+      field.setOnAction { _ =>
         val opt =
           if (field == dstNAVButton) getDstFund
           else getSrcFund
@@ -286,7 +283,7 @@ class NewAssetActionController extends Logging {
     }
 
     // Really make sure we don't leave if something is not OK
-    buttonOk.addEventFilter(ActionEvent.ACTION, { (event: ActionEvent) =>
+    buttonOk.addEventFilter(ActionEvent.ACTION, (event: ActionEvent) => {
       if (checkForm().isEmpty) event.consume()
     })
 
@@ -308,6 +305,7 @@ class NewAssetActionController extends Logging {
     }
 
     checkForm()
+    ()
   }
 
   /** Restores (persisted) view. */
@@ -374,12 +372,14 @@ class NewAssetActionController extends Logging {
       onDstFund()
     }
     checkForm()
+    ()
   }
 
   private def onOperationDate(): Unit = {
     updateSrcAvailability()
     updateNAV()
     checkForm()
+    ()
   }
 
   def onLatestDate(event: ActionEvent): Unit = {
@@ -410,6 +410,7 @@ class NewAssetActionController extends Logging {
   private def onSrcNAV(): Unit = {
     computeSrcAmount()
     checkForm()
+    ()
   }
 
   private def onSrcAmount(): Unit = {
@@ -428,6 +429,7 @@ class NewAssetActionController extends Logging {
   private def onSrcUnits(): Unit = {
     computeSrcAmount()
     checkForm()
+    ()
   }
 
   def onSrcEmpty(event: ActionEvent): Unit = {
@@ -449,6 +451,7 @@ class NewAssetActionController extends Logging {
     // Trigger units/amount computation from source amount
     onSrcAmount()
     checkForm()
+    ()
   }
 
   private def onDstAvailability(): Unit = breakRecursion {
@@ -459,11 +462,13 @@ class NewAssetActionController extends Logging {
   private def onDstNAV(): Unit = {
     computeDstAmount()
     checkForm()
+    ()
   }
 
   private def onDstUnits(): Unit = {
     computeDstAmount()
     checkForm()
+    ()
   }
 
   private def onNAVHistory(fund: Savings.Fund): Unit = {
@@ -522,9 +527,9 @@ class NewAssetActionController extends Logging {
       // with a separator between categories:
       //   - funds that already have assets
       //   - funds without assets
-      srcFundField.setItems(FXCollections.observableList(Form.buildOptions(fundsWithAsset, fundsOther)))
+      srcFundField.setItems(FXCollections.observableList(Form.buildOptions(fundsWithAsset, fundsOther).asJava))
     } else {
-      srcFundField.setItems(FXCollections.observableList(Form.buildOptions(fundsWithAsset)))
+      srcFundField.setItems(FXCollections.observableList(Form.buildOptions(fundsWithAsset).asJava))
     }
     updateDstSchemeAndFund()
   }
@@ -571,7 +576,7 @@ class NewAssetActionController extends Logging {
       //   - funds in the source scheme without assets
       //   - funds in another scheme that already have assets
       //   - funds in another scheme without assets
-      dstFundField.setItems(FXCollections.observableList(fundsDst))
+      dstFundField.setItems(FXCollections.observableList(fundsDst.asJava))
     }
   }
 
@@ -582,7 +587,7 @@ class NewAssetActionController extends Logging {
         // right away (unlike TableView). Probably because the concerned content
         // is drawn when necessary while the table has some already shown.
         srcAvailabilityField2.setButtonCell(new AvailabilityListCell(Some(date)))
-        srcAvailabilityField2.setCellFactory(Callback { new AvailabilityListCell(Some(date)) })
+        srcAvailabilityField2.setCellFactory(_ => new AvailabilityListCell(Some(date)))
 
         srcAvailabilityField2.setDisable(false)
         // Note: get availabilities for selected scheme&fund, sorted by date (with
@@ -592,7 +597,7 @@ class NewAssetActionController extends Logging {
             opt.getOrElse(LocalDate.ofEpochDay(0))
           }
         }.getOrElse(Nil)
-        srcAvailabilityField2.setItems(FXCollections.observableList(availabilities))
+        srcAvailabilityField2.setItems(FXCollections.observableList(availabilities.asJava))
         if (availabilities.size == 1) {
           srcAvailabilityField2.getSelectionModel.select(availabilities.head)
           // Manually update dst availability (overrides recursion prevention)
@@ -623,7 +628,7 @@ class NewAssetActionController extends Logging {
             field.setUserData(nav)
             field.setText(text)
             field.textField.setTooltip(new Tooltip(s"${Strings.date}: ${nav.date}\n${Strings.nav}: ${formatNumber(nav.value, epsa.Settings.currency())}"))
-            field.setOnButtonAction { (event: InputEvent) =>
+            field.setOnButtonAction { _ =>
               field.setText(text)
             }
             // Bind so that changing value allows to reset it
@@ -655,13 +660,12 @@ class NewAssetActionController extends Logging {
 
   private def computeLevies(grossAmount: BigDecimal): Unit = {
     if (actionKind == AssetActionKind.Refund) {
-      getSrcFund.foreach { fund =>
+      getSrcFund.foreach { schemeAndFund =>
         val amount = getSrcAmount
         val units = getSrcUnits
         if ((amount > 0) && (units > 0)) {
           for {
             operationDate <- getOperationDate
-            schemeAndFund <- getSrcFund
             srcAvailability = getSrcAvailability
             searchAsset = Savings.Asset(schemeAndFund.scheme.id, schemeAndFund.fund.id, srcAvailability, 0, 0)
             savings = getSavings(operationDate)
@@ -908,6 +912,7 @@ class NewAssetActionController extends Logging {
       finally {
         recursionLevel -= 1
       }
+      ()
     }
 
 }
@@ -947,7 +952,7 @@ object NewAssetActionController {
       controller.restoreView()
     }
 
-    dialog.setResultConverter(Callback { resultConverter(owner, controller) _ })
+    dialog.setResultConverter(resultConverter(owner, controller) _)
     Stages.trackMinimumDimensions(Stages.getStage(dialog))
 
     dialog

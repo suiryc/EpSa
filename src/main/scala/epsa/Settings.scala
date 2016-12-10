@@ -12,10 +12,10 @@ import suiryc.scala.settings.Preference._
 /** Settings. */
 object Settings {
 
-  implicit val prefs = Preferences.userRoot.node("suiryc.epsa").node("epsa")
+  implicit val prefs: Preferences = Preferences.userRoot.node("suiryc.epsa").node("epsa")
 
   var debugParams: Set[Debug.Value] = Set.empty
-  def debug(v: Debug.Value) = debugParams.contains(v)
+  def debug(v: Debug.Value): Boolean = debugParams.contains(v)
   def toString(product: Product, str: => String): String =
     if (debug(Debug.OriginalToString)) ScalaRunTime._toString(product)
     else str
@@ -27,7 +27,7 @@ object Settings {
     val df = try {
       NumberFormat.getInstance(Locale.getDefault).asInstanceOf[DecimalFormat]
     } catch {
-      case ex: Exception => new DecimalFormat()
+      case _: Exception => new DecimalFormat()
     }
 
     // We want to get BigDecimal upon parsing and we will manage rounding.
@@ -46,20 +46,20 @@ object Settings {
   }
 
   val preferredCurrencies = List("€", "$", "£", "￥", "฿")
-  val defaultCurrency = preferredCurrencies.head
+  val defaultCurrency: String = preferredCurrencies.head
 
-  val currency = Preference.from("currency", defaultCurrency)
+  val currency: Preference[String] = Preference.from("currency", defaultCurrency)
 
   implicit private val roundingMode = BigDecimal.RoundingMode
 
-  val amountScale = Preference.from("amount.scale", 2)
-  val amountRounding = Preference.from("amount.rounding", BigDecimal.RoundingMode.HALF_EVEN)
+  val amountScale: Preference[Int] = Preference.from("amount.scale", 2)
+  val amountRounding: Preference[BigDecimal.RoundingMode.Value] = Preference.from("amount.rounding", BigDecimal.RoundingMode.HALF_EVEN)
 
-  val unitsScale = Preference.from("units.scale", 4)
-  val unitsRounding = Preference.from("units.rounding", BigDecimal.RoundingMode.HALF_EVEN)
+  val unitsScale: Preference[Int] = Preference.from("units.scale", 4)
+  val unitsRounding: Preference[BigDecimal.RoundingMode.Value] = Preference.from("units.rounding", BigDecimal.RoundingMode.HALF_EVEN)
 
-  val vwapScale = Preference.from("vwap.scale", 4)
-  val vwapRounding = Preference.from("vwap.rounding", BigDecimal.RoundingMode.HALF_EVEN)
+  val vwapScale: Preference[Int] = Preference.from("vwap.scale", 4)
+  val vwapRounding: Preference[BigDecimal.RoundingMode.Value] = Preference.from("vwap.rounding", BigDecimal.RoundingMode.HALF_EVEN)
 
   // Note: not really useful to let user change percents scale/rounding
   val percentsScale = 2
@@ -117,7 +117,7 @@ object Settings {
       else BigDecimal(s)
     }.getOrElse(BigDecimal(0))
   } catch {
-    case ex: Exception => BigDecimal(0)
+    case _: Exception => BigDecimal(0)
   }
 
   case object Debug extends Enumeration {

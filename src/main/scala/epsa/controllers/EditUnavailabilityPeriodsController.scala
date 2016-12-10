@@ -14,14 +14,12 @@ import javafx.scene.control._
 import javafx.scene.image.ImageView
 import javafx.scene.input.{KeyCode, KeyEvent, MouseEvent}
 import javafx.stage.{Stage, Window}
-import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
 import suiryc.scala.concurrent.RichFuture.Action
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.event.Events
-import suiryc.scala.javafx.event.EventHandler._
 import suiryc.scala.javafx.stage.Stages
 import suiryc.scala.javafx.stage.Stages.StageLocation
-import suiryc.scala.javafx.util.Callback
 import suiryc.scala.settings.Preference
 
 // TODO: handle user-defined displaying order ?
@@ -79,15 +77,15 @@ class EditUnavailabilityPeriodsController {
     buttonOk.setDisable(true)
 
     // Set months
-    monthField.setItems(FXCollections.observableList(None :: Month.values.toList.map(Some(_))))
+    monthField.setItems(FXCollections.observableList((None :: Month.values.toList.map(Some(_))).asJava))
     monthField.setButtonCell(new MonthListCell)
-    monthField.setCellFactory(Callback { new MonthListCell })
+    monthField.setCellFactory(_ => new MonthListCell)
 
     entries0 = Awaits.readDataStoreUnavailabilityPeriods(Some(stage)).getOrElse(Seq.empty).sortBy(_.id)
     entries = entries0
 
     // Initialize periods list view
-    periodsField.setCellFactory(Callback { newPeriodCell _ })
+    periodsField.setCellFactory(newPeriodCell _)
     updatePeriods()
     // Handle period selection changes
     periodsField.getSelectionModel.selectedItemProperty.listen(onSelectedPeriod())
@@ -174,7 +172,7 @@ class EditUnavailabilityPeriodsController {
 
   private def getYears: Int =
     try { yearsField.getText.trim.toInt }
-    catch { case ex: Exception => 0}
+    catch { case _: Exception => 0}
 
   private def getMonth: Option[Month] =
     Option(monthField.getSelectionModel.getSelectedItem).getOrElse(None)
@@ -322,7 +320,7 @@ class EditUnavailabilityPeriodsController {
   /** Updates the list of periods. */
   private def updatePeriods(): Unit = {
     periodsField.getSelectionModel.clearSelection()
-    periodsField.setItems(FXCollections.observableList(entries))
+    periodsField.setItems(FXCollections.observableList(entries.asJava))
   }
 
   /** Resets editing fields. */
@@ -410,7 +408,7 @@ object EditUnavailabilityPeriodsController {
       controller.restoreView()
     }
 
-    dialog.setResultConverter(Callback { resultConverter(owner, controller) _ })
+    dialog.setResultConverter(resultConverter(owner, controller) _)
     Stages.trackMinimumDimensions(Stages.getStage(dialog))
 
     dialog

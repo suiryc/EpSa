@@ -2,16 +2,18 @@ import sbt._
 import Keys._
 
 lazy val versions = Map[String, String](
-  "akka"         -> "2.4.2",
+  "akka"         -> "2.4.14",
   "epsa"         -> "1.0-SNAPSHOT",
-  "grizzled"     -> "1.0.2",
-  "h2"           -> "1.4.191",
-  "logback"      -> "1.1.7",
-  "poi"          -> "3.13",
-  "scala"        -> "2.11.8",
-  "scalatest"    -> "2.2.6",
-  "slf4j"        -> "1.7.20",
-  "slick"        -> "3.1.1",
+  "grizzled"     -> "1.3.0",
+  "h2"           -> "1.4.193",
+  "logback"      -> "1.1.8",
+  // Remain on POI 3.14 until 4.0 because POI 3.15 made all functions to get Cell type deprecated ...
+  // (one will get un-deprecated, unless POI developers become deprecated)
+  "poi"          -> "3.14",
+  "scala"        -> "2.12.1",
+  "scalatest"    -> "3.0.1",
+  "slf4j"        -> "1.7.21",
+  "slick"        -> "3.2.0-M2",
   "simple-odf"   -> "0.8.1-incubating",
   "spray-json"   -> "1.3.2",
   "suiryc-scala" -> "0.0.2-SNAPSHOT"
@@ -43,10 +45,22 @@ lazy val epsa = project.in(file(".")).
 
     scalacOptions ++= Seq(
       "-deprecation",
+      "-encoding", "UTF-8",
       "-feature",
-      "-optimize",
       "-unchecked",
-      "-Yinline-warnings"
+      "-Xfatal-warnings",
+      "-Xlint",
+      "-Yno-adapted-args",
+      "-Ywarn-numeric-widen",
+      "-Ywarn-value-discard",
+      "-Ywarn-inaccessible",
+      "-Ywarn-infer-any",
+      // Compiler warns of dead code after FXMLLoader.load ...
+      //"-Ywarn-dead-code",
+      "-Ywarn-nullary-override",
+      "-Ywarn-nullary-unit",
+      "-Ywarn-unused",
+      "-Ywarn-unused-import"
     ),
     scalacOptions in (Compile, doc) ++= Seq("-diagrams", "-implicits"),
     resolvers += Resolver.mavenLocal,
@@ -78,7 +92,7 @@ lazy val epsa = project.in(file(".")).
     ),
 
     assemblyMergeStrategy in assembly := {
-      case PathList("javax", "xml", xs @ _*) => MergeStrategy.first
+      case PathList("javax", "xml", _ @ _*) => MergeStrategy.first
       case v if v.startsWith("library.properties") => MergeStrategy.discard
       case v => MergeStrategy.defaultMergeStrategy(v)
     },

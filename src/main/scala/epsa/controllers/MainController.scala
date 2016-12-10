@@ -20,13 +20,12 @@ import javafx.scene.control._
 import javafx.scene.image.ImageView
 import javafx.scene.input.{KeyCode, KeyEvent, MouseEvent}
 import javafx.stage._
-import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
 import scala.util.Success
 import suiryc.scala.RichOption._
 import suiryc.scala.{javafx => jfx}
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.concurrent.JFXSystem
-import suiryc.scala.javafx.event.EventHandler._
 import suiryc.scala.javafx.scene.control.{Dialogs, TableViews}
 import suiryc.scala.javafx.stage.{FileChoosers, Stages}
 import suiryc.scala.math.Ordered._
@@ -159,6 +158,7 @@ class MainController extends Logging {
     AnchorPane.setBottomAnchor(chartPane, 0.0)
     AnchorPane.setLeftAnchor(chartPane, 0.0)
     navHistoryPane.getChildren.add(chartPane)
+    ()
   }
 
   /** Restores (persisted) view. */
@@ -186,6 +186,7 @@ class MainController extends Logging {
     import scala.concurrent.duration._
     if (!jfx.isLinux) restoreDividerPositions()
     else JFXSystem.scheduleOnce(200.millis)(restoreDividerPositions())
+    ()
   }
 
   /** Persists view (stage location, ...). */
@@ -328,7 +329,7 @@ class MainController extends Logging {
 
   class ControllerActor(state0: State) extends Actor {
 
-    val savingsOnDateStage = {
+    val savingsOnDateStage: Stage = {
       import com.sun.javafx.scene.control.skin.DatePickerSkin
       import suiryc.scala.javafx.scene.control.Dialogs
 
@@ -395,7 +396,7 @@ class MainController extends Logging {
       )
     }
 
-    val toDateSavingsViewTab = addSavingsOnDateTab(None, init = true)
+    val toDateSavingsViewTab: SavingsViewTab = addSavingsOnDateTab(None, init = true)
 
     refresh(state0, updateAssetsValue = true)
 
@@ -405,7 +406,7 @@ class MainController extends Logging {
     // Otherwise window becomes unusable (akka messages goes to dead letters).
     def receive(state: State): Receive =
       new PartialFunction[Any, Unit]() {
-        val r = receive0(state)
+        val r: Receive = receive0(state)
         override def isDefinedAt(x: Any): Boolean = r.isDefinedAt(x)
         override def apply(x: Any): Unit = try {
           r.apply(x)
@@ -418,6 +419,7 @@ class MainController extends Logging {
               contentText = None,
               ex = Some(ex)
             )
+            ()
         }
       }
 
@@ -504,6 +506,7 @@ class MainController extends Logging {
     private def refresh(state: State, updateAssetsValue: Boolean = false): Unit = {
       // Cheap trick to fill fields with Savings data
       processEvents(state, Nil, updateAssetsValue)
+      ()
     }
 
     def reload(state0: State): Unit = {
@@ -549,7 +552,7 @@ class MainController extends Logging {
     }
 
     def refreshTabs(state: State): Unit = {
-      tabPane.getTabs.map(_.getUserData).foreach {
+      tabPane.getTabs.asScala.map(_.getUserData).foreach {
         case tab: TabWithState => refreshTab(tab, state)
         case _                 =>
       }
@@ -611,6 +614,7 @@ class MainController extends Logging {
       dialog.setResizable(true)
       val events = dialog.showAndWait().orElse(Nil)
       if (events.nonEmpty) processEvents(state, events)
+      ()
     }
 
     def onEditFunds(state: State, edit: Option[Savings.Fund]): Unit = {
@@ -619,6 +623,7 @@ class MainController extends Logging {
       dialog.setResizable(true)
       val events = dialog.showAndWait().orElse(Nil)
       if (events.nonEmpty) processEvents(state, events)
+      ()
     }
 
     def onEditUnavailabilityPeriods(state: State): Unit = {
@@ -655,6 +660,7 @@ class MainController extends Logging {
         } else {
           // Refresh NAVs as there may be new assets
           processEvents(state, event.toList, updateAssetsValue = true)
+          ()
         }
       }
     }
@@ -670,7 +676,7 @@ class MainController extends Logging {
         // Persist now to restore it when rebuilding the stage
         persistView(state, toDateSavingsViewTab.view)
         context.stop(self)
-        MainController.build(state, needRestart, applicationStart = false)
+        MainController.build(state, needRestart)
       }
     }
 
@@ -681,6 +687,7 @@ class MainController extends Logging {
         case Some(date) => addSavingsOnDateTab(Some(date))
         case None       => savingsOnDateStage.show()
       }
+      ()
     }
 
     def addSavingsOnDateTab(dateOpt: Option[LocalDate], init: Boolean = false): SavingsViewTab = {
@@ -916,7 +923,7 @@ class MainController extends Logging {
         // confirmation dialog.
         val buttonSave = alert.getDialogPane.lookupButton(buttonSaveType)
         buttonSave.asInstanceOf[Button].setGraphic(new ImageView(Images.iconDisk))
-        buttonSave.addEventFilter(ActionEvent.ACTION, { (event: ActionEvent) =>
+        buttonSave.addEventFilter(ActionEvent.ACTION, (event: ActionEvent) => {
           if (!save(state, owner = Some(Stages.getStage(alert)))) event.consume()
         })
 
@@ -947,8 +954,8 @@ class MainController extends Logging {
         Awaits.saveDataStoreChanges(actualOwner, fullDb = saveAs).isSuccess
 
       DataStore.dbOpened match {
-        case Some(name) if !saveAs => save()
-        case _                     =>
+        case Some(_) if !saveAs => save()
+        case _                  =>
           // Data store not opened yet: open then save
           Awaits.openDataStore(actualOwner, change = true, save = true, loadTmp = true) match {
             case Some(Success(())) => save()

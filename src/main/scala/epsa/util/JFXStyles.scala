@@ -7,7 +7,6 @@ import javafx.scene.Node
 import javafx.scene.control.{Control, Tooltip}
 import javafx.scene.image.ImageView
 import javafx.util.{Duration => jfxDuration}
-import suiryc.scala.javafx.event.EventHandler._
 
 object JFXStyles {
 
@@ -77,6 +76,7 @@ object JFXStyles {
   def setStyleImageButton(node: Node, set: Boolean): Unit = {
     if (set && !node.getStyleClass.contains(imageButtonClass)) node.getStyleClass.add(imageButtonClass)
     else if (!set) node.getStyleClass.remove(imageButtonClass)
+    ()
   }
 
   /**
@@ -125,11 +125,11 @@ object JFXStyles {
   }
 
   case class ErrorStyle(set: Boolean, msg: String = "") extends Style {
-    override val pseudoClass = errorClass
+    override val pseudoClass: PseudoClass = errorClass
   }
 
   case class WarningStyle(set: Boolean, msg: String = "") extends Style {
-    override val pseudoClass = warningClass
+    override val pseudoClass: PseudoClass = warningClass
   }
 
   case class AnimationHighlighter(rows: List[Node], timeline: Timeline, onStop: () => Unit) {

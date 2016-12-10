@@ -9,7 +9,7 @@ import suiryc.scala.math.BigDecimals._
 class LocalDateAxisWrapper(settings: ChartSettings) {
 
   /** Date format for axis. */
-  val dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
+  val dateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
 
   /** Actual (wrapped) axis. */
   val axis = new NumberAxis()
@@ -29,8 +29,8 @@ class LocalDateAxisWrapper(settings: ChartSettings) {
   def updateTicks(series: XYChart.Series[Number, Number], zoom: BigDecimal): Unit = {
     val data = series.getData
     if (!data.isEmpty) {
-      import scala.collection.JavaConversions._
-      val values = data.map(v => math.round(v.getXValue.doubleValue))
+      import scala.collection.JavaConverters._
+      val values = data.asScala.map(v => math.round(v.getXValue.doubleValue))
       val min = values.min
       val max = values.max
       axis.setLowerBound(min.doubleValue)
@@ -38,7 +38,7 @@ class LocalDateAxisWrapper(settings: ChartSettings) {
       // Default tick unit (1 pixel = 1 day): 8 weeks (56 days = 56 pixels)
       // Scale tick unit with zoom, minimum value (for high zooming): 7 days
       val tickUnit = math.max(7, round(7 * 4 * 2 / zoom)).toInt
-      axis.setTickUnit(tickUnit)
+      axis.setTickUnit(tickUnit.toDouble)
       // If tick unit is beyond 7 days, display 5 (the default) minor ticks,
       // otherwise display one minor tick for each day.
       val minorTickCount =

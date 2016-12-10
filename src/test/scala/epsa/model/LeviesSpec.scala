@@ -1201,6 +1201,7 @@ class LeviesSpec extends WordSpec with Matchers {
     } finally {
       DataStore.close()
     }
+    ()
   }
 
   case class NAVHistory(fundId: UUID, values: List[Savings.AssetValue])
@@ -1211,6 +1212,7 @@ class LeviesSpec extends WordSpec with Matchers {
     }
     val f = executeAllSequentially(stopOnError = true, actions)
     Await.ready(f, Duration.Inf)
+    ()
   }
 
   protected def buildLevies(str: String, normalize: Boolean = true): Levies = {

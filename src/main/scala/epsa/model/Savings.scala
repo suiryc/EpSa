@@ -68,7 +68,7 @@ object Savings extends Logging {
 
     case class DateRange(min: LocalDate, max: LocalDate)
     case class SortingEvents(prefix: List[Event], assetEvents: List[AssetEvent]) {
-      def isEmpty = prefix.isEmpty && assetEvents.isEmpty
+      def isEmpty: Boolean = prefix.isEmpty && assetEvents.isEmpty
       lazy val dateRange: Option[DateRange] = {
         val eventsDates = assetEvents.map(_.date)
         if (eventsDates.isEmpty) None
@@ -287,7 +287,7 @@ object Savings extends Logging {
     // See: http://stackoverflow.com/a/19348339
     import scala.math.Ordered.orderingToOrdered
     def compareParams(other: Scheme): Int =
-      (name, comment, disabled) compare (other.name, other.comment, other.disabled)
+      (name, comment, disabled).compare((other.name, other.comment, other.disabled))
   }
 
   case class Fund(id: UUID, name: String, comment: Option[String],
@@ -296,7 +296,7 @@ object Savings extends Logging {
     // See: http://stackoverflow.com/a/19348339
     import scala.math.Ordered.orderingToOrdered
     def compareParams(other: Fund): Int =
-      (name, comment, disabled) compare (other.name, other.comment, other.disabled)
+      (name, comment, disabled).compare((other.name, other.comment, other.disabled))
   }
 
   case class AssetId(schemeId: UUID, fundId: UUID) {
@@ -305,17 +305,17 @@ object Savings extends Logging {
   }
 
   case class Assets(list: List[Asset] = Nil, vwaps: Map[AssetId, BigDecimal] = Map.empty) {
-    lazy val byId = list.groupBy(_.id)
-    def units(id: AssetId) = byId.getOrElse(id, Nil).map(_.units).sum
-    def amount(id: AssetId, value: BigDecimal) = scaleAmount(units(id) * value)
-    def investedAmount(id: AssetId) = amount(id, vwaps.getOrElse(id, 0))
-    def addAsset(asset: Asset) = copy(list = list :+ asset)
-    def updateAsset(date: LocalDate, asset: Asset) =
+    lazy val byId: Map[AssetId, List[Asset]] = list.groupBy(_.id)
+    def units(id: AssetId): BigDecimal = byId.getOrElse(id, Nil).map(_.units).sum
+    def amount(id: AssetId, value: BigDecimal): BigDecimal = scaleAmount(units(id) * value)
+    def investedAmount(id: AssetId): BigDecimal = amount(id, vwaps.getOrElse(id, 0))
+    def addAsset(asset: Asset): Assets = copy(list = list :+ asset)
+    def updateAsset(date: LocalDate, asset: Asset): Assets =
       copy(list = list.map { currentAsset =>
         if (currentAsset.matches(date, asset)) asset
         else currentAsset
       })
-    def removeAsset(date: LocalDate, asset: AssetEntry) = {
+    def removeAsset(date: LocalDate, asset: AssetEntry): Assets = {
       // Filter out asset
       val assets0 = copy(list = list.filterNot(_.matches(date, asset)))
       // Then remove VWAP if no more asset
@@ -362,7 +362,7 @@ object Savings extends Logging {
   case class AssetPart(schemeId: UUID, fundId: UUID, availability: Option[LocalDate], units: BigDecimal, value: BigDecimal)
     extends AssetEntry
   {
-    def amount(value: BigDecimal) = scaleAmount(units * value)
+    def amount(value: BigDecimal): BigDecimal = scaleAmount(units * value)
     def toString(savings: Savings): String =
       Settings.toString(this, s"Asset(${id.toString(savings)},$units,$value,${availability.getOrElse("")})")
   }
@@ -425,18 +425,18 @@ object Savings extends Logging {
 
   object JsonProtocol extends DefaultJsonProtocol with JsonFormats {
 
-    implicit val createSchemeFormat = jsonFormat3(CreateScheme)
-    implicit val updateSchemeFormat = jsonFormat4(UpdateScheme.apply)
-    implicit val deleteSchemeFormat = jsonFormat1(DeleteScheme)
-    implicit val createFundFormat = jsonFormat3(CreateFund)
-    implicit val updateFundFormat = jsonFormat4(UpdateFund.apply)
-    implicit val deleteFundFormat = jsonFormat1(DeleteFund)
-    implicit val associateFundFormat = jsonFormat2(AssociateFund)
-    implicit val dissociateFundFormat = jsonFormat2(DissociateFund)
-    implicit val assetPartFormat = jsonFormat5(AssetPart)
-    implicit val makePaymentFormat = jsonFormat3(MakePayment)
-    implicit val makeTransferFormat = jsonFormat4(MakeTransfer)
-    implicit val makeRefundFormat = jsonFormat3(MakeRefund)
+    implicit val createSchemeFormat: RootJsonFormat[CreateScheme] = jsonFormat3(CreateScheme)
+    implicit val updateSchemeFormat: RootJsonFormat[UpdateScheme] = jsonFormat4(UpdateScheme.apply)
+    implicit val deleteSchemeFormat: RootJsonFormat[DeleteScheme] = jsonFormat1(DeleteScheme)
+    implicit val createFundFormat: RootJsonFormat[CreateFund] = jsonFormat3(CreateFund)
+    implicit val updateFundFormat: RootJsonFormat[UpdateFund] = jsonFormat4(UpdateFund.apply)
+    implicit val deleteFundFormat: RootJsonFormat[DeleteFund] = jsonFormat1(DeleteFund)
+    implicit val associateFundFormat: RootJsonFormat[AssociateFund] = jsonFormat2(AssociateFund)
+    implicit val dissociateFundFormat: RootJsonFormat[DissociateFund] = jsonFormat2(DissociateFund)
+    implicit val assetPartFormat: RootJsonFormat[AssetPart] = jsonFormat5(AssetPart)
+    implicit val makePaymentFormat: RootJsonFormat[MakePayment] = jsonFormat3(MakePayment)
+    implicit val makeTransferFormat: RootJsonFormat[MakeTransfer] = jsonFormat4(MakeTransfer)
+    implicit val makeRefundFormat: RootJsonFormat[MakeRefund] = jsonFormat3(MakeRefund)
 
     implicit object EventJsonFormat extends RootJsonFormat[Event] with BasicFormats {
 

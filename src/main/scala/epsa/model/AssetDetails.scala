@@ -11,7 +11,7 @@ import javafx.beans.property.{ObjectProperty, SimpleObjectProperty}
 import javafx.collections.ListChangeListener.Change
 import javafx.collections.{FXCollections, ObservableList}
 import javafx.collections.transformation.{SortedList, TransformationList}
-import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
 import suiryc.scala.javafx.collections.RichObservableList._
 import suiryc.scala.math.Ordering.localDateOrdering
 
@@ -58,22 +58,22 @@ trait AssetDetails {
   private val currency = epsa.Settings.currency()
 
   // The following functions/values give access to detailed values and formats
-  def availability = asset.availability
-  def units = asset.units
-  def vwap = actualVWAP.getOrElse(asset.vwap)
-  def investedAmount = asset.amount(vwap)
-  lazy val grossAmount = nav.map { value =>
+  def availability: Option[LocalDate] = asset.availability
+  def units: BigDecimal = asset.units
+  def vwap: BigDecimal = actualVWAP.getOrElse(asset.vwap)
+  def investedAmount: BigDecimal = asset.amount(vwap)
+  lazy val grossAmount: Option[BigDecimal] = nav.map { value =>
     asset.amount(value)
   }
-  lazy val grossGain = grossAmount.map { amount =>
+  lazy val grossGain: Option[BigDecimal] = grossAmount.map { amount =>
     amount - investedAmount
   }
-  lazy val grossGainPct =
+  lazy val grossGainPct: Option[BigDecimal] =
     if (investedAmount == 0) Some(BigDecimal(0))
     else grossGain.map(v => scalePercents((v * 100) / investedAmount))
   // When showing VWAP per asset, don't display levies (and net amount/gain)
   // as those are based on assetId VWAP.
-  lazy val leviesPeriodsData =
+  lazy val leviesPeriodsData: Option[LeviesPeriodsData] =
     if ((kind != AssetDetailsKind.Standard) || actualVWAP.isEmpty) None
     else nav.map { nav =>
       val totalUnits = savings.assets.units(asset.id)
@@ -81,45 +81,45 @@ trait AssetDetails {
       val (refundLevies, _) = leviesPeriodsData.proportioned(units / totalUnits)
       refundLevies
     }
-  def leviesWarning = leviesPeriodsData.map(_.warnings).getOrElse(Nil)
-  def leviesAmount = leviesPeriodsData.map(_.amount)
-  lazy val netAmount =
+  def leviesWarning: List[String] = leviesPeriodsData.map(_.warnings).getOrElse(Nil)
+  def leviesAmount: Option[BigDecimal] = leviesPeriodsData.map(_.amount)
+  lazy val netAmount: Option[BigDecimal] =
     for {
       grossAmount <- grossAmount
       leviesAmount <- leviesAmount
     } yield {
       grossAmount - leviesAmount
     }
-  lazy val netGain = netAmount.map { amount =>
+  lazy val netGain: Option[BigDecimal] = netAmount.map { amount =>
     amount - investedAmount
   }
-  lazy val netGainPct =
+  lazy val netGainPct: Option[BigDecimal] =
     if (investedAmount == 0) Some(BigDecimal(0))
     else netGain.map(v => scalePercents((v * 100) / investedAmount))
 
-  lazy val formatAvailability =
+  lazy val formatAvailability: String =
     if ((kind != AssetDetailsKind.Standard) && (kind != AssetDetailsKind.TotalPerAvailability)) null
     else Form.formatAvailability(asset.availability, date = availabilityBase)
-  lazy val formatUnits =
+  lazy val formatUnits: String =
     if ((kind != AssetDetailsKind.Standard) && (kind != AssetDetailsKind.TotalPerFund)) null
     else formatNumber(scaleUnits(units))
-  lazy val formatVWAP =
+  lazy val formatVWAP: String =
     if ((kind != AssetDetailsKind.Standard) && (kind != AssetDetailsKind.TotalPerFund)) null
     else formatNumber(vwap, currency)
-  lazy val formatDate =
+  lazy val formatDate: String =
     if ((kind != AssetDetailsKind.Standard) && (kind != AssetDetailsKind.TotalPerFund)) null
     else date.map(_.toString).getOrElse(Strings.na)
-  lazy val formatNAV =
+  lazy val formatNAV: String =
     if ((kind != AssetDetailsKind.Standard) && (kind != AssetDetailsKind.TotalPerFund)) null
     else nav.map(formatNumber(_, currency)).getOrElse(Strings.na)
-  lazy val formatInvestedAmount = formatNumber(investedAmount, currency)
-  lazy val formatGrossAmount = grossAmount.map(formatNumber(_, currency)).getOrElse(Strings.na)
-  lazy val formatLeviesAmount = leviesAmount.map(formatNumber(_, currency)).getOrElse(Strings.na)
-  lazy val formatNetAmount = netAmount.map(formatNumber(_, currency)).getOrElse(Strings.na)
-  lazy val formatGrossGain = grossGain.map(formatNumber(_, currency)).getOrElse(Strings.na)
-  lazy val formatGrossGainPct = grossGainPct.map(formatNumber(_, "%")).getOrElse(Strings.na)
-  lazy val formatNetGain = netGain.map(formatNumber(_, currency)).getOrElse(Strings.na)
-  lazy val formatNetGainPct = netGainPct.map(formatNumber(_, "%")).getOrElse(Strings.na)
+  lazy val formatInvestedAmount: String = formatNumber(investedAmount, currency)
+  lazy val formatGrossAmount: String = grossAmount.map(formatNumber(_, currency)).getOrElse(Strings.na)
+  lazy val formatLeviesAmount: String = leviesAmount.map(formatNumber(_, currency)).getOrElse(Strings.na)
+  lazy val formatNetAmount: String = netAmount.map(formatNumber(_, currency)).getOrElse(Strings.na)
+  lazy val formatGrossGain: String = grossGain.map(formatNumber(_, currency)).getOrElse(Strings.na)
+  lazy val formatGrossGainPct: String = grossGainPct.map(formatNumber(_, "%")).getOrElse(Strings.na)
+  lazy val formatNetGain: String = netGain.map(formatNumber(_, currency)).getOrElse(Strings.na)
+  lazy val formatNetGainPct: String = netGainPct.map(formatNumber(_, "%")).getOrElse(Strings.na)
 }
 
 /** Standard details. */
@@ -240,7 +240,7 @@ class AssetDetailsWithTotal(
   }
 
   private def toSorted(list: List[AssetDetails]): SortedList[AssetDetails] =
-    new SortedList[AssetDetails](FXCollections.observableList(list))
+    new SortedList[AssetDetails](FXCollections.observableList(list.asJava))
 
   // This adapts and fires a change triggered from a partial total group.
   // The adapted change properly sources the full items list (not only its own
@@ -248,7 +248,7 @@ class AssetDetailsWithTotal(
   private def adaptChange[A <: AssetDetails](c: Change[A], offset: Int): Unit = {
     // We need to update our list first before firing any change
     updateTotals()
-    val list = FXCollections.observableList(totals).asInstanceOf[ObservableList[A]]
+    val list = FXCollections.observableList(totals.asJava).asInstanceOf[ObservableList[A]]
     // Since the original list is not the complete one, wrap the change to
     // offset the returned indices.
     val adapted0 = new Change[A](list) {
@@ -271,7 +271,7 @@ class AssetDetailsWithTotal(
   val comparatorProperty: ObjectProperty[Comparator[AssetDetails]] =
     new SimpleObjectProperty[Comparator[AssetDetails]]()
 
-  private val assets0 = source0.toList
+  private val assets0 = source0.asScala.toList
 
   // The grand total
   private val total = computeTotal(savings, assets0, kind = AssetDetailsKind.Total, scheme = None, fund = None, availability = None)
@@ -338,7 +338,10 @@ class AssetDetailsWithTotal(
     }
 
     // Rebuild all totals, tagging the first row of each group
-    totals = (tagFirst(totalPerScheme.toList) ::: tagFirst(totalPerFund.toList) ::: tagFirst(totalPerAvailability.toList)) :+ total
+    totals = (tagFirst(totalPerScheme.asScala.toList)
+      ::: tagFirst(totalPerFund.asScala.toList)
+      ::: tagFirst(totalPerAvailability.asScala.toList)
+      ) :+ total
   }
 
   updateTotals()

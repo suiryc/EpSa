@@ -8,7 +8,7 @@ import org.scalatest.{Matchers, WordSpec}
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, Future}
 import scala.util.Success
-import slick.driver.H2Driver.backend.DatabaseDef
+import slick.jdbc.H2Profile.backend.DatabaseDef
 import suiryc.scala.concurrent.RichFuture
 import suiryc.scala.concurrent.RichFuture.Action
 
@@ -144,12 +144,14 @@ class DataStoreSpec extends WordSpec with Matchers {
       if (failFirst) attempt shouldBe 2
       else attempt shouldBe 1
       read() shouldBe Some(value)
+      ()
     }
 
     def checkNotDone(attempted: Boolean): Unit = {
       if (attempted) attempt shouldBe 1
       else attempt shouldBe 0
       read() shouldBe None
+      ()
     }
   }
 

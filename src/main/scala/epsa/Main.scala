@@ -6,12 +6,13 @@ import epsa.model.Savings
 import epsa.util.Awaits
 import javafx.application.{Application, Platform}
 import javafx.stage.Stage
+import scala.concurrent.ExecutionContextExecutor
 
 object Main {
 
   import Settings.Debug
 
-  val versionedName = s"${epsa.Info.name} ${epsa.Info.version}" +
+  val versionedName: String = s"${epsa.Info.name} ${epsa.Info.version}" +
     epsa.Info.gitHeadCommit.map(v => s" ($v)").getOrElse("")
 
   def main(args: Array[String]): Unit = {
@@ -37,7 +38,7 @@ object Main {
   object Akka {
 
     implicit val system = ActorSystem("epsa")
-    implicit val dispatcher = system.dispatcher
+    implicit val dispatcher: ExecutionContextExecutor = system.dispatcher
 
   }
 

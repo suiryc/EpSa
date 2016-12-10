@@ -14,7 +14,6 @@ import grizzled.slf4j.Logging
 import java.time.LocalDate
 import java.util.UUID
 import javafx.beans.property.SimpleObjectProperty
-import javafx.event.ActionEvent
 import javafx.fxml.{FXML, FXMLLoader}
 import javafx.scene.Scene
 import javafx.scene.control._
@@ -22,18 +21,16 @@ import javafx.scene.image.ImageView
 import javafx.scene.input.MouseEvent
 import javafx.scene.layout.{AnchorPane, Region}
 import javafx.stage.{Stage, WindowEvent}
-import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import suiryc.scala.javafx.beans.value.RichObservableValue
 import suiryc.scala.{javafx => jfx}
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.concurrent.JFXSystem
-import suiryc.scala.javafx.event.EventHandler._
 import suiryc.scala.javafx.scene.control.{Dialogs, TableViews}
 import suiryc.scala.javafx.stage.Stages
 import suiryc.scala.javafx.stage.Stages.StageLocation
-import suiryc.scala.javafx.util.Callback
 import suiryc.scala.math.Ordered._
 import suiryc.scala.math.Ordering._
 import suiryc.scala.settings.Preference
@@ -123,10 +120,10 @@ class AccountHistoryController extends Logging {
     // Display account details as of today
     showAccountDetails(LocalDate.now)
 
-    columnEventDate.setCellValueFactory(Callback { data =>
+    columnEventDate.setCellValueFactory(data => {
       new SimpleObjectProperty(data.getValue.valueProperty().get())
     })
-    columnEventDate.setCellFactory(Callback {
+    columnEventDate.setCellFactory(_ => {
       new TreeTableCell[AssetEventItem, AssetEventItem] {
         override def updateItem(item: AssetEventItem, empty: Boolean): Unit = {
           super.updateItem(item, empty)
@@ -139,10 +136,10 @@ class AccountHistoryController extends Logging {
 
     // There is no meaning to sort on event description, so disable it.
     columnEventDesc.setSortable(false)
-    columnEventDesc.setCellValueFactory(Callback { data =>
+    columnEventDesc.setCellValueFactory(data => {
       new SimpleObjectProperty(data.getValue.valueProperty().get())
     })
-    columnEventDesc.setCellFactory(Callback {
+    columnEventDesc.setCellFactory(_ => {
       new TreeTableCell[AssetEventItem, AssetEventItem] {
         // Display graphic on the right side
         setContentDisplay(ContentDisplay.RIGHT)
@@ -165,7 +162,7 @@ class AccountHistoryController extends Logging {
     })
 
     // Keep link between top-level items (history entries) and associated row.
-    historyTable.setRowFactory(Callback { newEventRow() })
+    historyTable.setRowFactory(_ => newEventRow())
 
     historyTable.getColumns.addAll(columnEventDate, columnEventDesc)
 
@@ -196,7 +193,7 @@ class AccountHistoryController extends Logging {
     // And display any unexpected issue.
     Future {
       buildHistory(state, events, showIndicator)
-    }.onFailure {
+    }.failed.foreach {
       case ex: Exception =>
       Dialogs.error(
         owner = Some(stage),
@@ -236,8 +233,8 @@ class AccountHistoryController extends Logging {
     // the minimum width between 'tableWidth - tablePadding - scrollBarWidth'
     // and 'containerWidth' prevents the horizontal scrollbar from appearing.
     val clippedContainer = historyTable.lookup(".clipped-container").asInstanceOf[Region]
-    val scrollBar = historyTable.lookupAll(".scroll-bar").collect {
-      case scrollBar: VirtualScrollBar if scrollBar.getPseudoClassStates.map(_.getPseudoClassName).contains("vertical") => scrollBar
+    val scrollBar = historyTable.lookupAll(".scroll-bar").asScala.collect {
+      case scrollBar: VirtualScrollBar if scrollBar.getPseudoClassStates.asScala.map(_.getPseudoClassName).contains("vertical") => scrollBar
     }.head
 
     def updateColumnWidth(): Unit = {
@@ -286,6 +283,7 @@ class AccountHistoryController extends Logging {
     // resizing ...
     if (!jfx.isLinux) restoreDividersPositions()
     else JFXSystem.scheduleOnce(200.millis)(restoreDividersPositions())
+    ()
   }
 
   /** Persists view (stage location, ...). */
@@ -328,7 +326,7 @@ class AccountHistoryController extends Logging {
             val contextMenu = new ContextMenu()
             val savingsOnDate = new MenuItem(Strings.savingsOnDate,
               new ImageView(Images.iconCalendarDay))
-            savingsOnDate.setOnAction { (event: ActionEvent) =>
+            savingsOnDate.setOnAction { _ =>
               // Request main window to show savings on selected date
               mainController.onSavingsOnDate(date)
             }
@@ -347,7 +345,7 @@ class AccountHistoryController extends Logging {
   private def onMarkEvent(event: ChartMarkEvent.Value, mark: HistoryMark): Unit = {
     // Do some animation (highlighting) when getting on the marker.
     if (event == ChartMarkEvent.Entered) {
-      val items = historyTable.getRoot.getChildren.filter { item =>
+      val items = historyTable.getRoot.getChildren.asScala.filter { item =>
         mark.items.contains(item.getValue)
       }.toList
       val rows = items.flatMap(_.getValue.row)
@@ -356,7 +354,7 @@ class AccountHistoryController extends Logging {
       // Get the VirtualFlow in the table skin (should be the first child,
       // accessible once table is shown), and ask to show the minimum entry
       // index associated to the marker.
-      historyTable.getSkin.asInstanceOf[TreeTableViewSkin[_]].getChildren.find(_.isInstanceOf[VirtualFlow[_]]).foreach {
+      historyTable.getSkin.asInstanceOf[TreeTableViewSkin[_]].getChildren.asScala.find(_.isInstanceOf[VirtualFlow[_]]).foreach {
         case flow: VirtualFlow[_] =>
           val indices = items.map(historyTable.getRow).filter(_ >= 0)
           if (indices.nonEmpty) flow.show(indices.min)
@@ -377,7 +375,7 @@ class AccountHistoryController extends Logging {
         header.getStyleClass.addAll(JFXStyles.CLASS_HEADER, JFXStyles.CLASS_NO_SELECT)
         val savingsOnDate = new MenuItem(Strings.savingsOnDate,
           new ImageView(Images.iconCalendarDay))
-        savingsOnDate.setOnAction { (event: ActionEvent) =>
+        savingsOnDate.setOnAction { _ =>
           // Request main window to show savings on selected date
           mainController.onSavingsOnDate(data.date)
         }
@@ -513,7 +511,7 @@ class AccountHistoryController extends Logging {
     def atDates(history: History, savings: Savings, since: Option[LocalDate], to: LocalDate): History = {
       val from = since.orElse(firstDate).getOrElse(to)
       Stream.from(0).map { i =>
-        from.plusDays(i)
+        from.plusDays(i.toLong)
       }.takeWhile { date =>
         date <= to
       }.toList.foldLeft(history) { (acc, date) =>
@@ -560,7 +558,7 @@ class AccountHistoryController extends Logging {
       ChartSeriesData(data.date, data.grossAmount)
     }
     // Converts useful history events (root items with date) into marks.
-    val marks = historyTable.getRoot.getChildren.toList.map(_.getValue).filter(_.date.isDefined).groupBy(_.date.get).map {
+    val marks = historyTable.getRoot.getChildren.asScala.toList.map(_.getValue).filter(_.date.isDefined).groupBy(_.date.get).map {
       case (date, items) => date -> HistoryMark(date, items)
     }
     val meta = ChartMeta(
@@ -716,8 +714,8 @@ class AccountHistoryController extends Logging {
     val savings = cachedSavings
 
     case class AccountDetails(investedAmount: BigDecimal, grossAmount: BigDecimal) {
-      def grossGain = grossAmount - investedAmount
-      def grossGainPct =
+      def grossGain: BigDecimal = grossAmount - investedAmount
+      def grossGainPct: BigDecimal =
         if (investedAmount == 0) BigDecimal(0)
         else scalePercents((grossGain * 100) / investedAmount)
     }
@@ -766,7 +764,7 @@ object AccountHistoryController {
 
   private val historyColumnsPref = Preference.from(s"$prefsKeyPrefix.history.columns", null:String)
 
-  def title = Strings.accountHistory
+  def title: String = Strings.accountHistory
 
   case class AssetEventItem(index: Int, date: Option[LocalDate], desc: String, comment: Option[String]) extends Ordered[AssetEventItem] {
     var row: Option[TreeTableRow[AssetEventItem]] = None
@@ -774,7 +772,7 @@ object AccountHistoryController {
     // Define order for items: by index then date
     // As a side effect this gives Comparable implementation for Java sorting.
     import scala.math.Ordered.orderingToOrdered
-    override def compare(that: AssetEventItem): Int = (index, date) compare (that.index, that.date)
+    override def compare(that: AssetEventItem): Int = (index, date).compare((that.index, that.date))
   }
 
   object AssetEventItem {
@@ -788,13 +786,13 @@ object AccountHistoryController {
   }
 
   case class History(data: List[HistoryData] = Nil, issues: List[String] = Nil) {
-    def addData(more: HistoryData) = copy(data :+ more)
-    def addIssue(issue: String) = copy(issues = issues :+ issue)
+    def addData(more: HistoryData): History = copy(data :+ more)
+    def addIssue(issue: String): History = copy(issues = issues :+ issue)
   }
 
   case class HistoryData(date: LocalDate, investedAmount: BigDecimal = BigDecimal(0), grossAmount: BigDecimal = BigDecimal(0)) {
-    def addInvestedAmount(v: BigDecimal) = copy(investedAmount = investedAmount + v)
-    def addGrossAmount(v: BigDecimal) = copy(grossAmount = grossAmount + v)
+    def addInvestedAmount(v: BigDecimal): HistoryData = copy(investedAmount = investedAmount + v)
+    def addGrossAmount(v: BigDecimal): HistoryData = copy(grossAmount = grossAmount + v)
   }
 
   case class HistoryMark(date: LocalDate, items: List[AssetEventItem]) extends ChartMark {

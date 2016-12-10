@@ -2,6 +2,7 @@ package epsa.storage
 
 import epsa.I18N.Strings
 import epsa.model.Savings
+import epsa.model.Savings.{Event, UnavailabilityPeriod}
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
@@ -14,9 +15,10 @@ import scala.concurrent.Await
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.Success
-import slick.driver.H2Driver.api._
-import slick.driver.H2Driver.backend.DatabaseDef
+import slick.jdbc.H2Profile.api._
+import slick.jdbc.H2Profile.backend.DatabaseDef
 import slick.jdbc.meta.MTable
+import slick.lifted.{PrimaryKey, ProvenShape}
 import suiryc.scala.concurrent.RichFuture
 import suiryc.scala.concurrent.RichFuture.Action
 import suiryc.scala.javafx.concurrent.JFXSystem
@@ -59,9 +61,9 @@ object DataStore {
   protected case class DBTemp(db: DatabaseDef) {
 
     /** Changes applied since creation. */
-    var changes = Map[DataStoreTable, Seq[DBChange[_]]]()
+    var changes: Map[DataStoreTable, Seq[DBChange[_]]] = Map[DataStoreTable, Seq[DBChange[_]]]()
 
-    def hasPendingChanges = changes.nonEmpty
+    def hasPendingChanges: Boolean = changes.nonEmpty
 
     def resetChanges(table: DataStoreTable): Unit =
       changes -= table
@@ -452,9 +454,9 @@ object DataStore {
     protected type Entry = (String, String)
 
     protected class Entries(tag: Tag) extends Table[Entry](tag, tableName) {
-      def key = column[String]("key", O.PrimaryKey)
-      def value = column[String]("value")
-      def * = (key, value)
+      def key: Rep[String] = column[String]("key", O.PrimaryKey)
+      def value: Rep[String] = column[String]("value")
+      def * : ProvenShape[(String, String)] = (key, value)
     }
 
     override protected val entries = TableQuery[Entries]
@@ -490,9 +492,9 @@ object DataStore {
     protected type Entry = (Long, Savings.Event)
 
     protected class Entries(tag: Tag) extends Table[Entry](tag, tableName) {
-      def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
-      def event = column[Savings.Event]("event")
-      def * = (id, event)
+      def id: Rep[Long] = column[Long]("id", O.PrimaryKey, O.AutoInc)
+      def event: Rep[Event] = column[Savings.Event]("event")
+      def * : ProvenShape[(Long, Event)] = (id, event)
     }
 
     override protected val entries = TableQuery[Entries]
@@ -544,10 +546,10 @@ object DataStore {
     implicit protected object EntryShape extends CaseClassShape(LiftedEntry.tupled, Entry.tupled)
 
     protected class Entries(tag: Tag) extends Table[Entry](tag, tableName) {
-      def fundId = column[UUID]("fundId")
-      def date = column[LocalDate]("date")
-      def value = column[BigDecimal]("value", O.SqlType("DECIMAL(21,6)"))
-      def pk = primaryKey("pk", (fundId, date))
+      def fundId: Rep[UUID] = column[UUID]("fundId")
+      def date: Rep[LocalDate] = column[LocalDate]("date")
+      def value: Rep[BigDecimal] = column[BigDecimal]("value", O.SqlType("DECIMAL(21,6)"))
+      def pk: PrimaryKey = primaryKey("pk", (fundId, date))
       def * = LiftedEntry(fundId, LiftedAssetValue(date, value))
     }
 
@@ -655,10 +657,10 @@ object DataStore {
     protected type Entry = Savings.UnavailabilityPeriod
 
     protected class Entries(tag: Tag) extends Table[Entry](tag, tableName) {
-      def id = column[String]("id", O.PrimaryKey)
-      def years = column[Int]("years")
-      def month = column[Option[Month]]("month")
-      def * = (id, years, month) <> (Savings.UnavailabilityPeriod.tupled, Savings.UnavailabilityPeriod.unapply)
+      def id: Rep[String] = column[String]("id", O.PrimaryKey)
+      def years: Rep[Int] = column[Int]("years")
+      def month: Rep[Option[Month]] = column[Option[Month]]("month")
+      def * : ProvenShape[UnavailabilityPeriod] = (id, years, month) <> (Savings.UnavailabilityPeriod.tupled, Savings.UnavailabilityPeriod.unapply)
     }
 
     override protected val entries = TableQuery[Entries]

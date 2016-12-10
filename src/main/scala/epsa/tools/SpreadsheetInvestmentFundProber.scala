@@ -78,7 +78,7 @@ object SpreadsheetInvestmentFundProber extends InvestmentFundProber {
       // There should ba at least one row, and at least 2 columns
       (table.getRowCount > 0) && (table.getColumnCount >= 2)
     }.map { table =>
-      import scala.collection.JavaConversions._
+      import scala.collection.JavaConverters._
       // Cell 0 contains the date and cell 1 the value at the given date
       val dateCellIdx = 0
       val valueCellIdx = 1
@@ -90,7 +90,7 @@ object SpreadsheetInvestmentFundProber extends InvestmentFundProber {
       // See:
       //  https://issues.apache.org/jira/browse/ODFTOOLKIT-378
       //  https://issues.apache.org/jira/browse/ODFTOOLKIT-388
-      val values = table.getRowIterator.takeWhile { row =>
+      val values = table.getRowIterator.asScala.takeWhile { row =>
         Option(row.getCellByIndex(dateCellIdx).getDisplayText).exists(_.trim.nonEmpty)
       }.toList.map { row =>
         val date = try {

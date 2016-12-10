@@ -16,14 +16,12 @@ import javafx.fxml.{FXML, FXMLLoader}
 import javafx.scene.Node
 import javafx.scene.control.{ButtonType, ComboBox, Dialog, TextArea}
 import javafx.stage.{FileChooser, Stage, Window, WindowEvent}
-import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
 import scala.io.Source
 import suiryc.scala.javafx.beans.value.RichObservableValue._
-import suiryc.scala.javafx.event.EventHandler._
 import suiryc.scala.javafx.scene.control.{Dialogs, ListCellEx}
 import suiryc.scala.javafx.stage.{FileChoosers, Stages}
 import suiryc.scala.javafx.stage.Stages.StageLocation
-import suiryc.scala.javafx.util.Callback
 import suiryc.scala.settings.Preference
 
 class LeviesController extends Logging {
@@ -51,7 +49,7 @@ class LeviesController extends Logging {
     // Note: we need to tell the combobox how to display both the 'button' area
     // (what is shown as selected) and the content (list of choices).
     leviesField.setButtonCell(new LeviesCell)
-    leviesField.setCellFactory(Callback { new LeviesCell })
+    leviesField.setCellFactory(_ => new LeviesCell)
 
     val json = Awaits.readAppSetting(Some(stage), AppSettings.KEY_LEVIES).getOrElse(None).getOrElse("")
     currentLeviesAndJson = LeviesAndJson(savings.levies, json)
@@ -65,7 +63,7 @@ class LeviesController extends Logging {
       // from this path. Then we drop everything after '!'.
       val jar = new JarFile(new URL(leviesPath.getPath).getFile.split('!').head)
       // Then filter entries to only get json files inside the subfolder
-      jar.entries().toList.filter(_.getName.matches("(?i)^/?levies/[^/]+\\.json$")).map { entry =>
+      jar.entries().asScala.toList.filter(_.getName.matches("(?i)^/?levies/[^/]+\\.json$")).map { entry =>
         (entry, Source.fromInputStream(jar.getInputStream(entry), "UTF-8").mkString)
       }
     } else {
@@ -91,7 +89,7 @@ class LeviesController extends Logging {
     val allLevies = currentLeviesAndJson :: otherLevies :::
       (if (currentLeviesAndJson.levies == Levies.empty) Nil
       else List(LeviesAndJson(Levies.empty, "")))
-    leviesField.getItems.setAll(FXCollections.observableList(allLevies))
+    leviesField.getItems.setAll(FXCollections.observableList(allLevies.asJava))
     leviesField.getSelectionModel.select(currentLeviesAndJson)
     onLevies(null)
   }
@@ -158,7 +156,7 @@ class LeviesController extends Logging {
         leviesField.getSelectionModel.select(entry)
         onLevies(null)
       } catch {
-        case ex: Exception =>
+        case _: Exception =>
           Dialogs.warning(
             owner = Some(stage),
             title = None,
@@ -220,7 +218,7 @@ object LeviesController {
       controller.restoreView()
     }
 
-    dialog.setResultConverter(Callback { resultConverter(window, controller) _ })
+    dialog.setResultConverter(resultConverter(window, controller) _)
     Stages.trackMinimumDimensions(Stages.getStage(dialog))
 
     dialog

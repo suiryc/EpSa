@@ -15,13 +15,12 @@ import javafx.scene.image.ImageView
 import javafx.scene.input.{MouseButton, MouseEvent, ScrollEvent}
 import javafx.scene.layout.{AnchorPane, Region}
 import javafx.scene.shape.{Line, Rectangle}
-import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import suiryc.scala.concurrent.Cancellable
 import suiryc.scala.javafx.beans.value.RichObservableValue
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.concurrent.JFXSystem
-import suiryc.scala.javafx.event.EventHandler._
 import suiryc.scala.javafx.geometry.BoundsEx
 import suiryc.scala.javafx.scene.control.{ScrollOffsetPosition, Scrolls}
 import suiryc.scala.math.BigDecimals._
@@ -36,8 +35,8 @@ trait ChartSeriesData {
 object ChartSeriesData {
   def apply(date0: LocalDate, value0: BigDecimal): ChartSeriesData =
     new ChartSeriesData {
-      override val date = date0
-      override val value = value0
+      override val date: LocalDate = date0
+      override val value: BigDecimal = value0
     }
 }
 
@@ -412,7 +411,7 @@ class ChartHandler[A <: ChartMark](
     // the parent anchor pane) if necessary. Also take into account elements
     // around the chart (like y axis, padding etc).
     val viewedBounds = getChartBackgroundViewedBounds()
-    val data = series.getData.map(v => math.round(v.getXValue.doubleValue))
+    val data = series.getData.asScala.map(v => math.round(v.getXValue.doubleValue))
     val range =
       if (data.isEmpty) 0
       else data.max - data.min
@@ -420,7 +419,7 @@ class ChartHandler[A <: ChartMark](
     val widthParent = anchorPane.getWidth
     val width = xAxis.getWidth
     val widthExtra = widthParent - width
-    val widthExpected = math.max(viewedBounds.getWidth - widthExtra, round(zoomedRange))
+    val widthExpected = math.max(viewedBounds.getWidth - widthExtra, round(zoomedRange).toDouble)
     if ((widthParent > 0) && (width > 0) && (width != widthExpected)) {
       val newWidth = widthExpected + widthExtra
       // Notes:
@@ -445,7 +444,7 @@ class ChartHandler[A <: ChartMark](
    * Applies body code, expecting it to change view, and track view changes
    * to re-apply code if requested.
    */
-  private def changeView(track: Boolean = false)(body: => Unit): Unit = {
+  private def changeView(track: Boolean)(body: => Unit): Unit = {
     body
 
     if (track) {
@@ -464,6 +463,7 @@ class ChartHandler[A <: ChartMark](
       epsa.Main.Akka.system.scheduler.scheduleOnce(500.milliseconds) {
         cancellable.cancel()
       }(epsa.Main.Akka.dispatcher)
+      ()
     }
   }
 
@@ -501,7 +501,7 @@ class ChartHandler[A <: ChartMark](
       List(marker.verticalLine, marker.region)
     }
     markers = Map.empty
-    anchorPane.getChildren.removeAll(remove)
+    anchorPane.getChildren.removeAll(remove.toList.asJava)
 
     val bounds = getChartBackgroundBounds
     markers = meta.marks.map { case (date, mark) =>
@@ -533,10 +533,10 @@ class ChartHandler[A <: ChartMark](
         Tooltip.install(markRegion, new Tooltip(s"${dateFormatter.format(date)}\n$comment"))
       }
 
-      markRegion.setOnMouseEntered { (_: MouseEvent) =>
+      markRegion.setOnMouseEntered { _ =>
         meta.marksHandler(ChartMarkEvent.Entered, mark)
       }
-      markRegion.setOnMouseExited { (_: MouseEvent) =>
+      markRegion.setOnMouseExited { _ =>
         meta.marksHandler(ChartMarkEvent.Exited, mark)
       }
 
@@ -586,7 +586,7 @@ class ChartHandler[A <: ChartMark](
     val add = markers.values.flatMap { marker =>
       List(marker.verticalLine, marker.region)
     }
-    anchorPane.getChildren.addAll(add)
+    anchorPane.getChildren.addAll(add.toList.asJava)
 
     // Requesting layout (in 'runLater') triggers marker drawing (which
     // otherwise sometimes is done next time something happens in pane).
@@ -641,7 +641,7 @@ class ChartHandler[A <: ChartMark](
   }
 
   /** Apply zoom value and keep xIdx data at given x position in view. */
-  private def zoomOn(zoom: BigDecimal, x: Double, xIdx: Double): Unit = {
+  private def zoomOn(zoom: BigDecimal, x: Double, xIdx: Long): Unit = {
     if (zoom != xZoom) {
       xZoom = zoom
       // Note: we want to keep the zoom 'center' (mouse position) where it is.
@@ -650,20 +650,20 @@ class ChartHandler[A <: ChartMark](
       // xCenterIdx = xIdx - xOffset / xZoom
       val viewedBounds = getChartBackgroundViewedBounds()
       val xOffset = x - (viewedBounds.getMinX + viewedBounds.getMaxX) / 2
-      val xCenterIdx = (xIdx - xOffset / xZoom).doubleValue
+      val xCenterIdx = round(xIdx - xOffset / xZoom)
       refreshView(resetData = false)
       centerOnXIdx(xCenterIdx, track = true)
     }
   }
 
   /** Gets current 'x' index at chart center. */
-  private def getCenterXIdx: Double = {
+  private def getCenterXIdx: Long = {
     val viewedBounds = getChartBackgroundViewedBounds()
     getXIdxReal(getChartBackgroundBounds, (viewedBounds.getMinX + viewedBounds.getMaxX) / 2)
   }
 
   /** Centers chart on requested 'x' index. */
-  private def centerOnXIdx(xIdx: Double, track: Boolean = false): Unit = {
+  private def centerOnXIdx(xIdx: Long, track: Boolean = false): Unit = {
     changeView(track) {
       val hoffset = getX(getChartBackgroundBounds, xIdx)
       val hvalue = Scrolls.computeHValue(chartPane, hoffset, ScrollOffsetPosition.Middle)
@@ -740,10 +740,10 @@ class ChartHandler[A <: ChartMark](
     pixelCenter(v) - 0.5
 
   /** Gets chart 'x' index for given position. */
-  private def getXIdxReal(bounds: Bounds, x: Double): Double = {
+  private def getXIdxReal(bounds: Bounds, x: Double): Long = {
     // Note: x is relative to the chart, while xAxis works
     // relatively to the background. So adjust.
-    xAxis.getValueForDisplay(x - bounds.getMinX).doubleValue
+    math.round(xAxis.getValueForDisplay(x - bounds.getMinX).doubleValue)
   }
 
   /** Gets chart 'x' nearest value for given position. */
@@ -767,7 +767,7 @@ class ChartHandler[A <: ChartMark](
   }
 
   /** Gets 'x' position for given chart value. */
-  private def getX(bounds: Bounds, xIdx: Double): Double =
+  private def getX(bounds: Bounds, xIdx: Long): Double =
   // Note: x is relative to the chart, while xAxis works
   // relatively to the background. So adjust.
     bounds.getMinX + xAxis.getDisplayPosition(xIdx)
@@ -912,7 +912,7 @@ class ChartHandler[A <: ChartMark](
    *
    * Also updates zoom 'highlight' zone and label.
    */
-  private def drawLines(event: MouseEvent, xIdx: Option[Long] = None): Unit = {
+  private def drawLines(event: MouseEvent, xIdx: Option[Long]): Unit = {
     val bounds = getChartBackgroundBounds
 
     xIdx.orElse(getXIdx(bounds, event.getX)).foreach { xIdx =>
@@ -1015,6 +1015,7 @@ class ChartHandler[A <: ChartMark](
           zoomZone.setVisible(true)
         }
       }
+      ()
     }
   }
 
@@ -1073,7 +1074,7 @@ class ChartHandler[A <: ChartMark](
 
         // Note: actual minimal zoom depends on data dates range and viewed bounds
         val viewedBounds = getChartBackgroundViewedBounds()
-        val data = series.getData.map(v => math.round(v.getXValue.doubleValue))
+        val data = series.getData.asScala.map(v => math.round(v.getXValue.doubleValue))
         val range =
           if (data.isEmpty) 0
           else data.max - data.min
@@ -1096,6 +1097,7 @@ class ChartHandler[A <: ChartMark](
         zoomOn(zoom, event.getX, xIdx)
       }
     }
+    ()
   }
 
   /**
@@ -1136,6 +1138,7 @@ class ChartHandler[A <: ChartMark](
         }
       }
     }
+    ()
   }
 
 }

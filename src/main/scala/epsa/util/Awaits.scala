@@ -121,6 +121,7 @@ object Awaits {
     orError(DataStore.AssetHistory.cleanup(fundIds), owner, DataStore.cleanupIssueMsg) match {
       case Success(v) =>
         if (v.nonEmpty) Dialogs.information(owner = owner, title = None, headerText = None, contentText = Some(DataStore.cleanupMsg))
+        ()
 
       case _ =>
         // Failure was already notified

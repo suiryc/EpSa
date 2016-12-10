@@ -10,7 +10,6 @@ import javafx.scene.control.{ContentDisplay, Label, TableColumn, Tooltip}
 import javafx.scene.image.ImageView
 import javafx.scene.layout.{HBox, Region}
 import scala.collection.immutable.ListMap
-import suiryc.scala.javafx.util.Callback
 import suiryc.scala.math.Ordering.localDateOrdering
 import suiryc.scala.util.Comparators
 
@@ -34,7 +33,7 @@ trait AssetField[A] {
   /** The details pane label (where value is displayed). */
   // Note: the label is cached so that all tabs (savings on various dates)
   // can display their respective details.
-  lazy val detailsValue = AssetField.detailsLabels.get(key) match {
+  lazy val detailsValue: Label = AssetField.detailsLabels.get(key) match {
     case Some(label) =>
       label
 
@@ -85,7 +84,7 @@ case class AssetTextField(key: String, columnIdx: Int, tableLabel: String, detai
   override val comment: (AssetDetails) => Option[String] = { _ => None }
 ) extends AssetField[String] {
   val column = new TableColumn[AssetDetails, String](tableLabel)
-  column.setCellValueFactory(Callback { data =>
+  column.setCellValueFactory(data => {
     new SimpleStringProperty(format(data.getValue))
   })
 }
@@ -96,10 +95,10 @@ case class AssetDateField(key: String, columnIdx: Int, tableLabel: String, detai
   value: (AssetDetails) => Option[LocalDate]
 ) extends AssetField[AssetDetails] {
   val column = new TableColumn[AssetDetails, AssetDetails](tableLabel)
-  column.setCellValueFactory(Callback { data =>
+  column.setCellValueFactory(data => {
     new SimpleObjectProperty(data.getValue)
   })
-  column.setCellFactory(Callback { new FormatCell[AssetDetails, AssetDetails](format) })
+  column.setCellFactory(_ => new FormatCell[AssetDetails, AssetDetails](format))
   column.setComparator(AssetField.dateComparator(value))
 }
 
@@ -110,14 +109,14 @@ case class AssetNumberField(key: String, columnIdx: Int, tableLabel: String, det
   override val warning: (AssetDetails) => Option[String] = { _ => None }
 ) extends AssetField[AssetDetails] {
   val column = new TableColumn[AssetDetails, AssetDetails](tableLabel)
-  column.setCellValueFactory(Callback { data =>
+  column.setCellValueFactory(data => {
     new SimpleObjectProperty(data.getValue)
   })
-  val warning0 = warning
-  column.setCellFactory(Callback {
+  val warning0: (AssetDetails) => Option[String] = warning
+  column.setCellFactory(_ => {
     new FormatCell[AssetDetails, AssetDetails](format) with WarningCell[AssetDetails] {
       getStyleClass.add(JFXStyles.CLASS_VALUE_NUMBER)
-      override def warning(v: AssetDetails) = warning0(v)
+      override def warning(v: AssetDetails): Option[String] = warning0(v)
     }
   })
   column.setComparator(AssetField.numberComparator(value))
@@ -130,16 +129,16 @@ case class AssetColoredNumberField(key: String, columnIdx: Int, tableLabel: Stri
   override val warning: (AssetDetails) => Option[String] = { _ => None }
 ) extends AssetField[AssetDetails] {
   val column = new TableColumn[AssetDetails, AssetDetails](tableLabel)
-  column.setCellValueFactory(Callback { data =>
+  column.setCellValueFactory(data => {
     new SimpleObjectProperty(data.getValue)
   })
-  val value0 = value
-  val warning0 = warning
-  column.setCellFactory(Callback {
+  val value0: (AssetDetails) => Option[BigDecimal] = value
+  val warning0: (AssetDetails) => Option[String] = warning
+  column.setCellFactory(_ => {
     new FormatCell[AssetDetails, AssetDetails](format) with ColoredCell[AssetDetails] with WarningCell[AssetDetails] {
       getStyleClass.add(JFXStyles.CLASS_VALUE_NUMBER)
-      override def value(v: AssetDetails) = value0(v)
-      override def warning(v: AssetDetails) = warning0(v)
+      override def value(v: AssetDetails): Option[BigDecimal] = value0(v)
+      override def warning(v: AssetDetails): Option[String] = warning0(v)
     }
   })
   column.setComparator(AssetField.numberComparator(value))
@@ -182,7 +181,7 @@ object AssetField {
   // upon reloading view.
   // Order here is the one the fields will appear in the asset details pane
   // and table columns.
-  def fields() = List(
+  def fields(): ListMap[String, AssetField[_]] = List(
     AssetTextField(KEY_SCHEME, 0, Strings.scheme, Strings.schemeColon,
       AssetField.formatScheme, AssetField.schemeComment),
     AssetTextField(KEY_FUND, 0, Strings.fund, Strings.fundColon,
@@ -217,56 +216,50 @@ object AssetField {
     field.key -> field
   }.foldLeft(ListMap.empty[String, AssetField[_]])(_ + _)
 
-  val bigDecimalComparator = Comparators.optionComparator[BigDecimal]
-  val localDateComparator = Comparators.optionComparator[LocalDate]
+  val bigDecimalComparator: Comparator[Option[BigDecimal]] = Comparators.optionComparator[BigDecimal]
+  val localDateComparator: Comparator[Option[LocalDate]] = Comparators.optionComparator[LocalDate]
 
   def numberComparator(value: AssetDetails => Option[BigDecimal]): Comparator[AssetDetails] = {
-    new Comparator[AssetDetails] {
-      override def compare(o1: AssetDetails, o2: AssetDetails): Int =
-        bigDecimalComparator.compare(value(o1), value(o2))
-    }
+    (o1: AssetDetails, o2: AssetDetails) => bigDecimalComparator.compare(value(o1), value(o2))
   }
   def dateComparator(value: AssetDetails => Option[LocalDate]): Comparator[AssetDetails] = {
-    new Comparator[AssetDetails] {
-      override def compare(o1: AssetDetails, o2: AssetDetails): Int =
-        localDateComparator.compare(value(o1), value(o2))
-    }
+    (o1: AssetDetails, o2: AssetDetails) => localDateComparator.compare(value(o1), value(o2))
   }
 
-  def formatScheme(details: AssetDetails) = details.scheme.name
-  def schemeComment(details: AssetDetails) = details.scheme.comment
-  def formatFund(details: AssetDetails) = details.fund.name
-  def fundComment(details: AssetDetails) = details.fund.comment
-  def formatAvailability(details: AssetDetails) = details.formatAvailability
-  def availability(details: AssetDetails) = details.availability
-  def formatUnits(details: AssetDetails) = details.formatUnits
+  def formatScheme(details: AssetDetails): String = details.scheme.name
+  def schemeComment(details: AssetDetails): Option[String] = details.scheme.comment
+  def formatFund(details: AssetDetails): String = details.fund.name
+  def fundComment(details: AssetDetails): Option[String] = details.fund.comment
+  def formatAvailability(details: AssetDetails): String = details.formatAvailability
+  def availability(details: AssetDetails): Option[LocalDate] = details.availability
+  def formatUnits(details: AssetDetails): String = details.formatUnits
   def units(details: AssetDetails) = Some(details.units)
-  def formatVWAP(details: AssetDetails) = details.formatVWAP
+  def formatVWAP(details: AssetDetails): String = details.formatVWAP
   def vwap(details: AssetDetails) = Some(details.vwap)
-  def formatDate(details: AssetDetails) = details.formatDate
-  def date(details: AssetDetails) = details.date
-  def formatNAV(details: AssetDetails) = details.formatNAV
-  def nav(details: AssetDetails) = details.nav
-  def formatInvestedAmount(details: AssetDetails) = details.formatInvestedAmount
+  def formatDate(details: AssetDetails): String = details.formatDate
+  def date(details: AssetDetails): Option[LocalDate] = details.date
+  def formatNAV(details: AssetDetails): String = details.formatNAV
+  def nav(details: AssetDetails): Option[BigDecimal] = details.nav
+  def formatInvestedAmount(details: AssetDetails): String = details.formatInvestedAmount
   def investedAmount(details: AssetDetails) = Some(details.investedAmount)
-  def formatGrossAmount(details: AssetDetails) = details.formatGrossAmount
-  def grossAmount(details: AssetDetails) = details.grossAmount
-  def grossAmountWarning(details: AssetDetails) = Option(details.grossAmountWarning.mkString("\n")).filterNot(_.isEmpty)
-  def leviesWarning(details: AssetDetails) = Option {
+  def formatGrossAmount(details: AssetDetails): String = details.formatGrossAmount
+  def grossAmount(details: AssetDetails): Option[BigDecimal] = details.grossAmount
+  def grossAmountWarning(details: AssetDetails): Option[String] = Option(details.grossAmountWarning.mkString("\n")).filterNot(_.isEmpty)
+  def leviesWarning(details: AssetDetails): Option[String] = Option {
     (details.grossAmountWarning ::: details.leviesWarning).distinct.mkString("\n")
   }.filterNot(_.isEmpty)
-  def formatLeviesAmount(details: AssetDetails) = details.formatLeviesAmount
-  def leviesAmount(details: AssetDetails) = details.leviesAmount
-  def formatNetAmount(details: AssetDetails) = details.formatNetAmount
-  def netAmount(details: AssetDetails) = details.netAmount
-  def formatGrossGain(details: AssetDetails) = details.formatGrossGain
-  def grossGain(details: AssetDetails) = details.grossGain
-  def formatGrossGainPct(details: AssetDetails) = details.formatGrossGainPct
-  def grossGainPct(details: AssetDetails) = details.grossGainPct
-  def formatNetGain(details: AssetDetails) = details.formatNetGain
-  def netGain(details: AssetDetails) = details.netGain
-  def formatNetGainPct(details: AssetDetails) = details.formatNetGainPct
-  def netGainPct(details: AssetDetails) = details.netGainPct
+  def formatLeviesAmount(details: AssetDetails): String = details.formatLeviesAmount
+  def leviesAmount(details: AssetDetails): Option[BigDecimal] = details.leviesAmount
+  def formatNetAmount(details: AssetDetails): String = details.formatNetAmount
+  def netAmount(details: AssetDetails): Option[BigDecimal] = details.netAmount
+  def formatGrossGain(details: AssetDetails): String = details.formatGrossGain
+  def grossGain(details: AssetDetails): Option[BigDecimal] = details.grossGain
+  def formatGrossGainPct(details: AssetDetails): String = details.formatGrossGainPct
+  def grossGainPct(details: AssetDetails): Option[BigDecimal] = details.grossGainPct
+  def formatNetGain(details: AssetDetails): String = details.formatNetGain
+  def netGain(details: AssetDetails): Option[BigDecimal] = details.netGain
+  def formatNetGainPct(details: AssetDetails): String = details.formatNetGainPct
+  def netGainPct(details: AssetDetails): Option[BigDecimal] = details.netGainPct
 
   // Note: there need to be distinct ImageView instances to display an image
   // more than once.

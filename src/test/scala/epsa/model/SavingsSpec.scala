@@ -725,11 +725,15 @@ class SavingsSpec extends WordSpec with Matchers {
     }
   }
 
-  private def checkFlattening(savings: Savings, event: Savings.Event): Unit =
+  private def checkFlattening(savings: Savings, event: Savings.Event): Unit = {
     savings.flattenEvents(List(event)) shouldBe List(event)
+    ()
+  }
 
-  private def checkFlattening(savings: Savings, process: List[Savings.Event], expected: List[Savings.Event]): Unit =
+  private def checkFlattening(savings: Savings, process: List[Savings.Event], expected: List[Savings.Event]): Unit = {
     savings.flattenEvents(process) shouldBe expected
+    ()
+  }
 
   private def checkAsset(date: LocalDate, savings: Savings, expectedAsset: Savings.Asset): Unit = {
     val foundAssetOpt = savings.findAsset(date, expectedAsset)
@@ -746,6 +750,7 @@ class SavingsSpec extends WordSpec with Matchers {
     val fund = savings.getFund(expectedAsset.fundId)
     fund.used shouldBe true
     fund.active shouldBe true
+    ()
   }
 
   private def checkSavings(date: LocalDate, savings0: Savings, expectedAssets: Savings.Asset*): Unit = {
@@ -765,11 +770,13 @@ class SavingsSpec extends WordSpec with Matchers {
         savings.assets.vwaps shouldBe expectedVWAPs
       }
     }
+    ()
   }
 
   private def checkEventSerialization(event: Savings.Event): Unit = {
     val format = Savings.JsonProtocol.EventJsonFormat
     format.read(format.write(event)) shouldBe event
+    ()
   }
 
 }

@@ -17,10 +17,10 @@ import javafx.event.ActionEvent
 import javafx.fxml.{FXML, FXMLLoader}
 import javafx.scene.{Parent, Scene}
 import javafx.scene.control._
-import javafx.scene.input.{InputEvent, MouseEvent}
+import javafx.scene.input.MouseEvent
 import javafx.scene.layout.AnchorPane
 import javafx.stage._
-import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
@@ -28,11 +28,9 @@ import suiryc.scala.concurrent.RichFuture._
 import suiryc.scala.math.Ordering._
 import suiryc.scala.settings.Preference
 import suiryc.scala.javafx.beans.value.RichObservableValue._
-import suiryc.scala.javafx.event.EventHandler._
 import suiryc.scala.javafx.scene.control.{Dialogs, TextFieldWithButton}
 import suiryc.scala.javafx.stage.Stages.StageLocation
 import suiryc.scala.javafx.stage.{FileChoosers, Stages}
-import suiryc.scala.javafx.util.Callback
 
 class NetAssetValueHistoryController {
 
@@ -75,11 +73,11 @@ class NetAssetValueHistoryController {
     // Note: we need to tell the combobox how to display both the 'button' area
     // (what is shown as selected) and the content (list of choices).
     fundField.setButtonCell(new FundCell)
-    fundField.setCellFactory(Callback { new FundCell })
+    fundField.setCellFactory(_ => new FundCell)
 
     val funds = savings.getFunds(associated = true)
     val entries = Form.buildOptions(funds.filter(!_.disabled), funds.filter(_.disabled))
-    fundField.setItems(FXCollections.observableList(entries))
+    fundField.setItems(FXCollections.observableList(entries.asJava))
 
     importButton.setDisable(funds.isEmpty)
     purgeButton.setDisable(funds.isEmpty)
@@ -211,7 +209,7 @@ class NetAssetValueHistoryController {
     changed: Seq[Savings.AssetValue] = Seq.empty,
     added: Seq[Savings.AssetValue] = Seq.empty
   ) {
-    lazy val cleaned = (changed ++ added).sortBy(_.date)
+    lazy val cleaned: Seq[Savings.AssetValue] = (changed ++ added).sortBy(_.date)
   }
 
   private def cleanHistory(current: Seq[Savings.AssetValue], update: Seq[Savings.AssetValue]): HistoryChanges = {
@@ -333,7 +331,7 @@ class NetAssetValueHistoryController {
         val editNAV = new CustomMenuItem(menuTextField, false)
         // Set text, and reset it when requested
         menuTextField.setText(text)
-        menuTextField.setOnButtonAction { (event: InputEvent) =>
+        menuTextField.setOnButtonAction { _ =>
           menuTextField.setText(text)
         }
         // Bind so that changing value allows to reset it
@@ -432,23 +430,23 @@ class NetAssetValueHistoryController {
 
     def setupTable(table: TableView[AssetEntry], headers: Seq[String], entries: AssetEntries): Unit = {
       val column1 = new TableColumn[AssetEntry, LocalDate](headers.head)
-      column1.setCellValueFactory(Callback { data =>
+      column1.setCellValueFactory(data => {
         new SimpleObjectProperty(data.getValue.date)
       })
       val columns = column1 +: headers.tail.zipWithIndex.map {
         case (header, idx) =>
           val column2 = new TableColumn[AssetEntry, BigDecimal](header)
-          column2.setCellValueFactory(Callback { data =>
+          column2.setCellValueFactory(data => {
             new SimpleObjectProperty(data.getValue.values(idx))
           })
           column2
       }
-      table.getColumns.setAll(columns)
-      table.setItems(FXCollections.observableList(entries))
+      table.getColumns.setAll(columns.asJava)
+      table.setItems(FXCollections.observableList(entries.asJava))
     }
 
-    val current = result.current.groupBy(_.date).mapValues(_.head).view.force
-    val updatedEntries = result.fundChanges.changed.map { changed =>
+    val current: Map[LocalDate, Savings.AssetValue] = result.current.groupBy(_.date).mapValues(_.head).view.force
+    val updatedEntries: Seq[AssetEntry] = result.fundChanges.changed.map { changed =>
       AssetEntry(changed.date, Seq(current(changed.date).value, changed.value))
     }
     val addedEntries = result.fundChanges.added.map { added =>
@@ -461,10 +459,10 @@ class NetAssetValueHistoryController {
     val fundLabel = root.lookup("#fundLabel").asInstanceOf[Label]
     val updatedLabel = root.lookup("#updatedLabel").asInstanceOf[Label]
     // Note: 'TabPane' does not lookup its own 'Tab's but only their content ...
-    val updatedTab = tabPane.getTabs.find(_.getId == "updatedTab").get
+    val updatedTab = tabPane.getTabs.asScala.find(_.getId == "updatedTab").get
     val updatedTable = root.lookup("#updatedTable").asInstanceOf[TableView[AssetEntry]]
     val addedLabel = root.lookup("#addedLabel").asInstanceOf[Label]
-    val addedTab = tabPane.getTabs.find(_.getId == "addedTab").get
+    val addedTab = tabPane.getTabs.asScala.find(_.getId == "addedTab").get
     val addedTable = root.lookup("#addedTable").asInstanceOf[TableView[AssetEntry]]
     val unchangedLabel = root.lookup("#unchangedLabel").asInstanceOf[Label]
 
@@ -520,7 +518,7 @@ object NetAssetValueHistoryController {
 
   private val navHistoryImportPath = Preference.from("nav.history.import.path", null:Path)
 
-  def title = Strings.navHistory
+  def title: String = Strings.navHistory
 
   /** Builds a dialog out of this controller. */
   def buildDialog(mainController: MainController, savings: Savings, fundId: Option[UUID], window: Window): Dialog[Boolean] = {
@@ -548,7 +546,7 @@ object NetAssetValueHistoryController {
       controller.restoreView()
     }
 
-    dialog.setResultConverter(Callback { resultConverter(mainController, window, controller) _ })
+    dialog.setResultConverter(resultConverter(mainController, window, controller) _)
     Stages.trackMinimumDimensions(Stages.getStage(dialog))
 
     dialog

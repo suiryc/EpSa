@@ -7,7 +7,6 @@ import javafx.fxml.{FXML, FXMLLoader}
 import javafx.scene.control.{ButtonType, ComboBox, Dialog, Slider}
 import javafx.stage.Window
 import suiryc.scala.javafx.stage.Stages
-import suiryc.scala.javafx.util.Callback
 import suiryc.scala.settings.{SettingSnapshot, SettingsSnapshot}
 import suiryc.scala.util.I18NLocale
 
@@ -54,11 +53,11 @@ class OptionsController {
     // Note: we need to tell the combobox how to display both the 'button' area
     // (what is shown as selected) and the content (list of choices).
     languageChoice.setButtonCell(new I18NLocaleCell)
-    languageChoice.setCellFactory(Callback { new I18NLocaleCell })
+    languageChoice.setCellFactory(_ => new I18NLocaleCell)
 
-    import scala.collection.JavaConversions._
+    import scala.collection.JavaConverters._
     val locales = I18N.locales.sortBy(_.displayName)
-    languageChoice.setItems(FXCollections.observableList(locales))
+    languageChoice.setItems(FXCollections.observableList(locales.asJava))
     locales.find(_.code == I18N.pref()).foreach { locale =>
       languageChoice.getSelectionModel.select(locale)
     }
@@ -69,19 +68,19 @@ class OptionsController {
     } else {
       currency :: settings.preferredCurrencies
     }
-    currencyChoice.setItems(FXCollections.observableList(currencies))
+    currencyChoice.setItems(FXCollections.observableList(currencies.asJava))
     currencyChoice.getSelectionModel.select(currency)
 
-    amountScale.setValue(settings.amountScale())
-    amountRounding.setItems(FXCollections.observableList(BigDecimal.RoundingMode.values.toList))
+    amountScale.setValue(settings.amountScale().toDouble)
+    amountRounding.setItems(FXCollections.observableList(BigDecimal.RoundingMode.values.toList.asJava))
     amountRounding.getSelectionModel.select(settings.amountRounding())
 
-    unitsScale.setValue(settings.unitsScale())
-    unitsRounding.setItems(FXCollections.observableList(BigDecimal.RoundingMode.values.toList))
+    unitsScale.setValue(settings.unitsScale().toDouble)
+    unitsRounding.setItems(FXCollections.observableList(BigDecimal.RoundingMode.values.toList.asJava))
     unitsRounding.getSelectionModel.select(settings.unitsRounding())
 
-    vwapScale.setValue(settings.vwapScale())
-    vwapRounding.setItems(FXCollections.observableList(BigDecimal.RoundingMode.values.toList))
+    vwapScale.setValue(settings.vwapScale().toDouble)
+    vwapRounding.setItems(FXCollections.observableList(BigDecimal.RoundingMode.values.toList.asJava))
     vwapRounding.getSelectionModel.select(settings.vwapRounding())
   }
 
@@ -139,7 +138,7 @@ object OptionsController {
     val controller = loader.getController[OptionsController]
     controller.initialize(snapshot)
 
-    dialog.setResultConverter(Callback { resultConverter(snapshot, controller) _ })
+    dialog.setResultConverter(resultConverter(snapshot, controller) _)
     Stages.trackMinimumDimensions(Stages.getStage(dialog))
 
     dialog
