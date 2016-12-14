@@ -1,13 +1,13 @@
 package epsa.controllers
 
 import akka.actor.{Actor, ActorRef, Props}
+import com.typesafe.scalalogging.StrictLogging
 import epsa.I18N
 import epsa.I18N.Strings
 import epsa.charts.{ChartHandler, ChartMark, ChartMeta, ChartSettings}
 import epsa.model._
 import epsa.storage.DataStore
 import epsa.util.Awaits
-import grizzled.slf4j.Logging
 import java.io.PrintWriter
 import java.nio.file.Path
 import java.time.LocalDate
@@ -35,7 +35,7 @@ import suiryc.scala.settings.Preference
 //         - keep the necessary data (NAV on some dates) used to compute levies
 //         - way to determine if all levies of past fund assets were paid already, so that all NAVs can really be deleted ?
 // TODO: use scala-logging
-class MainController extends Logging {
+class MainController extends StrictLogging {
 
   import MainController._
 
@@ -175,7 +175,7 @@ class MainController extends Logging {
           val positions = dividerPositions.split(';').map(_.toDouble)
           splitPane.setDividerPositions(positions: _*)
         } catch {
-          case ex: Exception => warn(s"Could not restore SplitPane divider positions[$dividerPositions]: ${ex.getMessage}")
+          case ex: Exception => logger.warn(s"Could not restore SplitPane divider positions[$dividerPositions]: ${ex.getMessage}")
         }
       }
     }

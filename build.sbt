@@ -2,21 +2,21 @@ import sbt._
 import Keys._
 
 lazy val versions = Map[String, String](
-  "akka"         -> "2.4.14",
-  "epsa"         -> "1.0-SNAPSHOT",
-  "grizzled"     -> "1.3.0",
-  "h2"           -> "1.4.193",
-  "logback"      -> "1.1.8",
+  "akka"          -> "2.4.14",
+  "epsa"          -> "1.0-SNAPSHOT",
+  "h2"            -> "1.4.193",
+  "logback"       -> "1.1.8",
   // Remain on POI 3.14 until 4.0 because POI 3.15 made all functions to get Cell type deprecated ...
   // (one will get un-deprecated, unless POI developers become deprecated)
-  "poi"          -> "3.14",
-  "scala"        -> "2.12.1",
-  "scalatest"    -> "3.0.1",
-  "slf4j"        -> "1.7.21",
-  "slick"        -> "3.2.0-M2",
-  "simple-odf"   -> "0.8.1-incubating",
-  "spray-json"   -> "1.3.2",
-  "suiryc-scala" -> "0.0.2-SNAPSHOT"
+  "poi"           -> "3.14",
+  "scala"         -> "2.12.1",
+  "scala-logging" -> "3.5.0",
+  "scalatest"     -> "3.0.1",
+  "slf4j"         -> "1.7.21",
+  "slick"         -> "3.2.0-M2",
+  "simple-odf"    -> "0.8.1-incubating",
+  "spray-json"    -> "1.3.2",
+  "suiryc-scala"  -> "0.0.2-SNAPSHOT"
 )
 
 
@@ -69,26 +69,26 @@ lazy val epsa = project.in(file(".")).
     mainClass in assembly := Some("epsa.Main"),
 
     libraryDependencies ++= Seq(
-      "ch.qos.logback"        %  "logback-classic"                   % versions("logback"),
-      "com.h2database"        %  "h2"                                % versions("h2"),
-      "com.typesafe.akka"     %% "akka-actor"                        % versions("akka"),
-      "com.typesafe.akka"     %% "akka-slf4j"                        % versions("akka"),
-      "com.typesafe.slick"    %% "slick"                             % versions("slick"),
-      "io.spray"              %% "spray-json"                        % versions("spray-json"),
-      "org.apache.odftoolkit" %  "simple-odf"                        % versions("simple-odf")
+      "ch.qos.logback"             %  "logback-classic"                   % versions("logback"),
+      "com.h2database"             %  "h2"                                % versions("h2"),
+      "com.typesafe.akka"          %% "akka-actor"                        % versions("akka"),
+      "com.typesafe.akka"          %% "akka-slf4j"                        % versions("akka"),
+      "com.typesafe.scala-logging" %% "scala-logging"                     % versions("scala-logging"),
+      "com.typesafe.slick"         %% "slick"                             % versions("slick"),
+      "io.spray"                   %% "spray-json"                        % versions("spray-json"),
+      "org.apache.odftoolkit"      %  "simple-odf"                        % versions("simple-odf")
         exclude("commons-logging", "commons-logging")
         exclude("log4j", "log4j")
         exclude("org.slf4j", "slf4j-log4j12"),
-      "org.apache.poi"        %  "poi"                               % versions("poi"),
-      "org.apache.poi"        %  "poi-ooxml"                         % versions("poi"),
-      "org.clapper"           %% "grizzled-slf4j"                    % versions("grizzled"),
-      "org.scalatest"         %% "scalatest"                         % versions("scalatest")    % "test",
-      "org.slf4j"             %  "jcl-over-slf4j"                    % versions("slf4j"),
-      "org.slf4j"             %  "log4j-over-slf4j"                  % versions("slf4j"),
-      "org.slf4j"             %  "slf4j-api"                         % versions("slf4j"),
-      "suiryc"                %% "suiryc-scala-core"                 % versions("suiryc-scala"),
-      "suiryc"                %% "suiryc-scala-log"                  % versions("suiryc-scala"),
-      "suiryc"                %% "suiryc-scala-javafx"               % versions("suiryc-scala")
+      "org.apache.poi"             %  "poi"                               % versions("poi"),
+      "org.apache.poi"             %  "poi-ooxml"                         % versions("poi"),
+      "org.scalatest"              %% "scalatest"                         % versions("scalatest")    % "test",
+      "org.slf4j"                  %  "jcl-over-slf4j"                    % versions("slf4j"),
+      "org.slf4j"                  %  "log4j-over-slf4j"                  % versions("slf4j"),
+      "org.slf4j"                  %  "slf4j-api"                         % versions("slf4j"),
+      "suiryc"                     %% "suiryc-scala-core"                 % versions("suiryc-scala"),
+      "suiryc"                     %% "suiryc-scala-log"                  % versions("suiryc-scala"),
+      "suiryc"                     %% "suiryc-scala-javafx"               % versions("suiryc-scala")
     ),
 
     assemblyMergeStrategy in assembly := {

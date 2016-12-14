@@ -1,11 +1,11 @@
 package epsa.controllers
 
+import com.typesafe.scalalogging.StrictLogging
 import epsa.I18N
 import epsa.I18N.Strings
 import epsa.model.{Levies, Savings}
 import epsa.storage.DataStore._
 import epsa.util.Awaits
-import grizzled.slf4j.Logging
 import java.io.File
 import java.net.URL
 import java.nio.file.Path
@@ -24,7 +24,7 @@ import suiryc.scala.javafx.stage.{FileChoosers, Stages}
 import suiryc.scala.javafx.stage.Stages.StageLocation
 import suiryc.scala.settings.Preference
 
-class LeviesController extends Logging {
+class LeviesController extends StrictLogging {
 
   import LeviesController._
 
@@ -81,7 +81,7 @@ class LeviesController extends Logging {
         Some(LeviesAndJson(levies, str))
       } catch {
         case ex: Exception =>
-          warn(s"Could not parse <$entry> JSON levies: ${ex.getMessage}", ex)
+          logger.warn(s"Could not parse <$entry> JSON levies: ${ex.getMessage}", ex)
           None
       }
     }.filterNot(_.levies == currentLeviesAndJson.levies)

@@ -2,6 +2,7 @@ package epsa.controllers
 
 import akka.actor.Cancellable
 import com.sun.javafx.scene.control.skin.{TreeTableViewSkin, VirtualFlow, VirtualScrollBar}
+import com.typesafe.scalalogging.StrictLogging
 import epsa.{I18N, Settings}
 import epsa.I18N.Strings
 import epsa.Settings._
@@ -10,7 +11,6 @@ import epsa.controllers.MainController.State
 import epsa.model.Savings
 import epsa.util.{Awaits, JFXStyles}
 import epsa.util.JFXStyles.AnimationHighlighter
-import grizzled.slf4j.Logging
 import java.time.LocalDate
 import java.util.UUID
 import javafx.beans.property.SimpleObjectProperty
@@ -35,7 +35,7 @@ import suiryc.scala.math.Ordered._
 import suiryc.scala.math.Ordering._
 import suiryc.scala.settings.Preference
 
-class AccountHistoryController extends Logging {
+class AccountHistoryController extends StrictLogging {
 
   import AccountHistoryController._
 
@@ -264,7 +264,7 @@ class AccountHistoryController extends Logging {
         val positions = dividerPositions.split(';').map(_.toDouble)
         splitPane.setDividerPositions(positions: _*)
       } catch {
-        case ex: Exception => warn(s"Could not restore SplitPane divider positions[$dividerPositions]: ${ex.getMessage}")
+        case ex: Exception => logger.warn(s"Could not restore SplitPane divider positions[$dividerPositions]: ${ex.getMessage}")
       }
     }
 
@@ -636,7 +636,7 @@ class AccountHistoryController extends Logging {
       val leviesAmount = refundLevies.amount
       val leviesPct = scalePercents(leviesAmount * 100 / grossGain)
       if (savings.hasLevies && Settings.debug(Debug.LeviesComputation))
-        info(s"action=<refund> date=<${e.date}> id=<${part.id}> nav=<${part.value}> totalUnits=<$totalUnits> units=<${part.units}> investedAmount=<$investedAmount> grossAmount=<$grossAmount> grossGain=<$grossGain> refundLevies=<$refundLevies> leviesAmount=<${refundLevies.amount}> leviesPct=<$leviesPct>")
+        logger.info(s"action=<refund> date=<${e.date}> id=<${part.id}> nav=<${part.value}> totalUnits=<$totalUnits> units=<${part.units}> investedAmount=<$investedAmount> grossAmount=<$grossAmount> grossGain=<$grossGain> refundLevies=<$refundLevies> leviesAmount=<${refundLevies.amount}> leviesPct=<$leviesPct>")
       List(
         // $1=amount $2=fund $3=scheme
         AssetEventItem(index, e.date, Strings.assetEventRefundMain.format(

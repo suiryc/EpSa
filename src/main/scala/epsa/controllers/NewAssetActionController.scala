@@ -1,11 +1,11 @@
 package epsa.controllers
 
+import com.typesafe.scalalogging.StrictLogging
 import epsa.{I18N, Settings}
 import epsa.I18N.Strings
 import epsa.Settings._
 import epsa.model.Savings
 import epsa.util.{Awaits, JFXStyles}
-import grizzled.slf4j.Logging
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import javafx.event.ActionEvent
@@ -26,7 +26,7 @@ import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.scene.control.{DatePickers, TextFieldWithButton}
 import suiryc.scala.javafx.stage.Stages
 
-class NewAssetActionController extends Logging {
+class NewAssetActionController extends StrictLogging {
 
   import NewAssetActionController._
 
@@ -682,9 +682,9 @@ class NewAssetActionController extends Logging {
             if (savings.hasLevies) {
               lazy val msg = s"action=<refund> date=<$operationDate> id=<${schemeAndFund.id.toString(savings)}> nav=<$getSrcNAV> totalUnits=<$totalUnits> units=<$units> investedAmount=<$investedAmount> grossAmount=<$grossAmount> grossGain=<$grossGain> refundLevies=<$refundLevies> leviesAmount=<${refundLevies.amount}> leviesPct=<$leviesPct>"
               if (Settings.debug(Debug.LeviesHistory))
-                info(s"$msg debugInfo=<\n${refundLevies.debugInfo}\n>")
+                logger.info(s"$msg debugInfo=<\n${refundLevies.debugInfo}\n>")
               else if (Settings.debug(Debug.LeviesComputation))
-                info(msg)
+                logger.info(msg)
             }
             val warnings =
               if (refundLevies.warnings.isEmpty) ""
