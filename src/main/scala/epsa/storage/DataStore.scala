@@ -3,6 +3,7 @@ package epsa.storage
 import epsa.I18N.Strings
 import epsa.model.Savings
 import epsa.model.Savings.{Event, UnavailabilityPeriod}
+import java.io.FileNotFoundException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
@@ -175,7 +176,9 @@ object DataStore {
     else if (Files.exists(defaultPath)) {
       Some(changePath(defaultPath))
     } else {
-      None
+      // If last accessed data store does not exist (anymore), warn user
+      if (dbPathPref.option.isEmpty) None
+      else Some(Future.failed(new FileNotFoundException))
     }
   }
 
