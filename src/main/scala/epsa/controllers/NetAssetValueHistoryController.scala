@@ -69,6 +69,8 @@ class NetAssetValueHistoryController {
     SpreadsheetInvestmentFundProber
   )
 
+  private var working = false
+
   def initialize(savings: Savings, fundIdOpt: Option[UUID]): Unit = {
     // Note: we need to tell the combobox how to display both the 'button' area
     // (what is shown as selected) and the content (list of choices).
@@ -87,6 +89,19 @@ class NetAssetValueHistoryController {
     }.orElse(entries.flatten.headOption).foreach { fund =>
       fundField.getSelectionModel.select(Some(fund))
       loadHistory(fund)
+    }
+
+    // Lookup dialog buttons
+    val buttonOk = dialog.getDialogPane.lookupButton(ButtonType.OK)
+    val buttonCancel = dialog.getDialogPane.lookupButton(ButtonType.CANCEL)
+
+    // Ask confirmation before leaving if we are working
+    def confirmationFilter[A <: Event](event: A): Unit = {
+      if (working) Form.confirmDiscardPendingAction(Stages.getStage(dialog), event)
+      ()
+    }
+    for (button <- List(buttonOk, buttonCancel)) {
+      button.addEventFilter(ActionEvent.ACTION, confirmationFilter[ActionEvent] _)
     }
   }
 
@@ -111,9 +126,11 @@ class NetAssetValueHistoryController {
     // We do override this behaviour and need to close the dialog ourselves
     // if applicable.
     persistView()
-    val canClose =
-      if (changes.nonEmpty) Form.confirmDiscardPendingChanges(stage, event)
-      else true
+
+    def checkWorking = if (working) Form.confirmDiscardPendingAction(stage, event) else true
+    def checkPendingChanges = if (changes.nonEmpty) Form.confirmDiscardPendingChanges(stage, event) else true
+
+    val canClose = checkWorking && checkPendingChanges
     if (canClose) dialog.close()
   }
 
@@ -174,6 +191,8 @@ class NetAssetValueHistoryController {
   private def accessHistory[A](action: => Future[A], failureMsg: => String, successAction: A => Unit): Unit = {
     import suiryc.scala.javafx.concurrent.JFXExecutor.executor
 
+    working = true
+
     // Prepare to display progress indicator (if action takes too long)
     val showIndicator = epsa.Main.Akka.system.scheduler.scheduleOnce(500.milliseconds) {
       progressIndicator.toFront()
@@ -188,6 +207,7 @@ class NetAssetValueHistoryController {
         progressIndicator.toBack()
         progressIndicator.setVisible(false)
         successAction(result)
+        working = false
 
       case Failure(ex) =>
         showIndicator.cancel()
@@ -200,6 +220,7 @@ class NetAssetValueHistoryController {
           headerText = Some(failureMsg),
           ex = Some(ex)
         )
+        working = false
     }
   }
 

@@ -26,19 +26,19 @@ object Form {
     }.getOrElse(Strings.available)
 
   /**
-   * Asks user confirmation to discard pending changes.
+   * Asks user confirmation.
    *
    * If user does not confirm, the event is consumed.
    *
    * @param owner the dialog owner window
    * @param event the event that triggered the confirmation
-   * @return whether user confirmed discarding pending changes
+   * @return whether user confirmed
    */
-  def confirmDiscardPendingChanges(owner: Window, event: Event): Boolean = {
+  def askConfirmation(owner: Window, event: Event, msg: String): Boolean = {
     val resp = Dialogs.confirmation(
       owner = Some(owner),
       title = None,
-      headerText = Some(Strings.pendingChanges)
+      headerText = Some(msg)
     )
 
     if (!resp.contains(ButtonType.OK)) {
@@ -46,6 +46,20 @@ object Form {
       false
     }
     else true
+  }
+
+  /**
+   * Asks user confirmation to discard pending action.
+   */
+  def confirmDiscardPendingAction(owner: Window, event: Event): Boolean = {
+    askConfirmation(owner, event, Strings.pendingAction)
+  }
+
+  /**
+   * Asks user confirmation to discard pending changes.
+   */
+  def confirmDiscardPendingChanges(owner: Window, event: Event): Boolean = {
+    askConfirmation(owner, event, Strings.pendingChanges)
   }
 
   /**

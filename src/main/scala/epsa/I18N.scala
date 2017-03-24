@@ -88,6 +88,7 @@ object I18N extends suiryc.scala.util.I18N("i18n.epsa") with I18NWithPreference 
     def assetEventSchemeRenamed: String = getString("asset.event.scheme.renamed")
     def assetEventFundRenamed: String = getString("asset.event.fund.renamed")
     def leviesEstimation: String = getString("levies.estimation")
+    def pendingAction: String = getString("confirmation.pending-action")
     def pendingChanges: String = getString("confirmation.pending-changes")
     def confirmAction: String = getString("confirmation.action")
     def irreversibleAction: String = getString("confirmation.irreversible-action")
