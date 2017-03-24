@@ -35,6 +35,9 @@ class EditFundsController {
   protected var nameField: TextField = _
 
   @FXML
+  protected var amfIdField: TextField = _
+
+  @FXML
   protected var disabledCheckBox: CheckBox = _
 
   @FXML
@@ -91,7 +94,7 @@ class EditFundsController {
 
     // Re-check form when fund params are changed
     RichObservableValue.listen[AnyRef](
-      List(nameField.textProperty, disabledCheckBox.selectedProperty, commentField.textProperty),
+      List(nameField.textProperty, amfIdField.textProperty, disabledCheckBox.selectedProperty, commentField.textProperty),
       checkForm()
     )
 
@@ -144,7 +147,7 @@ class EditFundsController {
         event.consume()
       }
       else if (addReady && (event.getCharacter == "+")
-        && !nameField.isFocused && !commentField.isFocused)
+        && !nameField.isFocused && !amfIdField.isFocused && !commentField.isFocused)
       {
         onAdd(event)
         event.consume()
@@ -280,15 +283,16 @@ class EditFundsController {
         loop(1)
       }
       else nameField.getText.trim
+      val amfId = Form.textOrNone(amfIdField.getText)
       val disabled = disabledCheckBox.isSelected
       val comment = Form.textOrNone(commentField.getText)
 
-      val event = savings.createFundEvent(name, comment)
+      val event = savings.createFundEvent(name, amfId, comment)
       // Note: take into account the fact that flattening events will remove
       // unnecessary events; we can push an 'UpdateFund' with the 'disabled'
       // state without checking whether it is needed.
       val newEvents = event ::
-        Savings.UpdateFund(event.fundId, name, comment, disabled) ::
+        Savings.UpdateFund(event.fundId, name, amfId, comment, disabled) ::
         getSelectedSchemes.map { scheme =>
           Savings.AssociateFund(scheme.id, event.fundId)
         }
@@ -377,11 +381,12 @@ class EditFundsController {
     if (Events.isOnNode(event)) {
       edit.foreach { fund =>
         val name = nameField.getText.trim
+        val amfId = Form.textOrNone(amfIdField.getText)
         val disabled = disabledCheckBox.isSelected
         val comment = Form.textOrNone(commentField.getText)
         val event1 =
-          if (fund.copy(name = name, comment = comment, disabled = disabled) == fund) None
-          else Some(Savings.UpdateFund(fund.id, name, comment, disabled))
+          if (fund.copy(name = name, amfId = amfId, comment = comment, disabled = disabled) == fund) None
+          else Some(Savings.UpdateFund(fund.id, name, amfId, comment, disabled))
 
         val oldSchemes = savings.schemes.filter(_.funds.contains(fund.id)).map(_.id).toSet
         val newSchemes = getSelectedSchemes.map(_.id).toSet
@@ -467,6 +472,7 @@ class EditFundsController {
    */
   private def updateEditFields(fund: Savings.Fund): Unit = {
     nameField.setText(fund.name)
+    amfIdField.setText(fund.amfId.orNull)
     disabledCheckBox.setSelected(fund.disabled)
     disabledCheckBox.setDisable(fund.active)
     commentField.setText(fund.comment.orNull)
@@ -488,6 +494,7 @@ class EditFundsController {
    */
   private def resetEditFields(): Unit = {
     nameField.clear()
+    amfIdField.clear()
     commentField.clear()
   }
 
@@ -498,13 +505,14 @@ class EditFundsController {
    */
   private def checkForm(): Unit = {
     val name = nameField.getText.trim
+    val amfId = Form.textOrNone(amfIdField.getText)
     val disabled = disabledCheckBox.isSelected
     val comment = Form.textOrNone(commentField.getText)
     // Edition is OK if either name or schemes are changed.
     val editOk = edit.exists { fund =>
       val oldSchemes = savings.schemes.filter(_.funds.contains(fund.id)).map(_.id).toSet
       val newSchemes = getSelectedSchemes.map(_.id).toSet
-      (fund.copy(name = name, comment = comment, disabled = disabled) != fund) ||
+      (fund.copy(name = name, amfId = amfId, comment = comment, disabled = disabled) != fund) ||
         oldSchemes != newSchemes
     }
     val exists = savings.funds.exists(_.name.equalsIgnoreCase(name)) && !edit.exists(_.name.equalsIgnoreCase(name))

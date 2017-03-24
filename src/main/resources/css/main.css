@@ -110,3 +110,10 @@
 .custom-menu-item.header, .custom-menu-item.header:focused {
   -fx-background-color: derive(-fx-control-inner-background, -10%);
 }
+
+/* Disable padding inside dialog pane menu.
+ * Because JavaFx does not expect us to put a menu bar inside a dialog pane.
+ */
+.dialog-pane:no-header .menu-bar .graphic-container {
+    -fx-padding: 0 0 0 0;
+}

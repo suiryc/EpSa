@@ -290,13 +290,13 @@ object Savings extends StrictLogging {
       (name, comment, disabled).compare((other.name, other.comment, other.disabled))
   }
 
-  case class Fund(id: UUID, name: String, comment: Option[String],
+  case class Fund(id: UUID, name: String, amfId: Option[String], comment: Option[String],
     used: Boolean = false, active: Boolean = false, disabled: Boolean = false)
   {
     // See: http://stackoverflow.com/a/19348339
     import scala.math.Ordered.orderingToOrdered
     def compareParams(other: Fund): Int =
-      (name, comment, disabled).compare((other.name, other.comment, other.disabled))
+      (name, amfId, comment, disabled).compare((other.name, other.amfId, other.comment, other.disabled))
   }
 
   case class AssetId(schemeId: UUID, fundId: UUID) {
@@ -389,14 +389,14 @@ object Savings extends StrictLogging {
   case class DeleteScheme(schemeId: UUID)
     extends Event
 
-  case class CreateFund(fundId: UUID, name: String, comment: Option[String])
+  case class CreateFund(fundId: UUID, name: String, amfId: Option[String], comment: Option[String])
     extends Event
 
-  case class UpdateFund(fundId: UUID, name: String, comment: Option[String], disabled: Boolean)
+  case class UpdateFund(fundId: UUID, name: String, amfId: Option[String], comment: Option[String], disabled: Boolean)
     extends Event
 
   object UpdateFund {
-    def apply(fund: Fund): UpdateFund = UpdateFund(fund.id, fund.name, fund.comment, fund.disabled)
+    def apply(fund: Fund): UpdateFund = UpdateFund(fund.id, fund.name, fund.amfId, fund.comment, fund.disabled)
   }
 
   case class DeleteFund(fundId: UUID)
@@ -428,8 +428,8 @@ object Savings extends StrictLogging {
     implicit val createSchemeFormat: RootJsonFormat[CreateScheme] = jsonFormat3(CreateScheme)
     implicit val updateSchemeFormat: RootJsonFormat[UpdateScheme] = jsonFormat4(UpdateScheme.apply)
     implicit val deleteSchemeFormat: RootJsonFormat[DeleteScheme] = jsonFormat1(DeleteScheme)
-    implicit val createFundFormat: RootJsonFormat[CreateFund] = jsonFormat3(CreateFund)
-    implicit val updateFundFormat: RootJsonFormat[UpdateFund] = jsonFormat4(UpdateFund.apply)
+    implicit val createFundFormat: RootJsonFormat[CreateFund] = jsonFormat4(CreateFund)
+    implicit val updateFundFormat: RootJsonFormat[UpdateFund] = jsonFormat5(UpdateFund.apply)
     implicit val deleteFundFormat: RootJsonFormat[DeleteFund] = jsonFormat1(DeleteFund)
     implicit val associateFundFormat: RootJsonFormat[AssociateFund] = jsonFormat2(AssociateFund)
     implicit val dissociateFundFormat: RootJsonFormat[DissociateFund] = jsonFormat2(DissociateFund)
@@ -584,17 +584,17 @@ case class Savings(
     processEvents(events)
 
   def processEvent(event: Event): Savings = event match {
-    case CreateScheme(id, name, comment)               => createScheme(id, name, comment)
-    case UpdateScheme(id, name, comment, disabled)     => updateScheme(id, name, comment, disabled)
-    case DeleteScheme(id)                              => deleteScheme(id)
-    case CreateFund(id, name, comment)                 => createFund(id, name, comment)
-    case UpdateFund(id, name, comment, disabled)       => updateFund(id, name, comment, disabled)
-    case DeleteFund(id)                                => deleteFund(id)
-    case AssociateFund(schemeId, fundId)               => associateFund(schemeId, fundId)
-    case DissociateFund(schemeId, fundId)              => dissociateFund(schemeId, fundId)
-    case MakePayment(date, part, comment)              => computeAssets(date).makePayment(date, part, comment)
-    case MakeTransfer(date, partSrc, partDst, comment) => computeAssets(date).makeTransfer(date, partSrc, partDst, comment)
-    case MakeRefund(date, part, comment)               => computeAssets(date).makeRefund(date, part, comment)._1
+    case CreateScheme(id, name, comment)                => createScheme(id, name, comment)
+    case UpdateScheme(id, name, comment, disabled)      => updateScheme(id, name, comment, disabled)
+    case DeleteScheme(id)                               => deleteScheme(id)
+    case CreateFund(id, name, amfId, comment)           => createFund(id, name, amfId, comment)
+    case UpdateFund(id, name, amfId, comment, disabled) => updateFund(id, name, amfId, comment, disabled)
+    case DeleteFund(id)                                 => deleteFund(id)
+    case AssociateFund(schemeId, fundId)                => associateFund(schemeId, fundId)
+    case DissociateFund(schemeId, fundId)               => dissociateFund(schemeId, fundId)
+    case MakePayment(date, part, comment)               => computeAssets(date).makePayment(date, part, comment)
+    case MakeTransfer(date, partSrc, partDst, comment)  => computeAssets(date).makeTransfer(date, partSrc, partDst, comment)
+    case MakeRefund(date, part, comment)                => computeAssets(date).makeRefund(date, part, comment)._1
   }
 
   protected def createScheme(id: UUID, name: String, comment: Option[String]): Savings = {
@@ -613,14 +613,14 @@ case class Savings(
     copy(schemes = schemes.filterNot(_.id == id))
   }
 
-  protected def createFund(id: UUID, name: String, comment: Option[String]): Savings = {
-    copy(funds = funds :+ Fund(id, name, comment))
+  protected def createFund(id: UUID, name: String, amfId: Option[String], comment: Option[String]): Savings = {
+    copy(funds = funds :+ Fund(id, name, amfId, comment))
   }
 
-  protected def updateFund(id: UUID, name: String, comment: Option[String], disabled: Boolean): Savings = {
+  protected def updateFund(id: UUID, name: String, amfId: Option[String], comment: Option[String], disabled: Boolean): Savings = {
     val updated = funds.map { fund =>
       if (fund.id != id) fund
-      else fund.copy(name = name, comment = comment, disabled = disabled && !fund.active)
+      else fund.copy(name = name, amfId = amfId, comment = comment, disabled = disabled && !fund.active)
     }
     copy(funds = updated)
   }
@@ -815,9 +815,9 @@ case class Savings(
     CreateScheme(id, name, comment)
   }
 
-  def createFundEvent(name: String, comment: Option[String] = None): CreateFund = {
+  def createFundEvent(name: String, amfId: Option[String] = None, comment: Option[String] = None): CreateFund = {
     val id = newId(funds.map(_.id))
-    CreateFund(id, name, comment)
+    CreateFund(id, name, amfId, comment)
   }
 
   protected def newId(existing: List[UUID]): UUID = {
@@ -910,7 +910,7 @@ case class Savings(
     } ::: fundsRemainingOrdered.flatMap { newFund =>
       val oldFund = getFund(newFund.id)
       if (newFund.compareParams(oldFund) == 0) None
-      else Some(Savings.UpdateFund(newFund.id, newFund.name, newFund.comment, newFund.disabled))
+      else Some(Savings.UpdateFund(newFund.id, newFund.name, newFund.amfId, newFund.comment, newFund.disabled))
       // Note: association/dissociation to old, new or remaining schemes have
       // been taken care of already.
     } ::: schemesCreatedOrdered.map { scheme =>
@@ -918,7 +918,7 @@ case class Savings(
     } ::: schemesCreatedOrdered.filter(_.disabled).map { scheme =>
       Savings.UpdateScheme(scheme).copy(disabled = scheme.disabled)
     } ::: fundsCreatedOrdered.map { fund =>
-      Savings.CreateFund(fund.id, fund.name, fund.comment)
+      Savings.CreateFund(fund.id, fund.name, fund.amfId, fund.comment)
     } ::: fundsCreatedOrdered.filter(_.disabled).map { fund =>
       Savings.UpdateFund(fund).copy(disabled = fund.disabled)
     } ::: schemesCreatedOrdered.flatMap { scheme =>

@@ -1,10 +1,11 @@
 package epsa.tools
 
 import epsa.model.Savings
+import java.io.ByteArrayInputStream
 import java.nio.file.Path
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
-import org.apache.poi.ss.usermodel.WorkbookFactory
+import org.apache.poi.ss.usermodel.{Workbook, WorkbookFactory}
 import suiryc.scala.io.PathsEx
 
 /**
@@ -19,7 +20,7 @@ object EsaliaInvestmentFundProber extends InvestmentFundProber {
     val extension = PathsEx.extension(path).toLowerCase
     try {
       if ((extension == "xls") || (extension == "xlsx")) {
-        probeExcel(path)
+        probeExcel(WorkbookFactory.create(path.toFile))
       } else None
     } catch {
       case ex: Exception =>
@@ -28,7 +29,11 @@ object EsaliaInvestmentFundProber extends InvestmentFundProber {
     }
   }
 
-  private def probeExcel(path: Path): Option[Savings.AssetValueHistory] = {
+  def probe(raw: Array[Byte]): Option[Savings.AssetValueHistory] = {
+    probeExcel(WorkbookFactory.create(new ByteArrayInputStream(raw)))
+  }
+
+  private def probeExcel(book: Workbook): Option[Savings.AssetValueHistory] = {
     // Rows 0 to 5 contain general information or nothing
     // Row 1 contains the investment fund name
     // Row 5 indicates which data are listed: cell 4 shall contain the date
@@ -39,7 +44,7 @@ object EsaliaInvestmentFundProber extends InvestmentFundProber {
     val dataRowIdx = labelsRowIdx + 1
     val dateCellIdx = 4
     val valueCellIdx = 5
-    Some(WorkbookFactory.create(path.toFile)).filter { book =>
+    Some(book).filter { book =>
       // There should only be one sheet
       book.getNumberOfSheets == 1
     }.map { book =>

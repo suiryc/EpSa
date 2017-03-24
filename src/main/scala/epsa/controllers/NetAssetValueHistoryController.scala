@@ -6,14 +6,14 @@ import epsa.Settings.{formatCompactNumber, parseNumber}
 import epsa.charts._
 import epsa.model.Savings
 import epsa.storage.DataStore
-import epsa.tools.{BNPParibasInvestmentFundProber, EsaliaInvestmentFundProber, SpreadsheetInvestmentFundProber}
+import epsa.tools.{AmundiInvestmentFundDownloader, BNPParibasInvestmentFundProber, EsaliaInvestmentFundProber, SpreadsheetInvestmentFundProber}
 import epsa.util.{Awaits, JFXStyles}
 import java.nio.file.Path
 import java.time.LocalDate
 import java.util.UUID
 import javafx.beans.property.SimpleObjectProperty
 import javafx.collections.FXCollections
-import javafx.event.ActionEvent
+import javafx.event.{ActionEvent, Event}
 import javafx.fxml.{FXML, FXMLLoader}
 import javafx.scene.{Parent, Scene}
 import javafx.scene.control._
@@ -25,9 +25,11 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 import suiryc.scala.concurrent.RichFuture._
+import suiryc.scala.math.Ordered._
 import suiryc.scala.math.Ordering._
 import suiryc.scala.settings.Preference
 import suiryc.scala.javafx.beans.value.RichObservableValue._
+import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.javafx.scene.control.{Dialogs, TextFieldWithButton}
 import suiryc.scala.javafx.stage.Stages.StageLocation
 import suiryc.scala.javafx.stage.{FileChoosers, Stages}
@@ -48,6 +50,9 @@ class NetAssetValueHistoryController {
 
   @FXML
   protected var fundField: ComboBox[Option[Savings.Fund]] = _
+
+  @FXML
+  protected var downloadButton: Button = _
 
   @FXML
   protected var importButton: Button = _
@@ -71,7 +76,12 @@ class NetAssetValueHistoryController {
 
   private var working = false
 
-  def initialize(savings: Savings, fundIdOpt: Option[UUID]): Unit = {
+  def initialize(savings: Savings, dialog: Dialog[_], fundIdOpt: Option[UUID]): Unit = {
+    // JavaFx applies padding on dialog pane content.
+    // We can either add another CSS class to disable it, or simply remove the
+    // "content" class as it is only defined to apply padding.
+    dialog.getDialogPane.getContent.getStyleClass.remove("content")
+
     // Note: we need to tell the combobox how to display both the 'button' area
     // (what is shown as selected) and the content (list of choices).
     fundField.setButtonCell(new FundCell)
@@ -81,6 +91,7 @@ class NetAssetValueHistoryController {
     val entries = Form.buildOptions(funds.filter(!_.disabled), funds.filter(_.disabled))
     fundField.setItems(FXCollections.observableList(entries.asJava))
 
+    downloadButton.setDisable(funds.isEmpty)
     importButton.setDisable(funds.isEmpty)
     purgeButton.setDisable(funds.isEmpty)
 
@@ -134,8 +145,40 @@ class NetAssetValueHistoryController {
     if (canClose) dialog.close()
   }
 
+  def onDownloadNAVHistories(event: ActionEvent): Unit = {
+    import epsa.Main.Akka.dispatcher
+
+    // Remember currently selected fund
+    val currentFund = getFund
+    // Hide chart and selection
+    fundField.setValue(null)
+    Option(chartHandler).foreach(_.chartPane.setVisible(false))
+
+    // Process all concerned funds
+    val actions = fundField.getItems.iterator().asScala.toList.flatten.filter { fund =>
+      // We need an enabled fund with AMF id
+      fund.amfId.isDefined && !fund.disabled
+    }.map { fund =>
+      Action(downloadHistory(fund, chart = false))
+    }
+
+    executeSequentially(actions).onComplete { _ =>
+      // Time to get back to initially selected fund
+      JFXSystem.runLater {
+        fundField.getSelectionModel.select(currentFund)
+      }
+    }
+  }
+
   def onFund(event: ActionEvent): Unit = {
-    getFund.foreach(loadHistory)
+    getFund.foreach { fund =>
+      downloadButton.setDisable(fund.amfId.isEmpty)
+      loadHistory(fund)
+    }
+  }
+
+  def onDownload(event: ActionEvent): Unit = {
+    getFund.filter(_.amfId.isDefined).foreach(downloadHistory(_))
   }
 
   def onImport(event: ActionEvent): Unit = {
@@ -324,6 +367,31 @@ class NetAssetValueHistoryController {
     ImportResult(history.name, updated, importChanges)
   }
 
+  private def downloadHistory(fund: Savings.Fund, chart: Boolean = true): Future[ImportResult] = {
+    import epsa.Main.Akka.dispatcher
+
+    val action = DataStore.AssetHistory.readValues(fund.id).flatMap { current =>
+      // We want to start from last known date
+      val dateStart = current.lastOption.map(_.date)
+      if (dateStart.exists(_ < LocalDate.now.minusDays(1))) {
+        AmundiInvestmentFundDownloader.download(fund.amfId.get, dateStart = dateStart).map { history =>
+          updateHistory(fund, current, history)
+        }
+      } else {
+        // We actually are up to date
+        val history = Savings.AssetValueHistory(name = None)
+        Future.successful(updateHistory(fund, current, history))
+      }
+    }
+
+    accessHistory(
+      action = action,
+      // $1=fund
+      failureMsg = Strings.downloadNavHistoryError.format(fund.name),
+      successAction = showImportResult(fund, chart)
+    )
+  }
+
   private def importHistory(fund: Savings.Fund, history: Savings.AssetValueHistory): Future[ImportResult] = {
     import epsa.Main.Akka.dispatcher
 
@@ -443,6 +511,7 @@ class NetAssetValueHistoryController {
       } else {
         chartHandler.setSeriesName(fund.name)
         chartHandler.updateSeries(actualValues, replace = true)
+        chartHandler.chartPane.setVisible(true)
       }
       historyPane.setVisible(true)
     }
@@ -566,7 +635,7 @@ object NetAssetValueHistoryController {
       getClass.getResource("/css/form.css").toExternalForm
     )
     val controller = loader.getController[NetAssetValueHistoryController]
-    controller.initialize(savings, fundId)
+    controller.initialize(savings, dialog, fundId)
 
     // Delegate closing request to controller
     Stages.getStage(dialog).setOnCloseRequest(controller.onCloseRequest(dialog) _)

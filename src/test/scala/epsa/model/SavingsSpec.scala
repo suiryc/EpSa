@@ -123,16 +123,19 @@ class SavingsSpec extends WordSpec with Matchers {
       fund.name shouldBe fundName
     }
 
-    "handle adding a fund with comment" in {
+    "handle adding a fund with optional parameters" in {
       val fundName = "fund 1"
+      val fundAMFId = Some("some AMF id")
       val fundComment = Some("some comment")
-      val event = savings0.createFundEvent(fundName, fundComment)
+      val event = savings0.createFundEvent(fundName, fundAMFId, fundComment)
       event.name shouldBe fundName
+      event.amfId shouldBe fundAMFId
       event.comment shouldBe fundComment
 
       val savings = savings0.processEvent(event)
       val fund = savings.funds.head
       fund.name shouldBe fundName
+      fund.amfId shouldBe fundAMFId
       fund.comment shouldBe fundComment
     }
 
@@ -141,6 +144,13 @@ class SavingsSpec extends WordSpec with Matchers {
       val fundName = fund.name + "-new"
       val savings = savings1.processEvent(Savings.UpdateFund(fund).copy(name = fundName))
       savings.funds.head shouldBe fund.copy(name = fundName)
+    }
+
+    "handle updating a fund AMF id" in {
+      val fund = savings1.funds.head
+      val fundAMFId = Some("New AMF id")
+      val savings = savings1.processEvent(Savings.UpdateFund(fund).copy(amfId = fundAMFId))
+      savings.funds.head shouldBe fund.copy(amfId = fundAMFId)
     }
 
     "handle updating a fund comment" in {
@@ -484,8 +494,8 @@ class SavingsSpec extends WordSpec with Matchers {
     }
 
     "handle UpdateFund" in {
-      checkEventSerialization(Savings.UpdateFund(savings1.funds.head.id, "fund new name", None, disabled = false))
-      checkEventSerialization(Savings.UpdateFund(savings1.funds.head.id, "fund new name", Some("fund new comment"), disabled = true))
+      checkEventSerialization(Savings.UpdateFund(savings1.funds.head.id, "fund new name", None, None, disabled = false))
+      checkEventSerialization(Savings.UpdateFund(savings1.funds.head.id, "fund new name", Some("fund new AMF id"), Some("fund new comment"), disabled = true))
     }
 
     "handle DeleteFund" in {
@@ -620,12 +630,12 @@ class SavingsSpec extends WordSpec with Matchers {
       val g2e4 = Savings.MakePayment(date0.plusDays(20), Savings.AssetPart(schemeId, fundId, None, 14, 14), None)
 
       val g3e1 = Savings.UpdateScheme(schemeId, schemeName + " - new", None, disabled = false)
-      val g3e2 = Savings.UpdateFund(fundId, fundName + " - new", None, disabled = false)
+      val g3e2 = Savings.UpdateFund(fundId, fundName + " - new", None, None, disabled = false)
       val g4e1 = Savings.MakePayment(date0.plusDays(20), Savings.AssetPart(schemeId, fundId, None, 15, 15), None)
       val g4e2 = Savings.MakePayment(date0.plusDays(21), Savings.AssetPart(schemeId, fundId, None, 16, 16), None)
 
       val g5e1 = Savings.UpdateScheme(schemeId, schemeName, None, disabled = false)
-      val g5e2 = Savings.UpdateFund(fundId, fundName, None, disabled = false)
+      val g5e2 = Savings.UpdateFund(fundId, fundName, None, None, disabled = false)
       val g6e1 = Savings.MakePayment(date0.plusDays(21), Savings.AssetPart(schemeId, fundId, None, 17, 17), None)
       val g6e2 = Savings.MakePayment(date0.plusDays(21), Savings.AssetPart(schemeId, fundId, None, 18, 18), None)
 
@@ -666,7 +676,7 @@ class SavingsSpec extends WordSpec with Matchers {
       val scheme2Id = g3e1mg1.schemeId
       val scheme2Name = g3e1mg1.name
       val g3e2 = Savings.UpdateScheme(schemeId, schemeName + " - new", None, disabled = false)
-      val g3e3 = Savings.UpdateFund(fundId, fundName + " - new", None, disabled = false)
+      val g3e3 = Savings.UpdateFund(fundId, fundName + " - new", None, None, disabled = false)
       val g4e1 = Savings.MakePayment(date0.plusDays(20), Savings.AssetPart(schemeId, fundId, None, 16, 16), None)
       val g4e2 = Savings.MakePayment(date0.plusDays(21), Savings.AssetPart(schemeId, fundId, None, 17, 17), None)
       val g4e1mg2 = Savings.MakePayment(date0.plusDays(15), Savings.AssetPart(schemeId, fundId, None, 18, 18), None)
@@ -679,10 +689,10 @@ class SavingsSpec extends WordSpec with Matchers {
       val g5e2mg1 = Savings.AssociateFund(scheme2Id, fund2Id)
       // Those events will be flattened (scheme&fund creation moved in the same group)
       val g5e3mg1 = Savings.UpdateScheme(scheme2Id, scheme2Name + " - new", None, disabled = false)
-      val g5e4mg1 = Savings.UpdateFund(fund2Id, fund2Name + " - new", None, disabled = false)
+      val g5e4mg1 = Savings.UpdateFund(fund2Id, fund2Name + " - new", None, None, disabled = false)
       // Those event won't be moved, but will be flattened with those from the next group
       val g5e5 = Savings.UpdateScheme(schemeId, schemeName, None, disabled = false)
-      val g5e6 = Savings.UpdateFund(fundId, fundName, None, disabled = false)
+      val g5e6 = Savings.UpdateFund(fundId, fundName, None, None, disabled = false)
       val g6e1mg2 = Savings.MakePayment(date0.plusDays(5), Savings.AssetPart(schemeId, fundId, None, 20, 20), None)
       val g6e2mg2 = Savings.MakePayment(date0.plusDays(16), Savings.AssetPart(schemeId, fundId, None, 21, 21), None)
       val g6e3mg2 = Savings.MakePayment(date0.plusDays(16), Savings.AssetPart(scheme2Id, fund2Id, None, 22, 22), None)
@@ -692,9 +702,9 @@ class SavingsSpec extends WordSpec with Matchers {
       //   * an asset action will be moved, but not before the asset creation
       // Those events should be merged with the ones from the previous group
       val g7e1 = Savings.UpdateScheme(schemeId, schemeName + " - new", None, disabled = false)
-      val g7e2 = Savings.UpdateFund(fundId, fundName + " - new", None, disabled = false)
+      val g7e2 = Savings.UpdateFund(fundId, fundName + " - new", None, None, disabled = false)
       val g7e3 = Savings.UpdateScheme(scheme2Id, scheme2Name, None, disabled = false)
-      val g7e4 = Savings.UpdateFund(fund2Id, fund2Name, None, disabled = false)
+      val g7e4 = Savings.UpdateFund(fund2Id, fund2Name, None, None, disabled = false)
       val g8e1mg3 = Savings.MakePayment(date0.plusDays(20), Savings.AssetPart(schemeId, fundId, None, 23, 23), None)
       // Those events should remain in this group but be reordered
       val g8e2 = Savings.MakePayment(date0.plusDays(22), Savings.AssetPart(schemeId, fundId, None, 24, 24), None)

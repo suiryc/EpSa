@@ -189,7 +189,7 @@ class AssetDetailsWithTotal(
       savings = savings,
       asset = Savings.Asset(scheme.map(_.id).orNull, fund.map(_.id).orNull, availability, units = 0, vwap = 0),
       scheme = scheme.getOrElse(Savings.Scheme(null, null, None, Nil)),
-      fund = fund.getOrElse(Savings.Fund(null, null, None)),
+      fund = fund.getOrElse(Savings.Fund(null, null, None, None)),
       date = None,
       nav = Some(0),
       availabilityBase = availabilityBase,
