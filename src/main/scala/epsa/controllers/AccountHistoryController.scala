@@ -495,7 +495,7 @@ class AccountHistoryController extends StrictLogging {
 
             case None =>
               // $1=fund $2=date
-              (acc1.addIssue(Strings.accountHistoryIssuesNAV.format(savings.getFund(asset.fundId), date)),
+              (acc1.addIssue(Strings.accountHistoryIssuesNAV.format(savings.getFund(asset.fundId).name, date)),
                 acc2.addInvestedAmount(asset.investedAmount))
           }
         }
