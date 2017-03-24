@@ -188,7 +188,7 @@ class NetAssetValueHistoryController {
     }
   }
 
-  private def accessHistory[A](action: => Future[A], failureMsg: => String, successAction: A => Unit): Unit = {
+  private def accessHistory[A](action: => Future[A], failureMsg: => String, successAction: A => Unit): Future[A] = {
     import suiryc.scala.javafx.concurrent.JFXExecutor.executor
 
     working = true
@@ -200,7 +200,8 @@ class NetAssetValueHistoryController {
     }
 
     // Action on history (with timeout)
-    action.withTimeout(60.seconds).onComplete {
+    val f = action.withTimeout(60.seconds)
+    f.onComplete {
       case Success(result) =>
         showIndicator.cancel()
         // Hide indicator and perform success action (e.g. display new chart)
@@ -222,6 +223,8 @@ class NetAssetValueHistoryController {
         )
         working = false
     }
+
+    f
   }
 
   case class HistoryChanges(
@@ -294,7 +297,7 @@ class NetAssetValueHistoryController {
     }
   }
 
-  private def loadHistory(fund: Savings.Fund): Unit =
+  private def loadHistory(fund: Savings.Fund): Future[Seq[Savings.AssetValue]] =
     accessHistory(
       action = DataStore.AssetHistory.readValues(fund.id),
       failureMsg = DataStore.readIssueMsg(),
@@ -303,39 +306,46 @@ class NetAssetValueHistoryController {
 
   case class ImportResult(name: Option[String], current: Seq[Savings.AssetValue], fundChanges: HistoryChanges)
 
-  private def importHistory(fund: Savings.Fund, history: Savings.AssetValueHistory): Unit = {
-    import epsa.Main.Akka.dispatcher
+  private def showImportResult(fund: Savings.Fund, chart: Boolean)(result: ImportResult): Unit = {
+    displayImportResult(fund, result)
+    if (chart) displayChart(fund, result.current)
+  }
 
+  private def updateHistory(fund: Savings.Fund, current: Seq[Savings.AssetValue], history: Savings.AssetValueHistory): ImportResult = {
     val values = history.values.sortBy(_.date)
-    val action = DataStore.AssetHistory.readValues(fund.id).map { current =>
-      // Compute import changes (imported values relatively to updated history)
-      val updated = updatedHistory(fund, current)
-      val importChanges = cleanHistory(updated, values)
-      // Compute fund changes (all changes relatively to initial history)
+    // Compute import changes (imported values relatively to updated history)
+    val updated = updatedHistory(fund, current)
+    val importChanges = cleanHistory(updated, values)
+    if (importChanges.added.nonEmpty || importChanges.changed.nonEmpty) {
+      // Compute new fund history
       val fundChanges = mergeHistory(updatedHistory(fund, Seq.empty), values)
       changes += fund -> Some(fundChanges)
-      ImportResult(history.name, updated, importChanges)
     }
+    ImportResult(history.name, updated, importChanges)
+  }
 
-    def showResult(result: ImportResult): Unit = {
-      displayImportResult(fund, result)
-      displayChart(fund, result.current)
+  private def importHistory(fund: Savings.Fund, history: Savings.AssetValueHistory): Future[ImportResult] = {
+    import epsa.Main.Akka.dispatcher
+
+    val action = DataStore.AssetHistory.readValues(fund.id).map { current =>
+      updateHistory(fund, current, history)
     }
 
     accessHistory(
       action = action,
       failureMsg = DataStore.readIssueMsg(),
-      successAction = showResult
+      successAction = showImportResult(fund, chart = true)
     )
   }
 
-  private def purgeHistory(fund: Savings.Fund): Unit = {
+  private def purgeHistory(fund: Savings.Fund): Future[Unit] = {
     accessHistory(
       action = Future.successful(()),
       failureMsg = "",
       successAction = (_: Unit) => {
         changes += fund -> None
         loadHistory(fund)
+        ()
       }
     )
   }
