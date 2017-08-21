@@ -183,14 +183,14 @@ object LeviesController {
   import epsa.Settings.prefs
   import Preference._
 
-  private val stageLocation = Preference.from("stage.levies.location", null:StageLocation)
+  private val stageLocation = Preference.from(prefs, "stage.levies.location", null:StageLocation)
 
-  private val leviesImportPath = Preference.from("levies.import.path", null:Path)
+  private val leviesImportPath = Preference.from(prefs, "levies.import.path", null:Path)
 
   case class LeviesAndJson(levies: Levies, json: String)
 
   class LeviesCell extends ListCellEx[LeviesAndJson] {
-    override protected def itemText(item: LeviesAndJson) =
+    override protected def itemText(item: LeviesAndJson): String =
       if (item.levies eq Levies.empty) Strings.na
       else if (item.levies.levies.isEmpty) item.levies.name
       else s"${item.levies.name} (${item.levies.date})"

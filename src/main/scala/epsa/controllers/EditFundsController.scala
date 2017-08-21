@@ -561,8 +561,9 @@ class EditFundsController {
 object EditFundsController {
 
   import epsa.Settings.prefs
+  import Preference._
 
-  private val stageLocation = Preference.from("stage.edit-funds.location", null:StageLocation)
+  private val stageLocation = Preference.from(prefs, "stage.edit-funds.location", null:StageLocation)
 
   /** Builds a dialog out of this controller. */
   def buildDialog(owner: Option[Window], savings: Savings, edit: Option[Savings.Fund]): Dialog[List[Savings.Event]] = {

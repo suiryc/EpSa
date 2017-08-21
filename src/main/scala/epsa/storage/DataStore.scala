@@ -34,9 +34,9 @@ object DataStore {
 
   private val dbExtension = Constants.SUFFIX_MV_FILE
 
-  protected val dbPathPref = Preference.from("datastore.path", null:Path)
+  protected val dbPathPref: Preference[Path] = Preference.from(prefs, "datastore.path", null:Path)
 
-  protected[epsa] def defaultPath = dbPathPref.option.getOrElse {
+  protected[epsa] def defaultPath: Path = dbPathPref.option.getOrElse {
     val path = {
       // See: http://stackoverflow.com/a/12733172
       val appPath = Paths.get(getClass.getProtectionDomain.getCodeSource.getLocation.toURI)
@@ -384,7 +384,7 @@ object DataStore {
     }
   }
 
-  protected val tables = List[DataStoreTable](AppSettings, EventSource, AssetHistory, UnavailabilityPeriods)
+  protected val tables: List[DataStoreTable] = List(AppSettings, EventSource, AssetHistory, UnavailabilityPeriods)
 
   protected trait DataStoreTable {
 

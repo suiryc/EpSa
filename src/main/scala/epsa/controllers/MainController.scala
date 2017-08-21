@@ -976,23 +976,23 @@ object MainController {
 
   private val prefsKeyPrefix = "stage.main"
 
-  private val stageLocation = Preference.from(s"$prefsKeyPrefix.location", null:StageLocation)
+  private val stageLocation = Preference.from(prefs, s"$prefsKeyPrefix.location", null:StageLocation)
 
-  private val splitPaneDividerPositions = Preference.from(s"$prefsKeyPrefix.splitPane.dividerPositions", null:String)
+  private val splitPaneDividerPositions = Preference.from(prefs, s"$prefsKeyPrefix.splitPane.dividerPositions", null:String)
 
-  private val assetsColumnsPref = Preference.from(s"$prefsKeyPrefix.assets.columns", null:String)
+  private val assetsColumnsPref = Preference.from(prefs, s"$prefsKeyPrefix.assets.columns", null:String)
 
-  private val accountHistoryPath = Preference.from("account.history.path", null:Path)
+  private val accountHistoryPath = Preference.from(prefs, "account.history.path", null:Path)
 
-  private val totalsPerScheme = Preference.from("totals.per-scheme", true)
+  private val totalsPerScheme = Preference.from(prefs, "totals.per-scheme", true)
 
-  private val totalsPerFund = Preference.from("totals.per-fund", true)
+  private val totalsPerFund = Preference.from(prefs, "totals.per-fund", true)
 
-  private val totalsPerAvailability = Preference.from("totals.per-availability", true)
+  private val totalsPerAvailability = Preference.from(prefs, "totals.per-availability", true)
 
-  private val vwapPerAsset = Preference.from("vwap.per-asset", false)
+  private val vwapPerAsset = Preference.from(prefs, "vwap.per-asset", false)
 
-  private val upToDateAssets = Preference.from("up-to-date-assets", false)
+  private val upToDateAssets = Preference.from(prefs, "up-to-date-assets", false)
 
   case class State(
     stage: Stage,

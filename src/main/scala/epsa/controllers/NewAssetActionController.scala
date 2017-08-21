@@ -924,9 +924,9 @@ object NewAssetActionController {
 
   private val prefsKeyPrefix = "stage.new-asset-action"
 
-  private val stageLocation = Preference.from(s"$prefsKeyPrefix.location", null:StageLocation)
+  private val stageLocation = Preference.from(prefs, s"$prefsKeyPrefix.location", null:StageLocation)
 
-  private val dstUnitsAuto = Preference.from(s"$prefsKeyPrefix.dst-units-auto", true)
+  private val dstUnitsAuto = Preference.from(prefs, s"$prefsKeyPrefix.dst-units-auto", true)
 
   /** Builds a dialog out of this controller. */
   def buildDialog(owner: Option[Window], mainController: MainController, savings: Savings,

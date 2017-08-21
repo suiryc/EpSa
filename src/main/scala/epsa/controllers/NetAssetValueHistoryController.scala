@@ -614,9 +614,9 @@ object NetAssetValueHistoryController {
   import epsa.Settings.prefs
   import Preference._
 
-  private val stageLocation = Preference.from("stage.nav.history.location", null:StageLocation)
+  private val stageLocation = Preference.from(prefs, "stage.nav.history.location", null:StageLocation)
 
-  private val navHistoryImportPath = Preference.from("nav.history.import.path", null:Path)
+  private val navHistoryImportPath = Preference.from(prefs, "nav.history.import.path", null:Path)
 
   def title: String = Strings.navHistory
 

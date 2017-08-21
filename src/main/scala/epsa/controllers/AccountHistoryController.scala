@@ -756,13 +756,13 @@ object AccountHistoryController {
 
   private val prefsKeyPrefix = "stage.account-history"
 
-  private val stageLocation = Preference.from(s"$prefsKeyPrefix.location", null:StageLocation)
+  private val stageLocation = Preference.from(prefs, s"$prefsKeyPrefix.location", null:StageLocation)
 
-  private val splitPaneDividerPositions = Preference.from(s"$prefsKeyPrefix.splitPane.dividerPositions", null:String)
+  private val splitPaneDividerPositions = Preference.from(prefs, s"$prefsKeyPrefix.splitPane.dividerPositions", null:String)
 
-  private val splitPane2DividerPositions = Preference.from(s"$prefsKeyPrefix.splitPane.2.dividerPositions", null:String)
+  private val splitPane2DividerPositions = Preference.from(prefs, s"$prefsKeyPrefix.splitPane.2.dividerPositions", null:String)
 
-  private val historyColumnsPref = Preference.from(s"$prefsKeyPrefix.history.columns", null:String)
+  private val historyColumnsPref = Preference.from(prefs, s"$prefsKeyPrefix.history.columns", null:String)
 
   def title: String = Strings.accountHistory
 

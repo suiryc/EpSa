@@ -548,8 +548,9 @@ class EditSchemesController {
 object EditSchemesController {
 
   import epsa.Settings.prefs
+  import Preference._
 
-  private val stageLocation = Preference.from("stage.edit-schemes.location", null:StageLocation)
+  private val stageLocation = Preference.from(prefs, "stage.edit-schemes.location", null:StageLocation)
 
   /** Builds a dialog out of this controller. */
   def buildDialog(owner: Option[Window], savings: Savings, edit: Option[Savings.Scheme]): Dialog[List[Savings.Event]] = {

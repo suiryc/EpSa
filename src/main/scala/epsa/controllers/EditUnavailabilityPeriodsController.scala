@@ -384,8 +384,9 @@ class EditUnavailabilityPeriodsController {
 object EditUnavailabilityPeriodsController {
 
   import epsa.Settings.prefs
+  import Preference._
 
-  private val stageLocation = Preference.from("stage.edit-unavailability-periods.location", null:StageLocation)
+  private val stageLocation = Preference.from(prefs, "stage.edit-unavailability-periods.location", null:StageLocation)
 
   /** Builds a dialog out of this controller. */
   def buildDialog(owner: Option[Window]): Dialog[Boolean] = {
