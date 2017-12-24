@@ -12,6 +12,11 @@
     </encoder>
   </appender>
 
+  <!-- Apache HttpClient logs a bunch of things in DEBUG level,
+       e.g. exchanged headers and wire tracing
+       (org.apache.http.headers and org.apache.http.wire).
+    -->
+  <logger name="org.apache.http" level="INFO" />
   <!-- Slick logs a bunch of things in DEBUG level.
        The most interesting ones to keep are executed queries and execution times
        (slick.jdbc.JdbcBackend.statement and slick.jdbc.JdbcBackend.benchmark).

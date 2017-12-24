@@ -4,6 +4,7 @@ import java.math.{BigDecimal => jBigDecimal}
 import java.text.{DecimalFormat, NumberFormat, ParsePosition}
 import java.util.Locale
 import java.util.prefs.Preferences
+import scala.concurrent.duration._
 import scala.runtime.ScalaRunTime
 import suiryc.scala.concurrent.ThreadLocalEx
 import suiryc.scala.settings.Preference
@@ -61,6 +62,8 @@ object Settings {
   val vwapScale: Preference[Int] = Preference.from(prefs, "vwap.scale", 4)
   val vwapRounding: Preference[BigDecimal.RoundingMode.Value] =
     Preference.from(prefs, "vwap.rounding", BigDecimal.RoundingMode, BigDecimal.RoundingMode.HALF_EVEN)
+
+  val httpClientTimeout: Preference[FiniteDuration] = Preference.from(prefs, "http.client.timeout", 10.seconds)
 
   // Note: not really useful to let user change percents scale/rounding
   val percentsScale = 2

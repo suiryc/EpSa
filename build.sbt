@@ -3,10 +3,10 @@ import Keys._
 
 lazy val versions = Map[String, String](
   "akka"          -> "2.4.17",
-  "akka-http"     -> "10.0.5",
   "epsa"          -> "1.0-SNAPSHOT",
   "h2"            -> "1.4.193",
   "html-cleaner"  -> "2.19",
+  "httpclient"    -> "4.5.4",
   "logback"       -> "1.1.8",
   // Remain on POI 3.14 until 4.0 because POI 3.15 made all functions to get Cell type deprecated ...
   // (one will get un-deprecated, unless POI developers become deprecated)
@@ -74,15 +74,14 @@ lazy val epsa = project.in(file(".")).
       "ch.qos.logback"              %  "logback-classic"                   % versions("logback"),
       "com.h2database"              %  "h2"                                % versions("h2"),
       "com.typesafe.akka"           %% "akka-actor"                        % versions("akka"),
-      "com.typesafe.akka"           %% "akka-http"                         % versions("akka-http"),
-      "com.typesafe.akka"           %% "akka-http-core"                    % versions("akka-http"),
-      //"com.typesafe.akka"           %% "akka-http-spray-json"              % versions("akka-http"),
       "com.typesafe.akka"           %% "akka-slf4j"                        % versions("akka"),
       "com.typesafe.akka"           %% "akka-stream"                       % versions("akka"),
       "com.typesafe.scala-logging"  %% "scala-logging"                     % versions("scala-logging"),
       "com.typesafe.slick"          %% "slick"                             % versions("slick"),
       "io.spray"                    %% "spray-json"                        % versions("spray-json"),
       "net.sourceforge.htmlcleaner" %  "htmlcleaner"                       % versions("html-cleaner"),
+      "org.apache.httpcomponents"   %  "httpclient"                        % versions("httpclient")
+        exclude ("commons-logging", "commons-logging"),
       "org.apache.odftoolkit"       %  "simple-odf"                        % versions("simple-odf")
         exclude("commons-logging", "commons-logging")
         exclude("log4j", "log4j")
