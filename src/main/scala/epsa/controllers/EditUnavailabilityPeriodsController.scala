@@ -175,7 +175,7 @@ class EditUnavailabilityPeriodsController {
     catch { case _: Exception => 0}
 
   private def getMonth: Option[Month] =
-    Option(monthField.getSelectionModel.getSelectedItem).getOrElse(None)
+    Option(monthField.getSelectionModel.getSelectedItem).flatten
 
   private def addDbAction(action: Action[Unit, AnyVal]): Unit =
     dbActions :+= action
@@ -278,7 +278,7 @@ class EditUnavailabilityPeriodsController {
    * An event filter is added on the generated cell to allow de-selecting an
    * entry in the list view by clicking on it a second time.
    */
-  private def newPeriodCell(lv: ListView[Savings.UnavailabilityPeriod]): ListCell[Savings.UnavailabilityPeriod] = {
+  private def newPeriodCell(@deprecated("unused","") lv: ListView[Savings.UnavailabilityPeriod]): ListCell[Savings.UnavailabilityPeriod] = {
     // See: http://stackoverflow.com/questions/23622703/deselect-an-item-on-an-javafx-listview-on-click
     val cell = new UnavailabilityPeriodCell
 

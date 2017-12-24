@@ -212,71 +212,71 @@ class MainController extends StrictLogging {
     event.consume()
   }
 
-  def onFileNew(event: ActionEvent): Unit = {
+  def onFileNew(@deprecated("unused","") event: ActionEvent): Unit = {
     actor ! OnFileNew
   }
 
-  def onFileOpen(event: ActionEvent): Unit = {
+  def onFileOpen(@deprecated("unused","") event: ActionEvent): Unit = {
     actor ! OnFileOpen
   }
 
-  def onFileClose(event: ActionEvent): Unit = {
+  def onFileClose(@deprecated("unused","") event: ActionEvent): Unit = {
     actor ! OnFileClose
   }
 
-  def onFileSave(event: ActionEvent): Unit = {
+  def onFileSave(@deprecated("unused","") event: ActionEvent): Unit = {
     actor ! OnFileSave(saveAs = false)
   }
 
-  def onFileSaveAs(event: ActionEvent): Unit = {
+  def onFileSaveAs(@deprecated("unused","") event: ActionEvent): Unit = {
     actor ! OnFileSave(saveAs = true)
   }
 
-  def onExit(event: ActionEvent): Unit = {
+  def onExit(@deprecated("unused","") event: ActionEvent): Unit = {
     actor ! OnExit
   }
 
-  def onEditUndo(event: ActionEvent): Unit = {
+  def onEditUndo(@deprecated("unused","") event: ActionEvent): Unit = {
     actor ! OnEditUndo
   }
 
-  def onEditSchemes(event: ActionEvent): Unit = {
+  def onEditSchemes(@deprecated("unused","") event: ActionEvent): Unit = {
     actor ! OnEditSchemes(getSelectedAsset.map(_.schemeId))
   }
 
-  def onEditFunds(event: ActionEvent): Unit = {
+  def onEditFunds(@deprecated("unused","") event: ActionEvent): Unit = {
     actor ! OnEditFunds(getSelectedAsset.map(_.fundId))
   }
 
-  def onEditUnavailabilityPeriods(event: ActionEvent): Unit = {
+  def onEditUnavailabilityPeriods(@deprecated("unused","") event: ActionEvent): Unit = {
     actor ! OnEditUnavailabilityPeriods
   }
 
-  def onNewPayment(event: ActionEvent): Unit = {
+  def onNewPayment(@deprecated("unused","") event: ActionEvent): Unit = {
     actor ! OnNewAssetAction(AssetActionKind.Payment, getSelectedAsset)
   }
 
-  def onNewTransfer(event: ActionEvent): Unit = {
+  def onNewTransfer(@deprecated("unused","") event: ActionEvent): Unit = {
     actor ! OnNewAssetAction(AssetActionKind.Transfer, getSelectedAsset)
   }
 
-  def onNewRefund(event: ActionEvent): Unit = {
+  def onNewRefund(@deprecated("unused","") event: ActionEvent): Unit = {
     actor ! OnNewAssetAction(AssetActionKind.Refund, getSelectedAsset)
   }
 
-  def onOptions(event: ActionEvent): Unit = {
+  def onOptions(@deprecated("unused","") event: ActionEvent): Unit = {
     actor ! OnOptions
   }
 
-  def onSavingsOnDate(event: ActionEvent): Unit = {
+  def onSavingsOnDate(@deprecated("unused","") event: ActionEvent): Unit = {
     actor ! OnSavingsOnDate(None)
   }
 
-  def onAccountHistory(event: ActionEvent): Unit = {
+  def onAccountHistory(@deprecated("unused","") event: ActionEvent): Unit = {
     actor ! OnAccountHistory
   }
 
-  def onNetAssetValueHistory(event: ActionEvent): Unit = {
+  def onNetAssetValueHistory(@deprecated("unused","") event: ActionEvent): Unit = {
     actor ! OnNetAssetValueHistory(getSelectedAsset.map(_.fundId))
   }
 
@@ -285,7 +285,7 @@ class MainController extends StrictLogging {
     actor ! OnShowNAVHistory
   }
 
-  def onLevies(event: ActionEvent): Unit = {
+  def onLevies(@deprecated("unused","") event: ActionEvent): Unit = {
     actor ! OnLevies
   }
 
@@ -297,15 +297,15 @@ class MainController extends StrictLogging {
     stage.toFront()
   }
 
-  def onExportRawAccountHistory(event: ActionEvent = null): Unit = {
+  def onExportRawAccountHistory(@deprecated("unused","") event: ActionEvent = null): Unit = {
     actor ! OnExportRawAccountHistory
   }
 
-  def onImportRawAccountHistory(event: ActionEvent = null): Unit = {
+  def onImportRawAccountHistory(@deprecated("unused","") event: ActionEvent = null): Unit = {
     actor ! OnImportRawAccountHistory
   }
 
-  def onCleanupDataStore(event: ActionEvent): Unit = {
+  def onCleanupDataStore(@deprecated("unused","") event: ActionEvent): Unit = {
     actor ! OnCleanupDataStore(normalize = false)
   }
 
@@ -436,7 +436,7 @@ class MainController extends StrictLogging {
       case OnEditUnavailabilityPeriods => onEditUnavailabilityPeriods(state)
       case OnNewAssetAction(kind, asset) => onNewAssetAction(state, kind, asset)
       case OnOptions         => onOptions(state)
-      case OnSavingsOnDate(date) => onSavingsOnDate(state, date)
+      case OnSavingsOnDate(date) => onSavingsOnDate(date)
       case OnAccountHistory  => onAccountHistory(state)
       case OnNetAssetValueHistory(fundId) => onNetAssetValueHistory(state, fundId)
       case OnShowNAVHistory  => onShowNAVHistory(state)
@@ -680,7 +680,7 @@ class MainController extends StrictLogging {
       }
     }
 
-    def onSavingsOnDate(state: State, dateOpt: Option[LocalDate]): Unit = {
+    def onSavingsOnDate(dateOpt: Option[LocalDate]): Unit = {
       // Show the modal stage, which requires to select a date then creates
       // a new Tab to display savings on the selected date.
       dateOpt match {

@@ -182,7 +182,7 @@ class EditSchemesController {
    * An event filter is added on the generated cell to allow de-selecting a
    * Scheme in the list view by clicking on it a second time.
    */
-  private def newSchemeCell(lv: ListView[Option[Savings.Scheme]]): ListCell[Option[Savings.Scheme]] = {
+  private def newSchemeCell(@deprecated("unused","") lv: ListView[Option[Savings.Scheme]]): ListCell[Option[Savings.Scheme]] = {
     // See: http://stackoverflow.com/questions/23622703/deselect-an-item-on-an-javafx-listview-on-click
     val cell = new SchemeCell
 

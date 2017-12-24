@@ -185,7 +185,7 @@ class EditFundsController {
    * An event filter is added on the generated cell to allow de-selecting a
    * Fund in the list view by clicking on it a second time.
    */
-  private def newFundCell(lv: ListView[Option[Savings.Fund]]): ListCell[Option[Savings.Fund]] = {
+  private def newFundCell(@deprecated("unused","") lv: ListView[Option[Savings.Fund]]): ListCell[Option[Savings.Fund]] = {
     // See: http://stackoverflow.com/questions/23622703/deselect-an-item-on-an-javafx-listview-on-click
     val cell = new FundCell
 

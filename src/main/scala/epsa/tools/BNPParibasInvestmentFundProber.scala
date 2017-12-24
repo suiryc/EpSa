@@ -4,7 +4,7 @@ import epsa.model.Savings
 import java.nio.file.Path
 import java.time.{LocalDate, ZoneId}
 import java.time.format.DateTimeFormatter
-import org.apache.poi.ss.usermodel.{Cell, WorkbookFactory}
+import org.apache.poi.ss.usermodel.{CellType, WorkbookFactory}
 import suiryc.scala.io.PathsEx
 
 /**
@@ -61,7 +61,12 @@ object BNPParibasInvestmentFundProber extends InvestmentFundProber {
         val name = nameRow.getCell(1).getStringCellValue
         // Table is ended by an empty row (while last row contains a warning comment)
         val values = (dataRowIdx to sheet.getLastRowNum).toStream.map(sheet.getRow).takeWhile { row =>
-          row.getCell(dateCellIdx).getCellType != Cell.CELL_TYPE_BLANK
+          // Notes:
+          // Cell.getCellType will be changed between 3.x and 4.x to return an
+          // enum instead of an int. In the meantime (starting with 3.15), it is
+          // made deprecated, while the temporary getCellTypeEnum function can
+          // be used (and will be removed in 4.2).
+          row.getCell(dateCellIdx).getCellTypeEnum != CellType.BLANK
         }.map { row =>
           val date = try {
             // Try as a date

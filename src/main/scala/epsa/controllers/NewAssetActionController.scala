@@ -264,11 +264,11 @@ class NewAssetActionController extends StrictLogging {
 
     // Setup src/dst NAV/amount/units field listeners
     for ((field, cb) <- List(
-      (srcNAVField.textField, onSrcNAV _),
-      (srcAmountField, onSrcAmount _),
-      (srcUnitsField, onSrcUnits _),
-      (dstNAVField.textField, onDstNAV _),
-      (dstUnitsField, onDstUnits _)
+      (srcNAVField.textField, () => onSrcNAV()),
+      (srcAmountField, () => onSrcAmount()),
+      (srcUnitsField, () => onSrcUnits()),
+      (dstNAVField.textField, () => onDstNAV()),
+      (dstUnitsField, () => onDstUnits())
     )) {
       field.textProperty.listen(cb())
     }
@@ -323,7 +323,7 @@ class NewAssetActionController extends StrictLogging {
     stageLocation() = Stages.getLocation(stage).orNull
   }
 
-  def onCloseRequest(event: DialogEvent): Unit = {
+  def onCloseRequest(@deprecated("unused","") event: DialogEvent): Unit = {
     dstUnitsAuto() = dstUnitsAutoButton.isSelected
     persistView()
   }
@@ -382,7 +382,7 @@ class NewAssetActionController extends StrictLogging {
     ()
   }
 
-  def onLatestDate(event: ActionEvent): Unit = {
+  def onLatestDate(@deprecated("unused","") event: ActionEvent): Unit = {
     savings.latestAssetAction.foreach { date =>
       operationDateField.setValue(date)
     }
@@ -432,7 +432,7 @@ class NewAssetActionController extends StrictLogging {
     ()
   }
 
-  def onSrcEmpty(event: ActionEvent): Unit = {
+  def onSrcEmpty(@deprecated("unused","") event: ActionEvent): Unit = {
     for {
       operationDate <- getOperationDate
       schemeAndFund <- getSrcFund
@@ -598,7 +598,7 @@ class NewAssetActionController extends StrictLogging {
           }
         }.getOrElse(Nil)
         srcAvailabilityField2.setItems(FXCollections.observableList(availabilities.asJava))
-        if (availabilities.size == 1) {
+        if (availabilities.lengthCompare(1) == 0) {
           srcAvailabilityField2.getSelectionModel.select(availabilities.head)
           // Manually update dst availability (overrides recursion prevention)
           updateDstAvailability()
@@ -879,7 +879,7 @@ class NewAssetActionController extends StrictLogging {
     val srcAvailabilityExact = actionKind != AssetActionKind.Payment
 
     if (!srcAvailabilityExact) Option(srcAvailabilityField.getValue)
-    else Option(srcAvailabilityField2.getValue).getOrElse(None)
+    else Option(srcAvailabilityField2.getValue).flatten
   }
 
   private def getSrcNAV: BigDecimal =

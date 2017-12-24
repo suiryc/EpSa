@@ -145,7 +145,7 @@ class NetAssetValueHistoryController {
     if (canClose) dialog.close()
   }
 
-  def onDownloadNAVHistories(event: ActionEvent): Unit = {
+  def onDownloadNAVHistories(@deprecated("unused","") event: ActionEvent): Unit = {
     import epsa.Main.Akka.dispatcher
 
     // Remember currently selected fund
@@ -170,18 +170,18 @@ class NetAssetValueHistoryController {
     }
   }
 
-  def onFund(event: ActionEvent): Unit = {
+  def onFund(@deprecated("unused","") event: ActionEvent): Unit = {
     getFund.foreach { fund =>
       downloadButton.setDisable(fund.amfId.isEmpty)
       loadHistory(fund)
     }
   }
 
-  def onDownload(event: ActionEvent): Unit = {
+  def onDownload(@deprecated("unused","") event: ActionEvent): Unit = {
     getFund.filter(_.amfId.isDefined).foreach(downloadHistory(_))
   }
 
-  def onImport(event: ActionEvent): Unit = {
+  def onImport(@deprecated("unused","") event: ActionEvent): Unit = {
     getFund.foreach { fund =>
       val fileChooser = new FileChooser()
       fileChooser.setTitle(Strings.importNAVHistory)
@@ -196,7 +196,7 @@ class NetAssetValueHistoryController {
         val path = file.toPath
         probers.toStream.map { prober =>
           prober.probe(path)
-        }.find(_.isDefined).map(_.get) match {
+        }.find(_.isDefined).flatten match {
           case Some(hist) =>
             // Save path in preferences
             navHistoryImportPath() = selectedFile.toPath
@@ -216,7 +216,7 @@ class NetAssetValueHistoryController {
     }
   }
 
-  def onPurge(event: ActionEvent): Unit = {
+  def onPurge(@deprecated("unused","") event: ActionEvent): Unit = {
     getFund.foreach { fund =>
       val resp = Dialogs.confirmation(
         owner = Some(stage),

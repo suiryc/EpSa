@@ -125,9 +125,9 @@ object Settings {
   }
 
   case object Debug extends Enumeration {
-    val OriginalToString = Value("original-tostring")
-    val LeviesComputation = Value("levies-computation")
-    val LeviesHistory = Value("levies-history")
+    val OriginalToString: Debug.Value = Value("original-tostring")
+    val LeviesComputation: Debug.Value = Value("levies-computation")
+    val LeviesHistory: Debug.Value = Value("levies-history")
   }
 
   trait DebugString { product: Product =>

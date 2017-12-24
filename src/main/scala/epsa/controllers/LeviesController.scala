@@ -123,7 +123,7 @@ class LeviesController extends StrictLogging {
     if (canClose) dialog.close()
   }
 
-  def onLevies(event: ActionEvent): Unit = {
+  def onLevies(@deprecated("unused","") event: ActionEvent): Unit = {
     getLevies match {
       case Some(levies) => leviesDescField.setText(levies.json)
       case None         => leviesDescField.setText("")
@@ -131,7 +131,7 @@ class LeviesController extends StrictLogging {
     checkForm()
   }
 
-  def onImport(event: ActionEvent): Unit = {
+  def onImport(@deprecated("unused","") event: ActionEvent): Unit = {
     val fileChooser = new FileChooser()
     fileChooser.setTitle(Strings.importLevies)
     fileChooser.getExtensionFilters.addAll(

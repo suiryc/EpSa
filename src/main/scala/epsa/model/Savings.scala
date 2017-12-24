@@ -162,7 +162,7 @@ object Savings extends StrictLogging {
     def extractCreations(to: SortingEvents, from: List[SortingEvents], movedIds: Set[AssetId]): (SortingEvents, List[SortingEvents]) = {
       val schemeIds = getNeededSchemes(from, movedIds)
       val fundIds = getNeededFunds(from, movedIds)
-      from.foldLeft(to, List.empty[SortingEvents]) {
+      from.foldLeft((to, List.empty[SortingEvents])) {
         case ((accTo, accSortings), sorting) =>
           val (extracted, remaining) = sorting.prefix.partition(extractNeeded(_, movedIds, schemeIds, fundIds))
           val accTo2 = accTo.addEvents(extracted)
@@ -176,7 +176,7 @@ object Savings extends StrictLogging {
     def extractActions(to: SortingEvents, from: List[SortingEvents]): (SortingEvents, List[SortingEvents]) =
       to.dateRange match {
         case Some(dateRange) =>
-          from.foldLeft(to, List.empty[SortingEvents]) {
+          from.foldLeft((to, List.empty[SortingEvents])) {
             case ((accTo, accSortings), sorting) =>
               if (sorting.dateRange.exists(_.min < dateRange.max)) {
                 // Extract actions and move them to head group
@@ -592,9 +592,9 @@ case class Savings(
     case DeleteFund(id)                                 => deleteFund(id)
     case AssociateFund(schemeId, fundId)                => associateFund(schemeId, fundId)
     case DissociateFund(schemeId, fundId)               => dissociateFund(schemeId, fundId)
-    case MakePayment(date, part, comment)               => computeAssets(date).makePayment(date, part, comment)
-    case MakeTransfer(date, partSrc, partDst, comment)  => computeAssets(date).makeTransfer(date, partSrc, partDst, comment)
-    case MakeRefund(date, part, comment)                => computeAssets(date).makeRefund(date, part, comment)._1
+    case MakePayment(date, part, _)                     => computeAssets(date).makePayment(date, part)
+    case MakeTransfer(date, partSrc, partDst, _)        => computeAssets(date).makeTransfer(date, partSrc, partDst)
+    case MakeRefund(date, part,    _)                   => computeAssets(date).makeRefund(date, part)._1
   }
 
   protected def createScheme(id: UUID, name: String, comment: Option[String]): Savings = {
@@ -678,7 +678,7 @@ case class Savings(
     copy(latestAssetAction = Some(newDate))
   }
 
-  protected def makePayment(date: LocalDate, part: AssetPart, comment: Option[String],
+  protected def makePayment(date: LocalDate, part: AssetPart,
     partSrc: Option[AssetPart] = None, savingsSrc: Option[Savings] = None,
     srcLeviesPeriodsData: Option[LeviesPeriodsData] = None): Savings =
   {
@@ -734,12 +734,12 @@ case class Savings(
     savings.updateLatestAssetAction(date).triggerActiveAsset(part)
   }
 
-  protected def makeTransfer(date: LocalDate, partSrc: AssetPart, partDst: AssetPart, comment: Option[String]): Savings = {
-    val (savings, leviesPeriodsData) = makeRefund(date, partSrc, comment)
-    savings.makePayment(date, partDst, comment, Some(partSrc), Some(this), Some(leviesPeriodsData))
+  protected def makeTransfer(date: LocalDate, partSrc: AssetPart, partDst: AssetPart): Savings = {
+    val (savings, leviesPeriodsData) = makeRefund(date, partSrc)
+    savings.makePayment(date, partDst, Some(partSrc), Some(this), Some(leviesPeriodsData))
   }
 
-  protected def makeRefund(date: LocalDate, part: AssetPart, comment: Option[String]): (Savings, LeviesPeriodsData) = {
+  protected def makeRefund(date: LocalDate, part: AssetPart): (Savings, LeviesPeriodsData) = {
     val currentAsset = findAsset(date, part).get
     val totalUnits = assets.units(part.id)
     val units = currentAsset.units - part.units

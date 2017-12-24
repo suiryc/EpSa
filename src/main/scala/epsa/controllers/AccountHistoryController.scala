@@ -192,7 +192,7 @@ class AccountHistoryController extends StrictLogging {
     // Now build (async) the account history chart.
     // And display any unexpected issue.
     Future {
-      buildHistory(state, events, showIndicator)
+      buildHistory(events, showIndicator)
     }.failed.foreach {
       case ex: Exception =>
       Dialogs.error(
@@ -300,7 +300,7 @@ class AccountHistoryController extends StrictLogging {
     splitPane2DividerPositions() = splitPane_2.getDividerPositions.mkString(";")
   }
 
-  def onCloseRequest(event: WindowEvent): Unit = {
+  def onCloseRequest(@deprecated("unused","") event: WindowEvent): Unit = {
     persistView()
   }
 
@@ -391,7 +391,7 @@ class AccountHistoryController extends StrictLogging {
     }
   }
 
-  private def buildHistory(state: State, events: List[Savings.Event], showIndicator: Cancellable): Unit = {
+  private def buildHistory(events: List[Savings.Event], showIndicator: Cancellable): Unit = {
     // Cached data store NAVs, and index in sequence (for more efficient search)
     var assetsNAVs = Map[UUID, Seq[Savings.AssetValue]]()
     var assetsNAVIdxs = Map[UUID, Int]()
@@ -487,7 +487,7 @@ class AccountHistoryController extends StrictLogging {
     def atDate(history: History, savings: Savings, date: LocalDate): History = {
       val navs = assetsNAV(savings, date)
       val r = if (validDate(date, navs)) {
-        val (history2, historyData) = savings.assets.list.foldLeft(history, HistoryData(date)) { case ((acc1, acc2), asset) =>
+        val (history2, historyData) = savings.assets.list.foldLeft((history, HistoryData(date))) { case ((acc1, acc2), asset) =>
           getNAV(asset.fundId, date, navs) match {
             case Some(nav) =>
               (acc1,

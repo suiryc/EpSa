@@ -37,7 +37,7 @@ object Main {
 
   object Akka {
 
-    implicit val system = ActorSystem("epsa")
+    implicit val system: ActorSystem = ActorSystem("epsa")
     implicit val dispatcher: ExecutionContextExecutor = system.dispatcher
 
   }
