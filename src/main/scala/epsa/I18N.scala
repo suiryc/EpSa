@@ -121,6 +121,7 @@ object I18N extends suiryc.scala.util.I18N("i18n.epsa") with I18NWithPreference 
     def accountHistoryIssues: String = getString("warning.account-history.issues")
     def accountHistoryIssuesNAV: String = getString("warning.account-history.issues.nav")
     def downloadNavHistoryError: String = getString("error.download-nav-history")
+    def durationError: String = getString("error.duration")
     def unexpectedIssue: String = getString("error.unexpected-issue")
   }
 

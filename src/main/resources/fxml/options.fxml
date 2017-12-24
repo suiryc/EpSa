@@ -4,11 +4,12 @@
 <?import javafx.scene.control.ComboBox?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.Slider?>
+<?import javafx.scene.control.TextField?>
 <?import javafx.scene.layout.ColumnConstraints?>
 <?import javafx.scene.layout.GridPane?>
 <?import javafx.scene.layout.RowConstraints?>
 
-<GridPane hgap="10.0" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="-Infinity" minWidth="-Infinity" vgap="10.0" xmlns="http://javafx.com/javafx/8.0.65" xmlns:fx="http://javafx.com/fxml/1" fx:controller="epsa.controllers.OptionsController">
+<GridPane hgap="10.0" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="-Infinity" minWidth="-Infinity" vgap="10.0" xmlns="http://javafx.com/javafx/8.0.141" xmlns:fx="http://javafx.com/fxml/1" fx:controller="epsa.controllers.OptionsController">
   <columnConstraints>
     <ColumnConstraints hgrow="NEVER" minWidth="-Infinity" />
     <ColumnConstraints hgrow="NEVER" maxWidth="1.7976931348623157E308" minWidth="-Infinity" />
@@ -19,6 +20,7 @@
       <RowConstraints minHeight="-Infinity" vgrow="NEVER" />
       <RowConstraints minHeight="-Infinity" vgrow="NEVER" />
       <RowConstraints minHeight="-Infinity" vgrow="NEVER" />
+      <RowConstraints minHeight="10.0" prefHeight="30.0" vgrow="NEVER" />
   </rowConstraints>
    <children>
       <Label text="%Language" />
@@ -87,6 +89,8 @@
             </ComboBox>
          </children>
       </GridPane>
+      <Label text="%http.client.timeout" GridPane.rowIndex="5" />
+      <TextField fx:id="httpClientTimeout" maxWidth="-Infinity" prefWidth="120.0" GridPane.columnIndex="1" GridPane.rowIndex="5" />
    </children>
    <padding>
       <Insets bottom="15.0" left="15.0" right="15.0" top="15.0" />

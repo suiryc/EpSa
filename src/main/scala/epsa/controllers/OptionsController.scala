@@ -2,11 +2,15 @@ package epsa.controllers
 
 import epsa.I18N
 import epsa.I18N.Strings
+import epsa.util.JFXStyles
 import javafx.collections.FXCollections
 import javafx.fxml.{FXML, FXMLLoader}
-import javafx.scene.control.{ButtonType, ComboBox, Dialog, Slider}
+import javafx.scene.Node
+import javafx.scene.control._
 import javafx.stage.Window
+import scala.concurrent.duration.{Duration, FiniteDuration}
 import suiryc.scala.javafx.stage.Stages
+import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.settings.{SettingSnapshot, SettingsSnapshot}
 import suiryc.scala.util.I18NLocale
 
@@ -38,7 +42,18 @@ class OptionsController {
   @FXML
   protected var vwapRounding: ComboBox[BigDecimal.RoundingMode.Value] = _
 
-  def initialize(snapshot: SettingsSnapshot): Unit = {
+  @FXML
+  protected var httpClientTimeout: TextField = _
+
+  protected var buttonOk: Node = _
+
+  def initialize(dialog: Dialog[_], snapshot: SettingsSnapshot): Unit = {
+    // Load css
+    dialog.getDialogPane.getStylesheets.add(getClass.getResource("/css/form.css").toExternalForm)
+
+    // Lookup OK dialog button
+    buttonOk = dialog.getDialogPane.lookupButton(ButtonType.OK)
+
     snapshot.add(
       SettingSnapshot(I18N.pref),
       SettingSnapshot(settings.currency),
@@ -82,6 +97,21 @@ class OptionsController {
     vwapScale.setValue(settings.vwapScale().toDouble)
     vwapRounding.setItems(FXCollections.observableList(BigDecimal.RoundingMode.values.toList.asJava))
     vwapRounding.getSelectionModel.select(settings.vwapRounding())
+
+    httpClientTimeout.textProperty.listen(checkForm())
+    httpClientTimeout.setText(settings.httpClientTimeout().toString)
+  }
+
+  private def checkForm(): Unit = {
+    val ok = try {
+      Duration(httpClientTimeout.getText).isFinite()
+      true
+    } catch {
+      case _: Throwable => false
+    }
+    JFXStyles.toggleError(httpClientTimeout, !ok,
+      if (ok) None else Some(I18N.Strings.durationError))
+    buttonOk.setDisable(!ok)
   }
 
   protected def applyChanges(snapshot: SettingsSnapshot): (Boolean, Boolean) = {
@@ -105,6 +135,8 @@ class OptionsController {
 
     settings.vwapScale() = vwapScale.getValue.round.toInt
     settings.vwapRounding() = vwapRounding.getValue
+
+    settings.httpClientTimeout() = Duration(httpClientTimeout.getText).asInstanceOf[FiniteDuration]
 
     // Caller needs to reload (view) if something changed
     val reload = snapshot.changed()
@@ -136,7 +168,7 @@ object OptionsController {
     val loader = new FXMLLoader(getClass.getResource("/fxml/options.fxml"), I18N.getResources)
     dialog.getDialogPane.setContent(loader.load())
     val controller = loader.getController[OptionsController]
-    controller.initialize(snapshot)
+    controller.initialize(dialog, snapshot)
 
     dialog.setResultConverter(resultConverter(snapshot, controller) _)
     Stages.trackMinimumDimensions(Stages.getStage(dialog))
