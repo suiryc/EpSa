@@ -1,6 +1,6 @@
 {
   "name": "Prélèvements sociaux français",
-  "date": "2013-01-01",
+  "date": "2018-01-01",
 
   "CRDS": {
     "periods": [{ "rate": 0.5, "start": "1996-02-01" }]
@@ -9,7 +9,8 @@
   "CSG": {
     "periods": [{ "rate": 3.4, "start": "1997-01-01" },
                 { "rate": 7.5, "start": "1998-01-01" },
-                { "rate": 8.2, "start": "2005-01-01" }]
+                { "rate": 8.2, "start": "2005-01-01" },
+                { "rate": 9.9, "start": "2018-01-01" }]
   },
 
   "PSOC": {
