@@ -6,7 +6,6 @@ import epsa.model.Savings.{Event, UnavailabilityPeriod}
 import java.io.FileNotFoundException
 import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.Paths
 import java.sql.Date
 import java.time.{LocalDate, Month}
 import java.util.UUID
@@ -24,6 +23,7 @@ import suiryc.scala.concurrent.RichFuture
 import suiryc.scala.concurrent.RichFuture.Action
 import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.javafx.stage.FileChoosers
+import suiryc.scala.misc.Util
 import suiryc.scala.settings.Preference
 
 object DataStore {
@@ -37,13 +37,8 @@ object DataStore {
   protected val dbPathPref: Preference[Path] = Preference.from(prefs, "datastore.path", null:Path)
 
   protected[epsa] def defaultPath: Path = dbPathPref.option.getOrElse {
-    val path = {
-      // See: http://stackoverflow.com/a/12733172
-      val appPath = Paths.get(getClass.getProtectionDomain.getCodeSource.getLocation.toURI)
-      // We either got the application running jar (file), or the running folder
-      if (Files.isDirectory(appPath)) appPath
-      else appPath.getParent
-    }
+    // Default path is where this application is running.
+    val path = Util.classLocation[DataStore.type]
     path.resolve(s"default$dbExtension")
   }
 
