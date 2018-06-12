@@ -25,7 +25,6 @@ import scala.collection.JavaConverters._
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import suiryc.scala.javafx.beans.value.RichObservableValue
-import suiryc.scala.{javafx => jfx}
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.javafx.scene.control.{Dialogs, TableViews}
@@ -34,6 +33,7 @@ import suiryc.scala.javafx.stage.Stages.StageLocation
 import suiryc.scala.math.Ordered._
 import suiryc.scala.math.Ordering._
 import suiryc.scala.settings.Preference
+import suiryc.scala.sys.OS
 
 class AccountHistoryController extends StrictLogging {
 
@@ -281,7 +281,7 @@ class AccountHistoryController extends StrictLogging {
     // On Linux, we must wait a bit after changing stage size before setting
     // divider positions, otherwise the value gets altered a bit by stage
     // resizing ...
-    if (!jfx.isLinux) restoreDividersPositions()
+    if (!OS.isLinux) restoreDividersPositions()
     else JFXSystem.scheduleOnce(200.millis)(restoreDividersPositions())
     ()
   }

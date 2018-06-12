@@ -23,13 +23,13 @@ import javafx.stage._
 import scala.collection.JavaConverters._
 import scala.util.Success
 import suiryc.scala.RichOption._
-import suiryc.scala.{javafx => jfx}
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.javafx.scene.control.{Dialogs, TableViews}
 import suiryc.scala.javafx.stage.{FileChoosers, Stages}
 import suiryc.scala.math.Ordered._
 import suiryc.scala.settings.Preference
+import suiryc.scala.sys.OS
 
 // TODO: smart deletion of funds ?
 //         - keep the necessary data (NAV on some dates) used to compute levies
@@ -184,7 +184,7 @@ class MainController extends StrictLogging {
     // divider positions, otherwise the value gets altered a bit by stage
     // resizing ...
     import scala.concurrent.duration._
-    if (!jfx.isLinux) restoreDividerPositions()
+    if (!OS.isLinux) restoreDividerPositions()
     else JFXSystem.scheduleOnce(200.millis)(restoreDividerPositions())
     ()
   }
