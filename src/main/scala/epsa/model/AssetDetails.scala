@@ -18,15 +18,15 @@ import suiryc.scala.math.Ordering.localDateOrdering
 /** The kind of asset details. */
 object AssetDetailsKind extends Enumeration {
   /** Standard (i.e. real) asset details. */
-  val Standard = Value
+  val Standard: AssetDetailsKind.Value = Value
   /** Partial total details. */
-  val TotalPartial = Value
+  val TotalPartial: AssetDetailsKind.Value = Value
   /** Partial (per fund) total details. */
-  val TotalPerFund = Value
+  val TotalPerFund: AssetDetailsKind.Value = Value
   /** Partial (per availability) total details. */
-  val TotalPerAvailability = Value
+  val TotalPerAvailability: AssetDetailsKind.Value = Value
   /** Total details. */
-  val Total = Value
+  val Total: AssetDetailsKind.Value = Value
 }
 
 /** Asset details. */
@@ -133,7 +133,7 @@ case class StandardAssetDetails(
   override val actualVWAP: Option[BigDecimal],
   availabilityBase: Option[LocalDate]
 ) extends AssetDetails {
-  val kind = AssetDetailsKind.Standard
+  val kind: AssetDetailsKind.Value = AssetDetailsKind.Standard
 }
 
 /** Total (maybe partial) details. */
@@ -174,10 +174,13 @@ class AssetDetailsWithTotal(
   // availability date) and the grand total at the end of the table.
   // We would also like for partial totals to be sortable (only the entries
   // inside each total group, not between groups).
-  // To do so, we create SortedList for each partial total group, and bind its
+  // To do so we create a SortedList for each partial total group, bind its
   // comparator to ours (which is bound to the table one), then we listen for
-  // changes in each group and propagate them (with appropriate adaptation to
-  // fir the transformed list given as table items).
+  // changes in each group and propagate them:
+  // Thus if the user changes the sorting, the bound comparator is updated,
+  // which triggers changes in each SortedList, which we propagate (with
+  // adapted indices to fit the actual displayed table entries) to update the
+  // displayed table.
 
   private def orZero(v: Option[BigDecimal]): BigDecimal = v.getOrElse(0)
 
@@ -242,11 +245,12 @@ class AssetDetailsWithTotal(
   private def toSorted(list: List[AssetDetails]): SortedList[AssetDetails] =
     new SortedList[AssetDetails](FXCollections.observableList(list.asJava))
 
-  // This adapts and fires a change triggered from a partial total group.
-  // The adapted change properly sources the full items list (not only its own
-  // group) and has its indices offsetted to get the correct ones in this list.
+  // This is the function called for each partial totals group when order is
+  // changed (sorting changed). We adapt each change (relative to this list)
+  // to a new change fitting the actual table entries (where those entries are
+  // actually displayed, at the given offset), and fire it (for the table).
   private def adaptChange[A <: AssetDetails](c: Change[A], offset: Int): Unit = {
-    // We need to update our list first before firing any change
+    // We need to update our totals list first before firing any change
     updateTotals()
     val list = FXCollections.observableList(totals.asJava).asInstanceOf[ObservableList[A]]
     // Since the original list is not the complete one, wrap the change to
@@ -319,9 +323,12 @@ class AssetDetailsWithTotal(
       totals
     }
 
+  // This contains all the extra entries we wish to display in the table
   private var totals: List[AssetDetails] = Nil
 
   private def updateTotals(): Unit = {
+    // Note: we need to 'tag' the first entry (for dedicated CSS style), and
+    // 'untag' others (since sorting rows change their order).
     def tagFirst(assets: List[AssetDetails]): List[AssetDetails] = {
       @scala.annotation.tailrec
       def loop(assets: List[AssetDetails], first: Boolean): Unit =
@@ -346,18 +353,31 @@ class AssetDetailsWithTotal(
 
   updateTotals()
 
+  // Since we only append extra entries, this TransformationList does not change
+  // the indices of original entries, which simplifies the mandatory functions
+  // implementation.
+
+  // No index change for original (source) list, so changes can be propagated
+  // as-is.
   override def sourceChanged(c: Change[_ <: AssetDetails]): Unit = {
     fireChange(c)
   }
 
-  override def getSourceIndex(index: Int): Int =
+  // We match source indexes
+  override def getSourceIndex(index: Int): Int = {
     if (index < getSource.size) index else -1
+  }
 
-  override def get(index: Int): AssetDetails =
+  // Gets a transformed entry:
+  //  - first (matching index): original (source) entries
+  //  - then: partial totals if any and grand total
+  override def get(index: Int): AssetDetails = {
     if (index < getSource.size) getSource.get(index)
     else if (index < getSource.size + totals.size) totals(index - getSource.size)
     else throw new ArrayIndexOutOfBoundsException(index)
+  }
 
+  // We add our totals to the original entries
   override def size(): Int = getSource.size + totals.size
 
 }
