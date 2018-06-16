@@ -3,7 +3,7 @@ import Keys._
 
 lazy val versions = Map[String, String](
   "akka"          -> "2.5.13",
-  "epsa"          -> "1.0-SNAPSHOT",
+  "epsa"          -> "1.1-SNAPSHOT",
   "h2"            -> "1.4.197",
   "html-cleaner"  -> "2.22",
   "httpclient"    -> "4.5.5",
@@ -16,7 +16,7 @@ lazy val versions = Map[String, String](
   "slick"         -> "3.2.3",
   "simple-odf"    -> "0.8.2-incubating",
   "spray-json"    -> "1.3.4",
-  "suiryc-scala"  -> "0.0.2-SNAPSHOT"
+  "suiryc-scala"  -> "0.0.3-SNAPSHOT"
 )
 
 

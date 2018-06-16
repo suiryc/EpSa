@@ -330,7 +330,7 @@ class MainController extends StrictLogging {
   class ControllerActor(state0: State) extends Actor {
 
     val savingsOnDateStage: Stage = {
-      import com.sun.javafx.scene.control.skin.DatePickerSkin
+      import javafx.scene.control.skin.DatePickerSkin
       import suiryc.scala.javafx.scene.control.Dialogs
 
       // Note:

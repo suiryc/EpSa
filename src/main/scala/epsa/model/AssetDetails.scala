@@ -368,6 +368,9 @@ class AssetDetailsWithTotal(
     if (index < getSource.size) index else -1
   }
 
+  // Ditto.
+  override def getViewIndex(index: Int): Int = getSourceIndex(index)
+
   // Gets a transformed entry:
   //  - first (matching index): original (source) entries
   //  - then: partial totals if any and grand total

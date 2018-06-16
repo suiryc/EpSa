@@ -1,7 +1,7 @@
 package epsa.controllers
 
 import akka.actor.Cancellable
-import com.sun.javafx.scene.control.skin.{TreeTableViewSkin, VirtualFlow, VirtualScrollBar}
+import com.sun.javafx.scene.control.VirtualScrollBar
 import com.typesafe.scalalogging.StrictLogging
 import epsa.{I18N, Settings}
 import epsa.I18N.Strings
@@ -17,6 +17,7 @@ import javafx.beans.property.SimpleObjectProperty
 import javafx.fxml.{FXML, FXMLLoader}
 import javafx.scene.Scene
 import javafx.scene.control._
+import javafx.scene.control.skin.{TreeTableViewSkin, VirtualFlow}
 import javafx.scene.image.ImageView
 import javafx.scene.input.MouseEvent
 import javafx.scene.layout.{AnchorPane, Region}
@@ -357,7 +358,7 @@ class AccountHistoryController extends StrictLogging {
       historyTable.getSkin.asInstanceOf[TreeTableViewSkin[_]].getChildren.asScala.find(_.isInstanceOf[VirtualFlow[_]]).foreach {
         case flow: VirtualFlow[_] =>
           val indices = items.map(historyTable.getRow).filter(_ >= 0)
-          if (indices.nonEmpty) flow.show(indices.min)
+          if (indices.nonEmpty) flow.scrollTo(indices.min)
       }
 
       animationHighlighter = Some(JFXStyles.highlightAnimation(rows, animationHighlighter))
