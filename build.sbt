@@ -2,18 +2,18 @@ import sbt._
 import Keys._
 
 lazy val versions = Map[String, String](
-  "akka"          -> "2.5.8",
+  "akka"          -> "2.5.13",
   "epsa"          -> "1.0-SNAPSHOT",
-  "h2"            -> "1.4.196",
-  "html-cleaner"  -> "2.21",
-  "httpclient"    -> "4.5.4",
+  "h2"            -> "1.4.197",
+  "html-cleaner"  -> "2.22",
+  "httpclient"    -> "4.5.5",
   "logback"       -> "1.2.3",
   "poi"           -> "3.17",
-  "scala"         -> "2.12.4",
-  "scala-logging" -> "3.7.2",
-  "scalatest"     -> "3.0.4",
+  "scala"         -> "2.12.6",
+  "scala-logging" -> "3.9.0",
+  "scalatest"     -> "3.0.5",
   "slf4j"         -> "1.7.25",
-  "slick"         -> "3.2.1",
+  "slick"         -> "3.2.3",
   "simple-odf"    -> "0.8.2-incubating",
   "spray-json"    -> "1.3.4",
   "suiryc-scala"  -> "0.0.2-SNAPSHOT"
@@ -62,7 +62,6 @@ lazy val epsa = project.in(file(".")).
       "-Ywarn-unused",
       "-Ywarn-unused-import"
     ),
-    scalacOptions in (Compile, doc) ++= Seq("-diagrams", "-implicits"),
     resolvers += Resolver.mavenLocal,
 
     parallelExecution in Test := false,

@@ -332,7 +332,12 @@ object DataStore {
     val dbPath = path.getParent.resolve(name)
 
     // Open the new DB, and create missing tables
-    val ref = Database.forURL(s"jdbc:h2:$dbPath", user = "user", password = "pass", driver = "org.h2.Driver")
+    // Note: it's best here to use the same value for minThreads, maxThreads
+    // and maxConnections.
+    // See: https://github.com/slick/slick/issues/1614
+    val executor = AsyncExecutor(name = "epsa", minThreads = 2, maxThreads = 2, queueSize = 100, maxConnections = 2)
+    val ref = Database.forURL(s"jdbc:h2:$dbPath", user = "user", password = "pass", driver = "org.h2.Driver",
+      executor = executor)
     dbOpen(ref).map { _ =>
       // Automatically keep in mind the new DB
       val dbInfoNew = DBInfo(ref, path)
