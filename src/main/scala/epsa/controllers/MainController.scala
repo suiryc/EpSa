@@ -415,8 +415,7 @@ class MainController extends StrictLogging {
             Dialogs.error(
               owner = Some(state.stage),
               title = Some(state.stage.getTitle),
-              headerText = Some(Strings.unexpectedIssue),
-              contentText = None,
+              contentText = Some(Strings.unexpectedIssue),
               ex = Some(ex)
             )
             ()
@@ -815,8 +814,7 @@ class MainController extends StrictLogging {
             Dialogs.error(
               owner = Some(state.stage),
               title = Some(Strings.exportRawAccountHistory),
-              headerText = Some(Strings.fileWriteError),
-              contentText = None,
+              contentText = Some(Strings.fileWriteError),
               ex = None
             )
           }
@@ -825,8 +823,7 @@ class MainController extends StrictLogging {
             Dialogs.error(
               owner = Some(state.stage),
               title = Some(Strings.exportRawAccountHistory),
-              headerText = Some(Strings.fileWriteError),
-              contentText = None,
+              contentText = Some(Strings.fileWriteError),
               ex = Some(ex)
             )
         }
@@ -874,8 +871,7 @@ class MainController extends StrictLogging {
               Dialogs.error(
                 owner = Some(state.stage),
                 title = Some(Strings.importRawAccountHistory),
-                headerText = Some(Strings.fileReadError),
-                contentText = None,
+                contentText = Some(Strings.fileReadError),
                 ex = Some(ex)
               )
               None
@@ -1095,7 +1091,7 @@ object MainController {
       Dialogs.information(
         owner = Some(state.stage),
         title = None,
-        headerText = Some(Strings.needRestart)
+        contentText = Some(Strings.needRestart)
       )
     }
 

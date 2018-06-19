@@ -38,7 +38,7 @@ object Form {
     val resp = Dialogs.confirmation(
       owner = Some(owner),
       title = None,
-      headerText = Some(msg)
+      contentText = Some(msg)
     )
 
     if (!resp.contains(ButtonType.OK)) {

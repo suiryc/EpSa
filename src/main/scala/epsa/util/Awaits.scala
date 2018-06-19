@@ -20,7 +20,7 @@ object Awaits {
   def orError[A](future: Future[A], owner: Option[Window], msg: => String): Try[A] = {
     val r = Await.ready(future, Duration.Inf).value.get
     r match {
-      case Failure(ex) => Dialogs.error(owner = owner, title = None, headerText = Some(msg), ex = Some(ex))
+      case Failure(ex) => Dialogs.error(owner = owner, title = None, contentText = Some(msg), ex = Some(ex))
       case _           =>
     }
     r
@@ -111,7 +111,7 @@ object Awaits {
         val f = RichFuture.executeAllSequentially(stopOnError = true, actions).map(_ => ())
         orError(f, owner, DataStore.writeIssueMsg()) match {
           case Success(_) =>
-            Dialogs.information(owner = owner, title = None, headerText = None, contentText = Some(DataStore.eventsReorderedMsg))
+            Dialogs.information(owner = owner, title = None, contentText = Some(DataStore.eventsReorderedMsg))
 
           case _ =>
             // Failure was already notified
@@ -120,7 +120,7 @@ object Awaits {
     }
     orError(DataStore.AssetHistory.cleanup(fundIds), owner, DataStore.cleanupIssueMsg) match {
       case Success(v) =>
-        if (v.nonEmpty) Dialogs.information(owner = owner, title = None, headerText = None, contentText = Some(DataStore.cleanupMsg))
+        if (v.nonEmpty) Dialogs.information(owner = owner, title = None, contentText = Some(DataStore.cleanupMsg))
         ()
 
       case _ =>

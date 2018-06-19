@@ -261,7 +261,7 @@ class NetAssetValueHistoryController {
         Dialogs.error(
           owner = Some(stage),
           title = None,
-          headerText = Some(failureMsg),
+          contentText = Some(failureMsg),
           ex = Some(ex)
         )
         working = false

@@ -199,8 +199,7 @@ class AccountHistoryController extends StrictLogging {
       Dialogs.error(
         owner = Some(stage),
         title = Some(title),
-        headerText = Some(Strings.unexpectedIssue),
-        contentText = None,
+        contentText = Some(Strings.unexpectedIssue),
         ex = Some(ex)
       )
     }
