@@ -26,7 +26,13 @@ class SavingsView(tab: SavingsViewTab) {
 
   val assetFields: Map[String, AssetField[_]] = AssetField.fields()
 
-  val assetsColumns: List[(String, TableColumn[AssetDetails, _])] = assetFields.mapValues(_.column).view.force.toList
+  // Notes:
+  // 'mapValues' creates a map-like which applies the given function each time
+  // a value is retrieved. We could '.view.force' to transform it back to a
+  // standard Map, but we would lose the ordering.
+  // But since we want a List in the end, a simple '.toList' will get rid of
+  // the map-like behaviour.
+  val assetsColumns: List[(String, TableColumn[AssetDetails, _])] = assetFields.mapValues(_.column).toList
 
   private val columnAmount = new TableColumn[AssetDetails, Nothing](Strings.amount)
 
