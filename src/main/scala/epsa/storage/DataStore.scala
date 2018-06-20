@@ -356,7 +356,9 @@ object DataStore {
     // is closed (which appears to be once a query is done). So we need to
     // prevent it with 'DB_CLOSE_DELAY=-1'.
     // See: http://stackoverflow.com/a/5936988
-    val ref = Database.forURL(s"jdbc:h2:mem:$name;DB_CLOSE_DELAY=-1", driver = "org.h2.Driver")
+    val executor = AsyncExecutor(name = "epsa", minThreads = 2, maxThreads = 2, queueSize = 100, maxConnections = 2)
+    val ref = Database.forURL(s"jdbc:h2:mem:$name;DB_CLOSE_DELAY=-1", driver = "org.h2.Driver",
+      executor = executor)
     dbOpen(ref).map(DBTemp)
   }
 
