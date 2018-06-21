@@ -282,7 +282,7 @@ class AccountHistoryController extends StrictLogging {
     // divider positions, otherwise the value gets altered a bit by stage
     // resizing ...
     if (!OS.isLinux) restoreDividersPositions()
-    else JFXSystem.scheduleOnce(200.millis)(restoreDividersPositions())
+    else JFXSystem.scheduleOnce(200.millis)(restoreDividersPositions())(epsa.Main.Akka.dispatcher)
     ()
   }
 

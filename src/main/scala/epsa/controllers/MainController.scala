@@ -185,7 +185,7 @@ class MainController extends StrictLogging {
     // resizing ...
     import scala.concurrent.duration._
     if (!OS.isLinux) restoreDividerPositions()
-    else JFXSystem.scheduleOnce(200.millis)(restoreDividerPositions())
+    else JFXSystem.scheduleOnce(200.millis)(restoreDividerPositions())(epsa.Main.Akka.dispatcher)
     ()
   }
 
