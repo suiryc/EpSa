@@ -21,22 +21,22 @@ import javafx.scene.control.skin.{TreeTableViewSkin, VirtualFlow}
 import javafx.scene.image.ImageView
 import javafx.scene.input.MouseEvent
 import javafx.scene.layout.{AnchorPane, Region}
-import javafx.stage.{Stage, WindowEvent}
+import javafx.stage.Stage
 import scala.collection.JavaConverters._
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import suiryc.scala.javafx.beans.value.RichObservableValue
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.concurrent.JFXSystem
-import suiryc.scala.javafx.scene.control.{Dialogs, TableViews}
-import suiryc.scala.javafx.stage.Stages
+import suiryc.scala.javafx.scene.control.skin.SplitPaneSkinEx
+import suiryc.scala.javafx.scene.control.{Dialogs, Panes, TableViews}
+import suiryc.scala.javafx.stage.{StagePersistentView, Stages}
 import suiryc.scala.javafx.stage.Stages.StageLocation
 import suiryc.scala.math.Ordered._
 import suiryc.scala.math.Ordering._
 import suiryc.scala.settings.Preference
-import suiryc.scala.sys.OS
 
-class AccountHistoryController extends StrictLogging {
+class AccountHistoryController extends StagePersistentView with StrictLogging {
 
   import AccountHistoryController._
 
@@ -206,10 +206,21 @@ class AccountHistoryController extends StrictLogging {
   }
 
   /** Restores (persisted) view. */
-  private def restoreView(): Unit = {
-    // Restore stage location
-    Option(stageLocation()).foreach { loc =>
-      Stages.setLocation(stage, loc, setSize = true)
+  override protected def restoreView(): Unit = {
+    Stages.onStageReady(stage, first = false) {
+      // Restore stage location
+      Stages.setMinimumDimensions(stage)
+      Option(stageLocation()).foreach { loc =>
+        Stages.setLocation(stage, loc, setSize = true)
+      }
+    }(JFXSystem.dispatcher)
+
+    // Restore SplitPane divider positions
+    Option(splitPaneDividerPositions()).foreach { dividerPositions =>
+      Panes.restoreDividerPositions(splitPane, dividerPositions)
+    }
+    Option(splitPane2DividerPositions()).foreach { dividerPositions =>
+      Panes.restoreDividerPositions(splitPane_2, dividerPositions)
     }
 
     // Restore assets columns order and width
@@ -254,40 +265,15 @@ class AccountHistoryController extends StrictLogging {
     // Requesting layout (in runLater) usually helps when the table is first
     // being shown. Otherwise the column is often properly resized but it is
     // not applied (visually) until we interact with the stage ...
-    JFXSystem.runLater {
-      historyTable.requestLayout()
-    }
-
-    def restoreDividerPositions(splitPane: SplitPane, dividerPositions: String): Unit = {
-      // Restore SplitPane divider positions
-      try {
-        val positions = dividerPositions.split(';').map(_.toDouble)
-        splitPane.setDividerPositions(positions: _*)
-      } catch {
-        case ex: Exception => logger.warn(s"Could not restore SplitPane divider positions[$dividerPositions]: ${ex.getMessage}")
-      }
-    }
-
-    def restoreDividersPositions(): Unit = {
-      // Restore SplitPane divider positions
-      Option(splitPaneDividerPositions()).foreach { dividerPositions =>
-        restoreDividerPositions(splitPane, dividerPositions)
-      }
-      Option(splitPane2DividerPositions()).foreach { dividerPositions =>
-        restoreDividerPositions(splitPane_2, dividerPositions)
-      }
-    }
-
-    // On Linux, we must wait a bit after changing stage size before setting
-    // divider positions, otherwise the value gets altered a bit by stage
-    // resizing ...
-    if (!OS.isLinux) restoreDividersPositions()
-    else JFXSystem.scheduleOnce(200.millis)(restoreDividersPositions())(epsa.Main.Akka.dispatcher)
+    // TODO: commenting to see if still useful in latest Java 10
+    //JFXSystem.runLater {
+    //  historyTable.requestLayout()
+    //}
     ()
   }
 
   /** Persists view (stage location, ...). */
-  private def persistView(): Unit = {
+  override protected def persistView(): Unit = {
     // Persist stage location
     // Note: if iconified, resets it
     stageLocation() = Stages.getLocation(stage).orNull
@@ -296,12 +282,8 @@ class AccountHistoryController extends StrictLogging {
     historyColumnsPref() = TableViews.getColumnsView(historyTable, historyColumns)
 
     // Persist SplitPane divider positions
-    splitPaneDividerPositions() = splitPane.getDividerPositions.mkString(";")
-    splitPane2DividerPositions() = splitPane_2.getDividerPositions.mkString(";")
-  }
-
-  def onCloseRequest(@deprecated("unused","") event: WindowEvent): Unit = {
-    persistView()
+    splitPaneDividerPositions() = Panes.encodeDividerPositions(splitPane)
+    splitPane2DividerPositions() = Panes.encodeDividerPositions(splitPane_2)
   }
 
   /**
@@ -808,19 +790,11 @@ object AccountHistoryController {
     val loader = new FXMLLoader(getClass.getResource("/fxml/account-history.fxml"), I18N.getResources)
     stage.setScene(new Scene(loader.load()))
     stage.getScene.getStylesheets.add(getClass.getResource("/css/main.css").toExternalForm)
+    SplitPaneSkinEx.addStylesheet(stage.getScene)
     val controller = loader.getController[AccountHistoryController]
     controller.initialize(mainController, stage, state)
 
-    // Delegate closing request to controller
-    stage.setOnCloseRequest(controller.onCloseRequest _)
-
-    // Wait for dialog to be shown before restoring the view
-    stage.showingProperty().listen2 { cancellable =>
-      cancellable.cancel()
-      controller.restoreView()
-    }
-
-    Stages.trackMinimumDimensions(stage)
+    Stages.addPersistence(stage, controller)
 
     stage
   }

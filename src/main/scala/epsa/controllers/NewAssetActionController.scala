@@ -23,10 +23,11 @@ import suiryc.scala.javafx.stage.Stages.StageLocation
 import suiryc.scala.math.Ordered._
 import suiryc.scala.settings.Preference
 import suiryc.scala.javafx.beans.value.RichObservableValue._
-import suiryc.scala.javafx.scene.control.{DatePickers, TextFieldWithButton}
-import suiryc.scala.javafx.stage.Stages
+import suiryc.scala.javafx.concurrent.JFXSystem
+import suiryc.scala.javafx.scene.control.{DatePickers, Dialogs, TextFieldWithButton}
+import suiryc.scala.javafx.stage.{StagePersistentView, Stages}
 
-class NewAssetActionController extends StrictLogging {
+class NewAssetActionController extends StagePersistentView with StrictLogging {
 
   import NewAssetActionController._
 
@@ -173,7 +174,7 @@ class NewAssetActionController extends StrictLogging {
         val contextMenu = new ContextMenu()
         unavailabilityPeriods.foreach { period =>
           val menuItem = new MenuItem(period.id)
-          menuItem.setOnAction { (_: ActionEvent) =>
+          menuItem.setOnAction { _: ActionEvent =>
             getOperationDate.foreach { date =>
               val (month, dayOfMonth) = period.month match {
                 case Some(v) => (v, 1)
@@ -309,23 +310,22 @@ class NewAssetActionController extends StrictLogging {
   }
 
   /** Restores (persisted) view. */
-  private def restoreView(): Unit = {
-    // Restore stage location
-    Option(stageLocation()).foreach { loc =>
-      Stages.setLocation(stage, loc, setSize = true)
-    }
+  override protected def restoreView(): Unit = {
+    Stages.onStageReady(stage, first = false) {
+      // Restore stage location
+      Stages.setMinimumDimensions(stage)
+      Option(stageLocation()).foreach { loc =>
+        Stages.setLocation(stage, loc, setSize = true)
+      }
+    }(JFXSystem.dispatcher)
   }
 
   /** Persists view (stage location, ...). */
-  private def persistView(): Unit = {
+  override protected def persistView(): Unit = {
+    dstUnitsAuto() = dstUnitsAutoButton.isSelected
     // Persist stage location
     // Note: if iconified, resets it
     stageLocation() = Stages.getLocation(stage).orNull
-  }
-
-  def onCloseRequest(@deprecated("unused","") event: DialogEvent): Unit = {
-    dstUnitsAuto() = dstUnitsAutoButton.isSelected
-    persistView()
   }
 
   private def onToggleKind(): Unit = {
@@ -943,17 +943,9 @@ object NewAssetActionController {
     val controller = loader.getController[NewAssetActionController]
     controller.initialize(mainController, savings, dialog, kind, asset)
 
-    // Delegate closing request to controller
-    dialog.setOnCloseRequest(controller.onCloseRequest _)
-
-    // Wait for dialog to be shown before restoring the view
-    dialog.showingProperty().listen2 { cancellable =>
-      cancellable.cancel()
-      controller.restoreView()
-    }
+    Dialogs.addPersistence(dialog, controller)
 
     dialog.setResultConverter(resultConverter(owner, controller) _)
-    Stages.trackMinimumDimensions(Stages.getStage(dialog))
 
     dialog
   }

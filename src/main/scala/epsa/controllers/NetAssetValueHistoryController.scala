@@ -32,9 +32,9 @@ import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.javafx.scene.control.{Dialogs, TextFieldWithButton}
 import suiryc.scala.javafx.stage.Stages.StageLocation
-import suiryc.scala.javafx.stage.{FileChoosers, Stages}
+import suiryc.scala.javafx.stage.{FileChoosers, StagePersistentView, Stages}
 
-class NetAssetValueHistoryController {
+class NetAssetValueHistoryController extends StagePersistentView {
 
   import NetAssetValueHistoryController._
 
@@ -117,15 +117,18 @@ class NetAssetValueHistoryController {
   }
 
   /** Restores (persisted) view. */
-  private def restoreView(): Unit = {
-    // Restore stage location
-    Option(stageLocation()).foreach { loc =>
-      Stages.setLocation(stage, loc, setSize = true)
-    }
+  override protected def restoreView(): Unit = {
+    Stages.onStageReady(stage, first = false) {
+      // Restore stage location
+      Stages.setMinimumDimensions(stage)
+      Option(stageLocation()).foreach { loc =>
+        Stages.setLocation(stage, loc, setSize = true)
+      }
+    }(JFXSystem.dispatcher)
   }
 
   /** Persists view (stage location, ...). */
-  private def persistView(): Unit = {
+  override protected def persistView(): Unit = {
     // Persist stage location
     // Note: if iconified, resets it
     stageLocation() = Stages.getLocation(stage).orNull
@@ -136,7 +139,6 @@ class NetAssetValueHistoryController {
     // when applicable.
     // We do override this behaviour and need to close the dialog ourselves
     // if applicable.
-    persistView()
 
     def checkWorking = if (working) Form.confirmDiscardPendingAction(stage, event) else true
     def checkPendingChanges = if (changes.nonEmpty) Form.confirmDiscardPendingChanges(stage, event) else true
@@ -447,7 +449,7 @@ class NetAssetValueHistoryController {
         }
 
         // Save edited value if applicable when requested
-        menuTextField.textField.setOnAction { (_: ActionEvent) =>
+        menuTextField.textField.setOnAction { _: ActionEvent =>
           val nav = getUserNAV
           if ((menuTextField.getText != text) && (nav > 0) && (nav != data.value)) {
             getFund.foreach { fund =>
@@ -600,7 +602,11 @@ class NetAssetValueHistoryController {
     resultStage.setTitle(stage.getTitle)
     val scene = new Scene(root)
     resultStage.setScene(scene)
-    Stages.trackMinimumDimensions(resultStage)
+
+    Stages.onStageReady(resultStage, first = false) {
+      Stages.setMinimumDimensions(stage)
+    }(JFXSystem.dispatcher)
+
     resultStage.show()
   }
 
@@ -640,22 +646,15 @@ object NetAssetValueHistoryController {
     // Delegate closing request to controller
     Stages.getStage(dialog).setOnCloseRequest(controller.onCloseRequest(dialog) _)
 
-    // Wait for dialog to be shown before restoring the view
-    dialog.showingProperty().listen2 { cancellable =>
-      cancellable.cancel()
-      controller.restoreView()
-    }
+    Dialogs.addPersistence(dialog, controller)
 
     dialog.setResultConverter(resultConverter(mainController, window, controller) _)
-    Stages.trackMinimumDimensions(Stages.getStage(dialog))
 
     dialog
   }
 
   private def resultConverter(mainController: MainController, window: Window, controller: NetAssetValueHistoryController)(buttonType: ButtonType): Boolean = {
     import epsa.Main.Akka.dispatcher
-
-    controller.persistView()
 
     // Apply changes upon validation
     if (buttonType == ButtonType.OK) {

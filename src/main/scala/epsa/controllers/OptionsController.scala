@@ -7,14 +7,17 @@ import javafx.collections.FXCollections
 import javafx.fxml.{FXML, FXMLLoader}
 import javafx.scene.Node
 import javafx.scene.control._
-import javafx.stage.Window
+import javafx.stage.{Stage, Window}
 import scala.concurrent.duration.{Duration, FiniteDuration}
-import suiryc.scala.javafx.stage.Stages
+import suiryc.scala.javafx.stage.{StagePersistentView, Stages}
 import suiryc.scala.javafx.beans.value.RichObservableValue._
-import suiryc.scala.settings.{SettingSnapshot, SettingsSnapshot}
+import suiryc.scala.javafx.concurrent.JFXSystem
+import suiryc.scala.javafx.scene.control.Dialogs
+import suiryc.scala.javafx.stage.Stages.StageLocation
+import suiryc.scala.settings.{Preference, SettingSnapshot, SettingsSnapshot}
 import suiryc.scala.util.I18NLocale
 
-class OptionsController {
+class OptionsController extends StagePersistentView {
 
   import OptionsController._
 
@@ -46,6 +49,8 @@ class OptionsController {
   protected var httpClientTimeout: TextField = _
 
   protected var buttonOk: Node = _
+
+  private lazy val stage = httpClientTimeout.getScene.getWindow.asInstanceOf[Stage]
 
   def initialize(dialog: Dialog[_], snapshot: SettingsSnapshot): Unit = {
     // Load css
@@ -102,6 +107,24 @@ class OptionsController {
     httpClientTimeout.setText(settings.httpClientTimeout().toString)
   }
 
+  /** Restores (persisted) view. */
+  override protected def restoreView(): Unit = {
+    Stages.onStageReady(stage, first = false) {
+      // Restore stage location
+      Stages.setMinimumDimensions(stage)
+      Option(stageLocation()).foreach { loc =>
+        Stages.setLocation(stage, loc, setSize = true)
+      }
+    }(JFXSystem.dispatcher)
+  }
+
+  /** Persists view (stage location, ...). */
+  override protected def persistView(): Unit = {
+    // Persist stage location
+    // Note: if iconified, resets it
+    stageLocation() = Stages.getLocation(stage).orNull
+  }
+
   private def checkForm(): Unit = {
     val ok = try {
       Duration(httpClientTimeout.getText).isFinite()
@@ -148,10 +171,15 @@ class OptionsController {
 
 object OptionsController {
 
+  import epsa.Settings.prefs
+  import Preference._
+
   // Note: the result of this dialog is whether the owner window needs to be
   // reloaded (language change)
 
   private val settings = epsa.Settings
+
+  private val stageLocation = Preference.from(prefs, "stage.options.location", null:StageLocation)
 
   def buildDialog(owner: Option[Window]): Dialog[(Boolean, Boolean)] = {
     val dialog = new Dialog[(Boolean, Boolean)]()
@@ -170,8 +198,9 @@ object OptionsController {
     val controller = loader.getController[OptionsController]
     controller.initialize(dialog, snapshot)
 
+    Dialogs.addPersistence(dialog, controller)
+
     dialog.setResultConverter(resultConverter(snapshot, controller) _)
-    Stages.trackMinimumDimensions(Stages.getStage(dialog))
 
     dialog
   }

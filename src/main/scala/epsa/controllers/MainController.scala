@@ -25,17 +25,17 @@ import scala.util.Success
 import suiryc.scala.RichOption._
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.concurrent.JFXSystem
-import suiryc.scala.javafx.scene.control.{Dialogs, TableViews}
-import suiryc.scala.javafx.stage.{FileChoosers, Stages}
+import suiryc.scala.javafx.scene.control.skin.SplitPaneSkinEx
+import suiryc.scala.javafx.scene.control.{Dialogs, Panes, TableViews}
+import suiryc.scala.javafx.stage.{FileChoosers, StagePersistentView, Stages}
 import suiryc.scala.math.Ordered._
 import suiryc.scala.settings.Preference
-import suiryc.scala.sys.OS
 
 // TODO: smart deletion of funds ?
 //         - keep the necessary data (NAV on some dates) used to compute levies
 //         - way to determine if all levies of past fund assets were paid already, so that all NAVs can really be deleted ?
 // TODO: use scala-logging
-class MainController extends StrictLogging {
+class MainController extends StagePersistentView with StrictLogging {
 
   import MainController._
 
@@ -94,6 +94,8 @@ class MainController extends StrictLogging {
 
   lazy private val stage = splitPane.getScene.getWindow.asInstanceOf[Stage]
 
+  lazy private val toDateSavingsViewTab: SavingsViewTab = addSavingsOnDateTab(None, init = true)
+
   private var chartHandler: ChartHandler[ChartMark] = _
 
   private var currentChartFund: Option[Savings.Fund] = None
@@ -102,7 +104,11 @@ class MainController extends StrictLogging {
 
   private[epsa] var actor: ActorRef = _
 
-  def initialize(state: State): Unit = {
+  private var first: Boolean = _
+
+  def initialize(state: State, first: Boolean): Unit = {
+    this.first = first
+
     // Note: make the actor name unique (with timestamp) so that it can be
     // recreated later.
     actor = JFXSystem.newJFXActor(
@@ -162,44 +168,93 @@ class MainController extends StrictLogging {
   }
 
   /** Restores (persisted) view. */
-  private def restoreView(stage: Stage): Unit = {
-    // Restore stage location
-    Option(stageLocation()).foreach { loc =>
-      Stages.setLocation(stage, loc, setSize = true)
-    }
-
-    def restoreDividerPositions(): Unit = {
-      // Restore SplitPane divider positions
-      Option(splitPaneDividerPositions()).foreach { dividerPositions =>
-        try {
-          val positions = dividerPositions.split(';').map(_.toDouble)
-          splitPane.setDividerPositions(positions: _*)
-        } catch {
-          case ex: Exception => logger.warn(s"Could not restore SplitPane divider positions[$dividerPositions]: ${ex.getMessage}")
-        }
+  override protected def restoreView(): Unit = {
+    Stages.onStageReady(stage, first) {
+      // Restore stage location
+      Stages.setMinimumDimensions(stage)
+      Option(stageLocation()).foreach { loc =>
+        Stages.setLocation(stage, loc, setSize = true)
       }
-    }
+    }(JFXSystem.dispatcher)
 
-    // On Linux, we must wait a bit after changing stage size before setting
-    // divider positions, otherwise the value gets altered a bit by stage
-    // resizing ...
-    import scala.concurrent.duration._
-    if (!OS.isLinux) restoreDividerPositions()
-    else JFXSystem.scheduleOnce(200.millis)(restoreDividerPositions())(epsa.Main.Akka.dispatcher)
-    ()
+    Option(splitPaneDividerPositions()).foreach { dividerPositions =>
+      Panes.restoreDividerPositions(splitPane, dividerPositions)
+    }
   }
 
   /** Persists view (stage location, ...). */
-  private def persistView(state: State, savingsView: SavingsView): Unit = {
+  override protected def persistView(): Unit = {
+    val savingsView = toDateSavingsViewTab.view
+
     // Persist stage location
     // Note: if iconified, resets it
-    stageLocation() = Stages.getLocation(state.stage).orNull
+    stageLocation() = Stages.getLocation(stage).orNull
 
     // Persist assets table columns order and width
     assetsColumnsPref() = TableViews.getColumnsView(savingsView.assetsTable, savingsView.assetsColumns)
 
     // Persist SplitPane divider positions
-    splitPaneDividerPositions() = splitPane.getDividerPositions.mkString(";")
+    splitPaneDividerPositions() = Panes.encodeDividerPositions(splitPane)
+  }
+
+  protected def refreshTab(tab: TabWithState, state: State): Unit = {
+    val refreshData = RefreshData(
+      state = state,
+      showTotalsPerScheme = totalsPerSchemeMenu.isSelected,
+      showTotalsPerFund = totalsPerFundMenu.isSelected,
+      showTotalsPerAvailability = totalsPerAvailabilityMenu.isSelected,
+      vwapPerAsset = vwapPerAssetMenu.isSelected,
+      upToDateAssets = upToDateAssetsMenu.isSelected
+    )
+    tab.refresh(refreshData)
+  }
+
+  protected def addSavingsOnDateTab(dateOpt: Option[LocalDate], init: Boolean = false): SavingsViewTab = {
+    val state = getState
+    val savingsViewTab = new SavingsViewTab(this, dateOpt)
+
+    // Restore assets columns order and width
+    val columnPrefs = if (init) {
+      // Add labels to show details of selected asset
+      // Note: setting constraints on each row does not seem necessary
+      savingsViewTab.view.assetFields.values.groupBy(_.columnIdx).foreach {
+        case (columnIdx, fields) =>
+          fields.zipWithIndex.foreach {
+            case (field, idx) =>
+              val label = new Label(field.detailsLabel)
+              assetDetails.getChildren.add(label)
+              GridPane.setColumnIndex(label, columnIdx * 2)
+              GridPane.setRowIndex(label, idx)
+              val value = field.detailsValue
+              assetDetails.getChildren.add(value)
+              GridPane.setColumnIndex(value, columnIdx * 2 + 1)
+              GridPane.setRowIndex(value, idx)
+          }
+      }
+
+      // Update details to actual selected asset in selected tab
+      tabPane.getSelectionModel.selectedItemProperty.listen { v =>
+        Option(v).map(_.getUserData).foreach {
+          case tab: SavingsViewTab => tab.view.updateDetailsValue()
+          case _                   => toDateSavingsViewTab.view.updateDetailsValue(None)
+        }
+      }
+
+      // Restore from preferences for main tab
+      Option(assetsColumnsPref())
+    } else {
+      // Apply main tab (current) view to new tabs
+      Some(TableViews.getColumnsView(toDateSavingsViewTab.view.assetsTable, toDateSavingsViewTab.view.assetsColumns))
+    }
+    TableViews.setColumnsView(savingsViewTab.view.assetsTable, savingsViewTab.view.assetsColumns, columnPrefs)
+
+    // Add the tab to the tab pane, and refresh its content
+    val tab = savingsViewTab.tab
+    tabPane.getTabs.add(tab)
+    tabPane.getSelectionModel.select(tab)
+    refreshTab(savingsViewTab, state)
+
+    savingsViewTab
   }
 
   def refresh(reload: Boolean = false): Unit = {
@@ -385,8 +440,8 @@ class MainController extends StrictLogging {
       }
       Dialogs.modalNode(
         splitPane.getScene.getWindow,
-        { (stage: Stage) =>
-          picker.setOnAction { (_: ActionEvent) =>
+        { stage: Stage =>
+          picker.setOnAction { _: ActionEvent =>
             onDate(stage)
           }
           stage.addEventFilter(KeyEvent.KEY_PRESSED, keyFilter(stage) _)
@@ -395,8 +450,6 @@ class MainController extends StrictLogging {
         }
       )
     }
-
-    val toDateSavingsViewTab: SavingsViewTab = addSavingsOnDateTab(None, init = true)
 
     refresh(state0, updateAssetsValue = true)
 
@@ -538,18 +591,6 @@ class MainController extends StrictLogging {
       refresh(state, updateAssetsValue = true)
     }
 
-    def refreshTab(tab: TabWithState, state: State): Unit = {
-      val refreshData = RefreshData(
-        state = state,
-        showTotalsPerScheme = totalsPerSchemeMenu.isSelected,
-        showTotalsPerFund = totalsPerFundMenu.isSelected,
-        showTotalsPerAvailability = totalsPerAvailabilityMenu.isSelected,
-        vwapPerAsset = vwapPerAssetMenu.isSelected,
-        upToDateAssets = upToDateAssetsMenu.isSelected
-      )
-      tab.refresh(refreshData)
-    }
-
     def refreshTabs(state: State): Unit = {
       tabPane.getTabs.asScala.map(_.getUserData).foreach {
         case tab: TabWithState => refreshTab(tab, state)
@@ -586,7 +627,7 @@ class MainController extends StrictLogging {
 
     def onExit(state: State): Unit = {
       if (checkPendingChanges(state)) {
-        persistView(state, toDateSavingsViewTab.view)
+        persistView()
 
         context.stop(self)
         epsa.Main.shutdown(state.stage)
@@ -673,7 +714,7 @@ class MainController extends StrictLogging {
         // Reset I18N cache to apply any language change
         I18N.reset()
         // Persist now to restore it when rebuilding the stage
-        persistView(state, toDateSavingsViewTab.view)
+        persistView()
         context.stop(self)
         MainController.build(state, needRestart)
       }
@@ -687,54 +728,6 @@ class MainController extends StrictLogging {
         case None       => savingsOnDateStage.show()
       }
       ()
-    }
-
-    def addSavingsOnDateTab(dateOpt: Option[LocalDate], init: Boolean = false): SavingsViewTab = {
-      val state = getState
-      val savingsViewTab = new SavingsViewTab(MainController.this, dateOpt)
-
-      // Restore assets columns order and width
-      val columnPrefs = if (init) {
-        // Add labels to show details of selected asset
-        // Note: setting constraints on each row does not seem necessary
-        savingsViewTab.view.assetFields.values.groupBy(_.columnIdx).foreach {
-          case (columnIdx, fields) =>
-            fields.zipWithIndex.foreach {
-              case (field, idx) =>
-                val label = new Label(field.detailsLabel)
-                assetDetails.getChildren.add(label)
-                GridPane.setColumnIndex(label, columnIdx * 2)
-                GridPane.setRowIndex(label, idx)
-                val value = field.detailsValue
-                assetDetails.getChildren.add(value)
-                GridPane.setColumnIndex(value, columnIdx * 2 + 1)
-                GridPane.setRowIndex(value, idx)
-            }
-        }
-
-        // Update details to actual selected asset in selected tab
-        tabPane.getSelectionModel.selectedItemProperty.listen { v =>
-          Option(v).map(_.getUserData).foreach {
-            case tab: SavingsViewTab => tab.view.updateDetailsValue()
-            case _                   => toDateSavingsViewTab.view.updateDetailsValue(None)
-          }
-        }
-
-        // Restore from preferences for main tab
-        Option(assetsColumnsPref())
-      } else {
-        // Apply main tab (current) view to new tabs
-        Some(TableViews.getColumnsView(toDateSavingsViewTab.view.assetsTable, toDateSavingsViewTab.view.assetsColumns))
-      }
-      TableViews.setColumnsView(savingsViewTab.view.assetsTable, savingsViewTab.view.assetsColumns, columnPrefs)
-
-      // Add the tab to the tab pane, and refresh its content
-      val tab = savingsViewTab.tab
-      tabPane.getTabs.add(tab)
-      tabPane.getSelectionModel.select(tab)
-      refreshTab(savingsViewTab, state)
-
-      savingsViewTab
     }
 
     def onAccountHistory(state: State): Unit = {
@@ -1065,27 +1058,23 @@ object MainController {
 
   def build(state: State, needRestart: Boolean = false, applicationStart: Boolean = false): Unit = {
     val stage = state.stage
+    val first = Option(stage.getScene).isEmpty
     stage.getIcons.setAll(Images.iconPiggyBank)
 
     val loader = new FXMLLoader(getClass.getResource("/fxml/main.fxml"), I18N.getResources)
     val root = loader.load[Parent]()
     val controller = loader.getController[MainController]
-    controller.initialize(state)
+    controller.initialize(state, first)
 
-    if (Option(stage.getScene).isDefined) stage.hide()
+    if (!first) stage.hide()
     // Delegate closing request to controller
     stage.setOnCloseRequest(controller.onCloseRequest _)
     stage.setScene(new Scene(root))
     stage.getScene.getStylesheets.add(getClass.getResource("/css/main.css").toExternalForm)
+    SplitPaneSkinEx.addStylesheet(stage.getScene)
+
+    Stages.addPersistence(stage, controller, persist = false)
     stage.show()
-
-    // It is important to restore view after showing the stage, at least for
-    // some settings (which may slightly change or not be fully applied):
-    //   - stage position/size
-    //   - SplitPane dividers position
-    controller.restoreView(stage)
-
-    Stages.trackMinimumDimensions(stage)
 
     if (needRestart) {
       Dialogs.information(

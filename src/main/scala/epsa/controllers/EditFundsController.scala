@@ -20,11 +20,11 @@ import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.javafx.event.Events
 import suiryc.scala.javafx.scene.control.{CheckBoxListCellWithInfo, CheckBoxListCellWithSeparator, Dialogs}
-import suiryc.scala.javafx.stage.Stages
+import suiryc.scala.javafx.stage.{StagePersistentView, Stages}
 import suiryc.scala.javafx.stage.Stages.StageLocation
 import suiryc.scala.settings.Preference
 
-class EditFundsController {
+class EditFundsController extends StagePersistentView {
 
   import EditFundsController._
 
@@ -164,15 +164,18 @@ class EditFundsController {
   }
 
   /** Restores (persisted) view. */
-  private def restoreView(): Unit = {
-    // Restore stage location
-    Option(stageLocation()).foreach { loc =>
-      Stages.setLocation(stage, loc, setSize = true)
-    }
+  override protected def restoreView(): Unit = {
+    Stages.onStageReady(stage, first = false) {
+      // Restore stage location
+      Stages.setMinimumDimensions(stage)
+      Option(stageLocation()).foreach { loc =>
+        Stages.setLocation(stage, loc, setSize = true)
+      }
+    }(JFXSystem.dispatcher)
   }
 
   /** Persists view (stage location, ...). */
-  private def persistView(): Unit = {
+  override protected def persistView(): Unit = {
     // Persist stage location
     // Note: if iconified, resets it
     stageLocation() = Stages.getLocation(stage).orNull
@@ -580,20 +583,14 @@ object EditFundsController {
     val controller = loader.getController[EditFundsController]
     controller.initialize(savings, dialog, edit)
 
-    // Wait for dialog to be shown before restoring the view
-    dialog.showingProperty().listen2 { cancellable =>
-      cancellable.cancel()
-      controller.restoreView()
-    }
+    Dialogs.addPersistence(dialog, controller)
 
     dialog.setResultConverter(resultConverter(controller) _)
-    Stages.trackMinimumDimensions(Stages.getStage(dialog))
 
     dialog
   }
 
   def resultConverter(controller: EditFundsController)(buttonType: ButtonType): List[Savings.Event] = {
-    controller.persistView()
     if (buttonType != ButtonType.OK) Nil
     else controller.events
   }
