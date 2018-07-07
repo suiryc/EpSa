@@ -6,7 +6,9 @@ import epsa.model.Savings
 import epsa.util.Awaits
 import javafx.application.{Application, Platform}
 import javafx.stage.Stage
+import monix.execution.Scheduler
 import scala.concurrent.ExecutionContextExecutor
+import suiryc.scala.akka.CoreSystem
 
 object Main {
 
@@ -37,8 +39,9 @@ object Main {
 
   object Akka {
 
-    implicit val system: ActorSystem = ActorSystem("epsa")
+    implicit val system: ActorSystem = CoreSystem.system
     implicit val dispatcher: ExecutionContextExecutor = system.dispatcher
+    val scheduler: Scheduler = CoreSystem.scheduler
 
   }
 

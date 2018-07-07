@@ -8,6 +8,7 @@ lazy val versions = Map[String, String](
   "html-cleaner"  -> "2.22",
   "httpclient"    -> "4.5.5",
   "logback"       -> "1.2.3",
+  "monix"         -> "3.0.0-RC1",
   "poi"           -> "3.17",
   "scala"         -> "2.12.6",
   "scala-logging" -> "3.9.0",
@@ -75,6 +76,7 @@ lazy val epsa = project.in(file(".")).
       "com.typesafe.akka"           %% "akka-stream"                       % versions("akka"),
       "com.typesafe.scala-logging"  %% "scala-logging"                     % versions("scala-logging"),
       "com.typesafe.slick"          %% "slick"                             % versions("slick"),
+      "io.monix"                    %% "monix"                             % versions("monix"),
       "io.spray"                    %% "spray-json"                        % versions("spray-json"),
       "net.sourceforge.htmlcleaner" %  "htmlcleaner"                       % versions("html-cleaner"),
       "org.apache.httpcomponents"   %  "httpclient"                        % versions("httpclient")

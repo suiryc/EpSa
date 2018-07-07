@@ -148,8 +148,6 @@ class NetAssetValueHistoryController extends StagePersistentView {
   }
 
   def onDownloadNAVHistories(@deprecated("unused","") event: ActionEvent): Unit = {
-    import epsa.Main.Akka.dispatcher
-
     // Remember currently selected fund
     val currentFund = getFund
     // Hide chart and selection
@@ -164,12 +162,10 @@ class NetAssetValueHistoryController extends StagePersistentView {
       Action(downloadHistory(fund, chart = false))
     }
 
-    executeSequentially(actions).onComplete { _ =>
+    executeSequentially(actions)(epsa.Main.Akka.dispatcher).onComplete { _ =>
       // Time to get back to initially selected fund
-      JFXSystem.runLater {
-        fundField.getSelectionModel.select(currentFund)
-      }
-    }
+      fundField.getSelectionModel.select(currentFund)
+    }(JFXSystem.dispatcher)
   }
 
   def onFund(@deprecated("unused","") event: ActionEvent): Unit = {
@@ -234,12 +230,10 @@ class NetAssetValueHistoryController extends StagePersistentView {
   }
 
   private def accessHistory[A](action: => Future[A], failureMsg: => String, successAction: A => Unit): Future[A] = {
-    import suiryc.scala.javafx.concurrent.JFXExecutor.executor
-
     working = true
 
     // Prepare to display progress indicator (if action takes too long)
-    val showIndicator = epsa.Main.Akka.system.scheduler.scheduleOnce(500.milliseconds) {
+    val showIndicator = JFXSystem.scheduler.scheduleOnce(500.milliseconds) {
       progressIndicator.toFront()
       progressIndicator.setVisible(true)
     }
@@ -267,7 +261,7 @@ class NetAssetValueHistoryController extends StagePersistentView {
           ex = Some(ex)
         )
         working = false
-    }
+    }(JFXSystem.dispatcher)
 
     f
   }

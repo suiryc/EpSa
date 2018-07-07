@@ -1,6 +1,5 @@
 package epsa.controllers
 
-import akka.actor.Cancellable
 import com.sun.javafx.scene.control.VirtualScrollBar
 import com.typesafe.scalalogging.StrictLogging
 import epsa.{I18N, Settings}
@@ -22,6 +21,7 @@ import javafx.scene.image.ImageView
 import javafx.scene.input.MouseEvent
 import javafx.scene.layout.{AnchorPane, Region}
 import javafx.stage.Stage
+import monix.execution.Cancelable
 import scala.collection.JavaConverters._
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -114,7 +114,7 @@ class AccountHistoryController extends StagePersistentView with StrictLogging {
     eventsNAVs = Savings.getEventsNAVs(events)
 
     // Prepare to display progress indicator (if action takes too long)
-    val showIndicator = epsa.Main.Akka.system.scheduler.scheduleOnce(500.milliseconds) {
+    val showIndicator = JFXSystem.scheduler.scheduleOnce(500.milliseconds) {
       progressIndicator.setVisible(true)
     }
 
@@ -373,7 +373,7 @@ class AccountHistoryController extends StagePersistentView with StrictLogging {
     }
   }
 
-  private def buildHistory(events: List[Savings.Event], showIndicator: Cancellable): Unit = {
+  private def buildHistory(events: List[Savings.Event], showIndicator: Cancelable): Unit = {
     // Cached data store NAVs, and index in sequence (for more efficient search)
     var assetsNAVs = Map[UUID, Seq[Savings.AssetValue]]()
     var assetsNAVIdxs = Map[UUID, Int]()
