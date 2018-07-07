@@ -41,9 +41,10 @@ object Main {
 
     implicit val system: ActorSystem = CoreSystem.system
     implicit val dispatcher: ExecutionContextExecutor = system.dispatcher
-    val scheduler: Scheduler = CoreSystem.scheduler
 
   }
+
+  val scheduler: Scheduler = CoreSystem.scheduler
 
   def shutdown(stage: Stage): Unit = {
     stage.close()

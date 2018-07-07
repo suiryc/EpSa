@@ -460,7 +460,7 @@ class ChartHandler[A <: ChartMark](
       // Since there may be more than once change, keep listening for a
       // limited amount of time.
       val cancellable = xAxis.scaleProperty.listen(body)
-      epsa.Main.Akka.scheduler.scheduleOnce(500.milliseconds) {
+      epsa.Main.scheduler.scheduleOnce(500.milliseconds) {
         cancellable.cancel()
       }
       ()
