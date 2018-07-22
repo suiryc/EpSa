@@ -340,15 +340,14 @@ class ChartHandler[A <: ChartMark](
 
   // Place zoom node at top center of view
   RichObservableValue.listen[AnyRef](
-    List(chart.widthProperty, chartPane.widthProperty, chartPane.hvalueProperty, chartPane.viewportBoundsProperty, zoomNode.widthProperty),
-    {
-      // Don't use cached bounds as these were get while zoom is being applied
-      // (but content not yet resized actually).
-      // Set on pixel edge for harper icon rendering in any case
-      val bounds = getChartBackgroundViewedBounds(cached = false)
-      zoomNode.setTranslateX(pixelEdge((bounds.getMinX + bounds.getMaxX) / 2 - zoomNode.getWidth / 2))
-    }
-  )
+    chart.widthProperty, chartPane.widthProperty, chartPane.hvalueProperty, chartPane.viewportBoundsProperty, zoomNode.widthProperty
+  ) {
+    // Don't use cached bounds as these were get while zoom is being applied
+    // (but content not yet resized actually).
+    // Set on pixel edge for harper icon rendering in any case
+    val bounds = getChartBackgroundViewedBounds(cached = false)
+    zoomNode.setTranslateX(pixelEdge((bounds.getMinX + bounds.getMaxX) / 2 - zoomNode.getWidth / 2))
+  }
 
   /** Chart background viewed bounds. */
   private var chartBgViewedBounds: Option[Bounds] = None
@@ -550,36 +549,35 @@ class ChartHandler[A <: ChartMark](
       // appearing unscaled for an instant the first time we change the
       // style class).
       val cancellable = RichObservableValue.listen(
-        List(markRegion.boundsInParentProperty, zoomNode.boundsInParentProperty),
-        {
-          val markBounds = markRegion.getBoundsInParent
-          val zoomBounds = zoomNode.getBoundsInParent
-          if (((markBounds.getMinX >= zoomBounds.getMinX) && (markBounds.getMinX <= zoomBounds.getMaxX)) ||
-              ((markBounds.getMaxX >= zoomBounds.getMinX) && (markBounds.getMaxX <= zoomBounds.getMaxX))) {
-            // The marker and zoom bounds are colliding horizontally
-            if (markRegion.getLayoutY == 0) {
-              // If the marker is at the top of the chart (first collision),
-              // move it at the bottom, and invert it (pointing up).
-              // Adjust vertical line accordingly.
-              markRegion.setLayoutY(pixelCenter(bounds.getMaxY))
-              JFXStyles.togglePseudoClass(markRegion, "inverted", set = true)
-              vertical.setStartY(pixelCenter(bounds.getMaxY))
-              vertical.setEndY(pixelCenter(y))
-            }
-          } else {
-            // The marker and zoom bounds don't collide horizontally
-            if (markRegion.getLayoutY != 0) {
-              // If the marker is at the bottom of the chart (previous collision),
-              // revert it to the top (pointing down).
-              // Adjust vertical line accordingly.
-              markRegion.setLayoutY(0)
-              JFXStyles.togglePseudoClass(markRegion, "inverted", set = false)
-              vertical.setStartY(pixelCenter(bounds.getMinY))
-              vertical.setEndY(pixelCenter(y))
-            }
+        markRegion.boundsInParentProperty, zoomNode.boundsInParentProperty
+      ) {
+        val markBounds = markRegion.getBoundsInParent
+        val zoomBounds = zoomNode.getBoundsInParent
+        if (((markBounds.getMinX >= zoomBounds.getMinX) && (markBounds.getMinX <= zoomBounds.getMaxX)) ||
+            ((markBounds.getMaxX >= zoomBounds.getMinX) && (markBounds.getMaxX <= zoomBounds.getMaxX))) {
+          // The marker and zoom bounds are colliding horizontally
+          if (markRegion.getLayoutY == 0) {
+            // If the marker is at the top of the chart (first collision),
+            // move it at the bottom, and invert it (pointing up).
+            // Adjust vertical line accordingly.
+            markRegion.setLayoutY(pixelCenter(bounds.getMaxY))
+            JFXStyles.togglePseudoClass(markRegion, "inverted", set = true)
+            vertical.setStartY(pixelCenter(bounds.getMaxY))
+            vertical.setEndY(pixelCenter(y))
+          }
+        } else {
+          // The marker and zoom bounds don't collide horizontally
+          if (markRegion.getLayoutY != 0) {
+            // If the marker is at the bottom of the chart (previous collision),
+            // revert it to the top (pointing down).
+            // Adjust vertical line accordingly.
+            markRegion.setLayoutY(0)
+            JFXStyles.togglePseudoClass(markRegion, "inverted", set = false)
+            vertical.setStartY(pixelCenter(bounds.getMinY))
+            vertical.setEndY(pixelCenter(y))
           }
         }
-      )
+      }
 
       date -> Marker(markRegion, vertical, cancellable)
     }

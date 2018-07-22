@@ -94,9 +94,10 @@ class EditFundsController extends StagePersistentView {
 
     // Re-check form when fund params are changed
     RichObservableValue.listen[AnyRef](
-      List(nameField.textProperty, amfIdField.textProperty, disabledCheckBox.selectedProperty, commentField.textProperty),
+      nameField.textProperty, amfIdField.textProperty, disabledCheckBox.selectedProperty, commentField.textProperty
+    ) {
       checkForm()
-    )
+    }
 
     // Initialize schemes list view
     // Use CheckBox ListCell elements to populate its content.

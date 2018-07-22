@@ -259,9 +259,10 @@ class AccountHistoryController extends StagePersistentView with StrictLogging {
     }
 
     RichObservableValue.listen[AnyRef](
-      List(historyTable.widthProperty, clippedContainer.widthProperty, columnEventDate.widthProperty),
+      historyTable.widthProperty, clippedContainer.widthProperty, columnEventDate.widthProperty
+    ) {
       updateColumnWidth()
-    )
+    }
     // Requesting layout (in runLater) usually helps when the table is first
     // being shown. Otherwise the column is often properly resized but it is
     // not applied (visually) until we interact with the stage ...
