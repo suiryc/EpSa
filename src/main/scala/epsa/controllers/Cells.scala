@@ -9,7 +9,6 @@ import java.util.Locale
 import javafx.scene.control.{Cell, ContentDisplay, ListCell, Tooltip}
 import javafx.scene.image.ImageView
 import suiryc.scala.javafx.scene.control.{CellWithSeparator, ListCellEx, TableCellEx}
-import suiryc.scala.util.I18NLocale
 
 class SchemeCell extends ListCell[Option[Savings.Scheme]] with CellWithSeparator[Savings.Scheme] {
   override protected def itemText(item: Savings.Scheme) = item.name
@@ -75,8 +74,4 @@ trait WarningCell[A] extends Cell[A] {
         setGraphic(null)
     }
   }
-}
-
-class I18NLocaleCell extends ListCellEx[I18NLocale] {
-  override protected def itemText(item: I18NLocale) = item.displayName
 }

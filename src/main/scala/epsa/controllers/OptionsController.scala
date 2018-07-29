@@ -12,7 +12,7 @@ import scala.concurrent.duration.{Duration, FiniteDuration}
 import suiryc.scala.javafx.stage.{StagePersistentView, Stages}
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.concurrent.JFXSystem
-import suiryc.scala.javafx.scene.control.Dialogs
+import suiryc.scala.javafx.scene.control.{Dialogs, I18NLocaleCell}
 import suiryc.scala.javafx.stage.Stages.StageLocation
 import suiryc.scala.settings.{Preference, SettingSnapshot, SettingsSnapshot}
 import suiryc.scala.util.I18NLocale
