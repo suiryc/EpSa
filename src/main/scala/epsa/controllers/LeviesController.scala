@@ -20,7 +20,7 @@ import scala.collection.JavaConverters._
 import scala.io.Source
 import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.javafx.scene.control.{Dialogs, ListCellEx}
-import suiryc.scala.javafx.stage.{FileChoosers, StagePersistentView, Stages}
+import suiryc.scala.javafx.stage.{PathChoosers, StagePersistentView, Stages}
 import suiryc.scala.javafx.stage.Stages.StageLocation
 import suiryc.scala.settings.Preference
 
@@ -139,7 +139,7 @@ class LeviesController extends StagePersistentView with StrictLogging {
       new FileChooser.ExtensionFilter(Strings.jsonFiles, "*.json")
     )
     leviesImportPath.option.foreach { path =>
-      FileChoosers.setInitialPath(fileChooser, path.toFile)
+      PathChoosers.setInitialPath(fileChooser, path.toFile)
     }
     val selectedFile = fileChooser.showOpenDialog(stage)
     Option(selectedFile).foreach { file =>

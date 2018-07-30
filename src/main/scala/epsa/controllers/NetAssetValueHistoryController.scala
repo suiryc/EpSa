@@ -32,7 +32,7 @@ import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.javafx.scene.control.{Dialogs, TextFieldWithButton}
 import suiryc.scala.javafx.stage.Stages.StageLocation
-import suiryc.scala.javafx.stage.{FileChoosers, StagePersistentView, Stages}
+import suiryc.scala.javafx.stage.{PathChoosers, StagePersistentView, Stages}
 
 class NetAssetValueHistoryController extends StagePersistentView {
 
@@ -187,7 +187,7 @@ class NetAssetValueHistoryController extends StagePersistentView {
         new FileChooser.ExtensionFilter(Strings.spreadsheets, "*.ods", "*.xls", "*.xlsx")
       )
       navHistoryImportPath.option.foreach { path =>
-        FileChoosers.setInitialPath(fileChooser, path.toFile)
+        PathChoosers.setInitialPath(fileChooser, path.toFile)
       }
       val selectedFile = fileChooser.showOpenDialog(stage)
       Option(selectedFile).foreach { file =>

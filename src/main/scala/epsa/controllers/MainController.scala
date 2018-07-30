@@ -27,7 +27,7 @@ import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.javafx.scene.control.skin.SplitPaneSkinEx
 import suiryc.scala.javafx.scene.control.{Dialogs, Panes, TableViews}
-import suiryc.scala.javafx.stage.{FileChoosers, StagePersistentView, Stages}
+import suiryc.scala.javafx.stage.{PathChoosers, StagePersistentView, Stages}
 import suiryc.scala.math.Ordered._
 import suiryc.scala.settings.Preference
 
@@ -794,7 +794,7 @@ class MainController extends StagePersistentView with StrictLogging {
         new FileChooser.ExtensionFilter(Strings.jsonFiles, "*.json")
       )
       accountHistoryPath.option.foreach { path =>
-        FileChoosers.setInitialPath(fileChooser, path.toFile)
+        PathChoosers.setInitialPath(fileChooser, path.toFile)
       }
       val selectedFile = fileChooser.showSaveDialog(state.stage)
       Option(selectedFile).foreach { file =>
@@ -844,7 +844,7 @@ class MainController extends StagePersistentView with StrictLogging {
           new FileChooser.ExtensionFilter(Strings.jsonFiles, "*.json")
         )
         accountHistoryPath.option.foreach { path =>
-          FileChoosers.setInitialPath(fileChooser, path.toFile)
+          PathChoosers.setInitialPath(fileChooser, path.toFile)
         }
         val selectedFile = fileChooser.showOpenDialog(state.stage)
         Option(selectedFile).flatMap { file =>
