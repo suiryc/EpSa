@@ -51,7 +51,7 @@ class LeviesController extends StagePersistentView with StrictLogging {
     leviesField.setButtonCell(new LeviesCell)
     leviesField.setCellFactory(_ => new LeviesCell)
 
-    val json = Awaits.readAppSetting(Some(stage), AppSettings.KEY_LEVIES).getOrElse(None).getOrElse("")
+    val json = Awaits.readAppSetting(stage, AppSettings.KEY_LEVIES).getOrElse(None).getOrElse("")
     currentLeviesAndJson = LeviesAndJson(savings.levies, json)
 
     // Get the json files from "levies" subfolder.
@@ -225,9 +225,9 @@ object LeviesController {
     if (buttonType == ButtonType.OK) {
       controller.getLevies.foreach { levies =>
         if (levies.levies == Levies.empty) {
-          Awaits.deleteAppSetting(Some(window), AppSettings.KEY_LEVIES)
+          Awaits.deleteAppSetting(window, AppSettings.KEY_LEVIES)
         } else {
-          Awaits.writeAppSetting(Some(window), AppSettings.KEY_LEVIES, levies.json)
+          Awaits.writeAppSetting(window, AppSettings.KEY_LEVIES, levies.json)
         }
       }
       true

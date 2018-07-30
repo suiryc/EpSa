@@ -510,7 +510,7 @@ class MainController extends StagePersistentView with StrictLogging {
       val savings =
         if (events.isEmpty) oldState.savings
         else {
-          Awaits.writeDataStoreEvents(Some(oldState.stage), events)
+          Awaits.writeDataStoreEvents(oldState.stage, events)
           oldState.savings.processEvents(events)
         }
       // Then update state
@@ -543,7 +543,7 @@ class MainController extends StagePersistentView with StrictLogging {
       fileSaveAsMenu.setDisable(!dirty || DataStore.dbOpened.isEmpty)
       editUndoMenu.setDisable(!dirty)
       viewNetAssetValueHistoryMenu.setDisable(state.savings.funds.isEmpty)
-      val hasHistory = Awaits.hasDataStoreEvents(Some(state.stage)).getOrElse(false)
+      val hasHistory = Awaits.hasDataStoreEvents(state.stage).getOrElse(false)
       viewSavingsOnDateMenu.setDisable(!hasHistory)
       viewAccountHistoryMenu.setDisable(!hasHistory)
       toolsExportRawAccountHistoryMenu.setDisable(!hasHistory)
@@ -562,13 +562,12 @@ class MainController extends StagePersistentView with StrictLogging {
     }
 
     def reload(state0: State): Unit = {
-      val owner = Some(state0.stage)
-      val levies = Awaits.readAppSetting(owner, DataStore.AppSettings.KEY_LEVIES).getOrElse(None).map { str =>
+      val levies = Awaits.readAppSetting(state0.stage, DataStore.AppSettings.KEY_LEVIES).getOrElse(None).map { str =>
         import spray.json._
         import Levies.JsonProtocol._
         str.parseJson.convertTo[Levies].normalized
       }.getOrElse(Levies.empty)
-      val state = Awaits.readDataStoreEvents(Some(state0.stage)) match {
+      val state = Awaits.readDataStoreEvents(state0.stage) match {
         case Success(events0) =>
           val (events, modified) = Savings.normalizeEvents(events0)
           // Cleanup datastore if necessary
@@ -649,7 +648,7 @@ class MainController extends StagePersistentView with StrictLogging {
     }
 
     def onEditSchemes(state: State, edit: Option[Savings.Scheme]): Unit = {
-      val dialog = EditSchemesController.buildDialog(Some(state.stage), state.savings, edit)
+      val dialog = EditSchemesController.buildDialog(state.stage, state.savings, edit)
       dialog.initModality(Modality.WINDOW_MODAL)
       dialog.setResizable(true)
       val events = dialog.showAndWait().orElse(Nil)
@@ -658,7 +657,7 @@ class MainController extends StagePersistentView with StrictLogging {
     }
 
     def onEditFunds(state: State, edit: Option[Savings.Fund]): Unit = {
-      val dialog = EditFundsController.buildDialog(Some(state.stage), state.savings, edit)
+      val dialog = EditFundsController.buildDialog(state.stage, state.savings, edit)
       dialog.initModality(Modality.WINDOW_MODAL)
       dialog.setResizable(true)
       val events = dialog.showAndWait().orElse(Nil)
@@ -667,14 +666,14 @@ class MainController extends StagePersistentView with StrictLogging {
     }
 
     def onEditUnavailabilityPeriods(state: State): Unit = {
-      val dialog = EditUnavailabilityPeriodsController.buildDialog(Some(state.stage))
+      val dialog = EditUnavailabilityPeriodsController.buildDialog(state.stage)
       dialog.initModality(Modality.WINDOW_MODAL)
       dialog.setResizable(true)
       if (dialog.showAndWait().orElse(false)) refreshDirty(state)
     }
 
     def onNewAssetAction(state: State, kind: AssetActionKind.Value, asset: Option[Savings.Asset]): Unit = {
-      val dialog = NewAssetActionController.buildDialog(Some(state.stage), MainController.this, state.savings, kind, asset)
+      val dialog = NewAssetActionController.buildDialog(state.stage, MainController.this, state.savings, kind, asset)
       dialog.initModality(Modality.WINDOW_MODAL)
       dialog.setResizable(true)
       val event = dialog.showAndWait().orElse(None)
@@ -687,13 +686,13 @@ class MainController extends StagePersistentView with StrictLogging {
           // existing anymore due to availability dates reached in-between).
 
           // First read (and order) history and apply new event
-          val events = Awaits.getEventsHistory(Some(state.stage), extra = event.toList)
+          val events = Awaits.getEventsHistory(state.stage, extra = event.toList)
           // Then process events to get up to date savings
           val savingsUpd = Savings(levies = state.savings.levies).processEvents(events)
           // Purge current history
-          Awaits.purgeDataStoreEvents(Some(state.stage))
+          Awaits.purgeDataStoreEvents(state.stage)
           // And rewrite reordered history.
-          Awaits.writeDataStoreEvents(Some(state.stage), events)
+          Awaits.writeDataStoreEvents(state.stage, events)
           val state2 = state.copy(savings = savingsUpd)
           // Now we can refresh the view
           refresh(state2, updateAssetsValue = true)
@@ -706,7 +705,7 @@ class MainController extends StagePersistentView with StrictLogging {
     }
 
     def onOptions(state: State): Unit = {
-      val dialog = OptionsController.buildDialog(Some(state.stage))
+      val dialog = OptionsController.buildDialog(state.stage)
       dialog.initModality(Modality.WINDOW_MODAL)
       dialog.setResizable(true)
       val (reload, needRestart) = dialog.showAndWait().orElse((false, false))
@@ -752,7 +751,7 @@ class MainController extends StagePersistentView with StrictLogging {
     def onShowNAVHistory(state: State): Unit = {
       if (requestedChartFund != currentChartFund) requestedChartFund match {
         case Some(fund) =>
-          val values = Awaits.readDataStoreNAVs(Some(state.stage), fund.id).getOrElse(Nil)
+          val values = Awaits.readDataStoreNAVs(state.stage, fund.id).getOrElse(Nil)
           // Only show non-empty series
           if (values.nonEmpty) {
             if (chartHandler.series.getData.isEmpty) {
@@ -779,7 +778,7 @@ class MainController extends StagePersistentView with StrictLogging {
     }
 
     def onExportRawAccountHistory(state: State): Unit = {
-      val events = Awaits.getEventsHistory(Some(state.stage))
+      val events = Awaits.getEventsHistory(state.stage)
       import spray.json._
       import Savings.JsonProtocol._
       val eventsJson = events.map(_.toJson)
@@ -872,7 +871,7 @@ class MainController extends StagePersistentView with StrictLogging {
         }.foreach { events =>
           accountHistoryPath() = selectedFile.toPath
           // Purge events history, and replay imported history
-          Awaits.purgeDataStoreEvents(Some(state.stage))
+          Awaits.purgeDataStoreEvents(state.stage)
           val newState = processEvents(state.zero(Savings(levies = state.savings.levies)), events, updateAssetsValue = true)
           // Then cleanup data store (no need to reorder as we did it already)
           onCleanupDataStore(newState, normalize = false)
@@ -881,7 +880,7 @@ class MainController extends StagePersistentView with StrictLogging {
     }
 
     def onCleanupDataStore(state: State, normalize: Boolean): Unit = {
-      Awaits.cleanupDataStore(Some(state.stage), state.savings.funds.map(_.id), normalize)
+      Awaits.cleanupDataStore(state.stage, state.savings.funds.map(_.id), normalize)
       // Note: don't bother reloading or refreshing tabs since history was
       // already sorted when populating them.
       // We still need to refresh the dirty state for potential new pending
@@ -904,7 +903,7 @@ class MainController extends StagePersistentView with StrictLogging {
         val buttonSaveType = new ButtonType(fileSaveMenu.getText, ButtonBar.ButtonData.OK_DONE)
         val alert = new Alert(Alert.AlertType.CONFIRMATION, "",
           ButtonType.OK, ButtonType.CANCEL, buttonSaveType)
-        alert.initOwner(state.stage)
+        Stages.initOwner(alert, state.stage)
         alert.setHeaderText(Strings.pendingChanges)
 
         // Filter action on "Save" button to trigger saving and check result:
@@ -937,7 +936,7 @@ class MainController extends StagePersistentView with StrictLogging {
       // When 'saving as', we need to make sure the current real DB content has
       // been copied to tmp before opening the (new) physical DB to save the
       // content.
-      val actualOwner = owner.orElse(Some(state.stage))
+      val actualOwner = owner.getOrElse(state.stage)
 
       def save() =
         Awaits.saveDataStoreChanges(actualOwner, fullDb = saveAs).isSuccess
@@ -946,7 +945,7 @@ class MainController extends StagePersistentView with StrictLogging {
         case Some(_) if !saveAs => save()
         case _                  =>
           // Data store not opened yet: open then save
-          Awaits.openDataStore(actualOwner, change = true, save = true, loadTmp = true) match {
+          Awaits.openDataStore(Some(actualOwner), change = true, save = true, loadTmp = true) match {
             case Some(Success(())) => save()
             case _                 => false
           }

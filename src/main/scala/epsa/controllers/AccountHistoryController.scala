@@ -107,7 +107,7 @@ class AccountHistoryController extends StagePersistentView with StrictLogging {
     this.stage = stage
 
     // Get&sort events
-    events = Awaits.getEventsHistory(Some(stage))
+    events = Awaits.getEventsHistory(stage)
 
     // Known NAVs through account history events.
     // This can complete data store NAVs, especially for old (now deleted) funds.
@@ -404,7 +404,7 @@ class AccountHistoryController extends StagePersistentView with StrictLogging {
           navs
 
         case None =>
-          val navs = Awaits.readDataStoreNAVs(Some(stage), fundId).getOrElse(Seq.empty)
+          val navs = Awaits.readDataStoreNAVs(stage, fundId).getOrElse(Seq.empty)
           assetsNAVs += (fundId -> navs)
           navs
       }

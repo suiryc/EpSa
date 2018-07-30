@@ -43,13 +43,13 @@ object Awaits {
     }
   }
 
-  def hasDataStoreEvents(owner: Option[Window]): Try[Boolean] =
-    orError(DataStore.EventSource.hasEvents(), owner, DataStore.readIssueMsg())
+  def hasDataStoreEvents(owner: Window): Try[Boolean] =
+    orError(DataStore.EventSource.hasEvents(), Some(owner), DataStore.readIssueMsg())
 
-  def readDataStoreEvents(owner: Option[Window]): Try[List[Savings.Event]] =
-    orError(DataStore.EventSource.readEvents(), owner, DataStore.readIssueMsg()).map(_.toList)
+  def readDataStoreEvents(owner: Window): Try[List[Savings.Event]] =
+    orError(DataStore.EventSource.readEvents(), Some(owner), DataStore.readIssueMsg()).map(_.toList)
 
-  def getEventsHistory(owner: Option[Window], extra: List[Savings.Event] = Nil, upTo: Option[LocalDate] = None): List[Savings.Event] = {
+  def getEventsHistory(owner: Window, extra: List[Savings.Event] = Nil, upTo: Option[LocalDate] = None): List[Savings.Event] = {
     val events0 = readDataStoreEvents(owner).getOrElse(Nil)
     val events1 =
       if (extra.isEmpty) events0
@@ -67,39 +67,39 @@ object Awaits {
     }
   }
 
-  def writeDataStoreEvents(owner: Option[Window], events: Seq[Savings.Event]): Try[Unit] =
-    orError(DataStore.EventSource.writeEvents(events), owner, DataStore.writeIssueMsg())
+  def writeDataStoreEvents(owner: Window, events: Seq[Savings.Event]): Try[Unit] =
+    orError(DataStore.EventSource.writeEvents(events), Some(owner), DataStore.writeIssueMsg())
 
-  def purgeDataStoreEvents(owner: Option[Window]): Try[Int] =
-    orError(DataStore.EventSource.deleteEntries(), owner, DataStore.writeIssueMsg())
+  def purgeDataStoreEvents(owner: Window): Try[Int] =
+    orError(DataStore.EventSource.deleteEntries(), Some(owner), DataStore.writeIssueMsg())
 
-  def saveDataStoreChanges(owner: Option[Window], fullDb: Boolean): Try[Unit] = {
+  def saveDataStoreChanges(owner: Window, fullDb: Boolean): Try[Unit] = {
     // Note: we are supposed to have a real database opened by now.
     // We can now apply any pending changes from temporary database.
     val dbSave =
       if (fullDb) DataStore.save()
       else DataStore.saveChanges()
-    orError(dbSave, owner, DataStore.writeIssueMsg(real = true))
+    orError(dbSave, Some(owner), DataStore.writeIssueMsg(real = true))
   }
 
-  def applyDataStoreChanges(owner: Option[Window], actions: List[RichFuture.Action[Unit, AnyVal]]): Try[Unit] = {
+  def applyDataStoreChanges(owner: Window, actions: List[RichFuture.Action[Unit, AnyVal]]): Try[Unit] = {
     val f = RichFuture.executeAllSequentially(stopOnError = true, actions).map(_ => ())
-    orError(f, owner, DataStore.writeIssueMsg())
+    orError(f, Some(owner), DataStore.writeIssueMsg())
   }
 
   def readDataStoreNAV(owner: Option[Window], fundId: UUID, date: LocalDate, exactDate: Boolean = false): Try[Option[Savings.AssetValue]] =
     orError(DataStore.AssetHistory.readValue(fundId, date, exactDate), owner, DataStore.readIssueMsg())
 
-  def readDataStoreNAVs(owner: Option[Window], fundId: UUID): Try[Seq[Savings.AssetValue]] =
-    orError(DataStore.AssetHistory.readValues(fundId), owner, DataStore.readIssueMsg())
+  def readDataStoreNAVs(owner: Window, fundId: UUID): Try[Seq[Savings.AssetValue]] =
+    orError(DataStore.AssetHistory.readValues(fundId), Some(owner), DataStore.readIssueMsg())
 
-  def saveDataStoreNAV(owner: Option[Window], fundId: UUID, nav: Savings.AssetValue): Try[Unit] =
-    orError(DataStore.AssetHistory.writeValues(fundId, nav), owner, DataStore.writeIssueMsg())
+  def saveDataStoreNAV(owner: Window, fundId: UUID, nav: Savings.AssetValue): Try[Unit] =
+    orError(DataStore.AssetHistory.writeValues(fundId, nav), Some(owner), DataStore.writeIssueMsg())
 
-  def readDataStoreUnavailabilityPeriods(owner: Option[Window]): Try[Seq[Savings.UnavailabilityPeriod]] =
-    orError(DataStore.UnavailabilityPeriods.readEntries(), owner, DataStore.readIssueMsg())
+  def readDataStoreUnavailabilityPeriods(owner: Window): Try[Seq[Savings.UnavailabilityPeriod]] =
+    orError(DataStore.UnavailabilityPeriods.readEntries(), Some(owner), DataStore.readIssueMsg())
 
-  def cleanupDataStore(owner: Option[Window], fundIds: List[UUID], normalize: Boolean): Unit = {
+  def cleanupDataStore(owner: Window, fundIds: List[UUID], normalize: Boolean): Unit = {
     if (normalize) {
       val events0 = readDataStoreEvents(owner).getOrElse(Nil)
       val (events, modified) = Savings.normalizeEvents(events0)
@@ -109,18 +109,18 @@ object Awaits {
           Action(DataStore.EventSource.writeEvents(events))
         )
         val f = RichFuture.executeAllSequentially(stopOnError = true, actions).map(_ => ())
-        orError(f, owner, DataStore.writeIssueMsg()) match {
+        orError(f, Some(owner), DataStore.writeIssueMsg()) match {
           case Success(_) =>
-            Dialogs.information(owner = owner, title = None, contentText = Some(DataStore.eventsReorderedMsg))
+            Dialogs.information(owner = Some(owner), title = None, contentText = Some(DataStore.eventsReorderedMsg))
 
           case _ =>
             // Failure was already notified
         }
       }
     }
-    orError(DataStore.AssetHistory.cleanup(fundIds), owner, DataStore.cleanupIssueMsg) match {
+    orError(DataStore.AssetHistory.cleanup(fundIds), Some(owner), DataStore.cleanupIssueMsg) match {
       case Success(v) =>
-        if (v.nonEmpty) Dialogs.information(owner = owner, title = None, contentText = Some(DataStore.cleanupMsg))
+        if (v.nonEmpty) Dialogs.information(owner = Some(owner), title = None, contentText = Some(DataStore.cleanupMsg))
         ()
 
       case _ =>
@@ -128,13 +128,13 @@ object Awaits {
     }
   }
 
-  def readAppSetting(owner: Option[Window], key: String): Try[Option[String]] =
-    orError(DataStore.AppSettings.readEntry(key), owner, DataStore.readIssueMsg())
+  def readAppSetting(owner: Window, key: String): Try[Option[String]] =
+    orError(DataStore.AppSettings.readEntry(key), Some(owner), DataStore.readIssueMsg())
 
-  def writeAppSetting(owner: Option[Window], key: String, value: String): Try[Unit] =
-    orError(DataStore.AppSettings.writeEntry((key, value)), owner, DataStore.writeIssueMsg())
+  def writeAppSetting(owner: Window, key: String, value: String): Try[Unit] =
+    orError(DataStore.AppSettings.writeEntry((key, value)), Some(owner), DataStore.writeIssueMsg())
 
-  def deleteAppSetting(owner: Option[Window], key: String): Try[Int] =
-    orError(DataStore.AppSettings.deleteEntry(key), owner, DataStore.writeIssueMsg())
+  def deleteAppSetting(owner: Window, key: String): Try[Int] =
+    orError(DataStore.AppSettings.deleteEntry(key), Some(owner), DataStore.writeIssueMsg())
 
 }

@@ -342,7 +342,7 @@ class EditSchemesController extends StagePersistentView {
 
     val events = if (funds.nonEmpty) {
       val alert = new Alert(Alert.AlertType.CONFIRMATION, "", ButtonType.OK)
-      alert.initOwner(stage)
+      Stages.initOwner(alert, stage)
 
       val loader = new FXMLLoader(getClass.getResource("/fxml/select-resources.fxml"), I18N.getResources)
       val root = loader.load[Node]()
@@ -557,11 +557,11 @@ object EditSchemesController {
   private val stageLocation = Preference.from(prefs, "stage.edit-schemes.location", null:StageLocation)
 
   /** Builds a dialog out of this controller. */
-  def buildDialog(owner: Option[Window], savings: Savings, edit: Option[Savings.Scheme]): Dialog[List[Savings.Event]] = {
+  def buildDialog(owner: Window, savings: Savings, edit: Option[Savings.Scheme]): Dialog[List[Savings.Event]] = {
     val dialog = new Dialog[List[Savings.Event]]()
     val title = Strings.editSchemes
     // Note: initializing owner resets dialog icon, so set the icon afterwards
-    owner.foreach(dialog.initOwner)
+    Stages.initOwner(dialog, owner)
     Stages.getStage(dialog).getIcons.setAll(Images.iconTables)
     dialog.setTitle(title)
     dialog.getDialogPane.getButtonTypes.addAll(ButtonType.OK, ButtonType.CANCEL)

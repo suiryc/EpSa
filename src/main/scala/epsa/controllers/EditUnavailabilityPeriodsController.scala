@@ -83,7 +83,7 @@ class EditUnavailabilityPeriodsController extends StagePersistentView {
     monthField.setButtonCell(new MonthListCell)
     monthField.setCellFactory(_ => new MonthListCell)
 
-    entries0 = Awaits.readDataStoreUnavailabilityPeriods(Some(stage)).getOrElse(Seq.empty).sortBy(_.id)
+    entries0 = Awaits.readDataStoreUnavailabilityPeriods(stage).getOrElse(Seq.empty).sortBy(_.id)
     entries = entries0
 
     // Initialize periods list view
@@ -394,11 +394,11 @@ object EditUnavailabilityPeriodsController {
   private val stageLocation = Preference.from(prefs, "stage.edit-unavailability-periods.location", null:StageLocation)
 
   /** Builds a dialog out of this controller. */
-  def buildDialog(owner: Option[Window]): Dialog[Boolean] = {
+  def buildDialog(owner: Window): Dialog[Boolean] = {
     val dialog = new Dialog[Boolean]()
     val title = Strings.editUnavailabilityPeriods
     // Note: initializing owner resets dialog icon, so set the icon afterwards
-    owner.foreach(dialog.initOwner)
+    Stages.initOwner(dialog, owner)
     Stages.getStage(dialog).getIcons.setAll(Images.iconCalendarMonth)
     dialog.setTitle(title)
     dialog.getDialogPane.getButtonTypes.addAll(ButtonType.OK, ButtonType.CANCEL)
@@ -415,7 +415,7 @@ object EditUnavailabilityPeriodsController {
     dialog
   }
 
-  private def resultConverter(owner: Option[Window], controller: EditUnavailabilityPeriodsController)(buttonType: ButtonType): Boolean = {
+  private def resultConverter(owner: Window, controller: EditUnavailabilityPeriodsController)(buttonType: ButtonType): Boolean = {
     val dbActions = controller.dbActions
     if ((buttonType == ButtonType.OK) && dbActions.nonEmpty) {
       Awaits.applyDataStoreChanges(owner, dbActions)

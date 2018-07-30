@@ -293,11 +293,11 @@ class SavingsViewTab(val mainController: MainController, val dateOpt: Option[Loc
     val actualData = dateOpt match {
       case Some(date) =>
         // Compute actual state from account history up to requested date
-        val owner = Some(state.stage)
+        val owner = state.stage
         val history = Awaits.getEventsHistory(owner, upTo = Some(date))
         val savings = Savings(levies = state.savings.levies).processEvents(history)
         val eventsNAVs = Savings.getEventsNAVs(history)
-        val navs = savings.getNAVs(owner, date, eventsNAVs)
+        val navs = savings.getNAVs(Some(owner), date, eventsNAVs)
         val actualState = state.copy(
           savings = savings,
           assetsValue = navs

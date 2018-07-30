@@ -181,10 +181,10 @@ object OptionsController {
 
   private val stageLocation = Preference.from(prefs, "stage.options.location", null:StageLocation)
 
-  def buildDialog(owner: Option[Window]): Dialog[(Boolean, Boolean)] = {
+  def buildDialog(owner: Window): Dialog[(Boolean, Boolean)] = {
     val dialog = new Dialog[(Boolean, Boolean)]()
     // Note: initializing owner resets dialog icon, so set the icon afterwards
-    owner.foreach(dialog.initOwner)
+    Stages.initOwner(dialog, owner)
     Stages.getStage(dialog).getIcons.setAll(Images.iconGear)
     dialog.setTitle(Strings.options)
     dialog.getDialogPane.getButtonTypes.addAll(ButtonType.OK, ButtonType.CANCEL)

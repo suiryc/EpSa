@@ -592,7 +592,7 @@ class NetAssetValueHistoryController extends StagePersistentView {
     // Use 'utility' style (we don't need minimize/maximize).
     val resultStage = new Stage()
     resultStage.initStyle(StageStyle.UTILITY)
-    resultStage.initOwner(stage)
+    Stages.initOwner(resultStage, stage)
     resultStage.setTitle(stage.getTitle)
     val scene = new Scene(root)
     resultStage.setScene(scene)

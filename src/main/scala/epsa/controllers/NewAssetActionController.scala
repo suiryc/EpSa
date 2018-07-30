@@ -135,7 +135,7 @@ class NewAssetActionController extends StagePersistentView with StrictLogging {
     savings = savings0
     actionKind = actionKind0
 
-    val unavailabilityPeriods = Awaits.readDataStoreUnavailabilityPeriods(Some(stage)).getOrElse(Seq.empty).sortBy(_.id)
+    val unavailabilityPeriods = Awaits.readDataStoreUnavailabilityPeriods(stage).getOrElse(Seq.empty).sortBy(_.id)
 
     // Load css
     dialog.getDialogPane.getStylesheets.add(getClass.getResource("/css/form.css").toExternalForm)
@@ -474,7 +474,7 @@ class NewAssetActionController extends StagePersistentView with StrictLogging {
   private def onNAVHistory(fund: Savings.Fund): Unit = {
     val dialog = NetAssetValueHistoryController.buildDialog(mainController, savings, Some(fund.id), stage)
     dialog.initModality(Modality.WINDOW_MODAL)
-    dialog.initOwner(stage)
+    Stages.initOwner(dialog, stage)
     dialog.setResizable(true)
     if (dialog.showAndWait().orElse(false)) updateNAV()
   }
@@ -863,7 +863,7 @@ class NewAssetActionController extends StagePersistentView with StrictLogging {
     else {
       val savings0 =
         if (savings.latestAssetAction.exists(operationDate < _)) {
-          val history = Awaits.getEventsHistory(Some(stage), upTo = Some(operationDate))
+          val history = Awaits.getEventsHistory(stage, upTo = Some(operationDate))
           Savings(levies = savings.levies).processEvents(history)
         } else savings
       actualSavings = savings0.computeAssets(operationDate)
@@ -929,12 +929,12 @@ object NewAssetActionController {
   private val dstUnitsAuto = Preference.from(prefs, s"$prefsKeyPrefix.dst-units-auto", true)
 
   /** Builds a dialog out of this controller. */
-  def buildDialog(owner: Option[Window], mainController: MainController, savings: Savings,
+  def buildDialog(owner: Window, mainController: MainController, savings: Savings,
     kind: AssetActionKind.Value, asset: Option[Savings.Asset]): Dialog[Option[Savings.AssetEvent]] =
   {
     val dialog = new Dialog[Option[Savings.AssetEvent]]()
     // Note: initializing owner resets dialog icon, so set the icon afterwards
-    owner.foreach(dialog.initOwner)
+    Stages.initOwner(dialog, owner)
     // Icon and title are changed according to chosen asset action
     dialog.getDialogPane.getButtonTypes.addAll(ButtonType.OK, ButtonType.CANCEL)
 
@@ -950,7 +950,7 @@ object NewAssetActionController {
     dialog
   }
 
-  private def resultConverter(owner: Option[Window], controller: NewAssetActionController)(buttonType: ButtonType): Option[Savings.AssetEvent] = {
+  private def resultConverter(owner: Window, controller: NewAssetActionController)(buttonType: ButtonType): Option[Savings.AssetEvent] = {
     if (buttonType != ButtonType.OK) None
     else {
       val eventOpt = controller.checkForm()
