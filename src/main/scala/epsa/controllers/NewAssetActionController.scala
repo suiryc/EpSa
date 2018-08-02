@@ -11,7 +11,7 @@ import java.time.format.DateTimeFormatter
 import javafx.event.ActionEvent
 import javafx.collections.FXCollections
 import javafx.fxml.{FXML, FXMLLoader}
-import javafx.geometry.{Insets, Side}
+import javafx.geometry.Side
 import javafx.scene.Node
 import javafx.scene.control._
 import javafx.scene.image.ImageView
@@ -156,18 +156,12 @@ class NewAssetActionController extends StagePersistentView with StrictLogging {
     for (field <- List(srcNAVButton, srcEmptyButton, dstNAVButton, dstUnitsAutoButton)) {
       // Disable by default; will be enabled when a fund is selected
       field.setDisable(true)
-      // Reset padding of button; by default uses 8 on each horizontal side
-      // and 4 on each vertical side, which gives a rectangle. We will use
-      // 4 on each side to get a square to display our square icon inside.
-      field.setPadding(new Insets(4))
     }
-    latestDateButton.setPadding(new Insets(4))
     latestDateButton.setDisable(savings.latestAssetAction.isEmpty)
     for ((button, field) <- List(
       (srcUnavailabilityPeriodButton, srcAvailabilityField),
       (dstUnavailabilityPeriodButton, dstAvailabilityField)
     )) {
-      button.setPadding(new Insets(4))
       button.setDisable(unavailabilityPeriods.isEmpty)
       // Apply selected unavailability period when requested
       if (unavailabilityPeriods.nonEmpty) {

@@ -25,6 +25,7 @@ import scala.util.Success
 import suiryc.scala.RichOption._
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.concurrent.JFXSystem
+import suiryc.scala.javafx.scene.Graphics
 import suiryc.scala.javafx.scene.control.skin.SplitPaneSkinEx
 import suiryc.scala.javafx.scene.control.{Dialogs, Panes, TableViews}
 import suiryc.scala.javafx.stage.{PathChoosers, StagePersistentView, Stages}
@@ -34,7 +35,6 @@ import suiryc.scala.settings.Preference
 // TODO: smart deletion of funds ?
 //         - keep the necessary data (NAV on some dates) used to compute levies
 //         - way to determine if all levies of past fund assets were paid already, so that all NAVs can really be deleted ?
-// TODO: use scala-logging
 class MainController extends StagePersistentView with StrictLogging {
 
   import MainController._
@@ -1071,6 +1071,7 @@ object MainController {
     stage.setScene(new Scene(root))
     stage.getScene.getStylesheets.add(getClass.getResource("/css/main.css").toExternalForm)
     SplitPaneSkinEx.addStylesheet(stage.getScene)
+    Graphics.addStylesheet(stage.getScene)
 
     Stages.addPersistence(stage, controller, persist = false)
     stage.show()
