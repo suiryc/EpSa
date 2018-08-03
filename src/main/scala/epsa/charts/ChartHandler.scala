@@ -561,7 +561,7 @@ class ChartHandler[A <: ChartMark](
             // move it at the bottom, and invert it (pointing up).
             // Adjust vertical line accordingly.
             markRegion.setLayoutY(pixelCenter(bounds.getMaxY))
-            JFXStyles.togglePseudoClass(markRegion, "inverted", set = true)
+            JFXStyles.togglePseudoClass(markRegion, "inverted", active = true)
             vertical.setStartY(pixelCenter(bounds.getMaxY))
             vertical.setEndY(pixelCenter(y))
           }
@@ -572,7 +572,7 @@ class ChartHandler[A <: ChartMark](
             // revert it to the top (pointing down).
             // Adjust vertical line accordingly.
             markRegion.setLayoutY(0)
-            JFXStyles.togglePseudoClass(markRegion, "inverted", set = false)
+            JFXStyles.togglePseudoClass(markRegion, "inverted", active = false)
             vertical.setStartY(pixelCenter(bounds.getMinY))
             vertical.setEndY(pixelCenter(y))
           }

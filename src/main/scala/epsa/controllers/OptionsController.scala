@@ -54,7 +54,7 @@ class OptionsController extends StagePersistentView {
 
   def initialize(dialog: Dialog[_], snapshot: SettingsSnapshot): Unit = {
     // Load css
-    dialog.getDialogPane.getStylesheets.add(getClass.getResource("/css/form.css").toExternalForm)
+    JFXStyles.addStylesheet(stage.getScene)
 
     // Lookup OK dialog button
     buttonOk = dialog.getDialogPane.lookupButton(ButtonType.OK)
@@ -132,8 +132,7 @@ class OptionsController extends StagePersistentView {
     } catch {
       case _: Throwable => false
     }
-    JFXStyles.toggleError(httpClientTimeout, !ok,
-      if (ok) None else Some(I18N.Strings.durationError))
+    JFXStyles.toggleError(httpClientTimeout, !ok, I18N.Strings.durationError)
     buttonOk.setDisable(!ok)
   }
 

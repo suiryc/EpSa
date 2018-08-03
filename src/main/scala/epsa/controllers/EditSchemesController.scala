@@ -76,7 +76,7 @@ class EditSchemesController extends StagePersistentView {
     savings = savings0
 
     // Load css
-    dialog.getDialogPane.getStylesheets.add(getClass.getResource("/css/form.css").toExternalForm)
+    JFXStyles.addStylesheet(stage.getScene)
 
     // Lookup OK dialog button
     buttonOk = dialog.getDialogPane.lookupButton(ButtonType.OK)
@@ -521,12 +521,12 @@ class EditSchemesController extends StagePersistentView {
     getScheme match {
       case None =>
         deleteReady = false
-        JFXStyles.toggleImageButton(minusField, set = deleteReady)
+        JFXStyles.toggleImageButton(minusField, active = deleteReady)
 
       case Some(scheme) =>
         deleteReady = canDeleteScheme(scheme)
-        if (deleteReady) JFXStyles.toggleImageButton(minusField, set = deleteReady)
-        else JFXStyles.toggleImageButton(minusField, set = deleteReady, Some(Strings.schemeNotEmpty))
+        if (deleteReady) JFXStyles.toggleImageButton(minusField, active = deleteReady)
+        else JFXStyles.toggleImageButton(minusField, active = deleteReady, Some(Strings.schemeNotEmpty))
     }
 
     // Plus field status: enable if adding new scheme which name is OK, or

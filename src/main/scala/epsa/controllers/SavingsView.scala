@@ -162,16 +162,16 @@ class SavingsView(tab: SavingsViewTab) {
             case AssetDetailsKind.TotalPerAvailability => (false, true, item.first)
             case AssetDetailsKind.Total                => (true, false, item.first)
           }
-          JFXStyles.togglePseudoClass(row, "row-total", set = total)
-          JFXStyles.togglePseudoClass(row, "row-total-partial", set = partialTotal)
-          JFXStyles.togglePseudoClass(row, "first", set = first)
+          JFXStyles.togglePseudoClass(row, "row-total", active = total)
+          JFXStyles.togglePseudoClass(row, "row-total-partial", active = partialTotal)
+          JFXStyles.togglePseudoClass(row, "first", active = first)
           if (item.kind != AssetDetailsKind.Standard) row.setContextMenu(null)
           else row.setContextMenu(contextMenu)
 
         case None =>
-          JFXStyles.togglePseudoClass(row, "row-total", set = false)
-          JFXStyles.togglePseudoClass(row, "row-total-partial", set = false)
-          JFXStyles.togglePseudoClass(row, "first", set = false)
+          JFXStyles.togglePseudoClass(row, "row-total", active = false)
+          JFXStyles.togglePseudoClass(row, "row-total-partial", active = false)
+          JFXStyles.togglePseudoClass(row, "first", active = false)
           row.setContextMenu(null)
       }
     }

@@ -436,10 +436,7 @@ class NetAssetValueHistoryController extends StagePersistentView {
         def getUserNAV = parseNumber(menuTextField.getText)
         menuTextField.textField.textProperty.listen { _ =>
           val navOk = getUserNAV > 0
-          JFXStyles.toggleError(menuTextField, !navOk,
-            if (navOk) None
-            else Some(Strings.positiveValue)
-          )
+          JFXStyles.toggleError(menuTextField, !navOk, Strings.positiveValue)
         }
 
         // Save edited value if applicable when requested
@@ -630,10 +627,8 @@ object NetAssetValueHistoryController {
 
     val loader = new FXMLLoader(getClass.getResource("/fxml/net-asset-value-history.fxml"), I18N.getResources)
     dialog.getDialogPane.setContent(loader.load())
-    stage.getScene.getStylesheets.addAll(
-      getClass.getResource("/css/main.css").toExternalForm,
-      getClass.getResource("/css/form.css").toExternalForm
-    )
+    stage.getScene.getStylesheets.add(getClass.getResource("/css/main.css").toExternalForm)
+    JFXStyles.addStylesheet(stage.getScene)
     val controller = loader.getController[NetAssetValueHistoryController]
     controller.initialize(savings, dialog, fundId)
 

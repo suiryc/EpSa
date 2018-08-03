@@ -79,7 +79,7 @@ class EditFundsController extends StagePersistentView {
     savings = savings0
 
     // Load css
-    dialog.getDialogPane.getStylesheets.add(getClass.getResource("/css/form.css").toExternalForm)
+    JFXStyles.addStylesheet(stage.getScene)
 
     // Lookup OK dialog button
     buttonOk = dialog.getDialogPane.lookupButton(ButtonType.OK)
@@ -534,12 +534,12 @@ class EditFundsController extends StagePersistentView {
     getFund match {
       case None =>
         deleteReady = false
-        JFXStyles.toggleImageButton(minusField, set = deleteReady)
+        JFXStyles.toggleImageButton(minusField, active = deleteReady)
 
       case Some(fund) =>
         deleteReady = canDeleteFund(fund)
-        if (deleteReady) JFXStyles.toggleImageButton(minusField, set = deleteReady)
-        else JFXStyles.toggleImageButton(minusField, set = deleteReady, Some(Strings.fundNotEmpty))
+        if (deleteReady) JFXStyles.toggleImageButton(minusField, active = deleteReady)
+        else JFXStyles.toggleImageButton(minusField, active = deleteReady, Some(Strings.fundNotEmpty))
     }
 
     // Plus field status: enable if adding new fund which name is OK, or

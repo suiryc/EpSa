@@ -138,7 +138,7 @@ class NewAssetActionController extends StagePersistentView with StrictLogging {
     val unavailabilityPeriods = Awaits.readDataStoreUnavailabilityPeriods(stage).getOrElse(Seq.empty).sortBy(_.id)
 
     // Load css
-    dialog.getDialogPane.getStylesheets.add(getClass.getResource("/css/form.css").toExternalForm)
+    JFXStyles.addStylesheet(stage.getScene)
 
     // Lookup OK dialog button
     buttonOk = dialog.getDialogPane.lookupButton(ButtonType.OK)
@@ -749,22 +749,13 @@ class NewAssetActionController extends StagePersistentView with StrictLogging {
       } else srcUnitsValueIssue
     }
     val srcOk = srcSelected && srcAvailabilitySelected && !srcAvailabilityAnterior && srcNAVValued && srcUnitsIssue.isEmpty
-    JFXStyles.toggleError(srcFundField, !srcSelected,
-      if (srcSelected) None
-      else Some(Strings.mandatoryField)
-    )
+    JFXStyles.toggleError(srcFundField, !srcSelected, Strings.mandatoryField)
     JFXStyles.toggleStyles(srcAvailabilityField, None,
       JFXStyles.ErrorStyle(!srcAvailabilitySelected, Strings.mandatoryField),
       JFXStyles.ErrorStyle(srcAvailabilityAnterior, Strings.anteriorAvailDate)
     )
-    JFXStyles.toggleError(srcAvailabilityField2, !srcAvailabilitySelected,
-      if (srcAvailabilitySelected) None
-      else Some(Strings.mandatoryField)
-    )
-    JFXStyles.toggleError(srcNAVField, !srcNAVValued,
-      if (srcNAVValued) None
-      else Some(Strings.positiveValue)
-    )
+    JFXStyles.toggleError(srcAvailabilityField2, !srcAvailabilitySelected, Strings.mandatoryField)
+    JFXStyles.toggleError(srcNAVField, !srcNAVValued, Strings.positiveValue)
     srcUnitsField.setPromptText(srcUnitsPrompt.orNull)
     JFXStyles.toggleError(srcUnitsField, srcUnitsIssue.nonEmpty, srcUnitsIssue.orElse(srcUnitsPrompt))
 
@@ -785,22 +776,13 @@ class NewAssetActionController extends StagePersistentView with StrictLogging {
     val dstUnitsValued = !dstNeeded || (dstUnits > 0)
     lazy val dstAsset = Savings.AssetPart(dstFund.scheme.id, dstFund.fund.id, dstAvailability, dstUnits, getDstNAV)
     val dstOk = dstSelected && dstAvailabilitySelected && !dstAvailabilityAnterior && dstNAVValued && dstUnitsValued
-    JFXStyles.toggleError(dstFundField, !dstSelected,
-      if (dstSelected) None
-      else Some(Strings.mandatoryField)
-    )
+    JFXStyles.toggleError(dstFundField, !dstSelected, Strings.mandatoryField)
     JFXStyles.toggleStyles(dstAvailabilityField, None,
       JFXStyles.ErrorStyle(!dstAvailabilitySelected, Strings.mandatoryField),
       JFXStyles.ErrorStyle(dstAvailabilityAnterior, Strings.anteriorAvailDate)
     )
-    JFXStyles.toggleError(dstNAVField, !dstNAVValued,
-      if (dstNAVValued) None
-      else Some(Strings.positiveValue)
-    )
-    JFXStyles.toggleError(dstUnitsField, !dstUnitsValued,
-      if (dstUnitsValued) None
-      else Some(Strings.positiveValue)
-    )
+    JFXStyles.toggleError(dstNAVField, !dstNAVValued, Strings.positiveValue)
+    JFXStyles.toggleError(dstUnitsField, !dstUnitsValued, Strings.positiveValue)
 
     lazy val srcAmount = getSrcAmount
     lazy val dstAmount = getDstAmount
@@ -811,9 +793,7 @@ class NewAssetActionController extends StagePersistentView with StrictLogging {
       val allowedDelta = scaleAmount((dsnNAV / BigDecimal(s"1${"0" * epsa.Settings.unitsScale()}")) / 2)
       val exceedsDelta = amountDelta > allowedDelta
       JFXStyles.toggleWarning(dstAmountField, exceedsDelta,
-        if (!exceedsDelta) None
-        else Some(Strings.dstAmountDelta.format(amountDelta, allowedDelta))
-      )
+        Strings.dstAmountDelta.format(amountDelta, allowedDelta))
     }
 
     val event = if (opDateOk && srcOk && dstOk) Some {

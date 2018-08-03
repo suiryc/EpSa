@@ -3,20 +3,17 @@ package epsa.util
 import javafx.animation.{KeyFrame, Timeline}
 import javafx.css.PseudoClass
 import javafx.event.ActionEvent
-import javafx.scene.Node
+import javafx.scene.{Node, Scene}
 import javafx.scene.control.{Control, Tooltip}
 import javafx.scene.image.ImageView
-import javafx.util.{Duration => jfxDuration}
+import javafx.util.{Duration ⇒ jfxDuration}
+import suiryc.scala.javafx.scene.{Styles, StylesFeat}
 
-object JFXStyles {
+object JFXStyles extends StylesFeat {
 
   val CLASS_HEADER = "header"
   val CLASS_NO_SELECT = "no-select"
   val CLASS_VALUE_NUMBER = "value-number"
-
-  private val warningClass = PseudoClass.getPseudoClass("warning")
-
-  private val errorClass = PseudoClass.getPseudoClass("error")
 
   private val animationHighlightClass = PseudoClass.getPseudoClass("animation-highlight")
 
@@ -26,70 +23,59 @@ object JFXStyles {
 
   private val imageButtonClass = "image-button"
 
-  private def setPseudoClass(node: Node, pseudoClass: PseudoClass, set: Boolean): Unit =
-  // See: http://stackoverflow.com/a/24231728
-    node.pseudoClassStateChanged(pseudoClass, set)
-
-  def togglePseudoClass(node: Node, pseudoClass: String, set: Boolean): Unit =
-    node.pseudoClassStateChanged(PseudoClass.getPseudoClass(pseudoClass), set)
+  override def addStylesheet(scene: Scene): Unit = {
+    super.addStylesheet(scene)
+    scene.getStylesheets.add(getClass.getResource("/css/form.css").toExternalForm)
+    ()
+  }
 
   def toggleStyles(node: Control, msgOpt: Option[String], styles: Style*): Unit = {
     // Apply all style changes
     // Group by style and check whether at least one instance is set
-    styles.groupBy(_.pseudoClass).mapValues(_.exists(_.set)).foreach {
-      case (pseudoClass, set) => setPseudoClass(node, pseudoClass, set)
+    styles.groupBy(_.pseudoClass).mapValues(_.exists(_.active)).foreach {
+      case (pseudoClass, set) => togglePseudoClass(node, pseudoClass, set)
     }
     // Get the first enabled style provided message, or the default one.
-    val opt = styles.find(_.set).map(_.msg).orElse(msgOpt)
+    val opt = styles.find(_.active).map(_.msg).orElse(msgOpt)
     node.setTooltip(opt.filterNot(_.isEmpty).map(new Tooltip(_)).orNull)
   }
 
-  def toggleWarning(node: Control, set: Boolean, msgOpt: Option[String] = None): Unit = {
-    setPseudoClass(node, warningClass, set)
-    node.setTooltip(msgOpt.map(new Tooltip(_)).orNull)
-  }
-
-  def toggleError(node: Control, set: Boolean, msgOpt: Option[String] = None): Unit = {
-    setPseudoClass(node, errorClass, set)
-    node.setTooltip(msgOpt.map(new Tooltip(_)).orNull)
-  }
-
-  def toggleAnimationHighlight(node: Node, set: Boolean): Unit = {
-    setPseudoClass(node, animationHighlightClass, set)
+  def toggleAnimationHighlight(node: Node, active: Boolean): Unit = {
+    togglePseudoClass(node, animationHighlightClass, active)
   }
 
   def togglePositive(node: Node): Unit = {
-    setPseudoClass(node, negativeClass, set = false)
-    setPseudoClass(node, positiveClass, set = true)
+    togglePseudoClass(node, negativeClass, active = false)
+    togglePseudoClass(node, positiveClass, active = true)
   }
 
   def toggleNegative(node: Node): Unit = {
-    setPseudoClass(node, positiveClass, set = false)
-    setPseudoClass(node, negativeClass, set = true)
+    togglePseudoClass(node, positiveClass, active = false)
+    togglePseudoClass(node, negativeClass, active = true)
   }
 
   def toggleNeutral(node: Node): Unit = {
-    setPseudoClass(node, positiveClass, set = false)
-    setPseudoClass(node, negativeClass, set = false)
+    togglePseudoClass(node, positiveClass, active = false)
+    togglePseudoClass(node, negativeClass, active = false)
   }
 
-  def setStyleImageButton(node: Node, set: Boolean): Unit = {
-    if (set && !node.getStyleClass.contains(imageButtonClass)) node.getStyleClass.add(imageButtonClass)
-    else if (!set) node.getStyleClass.remove(imageButtonClass)
+  def toggleImageButtonStyle(node: Node, active: Boolean): Unit = {
+    if (active && !node.getStyleClass.contains(imageButtonClass)) node.getStyleClass.add(imageButtonClass)
+    else if (!active) node.getStyleClass.remove(imageButtonClass)
     ()
   }
 
   /**
    * Toggles image button status.
    *
-   * When set, sets 'image-button' style class and have node opaque.
+   * When activated, sets 'image-button' style class and have node opaque.
    * Otherwise unsets 'image-button' style class and have node 60% transparent.
    * Also installs/uninstalls tooltip message.
    */
-  def toggleImageButton(node: ImageView, set: Boolean, msgOpt: Option[String] = None): Unit = {
+  def toggleImageButton(node: ImageView, active: Boolean, msgOpt: Option[String] = None): Unit = {
     // Note: do not disable node otherwise tooltip won't work
-    setStyleImageButton(node, set)
-    if (set) node.setOpacity(1.0)
+    toggleImageButtonStyle(node, active)
+    if (active) node.setOpacity(1.0)
     else node.setOpacity(0.4)
 
     msgOpt match {
@@ -104,32 +90,32 @@ object JFXStyles {
   }
 
   def highlightAnimation(nodes: List[Node], animationHighlighter: Option[AnimationHighlighter]): AnimationHighlighter = {
-    def toggle(set: Boolean): Unit =
+    def toggle(active: Boolean): Unit =
       nodes.foreach { node =>
-        toggleAnimationHighlight(node, set = set)
+        toggleAnimationHighlight(node, active)
       }
 
     animationHighlighter.foreach(_.stop())
     val timeline = new Timeline(
-      new KeyFrame(jfxDuration.seconds(0.5), { _: ActionEvent => toggle(set = true) }),
-      new KeyFrame(jfxDuration.seconds(1.0), { _: ActionEvent => toggle(set = false) })
+      new KeyFrame(jfxDuration.seconds(0.5), { _: ActionEvent => toggle(active = true) }),
+      new KeyFrame(jfxDuration.seconds(1.0), { _: ActionEvent => toggle(active = false) })
     )
     timeline.setCycleCount(3)
-    AnimationHighlighter(nodes, timeline, () => toggle(set = false))
+    AnimationHighlighter(nodes, timeline, () => toggle(active = false))
   }
 
   trait Style {
     val pseudoClass: PseudoClass
-    val set: Boolean
+    val active: Boolean
     val msg: String
   }
 
-  case class ErrorStyle(set: Boolean, msg: String = "") extends Style {
-    override val pseudoClass: PseudoClass = errorClass
+  case class ErrorStyle(active: Boolean, msg: String = "") extends Style {
+    override val pseudoClass: PseudoClass = Styles.errorClass
   }
 
-  case class WarningStyle(set: Boolean, msg: String = "") extends Style {
-    override val pseudoClass: PseudoClass = warningClass
+  case class WarningStyle(active: Boolean, msg: String = "") extends Style {
+    override val pseudoClass: PseudoClass = Styles.warningClass
   }
 
   case class AnimationHighlighter(rows: List[Node], timeline: Timeline, onStop: () => Unit) {

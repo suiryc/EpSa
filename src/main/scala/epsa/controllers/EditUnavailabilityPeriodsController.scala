@@ -71,7 +71,7 @@ class EditUnavailabilityPeriodsController extends StagePersistentView {
 
   def initialize(dialog: Dialog[_]): Unit = {
     // Load css
-    dialog.getDialogPane.getStylesheets.add(getClass.getResource("/css/form.css").toExternalForm)
+    JFXStyles.addStylesheet(stage.getScene)
 
     // Lookup OK dialog button
     buttonOk = dialog.getDialogPane.lookupButton(ButtonType.OK)
@@ -346,10 +346,7 @@ class EditUnavailabilityPeriodsController extends StagePersistentView {
     val month = getMonth
 
     val yearsOk = years > 0
-    JFXStyles.toggleError(yearsField, !yearsOk,
-      if (!yearsOk) Some(Strings.positiveValue)
-      else None
-    )
+    JFXStyles.toggleError(yearsField, !yearsOk, Strings.positiveValue)
 
     // Edition is OK if anything was changed.
     val editOk = yearsOk && edit.exists { period =>
@@ -370,7 +367,7 @@ class EditUnavailabilityPeriodsController extends StagePersistentView {
 
     // Minus field status: enable deletion if entry is selected
     deleteReady = Option(periodsField.getSelectionModel.getSelectedItem).isDefined
-    JFXStyles.toggleImageButton(minusField, set = deleteReady)
+    JFXStyles.toggleImageButton(minusField, active = deleteReady)
 
     // Plus field status: enable if adding new entry which is OK, or
     // copying with non-empty name and other settings are OK.
