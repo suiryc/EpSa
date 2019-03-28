@@ -99,6 +99,9 @@ object DataStore {
    * If temporary db exists, use it.
    * Otherwise, if physical db exists, use it.
    * Otherwise create an empty temporary db to use it.
+   * Note: starting with h2 v1.4.198, it may be better to always build temporary
+   * db out of real one because even read-only access does write in the file and
+   * may fail (access denied) when db is stored in Dropbox.
    */
   protected def getDBRead: Future[DatabaseDef] =
     dbTempOpt match {

@@ -62,11 +62,11 @@ object BNPParibasInvestmentFundProber extends InvestmentFundProber {
         // Table is ended by an empty row (while last row contains a warning comment)
         val values = (dataRowIdx to sheet.getLastRowNum).toStream.map(sheet.getRow).takeWhile { row =>
           // Notes:
-          // Cell.getCellType will be changed between 3.x and 4.x to return an
-          // enum instead of an int. In the meantime (starting with 3.15), it is
-          // made deprecated, while the temporary getCellTypeEnum function can
-          // be used (and will be removed in 4.2).
-          row.getCell(dateCellIdx).getCellTypeEnum != CellType.BLANK
+          // Cell.getCellType was made deprecated prior to being changed between
+          // 3.x and 4.x to return an enum instead of an int. In the meantime
+          // (starting with 3.15) the temporary getCellTypeEnum function was to
+          // be used, and is deprecated in 4.x (will be removed in 4.2).
+          row.getCell(dateCellIdx).getCellType != CellType.BLANK
         }.map { row =>
           val date = try {
             // Try as a date

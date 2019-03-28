@@ -1,6 +1,5 @@
 package epsa.controllers
 
-import com.sun.javafx.scene.control.VirtualScrollBar
 import com.typesafe.scalalogging.StrictLogging
 import epsa.{I18N, Settings}
 import epsa.I18N.Strings
@@ -19,13 +18,12 @@ import javafx.scene.control._
 import javafx.scene.control.skin.{TreeTableViewSkin, VirtualFlow}
 import javafx.scene.image.ImageView
 import javafx.scene.input.MouseEvent
-import javafx.scene.layout.{AnchorPane, Region}
+import javafx.scene.layout.AnchorPane
 import javafx.stage.Stage
 import monix.execution.Cancelable
 import scala.collection.JavaConverters._
 import scala.concurrent.Future
 import scala.concurrent.duration._
-import suiryc.scala.javafx.beans.value.RichObservableValue
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.javafx.scene.control.skin.SplitPaneSkinEx
@@ -225,52 +223,9 @@ class AccountHistoryController extends StagePersistentView with StrictLogging {
 
     // Restore assets columns order and width
     TableViews.setColumnsView(historyTable, historyColumns, Option(historyColumnsPref()))
-    // Now what we want is for both columns to occupy the whole table width.
-    // Using a constrained resizing policy gets in the way of restoring the
-    // view, so a solution is to create a binding through which we set the
-    // 'event description' column (preferred) width according to the width
-    // of other elements:
-    //  column2Width = tableWidth - tablePadding - column1Width
-    // However the vertical scrollbar which may appear is not taken into
-    // account in table width. It is in the "clipped-container" that is a
-    // Region of the viewed content:
-    //  column2Width = containerWidth - column1Width
-    //
-    // The table width is changed before the container one, which triggers
-    // glitches when resizing down using the second formula: the horizontal
-    // scrollbar appears (and disappears upon interaction or resizing up).
-    // Requesting layout (in 'runLater') makes it disappear right away.
-    // But listening to table width too (which is changed first) and keeping
-    // the minimum width between 'tableWidth - tablePadding - scrollBarWidth'
-    // and 'containerWidth' prevents the horizontal scrollbar from appearing.
-    val clippedContainer = historyTable.lookup(".clipped-container").asInstanceOf[Region]
-    val scrollBar = historyTable.lookupAll(".scroll-bar").asScala.collect {
-      case scrollBar: VirtualScrollBar if scrollBar.getPseudoClassStates.asScala.map(_.getPseudoClassName).contains("vertical") => scrollBar
-    }.head
 
-    def updateColumnWidth(): Unit = {
-      val insets = historyTable.getPadding
-      val padding = insets.getLeft + insets.getRight
-      val scrollbarWidth =
-        if (!scrollBar.isVisible) 0
-        else scrollBar.getWidth
-      val width = math.min(historyTable.getWidth - padding - scrollbarWidth, clippedContainer.getWidth) - columnEventDate.getWidth
-      columnEventDesc.setPrefWidth(width)
-    }
-
-    RichObservableValue.listen[AnyRef](
-      historyTable.widthProperty, clippedContainer.widthProperty, columnEventDate.widthProperty
-    ) {
-      updateColumnWidth()
-    }
-    // Requesting layout (in runLater) usually helps when the table is first
-    // being shown. Otherwise the column is often properly resized but it is
-    // not applied (visually) until we interact with the stage ...
-    // TODO: commenting to see if still useful in latest Java 10
-    //JFXSystem.runLater {
-    //  historyTable.requestLayout()
-    //}
-    ()
+    // Automatically resize 'event' column to fit the whole table width.
+    TableViews.autowidthColumn(columnEventDesc)
   }
 
   /** Persists view (stage location, ...). */

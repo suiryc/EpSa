@@ -2,21 +2,26 @@ import sbt._
 import Keys._
 
 lazy val versions = Map[String, String](
-  "akka"          -> "2.5.13",
+  "akka"          -> "2.5.21",
   "epsa"          -> "1.1-SNAPSHOT",
+  // Note: starting with h2 v1.4.198, doing read-only commands still does
+  // alter the DB file, which is problematic when stored on Dropbox; the access
+  // is performed asynchronously and often triggers an "access denied" error
+  // when Dropbox is still uploading the previous changes ...
   "h2"            -> "1.4.197",
   "html-cleaner"  -> "2.22",
-  "httpclient"    -> "4.5.5",
+  "httpclient"    -> "4.5.7",
   "logback"       -> "1.2.3",
-  "monix"         -> "3.0.0-RC1",
-  "poi"           -> "3.17",
-  "scala"         -> "2.12.6",
-  "scala-logging" -> "3.9.0",
+  "monix"         -> "3.0.0-RC2",
+  "poi"           -> "4.0.1",
+  "scala"         -> "2.12.8",
+  "scala-logging" -> "3.9.2",
   "scalatest"     -> "3.0.5",
-  "slf4j"         -> "1.7.25",
-  "slick"         -> "3.2.3",
+  "scopt"         -> "3.7.1",
+  "slf4j"         -> "1.7.26",
+  "slick"         -> "3.3.0",
   "simple-odf"    -> "0.8.2-incubating",
-  "spray-json"    -> "1.3.4",
+  "spray-json"    -> "1.3.5",
   "suiryc-scala"  -> "0.0.3-SNAPSHOT"
 )
 
@@ -70,6 +75,7 @@ lazy val epsa = project.in(file(".")).
 
     libraryDependencies ++= Seq(
       "ch.qos.logback"              %  "logback-classic"                   % versions("logback"),
+      "com.github.scopt"            %% "scopt"                             % versions("scopt"),
       "com.h2database"              %  "h2"                                % versions("h2"),
       "com.typesafe.akka"           %% "akka-actor"                        % versions("akka"),
       "com.typesafe.akka"           %% "akka-slf4j"                        % versions("akka"),
