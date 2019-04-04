@@ -1,6 +1,6 @@
 package epsa.controllers
 
-import epsa.I18N
+import epsa.{I18N, Main, Settings}
 import epsa.I18N.Strings
 import epsa.Settings.{formatCompactNumber, parseNumber}
 import epsa.charts._
@@ -27,7 +27,7 @@ import scala.util.{Failure, Success}
 import suiryc.scala.concurrent.RichFuture._
 import suiryc.scala.math.Ordered._
 import suiryc.scala.math.Ordering._
-import suiryc.scala.settings.Preference
+import suiryc.scala.settings.ConfigEntry
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.javafx.scene.control.{Dialogs, TextFieldWithButton}
@@ -121,7 +121,7 @@ class NetAssetValueHistoryController extends StagePersistentView {
     Stages.onStageReady(stage, first = false) {
       // Restore stage location
       Stages.setMinimumDimensions(stage)
-      Option(stageLocation()).foreach { loc =>
+      stageLocation.opt.foreach { loc =>
         Stages.setLocation(stage, loc, setSize = true)
       }
     }(JFXSystem.dispatcher)
@@ -131,7 +131,7 @@ class NetAssetValueHistoryController extends StagePersistentView {
   override protected def persistView(): Unit = {
     // Persist stage location
     // Note: if iconified, resets it
-    stageLocation() = Stages.getLocation(stage).orNull
+    stageLocation.set(Stages.getLocation(stage).orNull)
   }
 
   def onCloseRequest(dialog: Dialog[_])(event: WindowEvent): Unit = {
@@ -186,7 +186,7 @@ class NetAssetValueHistoryController extends StagePersistentView {
       fileChooser.getExtensionFilters.addAll(
         new FileChooser.ExtensionFilter(Strings.spreadsheets, "*.ods", "*.xls", "*.xlsx")
       )
-      navHistoryImportPath.option.foreach { path =>
+      navHistoryImportPath.opt.foreach { path =>
         PathChoosers.setInitialPath(fileChooser, path.toFile)
       }
       val selectedFile = fileChooser.showOpenDialog(stage)
@@ -197,7 +197,7 @@ class NetAssetValueHistoryController extends StagePersistentView {
         }.find(_.isDefined).flatten match {
           case Some(hist) =>
             // Save path in preferences
-            navHistoryImportPath() = selectedFile.toPath
+            navHistoryImportPath.set(selectedFile.toPath)
 
             // And import history
             importHistory(fund, hist)
@@ -491,7 +491,7 @@ class NetAssetValueHistoryController extends StagePersistentView {
           settings = ChartSettings.hidden.copy(
             xLabel = Strings.date,
             yLabel = Strings.nav,
-            ySuffix = epsa.Settings.defaultCurrency
+            ySuffix = Main.settings.currency.get
           )
         )
         val chartPane = chartHandler.chartPane
@@ -608,12 +608,13 @@ class NetAssetValueHistoryController extends StagePersistentView {
 
 object NetAssetValueHistoryController {
 
-  import epsa.Settings.prefs
-  import Preference._
+  private val settingsKeyPrefix = "nav-history"
 
-  private val stageLocation = Preference.from(prefs, "stage.nav.history.location", null:StageLocation)
+  private val stageLocation = ConfigEntry.from[StageLocation](Main.settings.settings,
+    Settings.KEY_SUIRYC, Settings.KEY_EPSA, Settings.KEY_STAGE, settingsKeyPrefix, Settings.KEY_LOCATION)
 
-  private val navHistoryImportPath = Preference.from(prefs, "nav.history.import.path", null:Path)
+  private val navHistoryImportPath = ConfigEntry.from[Path](Main.settings.settings,
+    Settings.KEY_SUIRYC, Settings.KEY_EPSA, settingsKeyPrefix, "import", "path")
 
   def title: String = Strings.navHistory
 

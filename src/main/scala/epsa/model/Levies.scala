@@ -1,7 +1,7 @@
 package epsa.model
 
-import epsa.Settings
-import epsa.Settings.{Debug, DebugString, scaleAmount, splitAmount}
+import epsa.{Main, Settings}
+import epsa.Settings.{Debug, DebugString}
 import java.time.LocalDate
 import scala.collection.immutable.ListMap
 import spray.json._
@@ -131,7 +131,7 @@ object Levies {
       val FIELD_NAME = "name"
       val FIELD_DATE = "date"
 
-      val knownFields = Set(FIELD_NAME, FIELD_DATE)
+      val knownFields: Set[String] = Set(FIELD_NAME, FIELD_DATE)
 
       override def read(json: JsValue): Levies = {
         val obj = json.asJsObject
@@ -162,6 +162,9 @@ case class LevyPeriodData(
   investedAmount: BigDecimal,
   grossGain: Option[BigDecimal]
 ) extends DebugString {
+
+  import Main.settings.{scaleAmount, splitAmount}
+
   def isComplete: Boolean = grossGain.isDefined
   def getGrossGain: BigDecimal = {
     assert(isComplete)

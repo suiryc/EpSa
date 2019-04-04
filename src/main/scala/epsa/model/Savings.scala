@@ -1,9 +1,10 @@
 package epsa.model
 
 import com.typesafe.scalalogging.StrictLogging
+import epsa.Main
 import epsa.I18N.Strings
 import epsa.Settings
-import epsa.Settings.{Debug, DebugInfo, scaleAmount, scaleVWAP}
+import epsa.Settings.{Debug, DebugInfo}
 import epsa.charts.ChartSeriesData
 import epsa.util.Awaits
 import java.time.{LocalDate, Month}
@@ -17,7 +18,8 @@ import suiryc.scala.spray.json.JsonFormats
 /** Savings helpers. */
 object Savings extends StrictLogging {
 
-  import epsa.Settings._
+  import Settings._
+  import Main.settings.scaleAmount
 
   /**
    * Resolves availability date against a target date.
@@ -494,6 +496,7 @@ case class Savings(
   leviesData: Map[Savings.AssetId, LeviesPeriodsData] = Map.empty
 ) extends StrictLogging {
 
+  import Main.settings.{scaleAmount, scaleVWAP}
   import Savings._
 
   // Notes on VWAP:

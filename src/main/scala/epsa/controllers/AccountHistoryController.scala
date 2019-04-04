@@ -1,7 +1,7 @@
 package epsa.controllers
 
 import com.typesafe.scalalogging.StrictLogging
-import epsa.{I18N, Settings}
+import epsa.{I18N, Main, Settings}
 import epsa.I18N.Strings
 import epsa.Settings._
 import epsa.charts._
@@ -32,10 +32,11 @@ import suiryc.scala.javafx.stage.{StagePersistentView, Stages}
 import suiryc.scala.javafx.stage.Stages.StageLocation
 import suiryc.scala.math.Ordered._
 import suiryc.scala.math.Ordering._
-import suiryc.scala.settings.Preference
+import suiryc.scala.settings.ConfigEntry
 
 class AccountHistoryController extends StagePersistentView with StrictLogging {
 
+  import Main.settings.scalePercents
   import AccountHistoryController._
 
   @FXML
@@ -83,7 +84,7 @@ class AccountHistoryController extends StagePersistentView with StrictLogging {
 
   private var animationHighlighter: Option[AnimationHighlighter] = None
 
-  private val currency = epsa.Settings.currency()
+  private val currency = Main.settings.currency.get
 
   private var stage: Stage = _
 
@@ -208,21 +209,21 @@ class AccountHistoryController extends StagePersistentView with StrictLogging {
     Stages.onStageReady(stage, first = false) {
       // Restore stage location
       Stages.setMinimumDimensions(stage)
-      Option(stageLocation()).foreach { loc =>
+      stageLocation.opt.foreach { loc =>
         Stages.setLocation(stage, loc, setSize = true)
       }
     }(JFXSystem.dispatcher)
 
     // Restore SplitPane divider positions
-    Option(splitPaneDividerPositions()).foreach { dividerPositions =>
+    splitPaneDividerPositions.opt.foreach { dividerPositions =>
       Panes.restoreDividerPositions(splitPane, dividerPositions)
     }
-    Option(splitPane2DividerPositions()).foreach { dividerPositions =>
+    splitPane2DividerPositions.opt.foreach { dividerPositions =>
       Panes.restoreDividerPositions(splitPane_2, dividerPositions)
     }
 
     // Restore assets columns order and width
-    TableViews.setColumnsView(historyTable, historyColumns, Option(historyColumnsPref()))
+    TableViews.setColumnsView(historyTable, historyColumns, historyColumnsPref.opt)
 
     // Automatically resize 'event' column to fit the whole table width.
     TableViews.autowidthColumn(columnEventDesc)
@@ -232,14 +233,14 @@ class AccountHistoryController extends StagePersistentView with StrictLogging {
   override protected def persistView(): Unit = {
     // Persist stage location
     // Note: if iconified, resets it
-    stageLocation() = Stages.getLocation(stage).orNull
+    stageLocation.set(Stages.getLocation(stage).orNull)
 
     // Persist assets table columns order and width
-    historyColumnsPref() = TableViews.getColumnsView(historyTable, historyColumns)
+    historyColumnsPref.set(TableViews.getColumnsView(historyTable, historyColumns))
 
     // Persist SplitPane divider positions
-    splitPaneDividerPositions() = Panes.encodeDividerPositions(splitPane)
-    splitPane2DividerPositions() = Panes.encodeDividerPositions(splitPane_2)
+    splitPaneDividerPositions.set(Panes.encodeDividerPositions(splitPane))
+    splitPane2DividerPositions.set(Panes.encodeDividerPositions(splitPane_2))
   }
 
   /**
@@ -511,7 +512,7 @@ class AccountHistoryController extends StagePersistentView with StrictLogging {
       settings = ChartSettings.hidden.copy(
         xLabel = Strings.date,
         yLabel = Strings.grossAmount,
-        ySuffix = epsa.Settings.defaultCurrency
+        ySuffix = Main.settings.currency.get
       )
     )
 
@@ -527,7 +528,9 @@ class AccountHistoryController extends StagePersistentView with StrictLogging {
       AnchorPane.setBottomAnchor(pane, 0.0)
       AnchorPane.setLeftAnchor(pane, 0.0)
       this.chartHandler = Some(chartHandler)
-      chartHandler.centerOnDate(grossHistory.last.date, track = true)
+      grossHistory.lastOption.foreach { last ⇒
+        chartHandler.centerOnDate(last.date, track = true)
+      }
     }
   }
 
@@ -567,7 +570,7 @@ class AccountHistoryController extends StagePersistentView with StrictLogging {
       val totalUnits = savings.assets.units(part.id)
       val leviesPeriodsData = savings.computeLevies(part.id, e.date, part.value)
       val (refundLevies, _) = leviesPeriodsData.proportioned(part.units / totalUnits)
-      val currency = epsa.Settings.currency()
+      val currency = Main.settings.currency.get
       val investedAmount = part.amount(savings.assets.vwaps(part.id))
       val grossAmount = part.amount(part.value)
       val grossGain = grossAmount - investedAmount
@@ -677,7 +680,7 @@ class AccountHistoryController extends StagePersistentView with StrictLogging {
       else JFXStyles.toggleNegative(label)
     }
 
-    val currency = epsa.Settings.currency()
+    val currency = Main.settings.currency.get
     dateLabel.setText(date.toString)
     investedAmountLabel.setText(formatNumber(details.investedAmount, currency))
     grossAmountLabel.setText(formatNumber(details.grossAmount, currency))
@@ -689,18 +692,19 @@ class AccountHistoryController extends StagePersistentView with StrictLogging {
 
 object AccountHistoryController {
 
-  import epsa.Settings.prefs
-  import Preference._
+  private val settingsKeyPrefix = "account-history"
 
-  private val prefsKeyPrefix = "stage.account-history"
+  private val stageLocation = ConfigEntry.from[StageLocation](Main.settings.settings,
+    Settings.KEY_SUIRYC, Settings.KEY_EPSA, Settings.KEY_STAGE, settingsKeyPrefix, Settings.KEY_LOCATION)
 
-  private val stageLocation = Preference.from(prefs, s"$prefsKeyPrefix.location", null:StageLocation)
+  private val splitPaneDividerPositions: ConfigEntry[String] = ConfigEntry.from[String](Main.settings.settings,
+    Settings.KEY_SUIRYC, Settings.KEY_EPSA, Settings.KEY_STAGE, settingsKeyPrefix, "splitPane", "dividerPositions")
 
-  private val splitPaneDividerPositions = Preference.from(prefs, s"$prefsKeyPrefix.splitPane.dividerPositions", null:String)
+  private val splitPane2DividerPositions: ConfigEntry[String] = ConfigEntry.from[String](Main.settings.settings,
+    Settings.KEY_SUIRYC, Settings.KEY_EPSA, Settings.KEY_STAGE, settingsKeyPrefix, "splitPane", "2", "dividerPositions")
 
-  private val splitPane2DividerPositions = Preference.from(prefs, s"$prefsKeyPrefix.splitPane.2.dividerPositions", null:String)
-
-  private val historyColumnsPref = Preference.from(prefs, s"$prefsKeyPrefix.history.columns", null:String)
+  private val historyColumnsPref: ConfigEntry[String] = ConfigEntry.from[String](Main.settings.settings,
+    Settings.KEY_SUIRYC, Settings.KEY_EPSA, Settings.KEY_STAGE, settingsKeyPrefix, "history", "columns")
 
   def title: String = Strings.accountHistory
 

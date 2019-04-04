@@ -2,7 +2,7 @@ package epsa.controllers
 
 import akka.actor.{Actor, ActorRef, Props}
 import com.typesafe.scalalogging.StrictLogging
-import epsa.I18N
+import epsa.{I18N, Main, Settings}
 import epsa.I18N.Strings
 import epsa.charts.{ChartHandler, ChartMark, ChartMeta, ChartSettings}
 import epsa.model._
@@ -30,7 +30,7 @@ import suiryc.scala.javafx.scene.control.skin.SplitPaneSkinEx
 import suiryc.scala.javafx.scene.control.{Dialogs, Panes, TableViews}
 import suiryc.scala.javafx.stage.{PathChoosers, StagePersistentView, Stages}
 import suiryc.scala.math.Ordered._
-import suiryc.scala.settings.Preference
+import suiryc.scala.settings.ConfigEntry
 
 // TODO: smart deletion of funds ?
 //         - keep the necessary data (NAV on some dates) used to compute levies
@@ -138,10 +138,10 @@ class MainController extends StagePersistentView with StrictLogging {
       )
     } {
       // First select menu according to saved settings
-      menu.setSelected(pref())
+      menu.setSelected(pref.get)
       // Then listen for changes to save new value in settings, then refresh the view
       menu.selectedProperty.listen { selected =>
-        pref() = selected
+        pref.set(selected)
         refresh()
       }
     }
@@ -155,7 +155,7 @@ class MainController extends StagePersistentView with StrictLogging {
       settings = ChartSettings.hidden.copy(
         xLabel = Strings.date,
         yLabel = Strings.nav,
-        ySuffix = epsa.Settings.defaultCurrency
+        ySuffix = Main.settings.currency.get
       )
     )
     val chartPane = chartHandler.chartPane
@@ -172,12 +172,12 @@ class MainController extends StagePersistentView with StrictLogging {
     Stages.onStageReady(stage, first) {
       // Restore stage location
       Stages.setMinimumDimensions(stage)
-      Option(stageLocation()).foreach { loc =>
+      stageLocation.opt.foreach { loc =>
         Stages.setLocation(stage, loc, setSize = true)
       }
     }(JFXSystem.dispatcher)
 
-    Option(splitPaneDividerPositions()).foreach { dividerPositions =>
+    splitPaneDividerPositions.opt.foreach { dividerPositions =>
       Panes.restoreDividerPositions(splitPane, dividerPositions)
     }
   }
@@ -188,13 +188,13 @@ class MainController extends StagePersistentView with StrictLogging {
 
     // Persist stage location
     // Note: if iconified, resets it
-    stageLocation() = Stages.getLocation(stage).orNull
+    stageLocation.set(Stages.getLocation(stage).orNull)
 
     // Persist assets table columns order and width
-    assetsColumnsPref() = TableViews.getColumnsView(savingsView.assetsTable, savingsView.assetsColumns)
+    assetsColumnsPref.set(TableViews.getColumnsView(savingsView.assetsTable, savingsView.assetsColumns))
 
     // Persist SplitPane divider positions
-    splitPaneDividerPositions() = Panes.encodeDividerPositions(splitPane)
+    splitPaneDividerPositions.set(Panes.encodeDividerPositions(splitPane))
   }
 
   protected def refreshTab(tab: TabWithState, state: State): Unit = {
@@ -241,7 +241,7 @@ class MainController extends StagePersistentView with StrictLogging {
       }
 
       // Restore from preferences for main tab
-      Option(assetsColumnsPref())
+      assetsColumnsPref.opt
     } else {
       // Apply main tab (current) view to new tabs
       Some(TableViews.getColumnsView(toDateSavingsViewTab.view.assetsTable, toDateSavingsViewTab.view.assetsColumns))
@@ -792,7 +792,7 @@ class MainController extends StagePersistentView with StrictLogging {
       fileChooser.getExtensionFilters.addAll(
         new FileChooser.ExtensionFilter(Strings.jsonFiles, "*.json")
       )
-      accountHistoryPath.option.foreach { path =>
+      accountHistoryPath.opt.foreach { path =>
         PathChoosers.setInitialPath(fileChooser, path.toFile)
       }
       val selectedFile = fileChooser.showSaveDialog(state.stage)
@@ -801,7 +801,7 @@ class MainController extends StagePersistentView with StrictLogging {
           val writer = new PrintWriter(file, "UTF-8")
           writer.write(history)
           writer.close()
-          accountHistoryPath() = selectedFile.toPath
+          accountHistoryPath.set(selectedFile.toPath)
           if (writer.checkError) {
             Dialogs.error(
               owner = Some(state.stage),
@@ -842,7 +842,7 @@ class MainController extends StagePersistentView with StrictLogging {
         fileChooser.getExtensionFilters.addAll(
           new FileChooser.ExtensionFilter(Strings.jsonFiles, "*.json")
         )
-        accountHistoryPath.option.foreach { path =>
+        accountHistoryPath.opt.foreach { path =>
           PathChoosers.setInitialPath(fileChooser, path.toFile)
         }
         val selectedFile = fileChooser.showOpenDialog(state.stage)
@@ -854,7 +854,14 @@ class MainController extends StagePersistentView with StrictLogging {
             import scala.io.Source
             import spray.json._
             import Savings.JsonProtocol._
-            val history = Source.fromFile(file, "UTF-8").mkString.parseJson.asJsObject.fields("history").asInstanceOf[JsArray]
+            val history = {
+              val source = Source.fromFile(file, "UTF-8")
+              try {
+                source.mkString
+              } finally {
+                source.close()
+              }
+            }.parseJson.asJsObject.fields("history").asInstanceOf[JsArray]
             val events = history.elements.toList.map(_.convertTo[Savings.Event])
             // Note: there is no need to reorder events since 'processEvents' will do it
             Some(events)
@@ -869,7 +876,7 @@ class MainController extends StagePersistentView with StrictLogging {
               None
           }
         }.foreach { events =>
-          accountHistoryPath() = selectedFile.toPath
+          accountHistoryPath.set(selectedFile.toPath)
           // Purge events history, and replay imported history
           Awaits.purgeDataStoreEvents(state.stage)
           val newState = processEvents(state.zero(Savings(levies = state.savings.levies)), events, updateAssetsValue = true)
@@ -958,29 +965,36 @@ class MainController extends StagePersistentView with StrictLogging {
 
 object MainController {
 
-  import epsa.Settings.prefs
-  import Preference._
   import Stages.StageLocation
 
-  private val prefsKeyPrefix = "stage.main"
+  private val settingsKeyPrefix = "main"
 
-  private val stageLocation = Preference.from(prefs, s"$prefsKeyPrefix.location", null:StageLocation)
+  private val stageLocation = ConfigEntry.from[StageLocation](Main.settings.settings,
+    Settings.KEY_SUIRYC, Settings.KEY_EPSA, Settings.KEY_STAGE, settingsKeyPrefix, Settings.KEY_LOCATION)
 
-  private val splitPaneDividerPositions = Preference.from(prefs, s"$prefsKeyPrefix.splitPane.dividerPositions", null:String)
+  private val splitPaneDividerPositions: ConfigEntry[String] = ConfigEntry.from[String](Main.settings.settings,
+    Settings.KEY_SUIRYC, Settings.KEY_EPSA, Settings.KEY_STAGE, settingsKeyPrefix, "splitPane", "dividerPositions")
 
-  private val assetsColumnsPref = Preference.from(prefs, s"$prefsKeyPrefix.assets.columns", null:String)
+  private val assetsColumnsPref: ConfigEntry[String] = ConfigEntry.from[String](Main.settings.settings,
+    Settings.KEY_SUIRYC, Settings.KEY_EPSA, Settings.KEY_STAGE, settingsKeyPrefix, "assets", "columns")
 
-  private val accountHistoryPath = Preference.from(prefs, "account.history.path", null:Path)
+  private val accountHistoryPath = ConfigEntry.from[Path](Main.settings.settings,
+    Settings.KEY_SUIRYC, Settings.KEY_EPSA, "account", "history", "path")
 
-  private val totalsPerScheme = Preference.from(prefs, "totals.per-scheme", true)
+  private val totalsPerScheme = ConfigEntry.from[Boolean](Main.settings.settings,
+    Settings.KEY_SUIRYC, Settings.KEY_EPSA, "totals", "per-scheme")
 
-  private val totalsPerFund = Preference.from(prefs, "totals.per-fund", true)
+  private val totalsPerFund = ConfigEntry.from[Boolean](Main.settings.settings,
+    Settings.KEY_SUIRYC, Settings.KEY_EPSA, "totals", "per-fund")
 
-  private val totalsPerAvailability = Preference.from(prefs, "totals.per-availability", true)
+  private val totalsPerAvailability = ConfigEntry.from[Boolean](Main.settings.settings,
+    Settings.KEY_SUIRYC, Settings.KEY_EPSA, "totals", "per-availability")
 
-  private val vwapPerAsset = Preference.from(prefs, "vwap.per-asset", false)
+  private val vwapPerAsset = ConfigEntry.from[Boolean](Main.settings.settings,
+    Settings.KEY_SUIRYC, Settings.KEY_EPSA, "vwap", "per-asset")
 
-  private val upToDateAssets = Preference.from(prefs, "up-to-date-assets", false)
+  private val upToDateAssets = ConfigEntry.from[Boolean](Main.settings.settings,
+    Settings.KEY_SUIRYC, Settings.KEY_EPSA, "up-to-date-assets")
 
   case class State(
     stage: Stage,

@@ -1,19 +1,36 @@
 package epsa
 
-import java.math.{BigDecimal => jBigDecimal}
+import java.math.{BigDecimal ⇒ jBigDecimal}
+import java.nio.file.Path
 import java.text.{DecimalFormat, NumberFormat, ParsePosition}
 import java.util.Locale
-import java.util.prefs.Preferences
 import scala.concurrent.duration._
 import scala.runtime.ScalaRunTime
 import suiryc.scala.concurrent.ThreadLocalEx
-import suiryc.scala.settings.Preference
-import suiryc.scala.settings.Preference._
+import suiryc.scala.settings.{ConfigEntry, PortableSettings}
 
 /** Settings. */
 object Settings {
 
-  val prefs: Preferences = Preferences.userRoot.node("suiryc.epsa").node("epsa")
+  private[epsa] val KEY_SUIRYC = "suiryc"
+  private[epsa] val KEY_EPSA = "epsa"
+
+  private[epsa] val KEY_LOCATION = "location"
+  private[epsa] val KEY_STAGE = "stage"
+
+  private val KEY_AMOUNT = "amount"
+  private val KEY_CLIENT = "client"
+  private val KEY_CODE = "code"
+  private val KEY_CURRENCY = "currency"
+  private val KEY_HTTP = "http"
+  private val KEY_LOCALE = "locale"
+  private val KEY_ROUNDING = "rounding"
+  private val KEY_SCALE = "scale"
+  private val KEY_TIMEOUT = "timeout"
+  private val KEY_UNITS = "units"
+  private val KEY_VWAP = "vwap"
+
+  private val prefix = List(KEY_SUIRYC, KEY_EPSA)
 
   var debugParams: Set[Debug.Value] = Set.empty
   def debug(v: Debug.Value): Boolean = debugParams.contains(v)
@@ -47,47 +64,10 @@ object Settings {
   }
 
   val preferredCurrencies = List("€", "$", "£", "￥", "฿")
-  val defaultCurrency: String = preferredCurrencies.head
-
-  val currency: Preference[String] = Preference.from(prefs, "currency", defaultCurrency)
-
-  val amountScale: Preference[Int] = Preference.from(prefs, "amount.scale", 2)
-  val amountRounding: Preference[BigDecimal.RoundingMode.Value] =
-    Preference.from(prefs, "amount.rounding", BigDecimal.RoundingMode, BigDecimal.RoundingMode.HALF_EVEN)
-
-  val unitsScale: Preference[Int] = Preference.from(prefs, "units.scale", 4)
-  val unitsRounding: Preference[BigDecimal.RoundingMode.Value] =
-    Preference.from(prefs, "units.rounding", BigDecimal.RoundingMode, BigDecimal.RoundingMode.HALF_EVEN)
-
-  val vwapScale: Preference[Int] = Preference.from(prefs, "vwap.scale", 4)
-  val vwapRounding: Preference[BigDecimal.RoundingMode.Value] =
-    Preference.from(prefs, "vwap.rounding", BigDecimal.RoundingMode, BigDecimal.RoundingMode.HALF_EVEN)
-
-  val httpClientTimeout: Preference[FiniteDuration] = Preference.from(prefs, "http.client.timeout", 10.seconds)
 
   // Note: not really useful to let user change percents scale/rounding
   val percentsScale = 2
   val percentsRounding: BigDecimal.RoundingMode.Value = BigDecimal.RoundingMode.HALF_EVEN
-
-  def splitAmount(amount: BigDecimal, ratio: BigDecimal): BigDecimal =
-    scaleAmount(amount * ratio)
-
-  def scaleAmount(v: BigDecimal): BigDecimal =
-    v.setScale(amountScale(), amountRounding())
-
-  def scaleUnits(v: BigDecimal): BigDecimal =
-    v.setScale(unitsScale(), unitsRounding())
-
-  def scaleVWAP(v: BigDecimal): BigDecimal =
-    v.setScale(vwapScale(), vwapRounding())
-
-  def scalePercents(v: BigDecimal): BigDecimal = {
-    // Adapt scale according to value.
-    // e.g. a value below 10 have the requested scale, a value below 100 have
-    // its scale down by 1, a value below 1000 down by 2, etc.
-    val scale = scala.math.max(0, percentsScale - (v.abs.intValue.toString.length - 1))
-    v.setScale(scale, percentsRounding)
-  }
 
   private def formatNumber(df: DecimalFormat, v: BigDecimal): String = {
     // Change minimum fraction digits to match the BigDecimal scale so that
@@ -161,6 +141,58 @@ object Settings {
       }
       loop("", List(0 -> this))
     }
+  }
+
+}
+
+class Settings(path: Path) {
+
+  import Settings._
+
+  private[epsa] val settings = PortableSettings(path, prefix)
+
+  val localeCode: ConfigEntry[String] =
+    ConfigEntry.from(settings, prefix ++ Seq(KEY_LOCALE, KEY_CODE))
+
+  val currency: ConfigEntry[String] =
+    ConfigEntry.from(settings, prefix ++ Seq(KEY_CURRENCY))
+
+  val amountScale: ConfigEntry[Int] =
+    ConfigEntry.from(settings, prefix ++ Seq(KEY_AMOUNT, KEY_SCALE))
+  val amountRounding: ConfigEntry[BigDecimal.RoundingMode.Value] =
+    ConfigEntry.from(settings, BigDecimal.RoundingMode, prefix ++ Seq(KEY_AMOUNT, KEY_ROUNDING))
+
+  val unitsScale: ConfigEntry[Int] =
+    ConfigEntry.from(settings, prefix ++ Seq(KEY_UNITS, KEY_SCALE))
+  val unitsRounding: ConfigEntry[BigDecimal.RoundingMode.Value] =
+    ConfigEntry.from(settings, BigDecimal.RoundingMode, prefix ++ Seq(KEY_UNITS, KEY_ROUNDING))
+
+  val vwapScale: ConfigEntry[Int] =
+    ConfigEntry.from(settings, prefix ++ Seq(KEY_VWAP, KEY_SCALE))
+  val vwapRounding: ConfigEntry[BigDecimal.RoundingMode.Value] =
+    ConfigEntry.from(settings, BigDecimal.RoundingMode, prefix ++ Seq(KEY_VWAP, KEY_ROUNDING))
+
+  val httpClientTimeout: ConfigEntry[FiniteDuration] =
+    ConfigEntry.from(settings, prefix ++ Seq(KEY_HTTP, KEY_CLIENT, KEY_TIMEOUT))
+
+  def splitAmount(amount: BigDecimal, ratio: BigDecimal): BigDecimal =
+    scaleAmount(amount * ratio)
+
+  def scaleAmount(v: BigDecimal): BigDecimal =
+    v.setScale(amountScale.get, amountRounding.get)
+
+  def scaleUnits(v: BigDecimal): BigDecimal =
+    v.setScale(unitsScale.get, unitsRounding.get)
+
+  def scaleVWAP(v: BigDecimal): BigDecimal =
+    v.setScale(vwapScale.get, vwapRounding.get)
+
+  def scalePercents(v: BigDecimal): BigDecimal = {
+    // Adapt scale according to value.
+    // e.g. a value below 10 have the requested scale, a value below 100 have
+    // its scale down by 1, a value below 1000 down by 2, etc.
+    val scale = scala.math.max(0, percentsScale - (v.abs.intValue.toString.length - 1))
+    v.setScale(scale, percentsRounding)
   }
 
 }

@@ -1,7 +1,7 @@
 package epsa.controllers
 
 import com.typesafe.scalalogging.StrictLogging
-import epsa.I18N
+import epsa.{I18N, Main, Settings}
 import epsa.I18N.Strings
 import epsa.model.{Levies, Savings}
 import epsa.storage.DataStore._
@@ -22,7 +22,7 @@ import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.javafx.scene.control.{Dialogs, ListCellEx}
 import suiryc.scala.javafx.stage.{PathChoosers, StagePersistentView, Stages}
 import suiryc.scala.javafx.stage.Stages.StageLocation
-import suiryc.scala.settings.Preference
+import suiryc.scala.settings.ConfigEntry
 
 class LeviesController extends StagePersistentView with StrictLogging {
 
@@ -70,7 +70,13 @@ class LeviesController extends StagePersistentView with StrictLogging {
       // Then filter files to only keep json ones inside the subfolder
       import suiryc.scala.io.NameFilter._
       leviesPath.listFiles("(?i)^.*\\.json$".r).toList.map { file =>
-        (file, Source.fromFile(file, "UTF-8").mkString)
+        val source = Source.fromFile(file, "UTF-8")
+        val str = try {
+          source.mkString
+        } finally {
+          source.close
+        }
+        (file, str)
       }
     }
     val otherLevies = jsons.flatMap { case (entry, str) =>
@@ -99,7 +105,7 @@ class LeviesController extends StagePersistentView with StrictLogging {
     Stages.onStageReady(stage, first = false) {
       // Restore stage location
       Stages.setMinimumDimensions(stage)
-      Option(stageLocation()).foreach { loc =>
+      stageLocation.opt.foreach { loc =>
         Stages.setLocation(stage, loc, setSize = true)
       }
     }(JFXSystem.dispatcher)
@@ -109,7 +115,7 @@ class LeviesController extends StagePersistentView with StrictLogging {
   override protected def persistView(): Unit = {
     // Persist stage location
     // Note: if iconified, resets it
-    stageLocation() = Stages.getLocation(stage).orNull
+    stageLocation.set(Stages.getLocation(stage).orNull)
   }
 
   def onCloseRequest(dialog: Dialog[_])(event: WindowEvent): Unit = {
@@ -138,17 +144,22 @@ class LeviesController extends StagePersistentView with StrictLogging {
     fileChooser.getExtensionFilters.addAll(
       new FileChooser.ExtensionFilter(Strings.jsonFiles, "*.json")
     )
-    leviesImportPath.option.foreach { path =>
+    leviesImportPath.opt.foreach { path =>
       PathChoosers.setInitialPath(fileChooser, path.toFile)
     }
     val selectedFile = fileChooser.showOpenDialog(stage)
     Option(selectedFile).foreach { file =>
-      leviesImportPath() = selectedFile.toPath
+      leviesImportPath.set(selectedFile.toPath)
 
       try {
         import spray.json._
         import Levies.JsonProtocol._
-        val str = Source.fromFile(file, "UTF-8").mkString
+        val source = Source.fromFile(file, "UTF-8")
+        val str = try {
+          source.mkString
+        } finally {
+          source.close()
+        }
         val levies = str.parseJson.convertTo[Levies].normalized
         val entry = LeviesAndJson(levies, str)
         if (!leviesField.getItems.contains(entry)) {
@@ -181,12 +192,13 @@ class LeviesController extends StagePersistentView with StrictLogging {
 
 object LeviesController {
 
-  import epsa.Settings.prefs
-  import Preference._
+  private val settingsKeyPrefix = "levies"
 
-  private val stageLocation = Preference.from(prefs, "stage.levies.location", null:StageLocation)
+  private val stageLocation = ConfigEntry.from[StageLocation](Main.settings.settings,
+    Settings.KEY_SUIRYC, Settings.KEY_EPSA, Settings.KEY_STAGE, settingsKeyPrefix, Settings.KEY_LOCATION)
 
-  private val leviesImportPath = Preference.from(prefs, "levies.import.path", null:Path)
+  private val leviesImportPath = ConfigEntry.from[Path](Main.settings.settings,
+    Settings.KEY_SUIRYC, Settings.KEY_EPSA, settingsKeyPrefix, "import", "path")
 
   case class LeviesAndJson(levies: Levies, json: String)
 

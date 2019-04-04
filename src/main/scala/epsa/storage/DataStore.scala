@@ -1,5 +1,6 @@
 package epsa.storage
 
+import epsa.{Main, Settings}
 import epsa.I18N.Strings
 import epsa.model.Savings
 import epsa.model.Savings.{Event, UnavailabilityPeriod}
@@ -24,19 +25,18 @@ import suiryc.scala.concurrent.RichFuture.Action
 import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.javafx.stage.PathChoosers
 import suiryc.scala.misc.Util
-import suiryc.scala.settings.Preference
+import suiryc.scala.settings.ConfigEntry
 
 object DataStore {
 
   import epsa.Main.Akka._
-  import epsa.Settings.prefs
-  import Preference._
 
   private val dbExtension = Constants.SUFFIX_MV_FILE
 
-  protected val dbPathPref: Preference[Path] = Preference.from(prefs, "datastore.path", null:Path)
+  protected val dbPathPref: ConfigEntry[Path] = ConfigEntry.from[Path](Main.settings.settings,
+    Settings.KEY_SUIRYC, Settings.KEY_EPSA, "datastore", "path")
 
-  protected[epsa] def defaultPath: Path = dbPathPref.option.getOrElse {
+  protected[epsa] def defaultPath: Path = dbPathPref.opt.getOrElse {
     // Default path is where this application is running.
     val path = Util.classLocation[DataStore.type]
     path.resolve(s"default$dbExtension")
@@ -175,7 +175,7 @@ object DataStore {
       Some(changePath(defaultPath))
     } else {
       // If last accessed data store does not exist (anymore), warn user
-      if (dbPathPref.option.isEmpty) None
+      if (dbPathPref.opt.isEmpty) None
       else Some(Future.failed(new FileNotFoundException))
     }
   }
@@ -347,7 +347,7 @@ object DataStore {
       dbRealOpt = Some(dbInfoNew)
 
       // Success, so save path
-      dbPathPref() = path
+      dbPathPref.set(path)
 
       dbInfoNew
     }
@@ -492,7 +492,7 @@ object DataStore {
 
     // Note: we manipulate 'Savings.Event' objects, but store them as String
     // so we need to define a mapping between the two.
-    protected implicit val eventColumnType = MappedColumnType.base[Savings.Event, String](
+    protected implicit val eventColumnType: BaseColumnType[Savings.Event] = MappedColumnType.base[Savings.Event, String](
       { e => e.toJson.compactPrint },
       { s => s.parseJson.convertTo[Savings.Event] }
     )
@@ -507,7 +507,7 @@ object DataStore {
 
     override protected val entries = TableQuery[Entries]
 
-    def hasEvents(): Future[Boolean] =
+    def hasEvents: Future[Boolean] =
       getDBRead.flatMap { db =>
         db.run(entries.size.result)
       }.map(_ > 0)
@@ -532,7 +532,7 @@ object DataStore {
     // Note: slick does not handle java.time classes (support may appear in
     // v3.2). java.sql.Date does handle conversion, so use it explicitly in
     // the meantime.
-    protected implicit val localDateColumnType = MappedColumnType.base[LocalDate, Date](
+    protected implicit val localDateColumnType: BaseColumnType[LocalDate] = MappedColumnType.base[LocalDate, Date](
       { d => Date.valueOf(d) },
       { d => d.toLocalDate }
     )
@@ -657,7 +657,7 @@ object DataStore {
 
     import scala.reflect._
 
-    protected implicit def enumColumnType[A <: Enum[A]](implicit tag: ClassTag[A]) = MappedColumnType.base[A, String](
+    protected implicit def enumColumnType[A <: Enum[A]](implicit tag: ClassTag[A]): BaseColumnType[A] = MappedColumnType.base[A, String](
       { d => d.name },
       { d => Enum.valueOf(classTag[A].runtimeClass.asInstanceOf[Class[A]], d) }
     )

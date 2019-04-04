@@ -1,6 +1,6 @@
 package epsa.controllers
 
-import epsa.I18N
+import epsa.{I18N, Main, Settings}
 import epsa.I18N.Strings
 import epsa.model.Savings
 import epsa.util.JFXStyles
@@ -22,7 +22,7 @@ import suiryc.scala.javafx.event.Events
 import suiryc.scala.javafx.scene.control.{CheckBoxListCellWithInfo, CheckBoxListCellWithSeparator, Dialogs}
 import suiryc.scala.javafx.stage.{StagePersistentView, Stages}
 import suiryc.scala.javafx.stage.Stages.StageLocation
-import suiryc.scala.settings.Preference
+import suiryc.scala.settings.ConfigEntry
 
 class EditFundsController extends StagePersistentView {
 
@@ -169,7 +169,7 @@ class EditFundsController extends StagePersistentView {
     Stages.onStageReady(stage, first = false) {
       // Restore stage location
       Stages.setMinimumDimensions(stage)
-      Option(stageLocation()).foreach { loc =>
+      stageLocation.opt.foreach { loc =>
         Stages.setLocation(stage, loc, setSize = true)
       }
     }(JFXSystem.dispatcher)
@@ -179,7 +179,7 @@ class EditFundsController extends StagePersistentView {
   override protected def persistView(): Unit = {
     // Persist stage location
     // Note: if iconified, resets it
-    stageLocation() = Stages.getLocation(stage).orNull
+    stageLocation.set(Stages.getLocation(stage).orNull)
   }
 
   /**
@@ -564,10 +564,8 @@ class EditFundsController extends StagePersistentView {
 
 object EditFundsController {
 
-  import epsa.Settings.prefs
-  import Preference._
-
-  private val stageLocation = Preference.from(prefs, "stage.edit-funds.location", null:StageLocation)
+  private val stageLocation = ConfigEntry.from[StageLocation](Main.settings.settings,
+    Settings.KEY_SUIRYC, Settings.KEY_EPSA, Settings.KEY_STAGE, "edit-funds", Settings.KEY_LOCATION)
 
   /** Builds a dialog out of this controller. */
   def buildDialog(owner: Window, savings: Savings, edit: Option[Savings.Fund]): Dialog[List[Savings.Event]] = {

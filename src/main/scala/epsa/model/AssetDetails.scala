@@ -1,6 +1,7 @@
 package epsa.model
 
 import com.sun.javafx.collections.SourceAdapterChange
+import epsa.Main
 import epsa.I18N.Strings
 import epsa.Settings._
 import epsa.controllers.Form
@@ -31,6 +32,9 @@ object AssetDetailsKind extends Enumeration {
 
 /** Asset details. */
 trait AssetDetails {
+
+  import Main.settings.{scaleUnits, scalePercents}
+
   /** Savings. */
   val savings: Savings
   /** Concerned asset. */
@@ -55,7 +59,7 @@ trait AssetDetails {
   /** Whether this is the first (used for styling in partial totals sections). */
   var first: Boolean = false
 
-  private val currency = epsa.Settings.currency()
+  private val currency = Main.settings.currency.get
 
   // The following functions/values give access to detailed values and formats
   def availability: Option[LocalDate] = asset.availability
@@ -168,6 +172,8 @@ class AssetDetailsWithTotal(
   availabilityBase: Option[LocalDate]
 ) extends TransformationList[AssetDetails, AssetDetails](source0)
 {
+
+  import Main.settings.scaleVWAP
 
   // Notes:
   // We wish to append partial totals (per scheme, per fund, and per

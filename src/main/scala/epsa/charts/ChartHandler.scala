@@ -1,13 +1,13 @@
 package epsa.charts
 
-import epsa.Settings.{formatNumber, scalePercents}
+import epsa.Main
+import epsa.Settings.formatNumber
 import epsa.controllers.Images
 import epsa.util.JFXStyles
 import epsa.util.JFXStyles.AnimationHighlighter
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import javafx.beans.property.{ObjectProperty, SimpleObjectProperty}
-import javafx.event.ActionEvent
 import javafx.geometry.Bounds
 import javafx.scene.chart.{LineChart, NumberAxis, XYChart}
 import javafx.scene.control._
@@ -103,6 +103,7 @@ class ChartHandler[A <: ChartMark](
   settings: ChartSettings
 ) {
 
+  import Main.settings.scalePercents
   import ChartHandler._
 
   // Note: using a CategoryAxis has many drawbacks.
@@ -168,7 +169,7 @@ class ChartHandler[A <: ChartMark](
   /** Zoom factor. */
   private val xZoomProperty: ObjectProperty[BigDecimal] = new SimpleObjectProperty[BigDecimal]()
   private def xZoom: BigDecimal = xZoomProperty.get
-  private def xZoom_=(v: BigDecimal) = xZoomProperty.set(v)
+  private def xZoom_=(v: BigDecimal): Unit = xZoomProperty.set(v)
   /** Minimal zoom factor. */
   private val xZoomMin: BigDecimal = BigDecimal(1) / 16
   /** Maximal zoom factor. */
@@ -236,7 +237,7 @@ class ChartHandler[A <: ChartMark](
   private def loop(zoom: BigDecimal): Unit =
     if (zoom <= xZoomMax) {
       val menuItem = new MenuItem(formatNumber(scalePercents(zoom * 100), "%"))
-      menuItem.setOnAction { (_: ActionEvent) =>
+      menuItem.setOnAction { _ =>
         // Stay on view center after zooming
         val viewedBounds = getChartBackgroundViewedBounds()
         val x = (viewedBounds.getMinX + viewedBounds.getMaxX) / 2
@@ -247,7 +248,7 @@ class ChartHandler[A <: ChartMark](
       loop(zoom * 2)
     }
   loop(xZoomMin)
-  zoomNode.setOnMouseReleased { (event: MouseEvent) =>
+  zoomNode.setOnMouseReleased { event =>
     // Reset visited state
     zoomNode.setVisited(false)
     // Show context menu where is mouse
@@ -405,7 +406,7 @@ class ChartHandler[A <: ChartMark](
     withMouseInChartBackground(event.getX, event.getY)(f)
 
   /** Resizes chart if necessary. */
-  private def resizeChart() = {
+  private def resizeChart(): Unit = {
     // Compare x axis width to actual data range and resize chart (actually
     // the parent anchor pane) if necessary. Also take into account elements
     // around the chart (like y axis, padding etc).
@@ -788,7 +789,7 @@ class ChartHandler[A <: ChartMark](
    * Default position is where the middle of the label is the currently
    * displayed 'x' chart value.
    */
-  private def setLabelX() = if (labelNAV.isVisible) {
+  private def setLabelX(): Unit = if (labelNAV.isVisible) {
     val bounds = getChartBackgroundBounds
 
     currentXIdx.map(getXY(bounds, _)) match {
@@ -806,7 +807,7 @@ class ChartHandler[A <: ChartMark](
    * Default position is where the bottom of the label is above the currently
    * displayed 'y' chart value by 10 pixels.
    */
-  private def setLabelY() = if (labelNAV.isVisible) {
+  private def setLabelY(): Unit = if (labelNAV.isVisible) {
     val bounds = getChartBackgroundBounds
 
     currentXIdx.map(getXY(bounds, _)) match {
@@ -824,7 +825,7 @@ class ChartHandler[A <: ChartMark](
    * Make sure it remains inside the chart background, and if possible does not
    * 'hide' the currently displayed chart data value.
    */
-  private def checkLabelPosition() = if (labelNAV.isVisible) {
+  private def checkLabelPosition(): Unit = if (labelNAV.isVisible) {
     val bounds = getChartBackgroundBounds
     val viewedBounds = getChartBackgroundViewedBounds()
 

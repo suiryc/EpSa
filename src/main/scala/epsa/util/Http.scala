@@ -49,7 +49,7 @@ object Http {
 
   /** Executes request and processes response. */
   private def executeRequest[A](request: HttpUriRequest)(p: CloseableHttpResponse => A): A = {
-    val timeout = epsa.Settings.httpClientTimeout()
+    val timeout = epsa.Main.settings.httpClientTimeout.get
     val config = RequestConfig.custom()
       .setSocketTimeout(timeout.toMillis.toInt)
       .setConnectTimeout(timeout.toMillis.toInt)

@@ -44,7 +44,7 @@ object Awaits {
   }
 
   def hasDataStoreEvents(owner: Window): Try[Boolean] =
-    orError(DataStore.EventSource.hasEvents(), Some(owner), DataStore.readIssueMsg())
+    orError(DataStore.EventSource.hasEvents, Some(owner), DataStore.readIssueMsg())
 
   def readDataStoreEvents(owner: Window): Try[List[Savings.Event]] =
     orError(DataStore.EventSource.readEvents(), Some(owner), DataStore.readIssueMsg()).map(_.toList)

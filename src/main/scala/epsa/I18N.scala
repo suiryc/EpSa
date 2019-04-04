@@ -1,14 +1,11 @@
 package epsa
 
-import suiryc.scala.util.{I18NWithCache, I18NWithPreference}
+import suiryc.scala.settings.ConfigEntry
+import suiryc.scala.util.{I18NWithCache, I18NWithConfigEntry}
 
-object I18N extends suiryc.scala.util.I18N("i18n.epsa") with I18NWithPreference with I18NWithCache {
+object I18N extends suiryc.scala.util.I18N("i18n.epsa") with I18NWithConfigEntry with I18NWithCache {
 
-  import epsa.Settings.prefs
-  import suiryc.scala.settings.Preference
-  import suiryc.scala.settings.Preference._
-
-  override val pref: Preference[String] = Preference.from(prefs, "locale.code", "en")
+  override val setting: ConfigEntry[String] = epsa.Main.settings.localeCode
 
   object Strings {
     // Titles, menu items, actions, ...

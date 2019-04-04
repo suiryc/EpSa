@@ -1,6 +1,6 @@
 package epsa.controllers
 
-import epsa.I18N
+import epsa.{I18N, Main, Settings}
 import epsa.I18N.Strings
 import epsa.util.JFXStyles
 import javafx.collections.FXCollections
@@ -14,7 +14,7 @@ import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.javafx.scene.control.{Dialogs, I18NLocaleCell}
 import suiryc.scala.javafx.stage.Stages.StageLocation
-import suiryc.scala.settings.{Preference, SettingSnapshot, SettingsSnapshot}
+import suiryc.scala.settings.{ConfigEntry, SettingSnapshot, SettingsSnapshot}
 import suiryc.scala.util.I18NLocale
 
 class OptionsController extends StagePersistentView {
@@ -60,7 +60,7 @@ class OptionsController extends StagePersistentView {
     buttonOk = dialog.getDialogPane.lookupButton(ButtonType.OK)
 
     snapshot.add(
-      SettingSnapshot(I18N.pref),
+      SettingSnapshot(I18N.setting),
       SettingSnapshot(settings.currency),
       SettingSnapshot(settings.amountScale),
       SettingSnapshot(settings.amountRounding),
@@ -78,33 +78,33 @@ class OptionsController extends StagePersistentView {
     import scala.collection.JavaConverters._
     val locales = I18N.locales.sortBy(_.displayName)
     languageChoice.setItems(FXCollections.observableList(locales.asJava))
-    locales.find(_.code == I18N.pref()).foreach { locale =>
+    locales.find(_.code == I18N.setting.get).foreach { locale =>
       languageChoice.getSelectionModel.select(locale)
     }
 
-    val currency = settings.currency()
-    val currencies = if (settings.preferredCurrencies.contains(currency)) {
-      settings.preferredCurrencies
+    val currency = settings.currency.get
+    val currencies = if (Settings.preferredCurrencies.contains(currency)) {
+      Settings.preferredCurrencies
     } else {
-      currency :: settings.preferredCurrencies
+      currency :: Settings.preferredCurrencies
     }
     currencyChoice.setItems(FXCollections.observableList(currencies.asJava))
     currencyChoice.getSelectionModel.select(currency)
 
-    amountScale.setValue(settings.amountScale().toDouble)
+    amountScale.setValue(settings.amountScale.get.toDouble)
     amountRounding.setItems(FXCollections.observableList(BigDecimal.RoundingMode.values.toList.asJava))
-    amountRounding.getSelectionModel.select(settings.amountRounding())
+    amountRounding.getSelectionModel.select(settings.amountRounding.get)
 
-    unitsScale.setValue(settings.unitsScale().toDouble)
+    unitsScale.setValue(settings.unitsScale.get.toDouble)
     unitsRounding.setItems(FXCollections.observableList(BigDecimal.RoundingMode.values.toList.asJava))
-    unitsRounding.getSelectionModel.select(settings.unitsRounding())
+    unitsRounding.getSelectionModel.select(settings.unitsRounding.get)
 
-    vwapScale.setValue(settings.vwapScale().toDouble)
+    vwapScale.setValue(settings.vwapScale.get.toDouble)
     vwapRounding.setItems(FXCollections.observableList(BigDecimal.RoundingMode.values.toList.asJava))
-    vwapRounding.getSelectionModel.select(settings.vwapRounding())
+    vwapRounding.getSelectionModel.select(settings.vwapRounding.get)
 
     httpClientTimeout.textProperty.listen(checkForm())
-    httpClientTimeout.setText(settings.httpClientTimeout().toString)
+    httpClientTimeout.setText(settings.httpClientTimeout.get.toString)
   }
 
   /** Restores (persisted) view. */
@@ -112,7 +112,7 @@ class OptionsController extends StagePersistentView {
     Stages.onStageReady(stage, first = false) {
       // Restore stage location
       Stages.setMinimumDimensions(stage)
-      Option(stageLocation()).foreach { loc =>
+      stageLocation.opt.foreach { loc =>
         Stages.setLocation(stage, loc, setSize = true)
       }
     }(JFXSystem.dispatcher)
@@ -122,7 +122,7 @@ class OptionsController extends StagePersistentView {
   override protected def persistView(): Unit = {
     // Persist stage location
     // Note: if iconified, resets it
-    stageLocation() = Stages.getLocation(stage).orNull
+    stageLocation.set(Stages.getLocation(stage).orNull)
   }
 
   private def checkForm(): Unit = {
@@ -137,11 +137,9 @@ class OptionsController extends StagePersistentView {
   }
 
   protected def applyChanges(snapshot: SettingsSnapshot): (Boolean, Boolean) = {
-    Option(currencyChoice.getEditor.getText).filterNot(_.isEmpty).foreach { currency =>
-      settings.currency() = currency
-    }
+    Option(currencyChoice.getEditor.getText).filterNot(_.isEmpty).foreach(settings.currency.set)
     val restart = Option(languageChoice.getValue) match {
-      case Some(locale) if locale.code != I18N.pref() =>
+      case Some(locale) if locale.code != I18N.setting.get =>
         I18N.setLocale(locale.code)
         true
 
@@ -149,16 +147,16 @@ class OptionsController extends StagePersistentView {
         false
     }
 
-    settings.amountScale() = amountScale.getValue.round.toInt
-    settings.amountRounding() = amountRounding.getValue
+    settings.amountScale.set(amountScale.getValue.round.toInt)
+    settings.amountRounding.set(amountRounding.getValue)
 
-    settings.unitsScale() = unitsScale.getValue.round.toInt
-    settings.unitsRounding() = unitsRounding.getValue
+    settings.unitsScale.set(unitsScale.getValue.round.toInt)
+    settings.unitsRounding.set(unitsRounding.getValue)
 
-    settings.vwapScale() = vwapScale.getValue.round.toInt
-    settings.vwapRounding() = vwapRounding.getValue
+    settings.vwapScale.set(vwapScale.getValue.round.toInt)
+    settings.vwapRounding.set(vwapRounding.getValue)
 
-    settings.httpClientTimeout() = Duration(httpClientTimeout.getText).asInstanceOf[FiniteDuration]
+    settings.httpClientTimeout.set(Duration(httpClientTimeout.getText).asInstanceOf[FiniteDuration])
 
     // Caller needs to reload (view) if something changed
     val reload = snapshot.changed()
@@ -170,15 +168,13 @@ class OptionsController extends StagePersistentView {
 
 object OptionsController {
 
-  import epsa.Settings.prefs
-  import Preference._
-
   // Note: the result of this dialog is whether the owner window needs to be
   // reloaded (language change)
 
-  private val settings = epsa.Settings
+  private val settings = Main.settings
 
-  private val stageLocation = Preference.from(prefs, "stage.options.location", null:StageLocation)
+  private val stageLocation = ConfigEntry.from[StageLocation](Main.settings.settings,
+    Settings.KEY_SUIRYC, Settings.KEY_EPSA, Settings.KEY_STAGE, "options", Settings.KEY_LOCATION)
 
   def buildDialog(owner: Window): Dialog[(Boolean, Boolean)] = {
     val dialog = new Dialog[(Boolean, Boolean)]()

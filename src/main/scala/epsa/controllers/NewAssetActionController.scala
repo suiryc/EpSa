@@ -1,7 +1,7 @@
 package epsa.controllers
 
 import com.typesafe.scalalogging.StrictLogging
-import epsa.{I18N, Settings}
+import epsa.{I18N, Main, Settings}
 import epsa.I18N.Strings
 import epsa.Settings._
 import epsa.model.Savings
@@ -21,7 +21,7 @@ import javafx.util.converter.LocalDateStringConverter
 import scala.collection.JavaConverters._
 import suiryc.scala.javafx.stage.Stages.StageLocation
 import suiryc.scala.math.Ordered._
-import suiryc.scala.settings.Preference
+import suiryc.scala.settings.ConfigEntry
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.javafx.scene.control.{DatePickers, Dialogs, TextFieldWithButton}
@@ -29,6 +29,7 @@ import suiryc.scala.javafx.stage.{StagePersistentView, Stages}
 
 class NewAssetActionController extends StagePersistentView with StrictLogging {
 
+  import Main.settings.{scaleAmount, scaleUnits, scalePercents}
   import NewAssetActionController._
 
   @FXML
@@ -272,7 +273,7 @@ class NewAssetActionController extends StagePersistentView with StrictLogging {
     // selected.
     // Note: behave as if counterpart value was modified ('initRecursion'), so
     // that recursion can be broken as expected.
-    dstUnitsAutoButton.setSelected(dstUnitsAuto())
+    dstUnitsAutoButton.setSelected(dstUnitsAuto.get)
     dstUnitsAutoButton.selectedProperty.listen { selected =>
       if (selected) onSrcAmount()
     }
@@ -308,7 +309,7 @@ class NewAssetActionController extends StagePersistentView with StrictLogging {
     Stages.onStageReady(stage, first = false) {
       // Restore stage location
       Stages.setMinimumDimensions(stage)
-      Option(stageLocation()).foreach { loc =>
+      stageLocation.opt.foreach { loc =>
         Stages.setLocation(stage, loc, setSize = true)
       }
     }(JFXSystem.dispatcher)
@@ -316,10 +317,10 @@ class NewAssetActionController extends StagePersistentView with StrictLogging {
 
   /** Persists view (stage location, ...). */
   override protected def persistView(): Unit = {
-    dstUnitsAuto() = dstUnitsAutoButton.isSelected
+    dstUnitsAuto.set(dstUnitsAutoButton.isSelected)
     // Persist stage location
     // Note: if iconified, resets it
-    stageLocation() = Stages.getLocation(stage).orNull
+    stageLocation.set(Stages.getLocation(stage).orNull)
   }
 
   private def onToggleKind(): Unit = {
@@ -621,7 +622,7 @@ class NewAssetActionController extends StagePersistentView with StrictLogging {
             val text = formatCompactNumber(nav.value)
             field.setUserData(nav)
             field.setText(text)
-            field.textField.setTooltip(new Tooltip(s"${Strings.date}: ${nav.date}\n${Strings.nav}: ${formatNumber(nav.value, epsa.Settings.currency())}"))
+            field.textField.setTooltip(new Tooltip(s"${Strings.date}: ${nav.date}\n${Strings.nav}: ${formatNumber(nav.value, Main.settings.currency.get)}"))
             field.setOnButtonAction { _ =>
               field.setText(text)
             }
@@ -668,7 +669,7 @@ class NewAssetActionController extends StagePersistentView with StrictLogging {
             val totalUnits = savings.assets.units(schemeAndFund.id)
             val leviesPeriodsData = savings.computeLevies(schemeAndFund.id, operationDate, getSrcNAV)
             val (refundLevies, _) = leviesPeriodsData.proportioned(units / totalUnits)
-            val currency = epsa.Settings.currency()
+            val currency = Main.settings.currency.get
             val investedAmount = scaleAmount((asset.amount(savings.assets.vwaps(asset.id)) * units) / asset.units)
             val grossGain = grossAmount - investedAmount
             val leviesAmount = refundLevies.amount
@@ -790,7 +791,7 @@ class NewAssetActionController extends StagePersistentView with StrictLogging {
       val amountDelta = (dstAmount - srcAmount).abs
       // Amount value step (due to units scale) is 'NAV * 10^-unitsScale'.
       // The max delta (absolute) to reach any amount is then 'amountStep / 2'.
-      val allowedDelta = scaleAmount((dsnNAV / BigDecimal(s"1${"0" * epsa.Settings.unitsScale()}")) / 2)
+      val allowedDelta = scaleAmount((dsnNAV / BigDecimal(s"1${"0" * Main.settings.unitsScale.get}")) / 2)
       val exceedsDelta = amountDelta > allowedDelta
       JFXStyles.toggleWarning(dstAmountField, exceedsDelta,
         Strings.dstAmountDelta.format(amountDelta, allowedDelta))
@@ -893,14 +894,13 @@ class NewAssetActionController extends StagePersistentView with StrictLogging {
 
 object NewAssetActionController {
 
-  import epsa.Settings.prefs
-  import Preference._
+  private val settingsKeyPrefix = "new-asset-action"
 
-  private val prefsKeyPrefix = "stage.new-asset-action"
+  private val stageLocation = ConfigEntry.from[StageLocation](Main.settings.settings,
+    Settings.KEY_SUIRYC, Settings.KEY_EPSA, Settings.KEY_STAGE, settingsKeyPrefix, Settings.KEY_LOCATION)
 
-  private val stageLocation = Preference.from(prefs, s"$prefsKeyPrefix.location", null:StageLocation)
-
-  private val dstUnitsAuto = Preference.from(prefs, s"$prefsKeyPrefix.dst-units-auto", true)
+  private val dstUnitsAuto = ConfigEntry.from[Boolean](Main.settings.settings,
+    Settings.KEY_SUIRYC, Settings.KEY_EPSA, settingsKeyPrefix, "dst-units-auto")
 
   /** Builds a dialog out of this controller. */
   def buildDialog(owner: Window, mainController: MainController, savings: Savings,

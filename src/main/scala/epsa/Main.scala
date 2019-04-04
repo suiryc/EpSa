@@ -4,15 +4,21 @@ import akka.actor.ActorSystem
 import epsa.controllers.MainController
 import epsa.model.Savings
 import epsa.util.Awaits
+import java.nio.file.Path
 import javafx.application.{Application, Platform}
 import javafx.stage.Stage
 import monix.execution.Scheduler
 import scala.concurrent.ExecutionContextExecutor
 import suiryc.scala.akka.CoreSystem
+import suiryc.scala.misc.Util
 
 object Main {
 
   import Settings.Debug
+
+  val appPath: Path = Util.classLocation[this.type]
+
+  val settings = new Settings(appPath.resolve("application.conf"))
 
   val versionedName: String = s"${epsa.Info.name} ${epsa.Info.version}" +
     epsa.Info.gitHeadCommit.map(v => s" ($v)").getOrElse("")
