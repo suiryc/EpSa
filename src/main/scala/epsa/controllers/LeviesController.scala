@@ -18,13 +18,12 @@ import javafx.scene.control.{ButtonType, ComboBox, Dialog, TextArea}
 import javafx.stage.{FileChooser, Stage, Window, WindowEvent}
 import scala.collection.JavaConverters._
 import scala.io.Source
-import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.javafx.scene.control.{Dialogs, ListCellEx}
-import suiryc.scala.javafx.stage.{PathChoosers, StagePersistentView, Stages}
+import suiryc.scala.javafx.stage.{PathChoosers, StageLocationPersistentView, Stages}
 import suiryc.scala.javafx.stage.Stages.StageLocation
 import suiryc.scala.settings.ConfigEntry
 
-class LeviesController extends StagePersistentView with StrictLogging {
+class LeviesController extends StageLocationPersistentView(LeviesController.stageLocation) with StrictLogging {
 
   import LeviesController._
 
@@ -36,7 +35,7 @@ class LeviesController extends StagePersistentView with StrictLogging {
 
   protected var buttonOk: Node = _
 
-  private lazy val stage = leviesField.getScene.getWindow.asInstanceOf[Stage]
+  lazy protected val stage: Stage = leviesField.getScene.getWindow.asInstanceOf[Stage]
 
   private var currentLeviesAndJson: LeviesAndJson = _
 
@@ -98,24 +97,6 @@ class LeviesController extends StagePersistentView with StrictLogging {
     leviesField.getItems.setAll(FXCollections.observableList(allLevies.asJava))
     leviesField.getSelectionModel.select(currentLeviesAndJson)
     onLevies(null)
-  }
-
-  /** Restores (persisted) view. */
-  override protected def restoreView(): Unit = {
-    Stages.onStageReady(stage, first = false) {
-      // Restore stage location
-      Stages.setMinimumDimensions(stage)
-      stageLocation.opt.foreach { loc =>
-        Stages.setLocation(stage, loc, setSize = true)
-      }
-    }(JFXSystem.dispatcher)
-  }
-
-  /** Persists view (stage location, ...). */
-  override protected def persistView(): Unit = {
-    // Persist stage location
-    // Note: if iconified, resets it
-    stageLocation.set(Stages.getLocation(stage).orNull)
   }
 
   def onCloseRequest(dialog: Dialog[_])(event: WindowEvent): Unit = {

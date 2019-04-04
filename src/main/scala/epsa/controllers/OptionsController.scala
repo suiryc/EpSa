@@ -9,15 +9,14 @@ import javafx.scene.Node
 import javafx.scene.control._
 import javafx.stage.{Stage, Window}
 import scala.concurrent.duration.{Duration, FiniteDuration}
-import suiryc.scala.javafx.stage.{StagePersistentView, Stages}
+import suiryc.scala.javafx.stage.{StageLocationPersistentView, Stages}
 import suiryc.scala.javafx.beans.value.RichObservableValue._
-import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.javafx.scene.control.{Dialogs, I18NLocaleCell}
 import suiryc.scala.javafx.stage.Stages.StageLocation
 import suiryc.scala.settings.{ConfigEntry, SettingSnapshot, SettingsSnapshot}
 import suiryc.scala.util.I18NLocale
 
-class OptionsController extends StagePersistentView {
+class OptionsController extends StageLocationPersistentView(OptionsController.stageLocation) {
 
   import OptionsController._
 
@@ -50,7 +49,7 @@ class OptionsController extends StagePersistentView {
 
   protected var buttonOk: Node = _
 
-  private lazy val stage = httpClientTimeout.getScene.getWindow.asInstanceOf[Stage]
+  lazy protected val stage: Stage = httpClientTimeout.getScene.getWindow.asInstanceOf[Stage]
 
   def initialize(dialog: Dialog[_], snapshot: SettingsSnapshot): Unit = {
     // Load css
@@ -105,24 +104,6 @@ class OptionsController extends StagePersistentView {
 
     httpClientTimeout.textProperty.listen(checkForm())
     httpClientTimeout.setText(settings.httpClientTimeout.get.toString)
-  }
-
-  /** Restores (persisted) view. */
-  override protected def restoreView(): Unit = {
-    Stages.onStageReady(stage, first = false) {
-      // Restore stage location
-      Stages.setMinimumDimensions(stage)
-      stageLocation.opt.foreach { loc =>
-        Stages.setLocation(stage, loc, setSize = true)
-      }
-    }(JFXSystem.dispatcher)
-  }
-
-  /** Persists view (stage location, ...). */
-  override protected def persistView(): Unit = {
-    // Persist stage location
-    // Note: if iconified, resets it
-    stageLocation.set(Stages.getLocation(stage).orNull)
   }
 
   private def checkForm(): Unit = {

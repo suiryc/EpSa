@@ -28,14 +28,14 @@ import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.javafx.scene.Graphics
 import suiryc.scala.javafx.scene.control.skin.SplitPaneSkinEx
 import suiryc.scala.javafx.scene.control.{Dialogs, Panes, TableViews}
-import suiryc.scala.javafx.stage.{PathChoosers, StagePersistentView, Stages}
+import suiryc.scala.javafx.stage.{PathChoosers, StageLocationPersistentView, Stages}
 import suiryc.scala.math.Ordered._
 import suiryc.scala.settings.ConfigEntry
 
 // TODO: smart deletion of funds ?
 //         - keep the necessary data (NAV on some dates) used to compute levies
 //         - way to determine if all levies of past fund assets were paid already, so that all NAVs can really be deleted ?
-class MainController extends StagePersistentView with StrictLogging {
+class MainController extends StageLocationPersistentView(MainController.stageLocation, first = true) with StrictLogging {
 
   import MainController._
 
@@ -92,7 +92,7 @@ class MainController extends StagePersistentView with StrictLogging {
   @FXML
   protected var tabPane: TabPane = _
 
-  lazy private val stage = splitPane.getScene.getWindow.asInstanceOf[Stage]
+  lazy protected val stage: Stage = splitPane.getScene.getWindow.asInstanceOf[Stage]
 
   lazy private val toDateSavingsViewTab: SavingsViewTab = addSavingsOnDateTab(None, init = true)
 
@@ -104,11 +104,7 @@ class MainController extends StagePersistentView with StrictLogging {
 
   private[epsa] var actor: ActorRef = _
 
-  private var first: Boolean = _
-
-  def initialize(state: State, first: Boolean): Unit = {
-    this.first = first
-
+  def initialize(state: State): Unit = {
     // Note: make the actor name unique (with timestamp) so that it can be
     // recreated later.
     actor = JFXSystem.newJFXActor(
@@ -169,13 +165,7 @@ class MainController extends StagePersistentView with StrictLogging {
 
   /** Restores (persisted) view. */
   override protected def restoreView(): Unit = {
-    Stages.onStageReady(stage, first) {
-      // Restore stage location
-      Stages.setMinimumDimensions(stage)
-      stageLocation.opt.foreach { loc =>
-        Stages.setLocation(stage, loc, setSize = true)
-      }
-    }(JFXSystem.dispatcher)
+    super.restoreView()
 
     splitPaneDividerPositions.opt.foreach { dividerPositions =>
       Panes.restoreDividerPositions(splitPane, dividerPositions)
@@ -184,11 +174,9 @@ class MainController extends StagePersistentView with StrictLogging {
 
   /** Persists view (stage location, ...). */
   override protected def persistView(): Unit = {
-    val savingsView = toDateSavingsViewTab.view
+    super.persistView()
 
-    // Persist stage location
-    // Note: if iconified, resets it
-    stageLocation.set(Stages.getLocation(stage).orNull)
+    val savingsView = toDateSavingsViewTab.view
 
     // Persist assets table columns order and width
     assetsColumnsPref.set(TableViews.getColumnsView(savingsView.assetsTable, savingsView.assetsColumns))
@@ -1077,7 +1065,7 @@ object MainController {
     val loader = new FXMLLoader(getClass.getResource("/fxml/main.fxml"), I18N.getResources)
     val root = loader.load[Parent]()
     val controller = loader.getController[MainController]
-    controller.initialize(state, first)
+    controller.initialize(state)
 
     if (!first) stage.hide()
     // Delegate closing request to controller

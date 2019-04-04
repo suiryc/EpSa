@@ -28,13 +28,13 @@ import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.javafx.scene.control.skin.SplitPaneSkinEx
 import suiryc.scala.javafx.scene.control.{Dialogs, Panes, TableViews}
-import suiryc.scala.javafx.stage.{StagePersistentView, Stages}
+import suiryc.scala.javafx.stage.{StageLocationPersistentView, Stages}
 import suiryc.scala.javafx.stage.Stages.StageLocation
 import suiryc.scala.math.Ordered._
 import suiryc.scala.math.Ordering._
 import suiryc.scala.settings.ConfigEntry
 
-class AccountHistoryController extends StagePersistentView with StrictLogging {
+class AccountHistoryController extends StageLocationPersistentView(AccountHistoryController.stageLocation) with StrictLogging {
 
   import Main.settings.scalePercents
   import AccountHistoryController._
@@ -86,7 +86,7 @@ class AccountHistoryController extends StagePersistentView with StrictLogging {
 
   private val currency = Main.settings.currency.get
 
-  private var stage: Stage = _
+  protected var stage: Stage = _
 
   private var chartHandler: Option[ChartHandler[HistoryMark]] = None
 
@@ -206,13 +206,7 @@ class AccountHistoryController extends StagePersistentView with StrictLogging {
 
   /** Restores (persisted) view. */
   override protected def restoreView(): Unit = {
-    Stages.onStageReady(stage, first = false) {
-      // Restore stage location
-      Stages.setMinimumDimensions(stage)
-      stageLocation.opt.foreach { loc =>
-        Stages.setLocation(stage, loc, setSize = true)
-      }
-    }(JFXSystem.dispatcher)
+    super.restoreView()
 
     // Restore SplitPane divider positions
     splitPaneDividerPositions.opt.foreach { dividerPositions =>
@@ -231,9 +225,7 @@ class AccountHistoryController extends StagePersistentView with StrictLogging {
 
   /** Persists view (stage location, ...). */
   override protected def persistView(): Unit = {
-    // Persist stage location
-    // Note: if iconified, resets it
-    stageLocation.set(Stages.getLocation(stage).orNull)
+    super.persistView()
 
     // Persist assets table columns order and width
     historyColumnsPref.set(TableViews.getColumnsView(historyTable, historyColumns))

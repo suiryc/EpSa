@@ -32,9 +32,9 @@ import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.javafx.scene.control.{Dialogs, TextFieldWithButton}
 import suiryc.scala.javafx.stage.Stages.StageLocation
-import suiryc.scala.javafx.stage.{PathChoosers, StagePersistentView, Stages}
+import suiryc.scala.javafx.stage.{PathChoosers, StageLocationPersistentView, Stages}
 
-class NetAssetValueHistoryController extends StagePersistentView {
+class NetAssetValueHistoryController extends StageLocationPersistentView(NetAssetValueHistoryController.stageLocation) {
 
   import NetAssetValueHistoryController._
 
@@ -62,7 +62,7 @@ class NetAssetValueHistoryController extends StagePersistentView {
 
   private val historyChartContextMenu = new ContextMenu()
 
-  private lazy val stage = fundField.getScene.getWindow.asInstanceOf[Stage]
+  lazy protected val stage: Stage = fundField.getScene.getWindow.asInstanceOf[Stage]
 
   private var changes = Map[Savings.Fund, Option[Seq[Savings.AssetValue]]]()
 
@@ -114,24 +114,6 @@ class NetAssetValueHistoryController extends StagePersistentView {
     for (button <- List(buttonOk, buttonCancel)) {
       button.addEventFilter(ActionEvent.ACTION, confirmationFilter[ActionEvent] _)
     }
-  }
-
-  /** Restores (persisted) view. */
-  override protected def restoreView(): Unit = {
-    Stages.onStageReady(stage, first = false) {
-      // Restore stage location
-      Stages.setMinimumDimensions(stage)
-      stageLocation.opt.foreach { loc =>
-        Stages.setLocation(stage, loc, setSize = true)
-      }
-    }(JFXSystem.dispatcher)
-  }
-
-  /** Persists view (stage location, ...). */
-  override protected def persistView(): Unit = {
-    // Persist stage location
-    // Note: if iconified, resets it
-    stageLocation.set(Stages.getLocation(stage).orNull)
   }
 
   def onCloseRequest(dialog: Dialog[_])(event: WindowEvent): Unit = {

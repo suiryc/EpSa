@@ -23,11 +23,10 @@ import suiryc.scala.javafx.stage.Stages.StageLocation
 import suiryc.scala.math.Ordered._
 import suiryc.scala.settings.ConfigEntry
 import suiryc.scala.javafx.beans.value.RichObservableValue._
-import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.javafx.scene.control.{DatePickers, Dialogs, TextFieldWithButton}
-import suiryc.scala.javafx.stage.{StagePersistentView, Stages}
+import suiryc.scala.javafx.stage.{StageLocationPersistentView, Stages}
 
-class NewAssetActionController extends StagePersistentView with StrictLogging {
+class NewAssetActionController extends StageLocationPersistentView(NewAssetActionController.stageLocation) with StrictLogging {
 
   import Main.settings.{scaleAmount, scaleUnits, scalePercents}
   import NewAssetActionController._
@@ -114,9 +113,9 @@ class NewAssetActionController extends StagePersistentView with StrictLogging {
 
   private var mainController: MainController = _
 
-  private lazy val stage = paymentButton.getScene.getWindow.asInstanceOf[Stage]
+  lazy protected val stage: Stage = paymentButton.getScene.getWindow.asInstanceOf[Stage]
 
-  private lazy val toggleButtons = List(paymentButton, transferButton, refundButton)
+  lazy private val toggleButtons = List(paymentButton, transferButton, refundButton)
 
   private var savings: Savings = _
 
@@ -304,23 +303,10 @@ class NewAssetActionController extends StagePersistentView with StrictLogging {
     ()
   }
 
-  /** Restores (persisted) view. */
-  override protected def restoreView(): Unit = {
-    Stages.onStageReady(stage, first = false) {
-      // Restore stage location
-      Stages.setMinimumDimensions(stage)
-      stageLocation.opt.foreach { loc =>
-        Stages.setLocation(stage, loc, setSize = true)
-      }
-    }(JFXSystem.dispatcher)
-  }
-
   /** Persists view (stage location, ...). */
   override protected def persistView(): Unit = {
+    super.persistView()
     dstUnitsAuto.set(dstUnitsAutoButton.isSelected)
-    // Persist stage location
-    // Note: if iconified, resets it
-    stageLocation.set(Stages.getLocation(stage).orNull)
   }
 
   private def onToggleKind(): Unit = {

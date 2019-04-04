@@ -17,18 +17,15 @@ import javafx.stage.{Stage, Window}
 import scala.collection.JavaConverters._
 import suiryc.scala.concurrent.RichFuture.Action
 import suiryc.scala.javafx.beans.value.RichObservableValue._
-import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.javafx.event.Events
 import suiryc.scala.javafx.scene.control.Dialogs
-import suiryc.scala.javafx.stage.{StagePersistentView, Stages}
+import suiryc.scala.javafx.stage.{StageLocationPersistentView, Stages}
 import suiryc.scala.javafx.stage.Stages.StageLocation
 import suiryc.scala.settings.ConfigEntry
 
 // TODO: handle user-defined displaying order ?
 
-class EditUnavailabilityPeriodsController extends StagePersistentView {
-
-  import EditUnavailabilityPeriodsController._
+class EditUnavailabilityPeriodsController extends StageLocationPersistentView(EditUnavailabilityPeriodsController.stageLocation) {
 
   @FXML
   protected var periodsField: ListView[Savings.UnavailabilityPeriod] = _
@@ -55,7 +52,7 @@ class EditUnavailabilityPeriodsController extends StagePersistentView {
 
   protected var buttonOk: Node = _
 
-  private lazy val stage = nameField.getScene.getWindow.asInstanceOf[Stage]
+  lazy protected val stage: Stage = nameField.getScene.getWindow.asInstanceOf[Stage]
 
   private var entries0: Seq[Savings.UnavailabilityPeriod] = Seq.empty
 
@@ -155,24 +152,6 @@ class EditUnavailabilityPeriodsController extends StagePersistentView {
 
     // Initial focus goes to name field
     nameField.requestFocus()
-  }
-
-  /** Restores (persisted) view. */
-  override protected def restoreView(): Unit = {
-    Stages.onStageReady(stage, first = false) {
-      // Restore stage location
-      Stages.setMinimumDimensions(stage)
-      stageLocation.opt.foreach { loc =>
-        Stages.setLocation(stage, loc, setSize = true)
-      }
-    }(JFXSystem.dispatcher)
-  }
-
-  /** Persists view (stage location, ...). */
-  override protected def persistView(): Unit = {
-    // Persist stage location
-    // Note: if iconified, resets it
-    stageLocation.set(Stages.getLocation(stage).orNull)
   }
 
   private def getYears: Int =
