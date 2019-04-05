@@ -111,3 +111,21 @@ lazy val epsa = project.in(file(".")).
     publishMavenStyle := true,
     publishTo := Some(Resolver.mavenLocal)
   )
+
+lazy val install = taskKey[Unit]("Installs application")
+install := {
+  import suiryc.scala.io.RichFile
+  import suiryc.scala.sys.OS
+
+  val jar = assembly.value
+  val targetFolder = if (OS.isLinux) {
+    Path(RichFile.userHome) / "progs" / "EpSa"
+  } else {
+    Path("C:\\") / "Progs" / "EpSa"
+  }
+  sLog.value.info(s"Copying files to: $targetFolder")
+  List(jar).foreach { src ⇒
+    val targetPath = targetFolder / src.getName
+    IO.copyFile(src, targetPath.asFile)
+  }
+}
