@@ -155,7 +155,7 @@ object OptionsController {
   private val settings = Main.settings
 
   private val stageLocation = ConfigEntry.from[StageLocation](Main.settings.settings,
-    Settings.KEY_SUIRYC, Settings.KEY_EPSA, Settings.KEY_STAGE, "options", Settings.KEY_LOCATION)
+    Settings.prefix ++ Seq(Settings.KEY_STAGE, "options", Settings.KEY_LOCATION))
 
   def buildDialog(owner: Window): Dialog[(Boolean, Boolean)] = {
     val dialog = new Dialog[(Boolean, Boolean)]()

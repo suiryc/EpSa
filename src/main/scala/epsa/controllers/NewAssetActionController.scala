@@ -883,10 +883,10 @@ object NewAssetActionController {
   private val settingsKeyPrefix = "new-asset-action"
 
   private val stageLocation = ConfigEntry.from[StageLocation](Main.settings.settings,
-    Settings.KEY_SUIRYC, Settings.KEY_EPSA, Settings.KEY_STAGE, settingsKeyPrefix, Settings.KEY_LOCATION)
+    Settings.prefix ++ Seq(Settings.KEY_STAGE, settingsKeyPrefix, Settings.KEY_LOCATION))
 
   private val dstUnitsAuto = ConfigEntry.from[Boolean](Main.settings.settings,
-    Settings.KEY_SUIRYC, Settings.KEY_EPSA, settingsKeyPrefix, "dst-units-auto")
+    Settings.prefix ++ Seq(settingsKeyPrefix, "dst-units-auto"))
 
   /** Builds a dialog out of this controller. */
   def buildDialog(owner: Window, mainController: MainController, savings: Savings,

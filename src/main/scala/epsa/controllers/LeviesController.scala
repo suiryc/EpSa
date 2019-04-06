@@ -176,10 +176,10 @@ object LeviesController {
   private val settingsKeyPrefix = "levies"
 
   private val stageLocation = ConfigEntry.from[StageLocation](Main.settings.settings,
-    Settings.KEY_SUIRYC, Settings.KEY_EPSA, Settings.KEY_STAGE, settingsKeyPrefix, Settings.KEY_LOCATION)
+    Settings.prefix ++ Seq(Settings.KEY_STAGE, settingsKeyPrefix, Settings.KEY_LOCATION))
 
   private val leviesImportPath = ConfigEntry.from[Path](Main.settings.settings,
-    Settings.KEY_SUIRYC, Settings.KEY_EPSA, settingsKeyPrefix, "import", "path")
+    Settings.prefix ++ Seq(settingsKeyPrefix, "import", "path"))
 
   case class LeviesAndJson(levies: Levies, json: String)
 

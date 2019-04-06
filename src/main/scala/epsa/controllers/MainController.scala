@@ -958,31 +958,31 @@ object MainController {
   private val settingsKeyPrefix = "main"
 
   private val stageLocation = ConfigEntry.from[StageLocation](Main.settings.settings,
-    Settings.KEY_SUIRYC, Settings.KEY_EPSA, Settings.KEY_STAGE, settingsKeyPrefix, Settings.KEY_LOCATION)
+    Settings.prefix ++ Seq(Settings.KEY_STAGE, settingsKeyPrefix, Settings.KEY_LOCATION))
 
   private val splitPaneDividerPositions: ConfigEntry[String] = ConfigEntry.from[String](Main.settings.settings,
-    Settings.KEY_SUIRYC, Settings.KEY_EPSA, Settings.KEY_STAGE, settingsKeyPrefix, "splitPane", "dividerPositions")
+    Settings.prefix ++ Seq(Settings.KEY_STAGE, settingsKeyPrefix, "splitPane", "dividerPositions"))
 
   private val assetsColumnsPref: ConfigEntry[String] = ConfigEntry.from[String](Main.settings.settings,
-    Settings.KEY_SUIRYC, Settings.KEY_EPSA, Settings.KEY_STAGE, settingsKeyPrefix, "assets", "columns")
+    Settings.prefix ++ Seq(Settings.KEY_STAGE, settingsKeyPrefix, "assets", "columns"))
 
   private val accountHistoryPath = ConfigEntry.from[Path](Main.settings.settings,
-    Settings.KEY_SUIRYC, Settings.KEY_EPSA, "account", "history", "path")
+    Settings.prefix ++ Seq("account", "history", "path"))
 
   private val totalsPerScheme = ConfigEntry.from[Boolean](Main.settings.settings,
-    Settings.KEY_SUIRYC, Settings.KEY_EPSA, "totals", "per-scheme")
+    Settings.prefix ++ Seq("totals", "per-scheme"))
 
   private val totalsPerFund = ConfigEntry.from[Boolean](Main.settings.settings,
-    Settings.KEY_SUIRYC, Settings.KEY_EPSA, "totals", "per-fund")
+    Settings.prefix ++ Seq("totals", "per-fund"))
 
   private val totalsPerAvailability = ConfigEntry.from[Boolean](Main.settings.settings,
-    Settings.KEY_SUIRYC, Settings.KEY_EPSA, "totals", "per-availability")
+    Settings.prefix ++ Seq("totals", "per-availability"))
 
   private val vwapPerAsset = ConfigEntry.from[Boolean](Main.settings.settings,
-    Settings.KEY_SUIRYC, Settings.KEY_EPSA, "vwap", "per-asset")
+    Settings.prefix ++ Seq("vwap", "per-asset"))
 
   private val upToDateAssets = ConfigEntry.from[Boolean](Main.settings.settings,
-    Settings.KEY_SUIRYC, Settings.KEY_EPSA, "up-to-date-assets")
+    Settings.prefix ++ Seq("up-to-date-assets"))
 
   case class State(
     stage: Stage,

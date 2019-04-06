@@ -687,16 +687,16 @@ object AccountHistoryController {
   private val settingsKeyPrefix = "account-history"
 
   private val stageLocation = ConfigEntry.from[StageLocation](Main.settings.settings,
-    Settings.KEY_SUIRYC, Settings.KEY_EPSA, Settings.KEY_STAGE, settingsKeyPrefix, Settings.KEY_LOCATION)
+    Settings.prefix ++ Seq(Settings.KEY_STAGE, settingsKeyPrefix, Settings.KEY_LOCATION))
 
   private val splitPaneDividerPositions: ConfigEntry[String] = ConfigEntry.from[String](Main.settings.settings,
-    Settings.KEY_SUIRYC, Settings.KEY_EPSA, Settings.KEY_STAGE, settingsKeyPrefix, "splitPane", "dividerPositions")
+    Settings.prefix ++ Seq(Settings.KEY_STAGE, settingsKeyPrefix, "splitPane", "dividerPositions"))
 
   private val splitPane2DividerPositions: ConfigEntry[String] = ConfigEntry.from[String](Main.settings.settings,
-    Settings.KEY_SUIRYC, Settings.KEY_EPSA, Settings.KEY_STAGE, settingsKeyPrefix, "splitPane", "2", "dividerPositions")
+    Settings.prefix ++ Seq(Settings.KEY_STAGE, settingsKeyPrefix, "splitPane", "2", "dividerPositions"))
 
   private val historyColumnsPref: ConfigEntry[String] = ConfigEntry.from[String](Main.settings.settings,
-    Settings.KEY_SUIRYC, Settings.KEY_EPSA, Settings.KEY_STAGE, settingsKeyPrefix, "history", "columns")
+    Settings.prefix ++ Seq(Settings.KEY_STAGE, settingsKeyPrefix, "history", "columns"))
 
   def title: String = Strings.accountHistory
 

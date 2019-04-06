@@ -34,7 +34,7 @@ object DataStore {
   private val dbExtension = Constants.SUFFIX_MV_FILE
 
   protected val dbPathPref: ConfigEntry[Path] = ConfigEntry.from[Path](Main.settings.settings,
-    Settings.KEY_SUIRYC, Settings.KEY_EPSA, "datastore", "path")
+    Settings.prefix ++ Seq("datastore", "path"))
 
   protected[epsa] def defaultPath: Path = dbPathPref.opt.getOrElse {
     // Default path is where this application is running.

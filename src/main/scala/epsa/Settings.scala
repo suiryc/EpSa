@@ -30,7 +30,7 @@ object Settings {
   private val KEY_UNITS = "units"
   private val KEY_VWAP = "vwap"
 
-  private val prefix = List(KEY_SUIRYC, KEY_EPSA)
+  private[epsa] val prefix = List(KEY_SUIRYC, KEY_EPSA)
 
   var debugParams: Set[Debug.Value] = Set.empty
   def debug(v: Debug.Value): Boolean = debugParams.contains(v)

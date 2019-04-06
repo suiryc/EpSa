@@ -365,7 +365,7 @@ class EditUnavailabilityPeriodsController extends StageLocationPersistentView(Ed
 object EditUnavailabilityPeriodsController {
 
   private val stageLocation = ConfigEntry.from[StageLocation](Main.settings.settings,
-    Settings.KEY_SUIRYC, Settings.KEY_EPSA, Settings.KEY_STAGE, "edit-unavailability-periods", Settings.KEY_LOCATION)
+    Settings.prefix ++ Seq(Settings.KEY_STAGE, "edit-unavailability-periods", Settings.KEY_LOCATION))
 
   /** Builds a dialog out of this controller. */
   def buildDialog(owner: Window): Dialog[Boolean] = {

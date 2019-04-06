@@ -534,7 +534,7 @@ class EditSchemesController extends StageLocationPersistentView(EditSchemesContr
 object EditSchemesController {
 
   private val stageLocation = ConfigEntry.from[StageLocation](Main.settings.settings,
-    Settings.KEY_SUIRYC, Settings.KEY_EPSA, Settings.KEY_STAGE, "edit-schemes", Settings.KEY_LOCATION)
+    Settings.prefix ++ Seq(Settings.KEY_STAGE, "edit-schemes", Settings.KEY_LOCATION))
 
   /** Builds a dialog out of this controller. */
   def buildDialog(owner: Window, savings: Savings, edit: Option[Savings.Scheme]): Dialog[List[Savings.Event]] = {
