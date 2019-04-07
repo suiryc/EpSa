@@ -14,10 +14,10 @@ import suiryc.scala.concurrent.RichFuture.Action
 
 class DataStoreSpec extends WordSpec with Matchers {
 
-  val store = DataStore.UnavailabilityPeriods
+  private val store = DataStore.UnavailabilityPeriods
 
-  val entry1 = Savings.UnavailabilityPeriod("id1", years = 1, month = None)
-  val entry2 = entry1.copy(id = entry1.id + " new", years = entry1.years + 1, month = Some(Month.OCTOBER))
+  private val entry1 = Savings.UnavailabilityPeriod("id1", years = 1, month = None)
+  private val entry2 = entry1.copy(id = entry1.id + " new", years = entry1.years + 1, month = Some(Month.OCTOBER))
 
   "DataStore" should {
     "handle failure upon saving changes" in {
@@ -82,7 +82,7 @@ class DataStoreSpec extends WordSpec with Matchers {
       DataStore.close()
       val fakeReal = await(DataStore.dbOpen("temporary-test"))
       val realDb = fakeReal.db
-      DataStore.dbRealOpt = Some(DataStore.DBInfo(fakeReal.db, Paths.get("temporary-test")))
+      DataStore.dbRealOpt = Some(DataStore.DBInfo(fakeReal.db, Paths.get("temporary-test"), fake = true))
 
       test(failures = 0, List(
         TestAppSetting(realDb, failFirst = false),
@@ -124,9 +124,9 @@ class DataStoreSpec extends WordSpec with Matchers {
   case object TestingFailure extends Exception
 
   case class TestAppSetting(real: DatabaseDef, failFirst: Boolean) {
-    val key = scala.util.Random.nextString(16)
+    private val key = scala.util.Random.nextString(16)
     var attempt = 0
-    def value = attempt.toString
+    private def value = attempt.toString
     val dbAction: DBAction[Unit] = (db: DatabaseDef) => {
       lazy val f = DataStore.AppSettings.writeEntry(db, (key, value))
       if (!(db eq real)) f

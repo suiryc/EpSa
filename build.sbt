@@ -4,11 +4,7 @@ import Keys._
 lazy val versions = Map[String, String](
   "akka"          -> "2.5.21",
   "epsa"          -> "1.1-SNAPSHOT",
-  // Note: starting with h2 v1.4.198, doing read-only commands still does
-  // alter the DB file, which is problematic when stored on Dropbox; the access
-  // is performed asynchronously and often triggers an "access denied" error
-  // when Dropbox is still uploading the previous changes ...
-  "h2"            -> "1.4.197",
+  "h2"            -> "1.4.199",
   "html-cleaner"  -> "2.22",
   "httpclient"    -> "4.5.7",
   "logback"       -> "1.2.3",

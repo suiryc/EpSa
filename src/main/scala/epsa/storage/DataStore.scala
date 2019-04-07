@@ -5,13 +5,13 @@ import epsa.I18N.Strings
 import epsa.model.Savings
 import epsa.model.Savings.{Event, UnavailabilityPeriod}
 import java.io.FileNotFoundException
-import java.nio.file.Files
-import java.nio.file.Path
+import java.nio.file.{Files, Path}
 import java.sql.Date
 import java.time.{LocalDate, Month}
 import java.util.UUID
 import javafx.stage.{FileChooser, Window}
 import org.h2.engine.Constants
+import org.h2.store.fs.FilePath
 import scala.concurrent.Await
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -69,19 +69,33 @@ object DataStore {
 
   }
 
-  /** Real database. */
-  protected[storage] case class DBInfo(db: DatabaseDef, path: Path)
+  /**
+   * Real database.
+   *
+   * Note: starting with H2 v1.4.198, read-only commands still do alter the DB
+   * file which is problematic when stored on Dropbox+encfs: the access is
+   * performed asynchronously and often triggers an "access denied" error
+   * when Dropbox is still uploading the previous changes ...
+   * To circumvent this the real DB is virtualized (H2 virtual filesystem):
+   *  - upon opening, the real content is copied into the virtual filesystem
+   *    and opened from it
+   *  - upon saving/applying changes, the virtual path is synchronized (files
+   *    content copied) into the real path
+   */
+  protected[storage] case class DBInfo(db: DatabaseDef, path: Path, fake: Boolean = false)
 
   /** Temporary (in-memory) DB. */
   protected var dbTempOpt: Option[DBTemp] = None
   /** Real (physical) DB. */
   protected[storage] var dbRealOpt: Option[DBInfo] = None
 
-  /** Gets name (to display) from database path. */
-  protected def getName(path: Path): String = {
-    val name = path.toFile.getName
-    name.substring(0, name.length - dbExtension.length)
-  }
+  /** Gets name (to display) from database filename. */
+  protected def getName(filename: String): String =
+    filename.substring(0, filename.length - dbExtension.length)
+
+  protected def getName(path: Path): String = getName(path.toFile.getName)
+
+  protected def getName(filepath: FilePath): String = getName(filepath.getName)
 
   /** Whether a real database is opened. */
   def dbOpened: Option[String] =
@@ -99,9 +113,6 @@ object DataStore {
    * If temporary db exists, use it.
    * Otherwise, if physical db exists, use it.
    * Otherwise create an empty temporary db to use it.
-   * Note: starting with h2 v1.4.198, it may be better to always build temporary
-   * db out of real one because even read-only access does write in the file and
-   * may fail (access denied) when db is stored in Dropbox.
    */
   protected def getDBRead: Future[DatabaseDef] =
     dbTempOpt match {
@@ -214,7 +225,10 @@ object DataStore {
             }
         }.toSeq
         // Execute tables changes sequentially.
-        RichFuture.executeAllSequentially(stopOnError = true, actions).map(_ => ()).andThen {
+        RichFuture.executeAllSequentially(stopOnError = true, actions).map { _ =>
+          // Sync to real path upon success.
+          sync(real)
+        }.andThen {
           case Success(_) =>
             // Upon success close temporary db
             closeTempDB()
@@ -228,6 +242,9 @@ object DataStore {
                 if (remaining.isEmpty) None
                 else Some(table -> remaining)
             }
+            // Close temporary db if there is no more pending changes.
+            // (may happen if 'sync' fails)
+            if (tmp.changes.isEmpty) closeTempDB()
         }
 
       case _ =>
@@ -237,12 +254,20 @@ object DataStore {
     }
   }
 
+  /** Synchronizes virtual path into real DB path. */
+  private def sync(dbInfo: DBInfo): Unit = {
+    // Do nothing if DB is fake (happens during tests)
+    if (!dbInfo.fake) VfsHandler.sync(dbInfo.path.getParent)
+  }
+
   /** Saves temporary DB to physical one. */
   def save(): Future[Unit] = {
     dbRealOpt match {
       case Some(dbInfo) =>
         getDBTemp.flatMap { tmp =>
           copyDB(tmp.db, dbInfo.db)
+        }.map { _ ⇒
+          sync(dbInfo)
         }.andThen {
           case _ => closeTempDB()
         }
@@ -304,6 +329,8 @@ object DataStore {
   protected def closeRealDB(): Unit = {
     dbRealOpt.foreach(_.db.close())
     dbRealOpt = None
+    // Time to cleanup virtual path.
+    VfsHandler.cleanup()
   }
 
   /** Close data store. */
@@ -330,16 +357,17 @@ object DataStore {
 
   /** Opens real database. */
   protected def dbOpen(path: Path): Future[DBInfo] = {
+    // First we virtualize the DB, then we will work with the virtual path.
+    val filepath = VfsHandler.virtualize(path)
     // Note: path contains extension, which is added by driver.
-    val name = getName(path)
-    val dbPath = path.getParent.resolve(name)
+    val vfsPath = s"${filepath.getParent}/${getName(filepath)}"
 
     // Open the new DB, and create missing tables
     // Note: it's best here to use the same value for minThreads, maxThreads
     // and maxConnections.
     // See: https://github.com/slick/slick/issues/1614
     val executor = AsyncExecutor(name = "epsa", minThreads = 2, maxThreads = 2, queueSize = 100, maxConnections = 2)
-    val ref = Database.forURL(s"jdbc:h2:$dbPath", user = "user", password = "pass", driver = "org.h2.Driver",
+    val ref = Database.forURL(s"jdbc:h2:$vfsPath", user = "user", password = "pass", driver = "org.h2.Driver",
       executor = executor)
     dbOpen(ref).map { _ =>
       // Automatically keep in mind the new DB
