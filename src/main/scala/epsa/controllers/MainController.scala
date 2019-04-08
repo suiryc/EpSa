@@ -31,6 +31,7 @@ import suiryc.scala.javafx.scene.control.{Dialogs, Panes, TableViews}
 import suiryc.scala.javafx.stage.{PathChoosers, StageLocationPersistentView, Stages}
 import suiryc.scala.math.Ordered._
 import suiryc.scala.settings.ConfigEntry
+import suiryc.scala.util.Using
 
 // TODO: smart deletion of funds ?
 //         - keep the necessary data (NAV on some dates) used to compute levies
@@ -842,14 +843,8 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
             import scala.io.Source
             import spray.json._
             import Savings.JsonProtocol._
-            val history = {
-              val source = Source.fromFile(file, "UTF-8")
-              try {
-                source.mkString
-              } finally {
-                source.close()
-              }
-            }.parseJson.asJsObject.fields("history").asInstanceOf[JsArray]
+            val history = Using(Source.fromFile(file, "UTF-8"))(_.mkString).get
+              .parseJson.asJsObject.fields("history").asInstanceOf[JsArray]
             val events = history.elements.toList.map(_.convertTo[Savings.Event])
             // Note: there is no need to reorder events since 'processEvents' will do it
             Some(events)

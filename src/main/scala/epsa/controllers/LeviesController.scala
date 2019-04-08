@@ -22,6 +22,7 @@ import suiryc.scala.javafx.scene.control.{Dialogs, ListCellEx}
 import suiryc.scala.javafx.stage.{PathChoosers, StageLocationPersistentView, Stages}
 import suiryc.scala.javafx.stage.Stages.StageLocation
 import suiryc.scala.settings.ConfigEntry
+import suiryc.scala.util.Using
 
 class LeviesController extends StageLocationPersistentView(LeviesController.stageLocation) with StrictLogging {
 
@@ -69,12 +70,7 @@ class LeviesController extends StageLocationPersistentView(LeviesController.stag
       // Then filter files to only keep json ones inside the subfolder
       import suiryc.scala.io.NameFilter._
       leviesPath.listFiles("(?i)^.*\\.json$".r).toList.map { file =>
-        val source = Source.fromFile(file, "UTF-8")
-        val str = try {
-          source.mkString
-        } finally {
-          source.close
-        }
+        val str = Using(Source.fromFile(file, "UTF-8"))(_.mkString).get
         (file, str)
       }
     }
@@ -135,12 +131,7 @@ class LeviesController extends StageLocationPersistentView(LeviesController.stag
       try {
         import spray.json._
         import Levies.JsonProtocol._
-        val source = Source.fromFile(file, "UTF-8")
-        val str = try {
-          source.mkString
-        } finally {
-          source.close()
-        }
+        val str = Using(Source.fromFile(file, "UTF-8"))(_.mkString).get
         val levies = str.parseJson.convertTo[Levies].normalized
         val entry = LeviesAndJson(levies, str)
         if (!leviesField.getItems.contains(entry)) {
