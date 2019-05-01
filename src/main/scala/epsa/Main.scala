@@ -5,11 +5,13 @@ import epsa.controllers.MainController
 import epsa.model.Savings
 import epsa.util.Awaits
 import java.nio.file.Path
-import javafx.application.{Application, Platform}
+import javafx.application.Application
 import javafx.stage.Stage
 import monix.execution.Scheduler
 import scala.concurrent.ExecutionContextExecutor
 import suiryc.scala.akka.CoreSystem
+import suiryc.scala.io.SystemStreams
+import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.misc.Util
 
 object Main {
@@ -18,17 +20,20 @@ object Main {
 
   val appPath: Path = Util.classLocation[this.type]
 
-  val settings = new Settings(appPath.resolve("application.conf"))
+  lazy val settings = new Settings(appPath.resolve("application.conf"))
 
   val versionedName: String = s"${epsa.Info.name} ${epsa.Info.version}" +
     epsa.Info.gitHeadCommit.map(v => s" ($v)").getOrElse("")
 
   def main(args: Array[String]): Unit = {
-    val parser = new scopt.OptionParser[Unit](getClass.getCanonicalName) {
+    val parser = new scopt.OptionParser[Params](getClass.getCanonicalName) {
       head(versionedName)
       help("help")
       opt[String]("debug").unbounded.foreach { v =>
         Settings.debugParams ++= v.split(',').toList.map(Debug.withName).toSet
+      }
+      opt[Boolean]("io-capture").action { (v, c) ⇒
+        c.copy(ioCapture = Some(v))
       }
       opt[Unit]("version").foreach { _ =>
         println(
@@ -40,7 +45,25 @@ object Main {
       }
     }
 
-    if (parser.parse(args)) (new Main).launch()
+    parser.parse(args, Params()) match {
+      case Some(params) ⇒
+        // Redirect stdout/stderr to logs.
+        // Note: scala 'Console' stores the current 'in/out/err' value. So
+        // better not trigger it before redirecting streams. (methods to change
+        // the values are marked deprecated)
+        val ioCapture = params.ioCapture.contains(true)
+        if (ioCapture) {
+          SystemStreams.replace(
+            SystemStreams.loggerOutput("stdout"),
+            SystemStreams.loggerOutput("stderr", error = true)
+          )
+        }
+        // 'launch' does not return until application is closed
+        Application.launch(classOf[Main])
+
+      case None ⇒
+        sys.exit(1)
+    }
   }
 
   object Akka {
@@ -58,9 +81,13 @@ object Main {
   }
 
   def shutdown(): Unit = {
-    Akka.system.terminate()
-    Platform.exit()
+    JFXSystem.terminate()
+    ()
   }
+
+  case class Params(
+    ioCapture: Option[Boolean] = Some(true)
+  )
 
 }
 
