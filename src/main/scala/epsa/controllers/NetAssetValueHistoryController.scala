@@ -147,7 +147,7 @@ class NetAssetValueHistoryController extends StageLocationPersistentView(NetAsse
     executeSequentially(actions)(epsa.Main.Akka.dispatcher).onComplete { _ =>
       // Time to get back to initially selected fund
       fundField.getSelectionModel.select(currentFund)
-    }(JFXSystem.dispatcher)
+    }(JFXSystem.executor)
   }
 
   def onFund(@deprecated("unused","") event: ActionEvent): Unit = {
@@ -243,7 +243,7 @@ class NetAssetValueHistoryController extends StageLocationPersistentView(NetAsse
           ex = Some(ex)
         )
         working = false
-    }(JFXSystem.dispatcher)
+    }(JFXSystem.executor)
 
     f
   }
@@ -578,7 +578,7 @@ class NetAssetValueHistoryController extends StageLocationPersistentView(NetAsse
 
     Stages.onStageReady(resultStage, first = false) {
       Stages.setMinimumDimensions(stage)
-    }(JFXSystem.dispatcher)
+    }
 
     resultStage.show()
   }
