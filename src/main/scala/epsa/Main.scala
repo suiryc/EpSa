@@ -5,16 +5,16 @@ import epsa.controllers.MainController
 import epsa.model.Savings
 import epsa.util.Awaits
 import java.nio.file.Path
-import javafx.application.Application
 import javafx.stage.Stage
 import monix.execution.Scheduler
 import scala.concurrent.ExecutionContextExecutor
 import suiryc.scala.akka.CoreSystem
 import suiryc.scala.io.SystemStreams
+import suiryc.scala.javafx.{JFXApplication, JFXLauncher}
 import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.misc.Util
 
-object Main {
+object Main extends JFXLauncher[MainApp] {
 
   import Settings.Debug
 
@@ -25,7 +25,7 @@ object Main {
   val versionedName: String = s"${epsa.Info.name} ${epsa.Info.version}" +
     epsa.Info.gitHeadCommit.map(v => s" ($v)").getOrElse("")
 
-  def main(args: Array[String]): Unit = {
+  override def main(args: Array[String]): Unit = {
     val parser = new scopt.OptionParser[Params](getClass.getCanonicalName) {
       head(versionedName)
       help("help")
@@ -59,7 +59,7 @@ object Main {
           )
         }
         // 'launch' does not return until application is closed
-        Application.launch(classOf[Main])
+        super.main(args)
 
       case None ⇒
         sys.exit(1)
@@ -75,12 +75,7 @@ object Main {
 
   val scheduler: Scheduler = CoreSystem.scheduler
 
-  def shutdown(stage: Stage): Unit = {
-    stage.close()
-    shutdown()
-  }
-
-  def shutdown(): Unit = {
+  override def shutdown(): Unit = {
     JFXSystem.terminate()
     ()
   }
@@ -91,11 +86,7 @@ object Main {
 
 }
 
-class Main extends Application {
-
-  def launch(): Unit = {
-    Application.launch()
-  }
+class MainApp extends JFXApplication {
 
   override def start(stage: Stage) {
     I18N.loadLocale()
