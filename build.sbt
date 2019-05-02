@@ -7,6 +7,7 @@ lazy val versions = Map[String, String](
   "h2"            -> "1.4.199",
   "html-cleaner"  -> "2.22",
   "httpclient"    -> "4.5.7",
+  "javafx"        -> "12.0.1",
   "logback"       -> "1.2.3",
   "monix"         -> "3.0.0-RC2",
   "poi"           -> "4.0.1",
@@ -18,7 +19,7 @@ lazy val versions = Map[String, String](
   "slick"         -> "3.3.0",
   "simple-odf"    -> "0.8.2-incubating",
   "spray-json"    -> "1.3.5",
-  "suiryc-scala"  -> "0.0.3-SNAPSHOT"
+  "suiryc-scala"  -> "0.0.4-SNAPSHOT"
 )
 
 
@@ -89,6 +90,10 @@ lazy val epsa = project.in(file(".")).
         exclude("org.slf4j", "slf4j-log4j12"),
       "org.apache.poi"              %  "poi"                               % versions("poi"),
       "org.apache.poi"              %  "poi-ooxml"                         % versions("poi"),
+      "org.openjfx"                 %  "javafx-base"                       % versions("javafx") classifier jfxPlatform,
+      "org.openjfx"                 %  "javafx-controls"                   % versions("javafx") classifier jfxPlatform,
+      "org.openjfx"                 %  "javafx-fxml"                       % versions("javafx") classifier jfxPlatform,
+      "org.openjfx"                 %  "javafx-graphics"                   % versions("javafx") classifier jfxPlatform,
       "org.scalatest"               %% "scalatest"                         % versions("scalatest")    % "test",
       "org.slf4j"                   %  "jcl-over-slf4j"                    % versions("slf4j"),
       "org.slf4j"                   %  "log4j-over-slf4j"                  % versions("slf4j"),
@@ -98,15 +103,25 @@ lazy val epsa = project.in(file(".")).
       "suiryc"                      %% "suiryc-scala-javafx"               % versions("suiryc-scala")
     ),
 
-    assemblyMergeStrategy in assembly := {
-      case PathList("javax", "xml", _ @ _*) => MergeStrategy.first
-      case v if v.startsWith("library.properties") => MergeStrategy.discard
-      case v => MergeStrategy.defaultMergeStrategy(v)
-    },
-
     publishMavenStyle := true,
     publishTo := Some(Resolver.mavenLocal)
   )
+
+assemblyMergeStrategy in assembly := {
+  case "module-info.class" => MergeStrategy.discard
+  case PathList("javax", "xml", _ @ _*) => MergeStrategy.first
+  case x if x.startsWith("library.properties") => MergeStrategy.discard
+  case x =>
+    val oldStrategy = (assemblyMergeStrategy in assembly).value
+    oldStrategy(x)
+}
+
+lazy val jfxPlatform = {
+  val osName = System.getProperty("os.name", "").toLowerCase
+  if (osName.startsWith("mac")) "mac"
+  else if (osName.startsWith("win")) "win"
+  else "linux"
+}
 
 lazy val install = taskKey[Unit]("Installs application")
 install := {
