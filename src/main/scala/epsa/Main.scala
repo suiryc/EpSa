@@ -9,9 +9,9 @@ import javafx.stage.Stage
 import monix.execution.Scheduler
 import scala.concurrent.ExecutionContextExecutor
 import suiryc.scala.akka.CoreSystem
-import suiryc.scala.io.SystemStreams
 import suiryc.scala.javafx.{JFXApplication, JFXLauncher}
 import suiryc.scala.javafx.concurrent.JFXSystem
+import suiryc.scala.log.Loggers
 import suiryc.scala.misc.Util
 
 object Main extends JFXLauncher[MainApp] {
@@ -51,13 +51,7 @@ object Main extends JFXLauncher[MainApp] {
         // Note: scala 'Console' stores the current 'in/out/err' value. So
         // better not trigger it before redirecting streams. (methods to change
         // the values are marked deprecated)
-        val ioCapture = params.ioCapture.contains(true)
-        if (ioCapture) {
-          SystemStreams.replace(
-            SystemStreams.loggerOutput("stdout"),
-            SystemStreams.loggerOutput("stderr", error = true)
-          )
-        }
+        if (params.ioCapture.contains(true)) Loggers.captureIo()
         // 'launch' does not return until application is closed
         super.main(args)
 
