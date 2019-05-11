@@ -15,7 +15,6 @@ import javafx.beans.property.SimpleObjectProperty
 import javafx.fxml.{FXML, FXMLLoader}
 import javafx.scene.Scene
 import javafx.scene.control._
-import javafx.scene.control.skin.{TreeTableViewSkin, VirtualFlow}
 import javafx.scene.image.ImageView
 import javafx.scene.input.MouseEvent
 import javafx.scene.layout.AnchorPane
@@ -282,13 +281,8 @@ class AccountHistoryController extends StageLocationPersistentView(AccountHistor
       val rows = items.flatMap(_.getValue.row)
 
       // Make sure the table entry is visible.
-      // Get the VirtualFlow in the table skin (should be the first child,
-      // accessible once table is shown), and ask to show the minimum entry
-      // index associated to the marker.
-      historyTable.getSkin.asInstanceOf[TreeTableViewSkin[_]].getChildren.asScala.find(_.isInstanceOf[VirtualFlow[_]]).foreach {
-        case flow: VirtualFlow[_] =>
-          val indices = items.map(historyTable.getRow).filter(_ >= 0)
-          if (indices.nonEmpty) flow.scrollTo(indices.min)
+      items.map(historyTable.getRow).filter(_ >= 0).sorted.headOption.foreach { index ⇒
+        TableViews.scrollTo(historyTable, index, top = true, padding = 1)
       }
 
       animationHighlighter = Some(JFXStyles.highlightAnimation(rows, animationHighlighter))
