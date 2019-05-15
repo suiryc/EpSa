@@ -473,6 +473,16 @@ class SavingsSpec extends WordSpec with Matchers {
       )
       savings.latestAssetAction shouldBe Some(date.plusDays(4))
     }
+
+    "handle re-creating scheme event" in {
+      val scheme = savings1.schemes.head
+      savings1.getSchemeEvent(scheme.id) shouldBe Savings.CreateScheme(scheme.id, scheme.name, scheme.comment)
+    }
+
+    "handle re-creating fund event" in {
+      val fund = savings1.funds.head
+      savings1.getFundEvent(fund.id) shouldBe Savings.CreateFund(fund.id, fund.name, fund.amfId, fund.comment)
+    }
   }
 
   "Savings (de)serialization" should {
@@ -535,6 +545,25 @@ class SavingsSpec extends WordSpec with Matchers {
         Savings.AssetPart(scheme.id, fund.id, Some(LocalDate.now), BigDecimal(10), BigDecimal(10)),
         Savings.AssetPart(fund.id, scheme.id, None, BigDecimal(1), BigDecimal(1)),
         Some("comment")))
+    }
+
+    "handle human-readable form" in {
+      val scheme = savings2.schemes.head
+      val fund1 = savings2.funds.head
+      val fund2 = savings2.funds.last
+      checkHumanReadable(Savings.DeleteScheme(scheme.id))
+      checkHumanReadable(Savings.DeleteFund(fund1.id))
+      checkHumanReadable(Savings.AssociateFund(scheme.id, fund1.id))
+      checkHumanReadable(Savings.DissociateFund(scheme.id, fund1.id))
+      val payment = Savings.MakePayment(LocalDate.now,
+        Savings.AssetPart(scheme.id, fund1.id, Some(LocalDate.now.plusDays(10)), BigDecimal(10), BigDecimal(10)), None)
+      checkHumanReadable(payment)
+      checkHumanReadable(payment, Savings.MakeRefund(LocalDate.now,
+        Savings.AssetPart(scheme.id, fund1.id, Some(LocalDate.now.plusDays(10)), BigDecimal(10), BigDecimal(10)), None))
+      checkHumanReadable(payment, Savings.MakeTransfer(LocalDate.now,
+        Savings.AssetPart(scheme.id, fund1.id, Some(LocalDate.now.plusDays(10)), BigDecimal(10), BigDecimal(10)),
+        Savings.AssetPart(scheme.id, fund2.id, None, BigDecimal(1), BigDecimal(1)),
+        None))
     }
   }
 
@@ -786,6 +815,22 @@ class SavingsSpec extends WordSpec with Matchers {
   private def checkEventSerialization(event: Savings.Event): Unit = {
     val format = Savings.JsonProtocol.EventJsonFormat
     format.read(format.write(event)) shouldBe event
+    ()
+  }
+
+  private def checkHumanReadable(events: Savings.Event*): Unit = {
+    val format = Savings.JsonProtocol.EventJsonFormat
+    val jsons = Savings.humanReadableJson {
+      savings2.schemes.map(scheme => savings2.getSchemeEvent(scheme.id)) :::
+        savings2.funds.map(fund => savings2.getFundEvent(fund.id)) :::
+        events.toList
+    }
+    val event = events.last
+    val json = jsons.last
+    // The target event representation shall not be the nominal one ...
+    json.compactPrint should not be format.write(event).compactPrint
+    // ... while retaining the original event information
+    format.read(json) shouldBe event
     ()
   }
 

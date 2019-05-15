@@ -769,8 +769,7 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
     def onExportRawAccountHistory(state: State): Unit = {
       val events = Awaits.getEventsHistory(state.stage)
       import spray.json._
-      import Savings.JsonProtocol._
-      val eventsJson = events.map(_.toJson)
+      val eventsJson = Savings.humanReadableJson(events)
       val historyJson = JsObject(
         "history" -> JsArray(eventsJson:_*)
       )

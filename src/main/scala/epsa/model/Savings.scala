@@ -219,6 +219,79 @@ object Savings extends StrictLogging {
   }
 
   /**
+   * Converts events to JSON in a human readable form.
+   *
+   * For events that reference scheme or fund by id, add a field including the
+   * actual name of the scheme/fund.
+   *
+   * @param events to process
+   * @return JSON form of events, enriched with necessary information
+   */
+  def humanReadableJson(events: List[Event]): List[JsValue] = {
+    import JsonProtocol._
+
+    @scala.annotation.tailrec
+    def enrich(events: List[Savings.Event], savings: Savings, jsons: List[JsValue]): List[JsValue] = {
+      if (events.isEmpty) jsons
+      else {
+        // The next event to process
+        val event = events.head
+        // Compute savings (to track schemes/funds names)
+        val savings2 = savings.processEvent(event)
+        // The nominal JSON form of the event
+        val js0 = event.toJson.asJsObject
+        // Adds fields to given JSON object key.
+        def update0(obj: JsObject, key: List[String], fields: Map[String, JsValue]): JsObject = key match {
+          case head :: tail => obj.copy(fields = obj.fields + (head -> update0(obj.fields(head).asJsObject, tail, fields)))
+          case _ => obj.copy(fields = obj.fields ++ fields)
+        }
+        def update(obj: JsObject, key: Option[String], fields: Map[String, JsValue]): JsObject =
+          update0(obj, "content" :: key.toList, fields)
+        def updateScheme(obj: JsObject, schemeId: UUID): JsObject =
+          update(obj, None, Map("schemeName" -> JsString(savings.getScheme(schemeId).name)))
+        def updateFund(obj: JsObject, fundId: UUID): JsObject =
+          update(obj, None, Map("fundName" -> JsString(savings.getFund(fundId).name)))
+        def updatePart(obj: JsObject, key: String, part: Savings.AssetPart): JsObject = update(obj, Some(key), Map(
+          "schemeName" -> JsString(savings.getScheme(part.schemeId).name),
+          "fundName" -> JsString(savings.getFund(part.fundId).name)
+        ))
+        // Add scheme or fund name where necessary.
+        val eventJson = event match {
+          case e: Savings.DeleteScheme =>
+            updateScheme(js0, e.schemeId)
+
+          case e: Savings.DeleteFund =>
+            updateFund(js0, e.fundId)
+
+          case e: Savings.AssociateFund =>
+            val js1 = updateScheme(js0, e.schemeId)
+            updateFund(js1, e.fundId)
+
+          case e: Savings.DissociateFund =>
+            val js1 = updateScheme(js0, e.schemeId)
+            updateFund(js1, e.fundId)
+
+          case e: Savings.MakePayment =>
+            updatePart(js0, "part", e.part)
+
+          case e: Savings.MakeRefund =>
+            updatePart(js0, "part", e.part)
+
+          case e: Savings.MakeTransfer   =>
+            val js1 = updatePart(js0, "partSrc", e.partSrc)
+            updatePart(js1, "partDst", e.partDst)
+
+          case _ =>
+            js0
+        }
+        enrich(events.tail, savings2, jsons :+ eventJson)
+      }
+    }
+
+    enrich(events, Savings(), Nil)
+  }
+
+  /**
    * Gets NAVs out of events.
    *
    * This can complete data store NAVs, especially for old (now deleted) funds.
@@ -818,9 +891,19 @@ case class Savings(
     CreateScheme(id, name, comment)
   }
 
+  def getSchemeEvent(schemeId: UUID): CreateScheme = {
+    val scheme = getScheme(schemeId)
+    CreateScheme(scheme.id, scheme.name, scheme.comment)
+  }
+
   def createFundEvent(name: String, amfId: Option[String] = None, comment: Option[String] = None): CreateFund = {
     val id = newId(funds.map(_.id))
     CreateFund(id, name, amfId, comment)
+  }
+
+  def getFundEvent(fundId: UUID): CreateFund = {
+    val fund = getFund(fundId)
+    CreateFund(fund.id, fund.name, fund.amfId, fund.comment)
   }
 
   protected def newId(existing: List[UUID]): UUID = {
