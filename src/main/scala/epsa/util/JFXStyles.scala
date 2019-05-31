@@ -7,6 +7,7 @@ import javafx.scene.{Node, Scene}
 import javafx.scene.control.{Control, Tooltip}
 import javafx.scene.image.ImageView
 import javafx.util.{Duration ⇒ jfxDuration}
+import suiryc.scala.javafx.css.Styleables
 import suiryc.scala.javafx.scene.{Styles, StylesFeat}
 
 object JFXStyles extends StylesFeat {
@@ -60,9 +61,7 @@ object JFXStyles extends StylesFeat {
   }
 
   def toggleImageButtonStyle(node: Node, active: Boolean): Unit = {
-    if (active && !node.getStyleClass.contains(imageButtonClass)) node.getStyleClass.add(imageButtonClass)
-    else if (!active) node.getStyleClass.remove(imageButtonClass)
-    ()
+    Styleables.toggleStyleClass(node, imageButtonClass, set = active)
   }
 
   /**
