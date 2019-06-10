@@ -22,6 +22,7 @@ import suiryc.scala.javafx.beans.value.RichObservableValue
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.javafx.geometry.BoundsEx
+import suiryc.scala.javafx.scene.Nodes
 import suiryc.scala.javafx.scene.control.{ScrollOffsetPosition, Scrolls}
 import suiryc.scala.math.BigDecimals._
 
@@ -46,15 +47,11 @@ trait ChartMark {
 }
 
 object ChartMarkEvent extends Enumeration {
-  val Entered = Value
-  val Exited = Value
+  val Entered, Exited = Value
 }
 
 object ChartEvent extends Enumeration {
-  val Moved = Value
-  val Clicked = Value
-  val RightClicked = Value
-  val Exited = Value
+  val Moved, Clicked, RightClicked, Exited = Value
 }
 
 case class ChartMeta[A <: ChartMark](
@@ -339,15 +336,17 @@ class ChartHandler[A <: ChartMark](
   chart.setOnMouseClicked(onMouseClicked _)
   chart.setOnScroll(onScroll _)
 
-  // Place zoom node at top center of view
+  // Place zoom node at top center of view, and move yAxis so that it stays on
+  // the left of the view.
   RichObservableValue.listen[AnyRef](
     chart.widthProperty, chartPane.widthProperty, chartPane.hvalueProperty, chartPane.viewportBoundsProperty, zoomNode.widthProperty
   ) {
-    // Don't use cached bounds as these were get while zoom is being applied
+    // Don't use cached bounds: these were obtained while zoom is being applied
     // (but content not yet resized actually).
-    // Set on pixel edge for harper icon rendering in any case
+    // Set on pixel edge for sharper icon rendering in any case
     val bounds = getChartBackgroundViewedBounds(cached = false)
-    zoomNode.setTranslateX(pixelEdge((bounds.getMinX + bounds.getMaxX) / 2 - zoomNode.getWidth / 2))
+    zoomNode.setTranslateX(bounds.getMinX + Nodes.pixelEdge((bounds.getWidth - zoomNode.getWidth) / 2))
+    yAxis.setTranslateX(bounds.getMinX)
   }
 
   /** Chart background viewed bounds. */
@@ -364,7 +363,13 @@ class ChartHandler[A <: ChartMark](
     chartBgViewedBounds = None
   }
 
-  refreshView(resetData = true)
+  // Redraw reference lines (especially horizontal one) so that it always
+  // goes to the yAxis.
+  yAxis.translateXProperty.listen {
+    redrawReferenceLines()
+  }
+
+  refreshView(resetData = true, clearRef = true)
 
   def setSeriesName(name: String): Unit = series.setName(name)
 
@@ -512,10 +517,10 @@ class ChartHandler[A <: ChartMark](
       // nicer to draw from chart border (top) to line point (bottom).
       val vertical = new Line()
       vertical.getStyleClass.add("chart-marker-line")
-      vertical.setStartX(pixelCenter(x))
-      vertical.setEndX(pixelCenter(x))
-      vertical.setStartY(pixelCenter(bounds.getMinY))
-      vertical.setEndY(pixelCenter(y))
+      vertical.setStartX(Nodes.pixelCenter(x))
+      vertical.setEndX(Nodes.pixelCenter(x))
+      vertical.setStartY(Nodes.pixelCenter(bounds.getMinY))
+      vertical.setEndY(Nodes.pixelCenter(y))
       vertical.setVisible(true)
       vertical.setDisable(true)
 
@@ -527,7 +532,7 @@ class ChartHandler[A <: ChartMark](
       // Note: set layout because 'translate' is used in CSS to center shape.
       // Setting it on pixel edge since it is a 'box'. (even though CSS may
       // have to offset by 0.5 if region width is an even number).
-      markRegion.setLayoutX(pixelEdge(x))
+      markRegion.setLayoutX(Nodes.pixelEdge(x))
 
       mark.comment.foreach { comment =>
         Tooltip.install(markRegion, new Tooltip(s"${dateFormatter.format(date)}\n$comment"))
@@ -561,10 +566,10 @@ class ChartHandler[A <: ChartMark](
             // If the marker is at the top of the chart (first collision),
             // move it at the bottom, and invert it (pointing up).
             // Adjust vertical line accordingly.
-            markRegion.setLayoutY(pixelCenter(bounds.getMaxY))
+            markRegion.setLayoutY(Nodes.pixelCenter(bounds.getMaxY))
             JFXStyles.togglePseudoClass(markRegion, "inverted", active = true)
-            vertical.setStartY(pixelCenter(bounds.getMaxY))
-            vertical.setEndY(pixelCenter(y))
+            vertical.setStartY(Nodes.pixelCenter(bounds.getMaxY))
+            vertical.setEndY(Nodes.pixelCenter(y))
           }
         } else {
           // The marker and zoom bounds don't collide horizontally
@@ -574,8 +579,8 @@ class ChartHandler[A <: ChartMark](
             // Adjust vertical line accordingly.
             markRegion.setLayoutY(0)
             JFXStyles.togglePseudoClass(markRegion, "inverted", active = false)
-            vertical.setStartY(pixelCenter(bounds.getMinY))
-            vertical.setEndY(pixelCenter(y))
+            vertical.setStartY(Nodes.pixelCenter(bounds.getMinY))
+            vertical.setEndY(Nodes.pixelCenter(y))
           }
         }
       }
@@ -608,7 +613,7 @@ class ChartHandler[A <: ChartMark](
       valuesList = valuesMap.toList.sortBy(_._1)
       None
     }
-    refreshView(resetData = true)
+    refreshView(resetData = true, clearRef = true)
     center.foreach { center =>
       centerOnXIdx(center, track = true)
     }
@@ -620,9 +625,9 @@ class ChartHandler[A <: ChartMark](
    * Populates chart series with data when required.
    * Updates ticks and resizes chart if necessary.
    */
-  private def refreshView(resetData: Boolean): Unit = {
+  private def refreshView(resetData: Boolean, clearRef: Boolean): Unit = {
     // Since we are about to change the chart data, hide lines
-    hideLines(clearRef = true)
+    hideLines(clearRef = clearRef)
 
     if (resetData) {
       val data = valuesList.map { case (valueX, valueY) =>
@@ -650,7 +655,7 @@ class ChartHandler[A <: ChartMark](
       val viewedBounds = getChartBackgroundViewedBounds()
       val xOffset = x - (viewedBounds.getMinX + viewedBounds.getMaxX) / 2
       val xCenterIdx = round(xIdx - xOffset / xZoom)
-      refreshView(resetData = false)
+      refreshView(resetData = false, clearRef = false)
       centerOnXIdx(xCenterIdx, track = true)
     }
   }
@@ -710,33 +715,6 @@ class ChartHandler[A <: ChartMark](
     // Reset previous position, so that it can be redrawn if we re-enter
     currentXIdx = None
   }
-
-  /**
-   * Computes value to center on a pixel.
-   *
-   * See 'Coordinate System' section in JavaFX Node JavaDoc.<br>
-   * The center of a pixel is at 0.5 past its index; e.g. top-left pixel center
-   * is at x=0.5 and y=0.5 (and not x=0 y=0).
-   * This function helps to get the center of pixel provided its index. This
-   * is useful to draw sharp 1-pixel wide lines, otherwise antialiasing is used
-   * to draw it 2-pixels wide.
-   *
-   * @param v pixel x or y index
-   * @return pixel center
-   */
-  private def pixelCenter(v: Double): Double =
-  // Note: add a small delta before flooring to try to prevent going to
-  // previous pixel due to 'double' rounding errors.
-    math.floor(v + 0.0001) + 0.5
-
-  /**
-   * Computes pixel (left/top) edge.
-   *
-   * @param v pixel x or y edge
-   * @return pixel edge
-   */
-  private def pixelEdge(v: Double): Double =
-    pixelCenter(v) - 0.5
 
   /** Gets chart 'x' index for given position. */
   private def getXIdxReal(bounds: Bounds, x: Double): Long = {
@@ -885,15 +863,15 @@ class ChartHandler[A <: ChartMark](
 
     // Note: when using non-plain (e.g. dashed) line style, it is visually
     // nicer to draw from axis (left or bottom) to line point (right or top).
-    vertical.setStartX(pixelCenter(x))
-    vertical.setEndX(pixelCenter(x))
-    vertical.setStartY(pixelCenter(bounds.getMaxY))
-    vertical.setEndY(pixelCenter(y))
+    vertical.setStartX(Nodes.pixelCenter(x))
+    vertical.setEndX(Nodes.pixelCenter(x))
+    vertical.setStartY(Nodes.pixelCenter(bounds.getMaxY))
+    vertical.setEndY(Nodes.pixelCenter(y))
     vertical.setVisible(true)
-    horizontal.setStartX(pixelCenter(bounds.getMinX))
-    horizontal.setEndX(pixelCenter(x))
-    horizontal.setStartY(pixelCenter(y))
-    horizontal.setEndY(pixelCenter(y))
+    horizontal.setStartX(Nodes.pixelCenter(bounds.getMinX) + yAxis.getTranslateX)
+    horizontal.setEndX(Nodes.pixelCenter(x))
+    horizontal.setStartY(Nodes.pixelCenter(y))
+    horizontal.setEndY(Nodes.pixelCenter(y))
     horizontal.setVisible(true)
 
     (x, y)
@@ -903,6 +881,16 @@ class ChartHandler[A <: ChartMark](
   private def drawReferenceLines(xIdx: Option[Long] = None): Unit = {
     xIdx.orElse(labelNAV.getDataRef.map(_.x)).foreach { xIdx =>
       drawLines(verticalLineRef, horizontalLineRef, xIdx)
+    }
+  }
+
+  private def redrawReferenceLines(): Unit = {
+    // We actually only need to redraw the horizontal line, but since this
+    // wouldn't change the vertical line properties, we can redraw both.
+    if (horizontalLineRef.isVisible) {
+      labelNAV.getDataRef.map(_.x).foreach { xIdx =>
+        drawLines(verticalLineRef, horizontalLineRef, xIdx)
+      }
     }
   }
 
@@ -924,12 +912,12 @@ class ChartHandler[A <: ChartMark](
         // rectangle width shall be computed taking into account the actual
         // pixels center on which lines are drawn.
         if (xIdx >= xIdx1) {
-          zoomZone.setX(pixelEdge(x1))
-          zoomZone.setWidth(pixelCenter(x) - pixelCenter(x1) + 1)
+          zoomZone.setX(Nodes.pixelEdge(x1))
+          zoomZone.setWidth(Nodes.pixelCenter(x) - Nodes.pixelCenter(x1) + 1)
         } else {
           // going left: needs to change x position
-          zoomZone.setX(pixelEdge(x))
-          zoomZone.setWidth(pixelCenter(x1) - pixelCenter(x) + 1)
+          zoomZone.setX(Nodes.pixelEdge(x))
+          zoomZone.setWidth(Nodes.pixelCenter(x1) - Nodes.pixelCenter(x) + 1)
         }
       }
 
@@ -1007,7 +995,7 @@ class ChartHandler[A <: ChartMark](
           labelNAV.setDataRef(Some(ChartData(xIdx, valuesMap(xIdx))))
           drawReferenceLines(xZoomIdx1)
 
-          zoomZone.setX(pixelEdge(getX(bounds, xIdx)))
+          zoomZone.setX(Nodes.pixelEdge(getX(bounds, xIdx)))
           zoomZone.setWidth(0)
           zoomZone.setY(bounds.getMinY)
           zoomZone.setHeight(bounds.getMaxY - bounds.getMinY)
@@ -1047,7 +1035,7 @@ class ChartHandler[A <: ChartMark](
           // zoomed), which is smaller than view, will appear centered.
           // If target zoom is lower than maximum zoom, selected range will
           // span the entire view.
-          refreshView(resetData = false)
+          refreshView(resetData = false, clearRef = true)
           centerOnXIdx((xIdx1 + xIdx2) / 2, track = true)
         }
         // else: either we selected the same zone, or we cannot zoom anymore
