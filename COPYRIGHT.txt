@@ -5,8 +5,7 @@
 <http://creativecommons.org/licenses/by/3.0/>
 
 
-"Refresh" and "map-marker-1" SVG icons by simpleicon
+"Refresh" SVG icon by simpleicon
 <http://simpleicon.com/>
 <http://simpleicon.com/refresh.html>
-<http://simpleicon.com/map-marker-1.html>
 <http://simpleicon.com/license-agreement/>

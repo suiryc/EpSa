@@ -3,7 +3,7 @@ package epsa.charts
 import epsa.Main
 import epsa.Settings.formatNumber
 import epsa.controllers.Images
-import epsa.util.JFXStyles
+import epsa.util.{Icons, JFXStyles}
 import epsa.util.JFXStyles.AnimationHighlighter
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -22,7 +22,7 @@ import suiryc.scala.javafx.beans.value.RichObservableValue
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.javafx.geometry.BoundsEx
-import suiryc.scala.javafx.scene.Nodes
+import suiryc.scala.javafx.scene.{Graphics, Nodes}
 import suiryc.scala.javafx.scene.control.{ScrollOffsetPosition, Scrolls}
 import suiryc.scala.math.BigDecimals._
 
@@ -519,70 +519,64 @@ class ChartHandler[A <: ChartMark](
       vertical.getStyleClass.add("chart-marker-line")
       vertical.setStartX(Nodes.pixelCenter(x))
       vertical.setEndX(Nodes.pixelCenter(x))
-      vertical.setStartY(Nodes.pixelCenter(bounds.getMinY))
-      vertical.setEndY(Nodes.pixelCenter(y))
       vertical.setVisible(true)
       vertical.setDisable(true)
 
-      val markRegion = new Region
+      val icon = Icons.mapPin()
+      val markRegion = icon.pane
+      val markGroup = icon.group
       markRegion.setFocusTraversable(false)
       markRegion.getStyleClass.setAll("chart-marker")
-      markRegion.setMaxWidth(Region.USE_PREF_SIZE)
-      markRegion.setMaxHeight(Region.USE_PREF_SIZE)
-      // Note: set layout because 'translate' is used in CSS to center shape.
-      // Setting it on pixel edge since it is a 'box'. (even though CSS may
-      // have to offset by 0.5 if region width is an even number).
-      markRegion.setLayoutX(Nodes.pixelEdge(x))
+      // Note: move icon by half its width and center on pixel.
+      markRegion.setTranslateX(Nodes.pixelCenter(x - Graphics.iconSize / 2))
 
-      mark.comment.foreach { comment =>
-        Tooltip.install(markRegion, new Tooltip(s"${dateFormatter.format(date)}\n$comment"))
-      }
-
-      markRegion.setOnMouseEntered { _ =>
-        meta.marksHandler(ChartMarkEvent.Entered, mark)
-      }
-      markRegion.setOnMouseExited { _ =>
-        meta.marksHandler(ChartMarkEvent.Exited, mark)
-      }
-
-      // Check marker and zoom bounds to prevent collision
-      // Notes:
-      // Change Y 'layout' as 'translate' is used in CSS.
-      // Don't change Y 'scale' when moving mark to bottom of chart as
-      // it is used in CSS (which ultimately overrides what the code
-      // may set). Instead use styling to do it through a pseudo class
-      // (using a class style may have some glitches, e.g. the SVG path
-      // appearing unscaled for an instant the first time we change the
-      // style class).
-      val cancellable = RichObservableValue.listen(
-        markRegion.boundsInParentProperty, zoomNode.boundsInParentProperty
-      ) {
+      def markZoomCollision: Boolean = {
         val markBounds = markRegion.getBoundsInParent
         val zoomBounds = zoomNode.getBoundsInParent
-        if (((markBounds.getMinX >= zoomBounds.getMinX) && (markBounds.getMinX <= zoomBounds.getMaxX)) ||
-            ((markBounds.getMaxX >= zoomBounds.getMinX) && (markBounds.getMaxX <= zoomBounds.getMaxX))) {
+        ((markBounds.getMinX >= zoomBounds.getMinX) && (markBounds.getMinX <= zoomBounds.getMaxX)) ||
+          ((markBounds.getMaxX >= zoomBounds.getMinX) && (markBounds.getMaxX <= zoomBounds.getMaxX))
+      }
+
+      def refreshMarker() {
+        // Check marker and zoom bounds to prevent collision
+        val translateY = markRegion.getTranslateY
+        if (markZoomCollision) {
           // The marker and zoom bounds are colliding horizontally
-          if (markRegion.getLayoutY == 0) {
-            // If the marker is at the top of the chart (first collision),
-            // move it at the bottom, and invert it (pointing up).
-            // Adjust vertical line accordingly.
-            markRegion.setLayoutY(Nodes.pixelCenter(bounds.getMaxY))
-            JFXStyles.togglePseudoClass(markRegion, "inverted", active = true)
+          if (translateY < bounds.getMinY) {
+            // Move to bottom (and invert).
+            markRegion.setTranslateY(Nodes.pixelCenter(bounds.getMaxY))
+            markRegion.setScaleY(-1)
             vertical.setStartY(Nodes.pixelCenter(bounds.getMaxY))
             vertical.setEndY(Nodes.pixelCenter(y))
           }
         } else {
           // The marker and zoom bounds don't collide horizontally
-          if (markRegion.getLayoutY != 0) {
-            // If the marker is at the bottom of the chart (previous collision),
-            // revert it to the top (pointing down).
-            // Adjust vertical line accordingly.
-            markRegion.setLayoutY(0)
-            JFXStyles.togglePseudoClass(markRegion, "inverted", active = false)
+          if ((translateY == 0) || (translateY > bounds.getMinY)) {
+            // Move to top (and restore nominal scale).
+            markRegion.setTranslateY(bounds.getMinY - 16)
+            markRegion.setScaleY(1)
             vertical.setStartY(Nodes.pixelCenter(bounds.getMinY))
             vertical.setEndY(Nodes.pixelCenter(y))
           }
         }
+      }
+      refreshMarker()
+
+      mark.comment.foreach { comment =>
+        Tooltip.install(markGroup, new Tooltip(s"${dateFormatter.format(date)}\n$comment"))
+      }
+
+      markGroup.setOnMouseEntered { _ =>
+        meta.marksHandler(ChartMarkEvent.Entered, mark)
+      }
+      markGroup.setOnMouseExited { _ =>
+        meta.marksHandler(ChartMarkEvent.Exited, mark)
+      }
+
+      val cancellable = RichObservableValue.listen(
+        markRegion.boundsInParentProperty, zoomNode.boundsInParentProperty
+      ) {
+        refreshMarker()
       }
 
       date -> Marker(markRegion, vertical, cancellable)
