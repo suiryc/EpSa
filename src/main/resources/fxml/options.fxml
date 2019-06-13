@@ -4,7 +4,7 @@
 <?import javafx.scene.control.ComboBox?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.Slider?>
-<?import javafx.scene.control.TextField?>
+<?import javafx.scene.control.Spinner?>
 <?import javafx.scene.layout.ColumnConstraints?>
 <?import javafx.scene.layout.GridPane?>
 <?import javafx.scene.layout.RowConstraints?>
@@ -90,7 +90,7 @@
          </children>
       </GridPane>
       <Label text="%http.client.timeout" GridPane.rowIndex="5" />
-      <TextField fx:id="httpClientTimeout" maxWidth="-Infinity" prefWidth="120.0" GridPane.columnIndex="1" GridPane.rowIndex="5" />
+      <Spinner fx:id="httpClientTimeout" editable="true" maxWidth="-Infinity" prefWidth="120.0" GridPane.columnIndex="1" GridPane.rowIndex="5" />
    </children>
    <padding>
       <Insets bottom="15.0" left="15.0" right="15.0" top="15.0" />

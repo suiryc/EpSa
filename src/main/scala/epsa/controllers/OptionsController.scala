@@ -8,10 +8,11 @@ import javafx.fxml.{FXML, FXMLLoader}
 import javafx.scene.Node
 import javafx.scene.control._
 import javafx.stage.{Stage, Window}
-import scala.concurrent.duration.{Duration, FiniteDuration}
+import scala.concurrent.duration.FiniteDuration
+import suiryc.scala.concurrent.duration.Durations
 import suiryc.scala.javafx.stage.{StageLocationPersistentView, Stages}
 import suiryc.scala.javafx.beans.value.RichObservableValue._
-import suiryc.scala.javafx.scene.control.{Dialogs, I18NLocaleCell}
+import suiryc.scala.javafx.scene.control.{Dialogs, FiniteDurationSpinnerValueFactory, I18NLocaleCell, Spinners}
 import suiryc.scala.javafx.stage.Stages.StageLocation
 import suiryc.scala.settings.{ConfigEntry, SettingSnapshot, SettingsSnapshot}
 import suiryc.scala.util.I18NLocale
@@ -45,7 +46,7 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
   protected var vwapRounding: ComboBox[BigDecimal.RoundingMode.Value] = _
 
   @FXML
-  protected var httpClientTimeout: TextField = _
+  protected var httpClientTimeout: Spinner[Option[FiniteDuration]] = _
 
   protected var buttonOk: Node = _
 
@@ -58,6 +59,8 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
     // Lookup OK dialog button
     buttonOk = dialog.getDialogPane.lookupButton(ButtonType.OK)
 
+    // Note: the snapshot is used to check whether we will need to refresh
+    // the main view; hence it does not contain the HTTP timeout.
     snapshot.add(
       SettingSnapshot(I18N.setting),
       SettingSnapshot(settings.currency),
@@ -102,17 +105,14 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
     vwapRounding.setItems(FXCollections.observableList(BigDecimal.RoundingMode.values.toList.asJava))
     vwapRounding.getSelectionModel.select(settings.vwapRounding.get)
 
-    httpClientTimeout.textProperty.listen(checkForm())
-    httpClientTimeout.setText(settings.httpClientTimeout.get.toString)
+    Spinners.handleEvents(httpClientTimeout)
+    httpClientTimeout.setValueFactory(new FiniteDurationSpinnerValueFactory(httpClientTimeout))
+    httpClientTimeout.getEditor.textProperty.listen(checkForm())
+    httpClientTimeout.getEditor.setText(settings.httpClientTimeout.rawOpt.map(_.unwrapped.toString).getOrElse(""))
   }
 
   private def checkForm(): Unit = {
-    val ok = try {
-      Duration(httpClientTimeout.getText).isFinite()
-      true
-    } catch {
-      case _: Throwable => false
-    }
+    val ok = Durations.parseFinite(httpClientTimeout.getEditor.getText).exists(_.length > 0)
     JFXStyles.toggleError(httpClientTimeout, !ok, I18N.Strings.durationError)
     buttonOk.setDisable(!ok)
   }
@@ -137,7 +137,7 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
     settings.vwapScale.set(vwapScale.getValue.round.toInt)
     settings.vwapRounding.set(vwapRounding.getValue)
 
-    settings.httpClientTimeout.set(Duration(httpClientTimeout.getText).asInstanceOf[FiniteDuration])
+    settings.httpClientTimeout.rawSet(httpClientTimeout.getEditor.getText)
 
     // Caller needs to reload (view) if something changed
     val reload = snapshot.changed()
