@@ -494,41 +494,56 @@ class ChartHandler[A <: ChartMark](
     // Notes: removing/adding markers in 'runLater' triggers glitches when
     // resizing chart width (not all nodes are removed at the end, action
     // is often triggered with some delay which gets lengthier the more
-    // events there are to process).
-    // Doing it right now still has the glitch that the marker (SVG
-    // path) 'disappears' while chart is resized.
+    // events there are to process). So do it rigth now.
+    // The ideal is to re-use already created markers when possible: it takes
+    // less time to move already existing children than to remove and recreate
+    // them all. It also prevents many visual glitches, and most of the time
+    // we can re-use the marker which is already at the target position.
 
-    // First remove current markers
-    val remove = markers.values.flatMap { marker =>
-      // It is necessary to remove listener once marker is removed, otherwise
-      // it keeps getting triggered because the zoom node is still there.
-      marker.cancellable.cancel()
-      List(marker.verticalLine, marker.region)
-    }
+    val markersOld = collection.mutable.Map.empty[LocalDate, Marker] ++ markers
+    val markersNew = collection.mutable.Set.empty[Marker]
     markers = Map.empty
-    anchorPane.getChildren.removeAll(remove.toList.asJava)
+    def cleanupOldMarkers(): Unit = {
+      anchorPane.getChildren.removeAll {
+        markersOld.values.flatMap { marker ⇒
+          // It is necessary to remove listener once marker is removed, otherwise
+          // it keeps getting triggered because the zoom node is still there.
+          marker.reset()
+          List(marker.verticalLine, marker.region)
+        }.toList.asJava
+      }
+      markersOld.clear()
+    }
+    def newMarker(date: LocalDate): Marker = {
+      markersOld.remove(date).map { marker ⇒
+        // Cancel any listener on the marker before reusing it
+        marker.reset()
+        marker
+      }.getOrElse {
+        val marker = new Marker
+        markersNew.add(marker)
+        marker
+      }
+    }
 
     val bounds = getChartBackgroundBounds
     markers = meta.marks.map { case (date, mark) =>
       val xIdx = xAxisWrapper.dateToNumber(mark.date)
       val (x, y) = getXY(bounds, xIdx)
 
+      val marker = newMarker(date)
+
       // Note: when using non-plain (e.g. dashed) line style, it is visually
       // nicer to draw from chart border (top) to line point (bottom).
-      val vertical = new Line()
-      vertical.getStyleClass.add("chart-marker-line")
+      val vertical = marker.verticalLine
       vertical.setStartX(Nodes.pixelCenter(x))
       vertical.setEndX(Nodes.pixelCenter(x))
-      vertical.setVisible(true)
-      vertical.setDisable(true)
 
-      val icon = Icons.mapPin()
-      val markRegion = icon.pane
+      val icon = marker.icon
+      val markRegion = marker.region
       val markGroup = icon.group
-      markRegion.setFocusTraversable(false)
-      markRegion.getStyleClass.setAll("chart-marker")
       // Note: move icon by half its width and center on pixel.
-      markRegion.setTranslateX(Nodes.pixelCenter(x - Graphics.iconSize / 2))
+      markRegion.setTranslateX(Nodes.pixelCenter(x - icon.bounds.getWidth / 2))
 
       def markZoomCollision: Boolean = {
         val markBounds = markRegion.getBoundsInParent
@@ -537,12 +552,12 @@ class ChartHandler[A <: ChartMark](
           ((markBounds.getMaxX >= zoomBounds.getMinX) && (markBounds.getMaxX <= zoomBounds.getMaxX))
       }
 
-      def refreshMarker() {
+      def refreshMarker(force: Boolean) {
         // Check marker and zoom bounds to prevent collision
         val translateY = markRegion.getTranslateY
         if (markZoomCollision) {
           // The marker and zoom bounds are colliding horizontally
-          if (translateY < bounds.getMinY) {
+          if (force || (translateY < bounds.getMinY)) {
             // Move to bottom (and invert).
             markRegion.setTranslateY(Nodes.pixelCenter(bounds.getMaxY))
             markRegion.setScaleY(-1)
@@ -551,7 +566,7 @@ class ChartHandler[A <: ChartMark](
           }
         } else {
           // The marker and zoom bounds don't collide horizontally
-          if ((translateY == 0) || (translateY > bounds.getMinY)) {
+          if (force || (translateY == 0) || (translateY > bounds.getMinY)) {
             // Move to top (and restore nominal scale).
             markRegion.setTranslateY(bounds.getMinY - 16)
             markRegion.setScaleY(1)
@@ -560,8 +575,11 @@ class ChartHandler[A <: ChartMark](
           }
         }
       }
-      refreshMarker()
+      refreshMarker(force = true)
 
+      // Remove any installed tooltip before installing a new one.
+      // This is necessary when re-using an existing marker.
+      Tooltip.uninstall(markGroup, null)
       mark.comment.foreach { comment =>
         Tooltip.install(markGroup, new Tooltip(s"${dateFormatter.format(date)}\n$comment"))
       }
@@ -576,15 +594,20 @@ class ChartHandler[A <: ChartMark](
       val cancellable = RichObservableValue.listen(
         markRegion.boundsInParentProperty, zoomNode.boundsInParentProperty
       ) {
-        refreshMarker()
+        refreshMarker(force = false)
       }
+      marker.setup(cancellable)
 
-      date -> Marker(markRegion, vertical, cancellable)
+      date -> marker
     }
-    val add = markers.values.flatMap { marker =>
-      List(marker.verticalLine, marker.region)
+
+    // Finally remove remaining old markers, and add new ones
+    cleanupOldMarkers()
+    anchorPane.getChildren.addAll {
+      markersNew.toList.flatMap { marker =>
+        List(marker.verticalLine, marker.region)
+      }.asJava
     }
-    anchorPane.getChildren.addAll(add.toList.asJava)
 
     // Requesting layout (in 'runLater') triggers marker drawing (which
     // otherwise sometimes is done next time something happens in pane).
@@ -1125,5 +1148,30 @@ class ChartHandler[A <: ChartMark](
 }
 
 object ChartHandler {
-  case class Marker(region: Region, verticalLine: Line, cancellable: Cancellable)
+
+  class Marker {
+    val icon: Graphics.SVGGroup = Icons.mapPin()
+    val region: Region = icon.pane
+    region.setFocusTraversable(false)
+    region.getStyleClass.setAll("chart-marker")
+
+    val verticalLine = new Line()
+    verticalLine.getStyleClass.add("chart-marker-line")
+    verticalLine.setVisible(true)
+    verticalLine.setDisable(true)
+
+    private var cancellable = Option.empty[Cancellable]
+
+    def setup(cancellable: Cancellable): Unit = {
+      reset()
+      this.cancellable = Some(cancellable)
+    }
+
+    def reset(): Unit = {
+      cancellable.foreach(_.cancel)
+      cancellable = None
+    }
+
+  }
+
 }
