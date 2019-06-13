@@ -80,6 +80,10 @@
  * (if applied on paths, it moves its positions to the shadow one ?!).
  * Don't forget effect is applied before scaling (1/32) in group.
  */
+.custom-chart .chart-marker:animation-highlight {
+  /* Move node to front (parent traverses children in decreasing view order). */
+  -fx-view-order: -100;
+}
 .custom-chart .chart-marker:animation-highlight .svg-path {
   -fx-fill: orange;
   -fx-opacity: 1;
