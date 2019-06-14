@@ -560,18 +560,21 @@ class ChartHandler[A <: ChartMark](
     // less time to move already existing children than to remove and recreate
     // them all. It also prevents many visual glitches, and most of the time
     // we can re-use the marker which is already at the target position.
+    // Since we create markers by increasing date, the easiest is also to re-use
+    // old markers by increasing date: even when the date does not match, we
+    // usually only need to move the old marker a bit.
     //
     // Important: we may be called while layout is being performed, and
     // particularly when the pane children are iterated over. This means we
     // must not remove children right now otherwise we could trigger an error,
     // but instead delay it (runLater).
 
-    val markersOld = collection.mutable.Map.empty[LocalDate, Marker] ++ markers
+    var markersOld = markers.values.toList.sortBy(_.date)
     val markersNew = collection.mutable.Set.empty[Marker]
     markers = Map.empty
     def cleanupOldMarkers(): Unit = {
       // We can still reset/hide the marker before removing them
-      markersOld.values.foreach { marker ⇒
+      markersOld.foreach { marker ⇒
         marker.region.setVisible(false)
         marker.verticalLine.setVisible(false)
         // It is necessary to remove listener otherwise it keeps getting
@@ -580,15 +583,16 @@ class ChartHandler[A <: ChartMark](
       }
       if (markersOld.nonEmpty) JFXSystem.runLater {
         anchorPane.getChildren.removeAll {
-          markersOld.values.flatMap { marker ⇒
+          markersOld.flatMap { marker ⇒
             List(marker.verticalLine, marker.region)
-          }.toList.asJava
+          }.asJava
         }
-        markersOld.clear()
+        markersOld = Nil
       }
     }
     def newMarker(date: LocalDate): Marker = {
-      markersOld.remove(date).map { marker ⇒
+      markersOld.headOption.map { marker ⇒
+        markersOld = markersOld.tail
         // Cancel any listener on the marker before reusing it
         marker.reset()
         marker.date = date
