@@ -88,7 +88,7 @@ object JFXStyles extends StylesFeat {
     }
   }
 
-  def highlightAnimation(nodes: List[Node], animationHighlighter: Option[AnimationHighlighter]): AnimationHighlighter = {
+  def highlightAnimation(nodes: List[Node], animationHighlighter: Option[AnimationHighlighter], onDone: ⇒ Unit = {}): AnimationHighlighter = {
     def toggle(active: Boolean): Unit =
       nodes.foreach { node =>
         toggleAnimationHighlight(node, active)
@@ -100,7 +100,13 @@ object JFXStyles extends StylesFeat {
       new KeyFrame(jfxDuration.seconds(1.0), { _: ActionEvent => toggle(active = false) })
     )
     timeline.setCycleCount(3)
-    AnimationHighlighter(nodes, timeline, () => toggle(active = false))
+    timeline.setOnFinished { _ ⇒
+      onDone
+    }
+    AnimationHighlighter(nodes, timeline, () => {
+      toggle(active = false)
+      onDone
+    })
   }
 
   trait Style {

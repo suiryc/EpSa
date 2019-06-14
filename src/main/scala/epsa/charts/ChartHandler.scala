@@ -25,6 +25,7 @@ import suiryc.scala.javafx.geometry.BoundsEx
 import suiryc.scala.javafx.scene.{Graphics, Nodes}
 import suiryc.scala.javafx.scene.control.{ScrollOffsetPosition, Scrolls}
 import suiryc.scala.math.BigDecimals._
+import suiryc.scala.math.Ordering._
 
 // TODO: way to limit y range to currently viewed min/max; and way to reset to auto range
 
@@ -474,18 +475,78 @@ class ChartHandler[A <: ChartMark](
 
   /** Highlights requested mark. */
   def highlightMark(date: LocalDate): Unit = {
-    markers.get(date).foreach { marker =>
-      val viewedBounds = getChartBackgroundViewedBounds()
-      val nodes = List(marker.verticalLine, marker.region)
+    markers.get(date) match {
+      case Some(marker) ⇒
+        val viewedBounds = getChartBackgroundViewedBounds()
+        val nodes = List(marker.verticalLine, marker.region)
 
-      // Make sure the marker is visible (and scroll to center on it if not).
-      val xIdx = xAxisWrapper.dateToNumber(date)
-      val x = getX(getChartBackgroundBounds, xIdx)
-      if ((x <= viewedBounds.getMinX) || (x >= viewedBounds.getMaxX)) {
-        centerOnXIdx(xIdx)
+        // Make sure the marker is visible (and scroll to center on it if not).
+        val xIdx = xAxisWrapper.dateToNumber(date)
+        val x = getX(getChartBackgroundBounds, xIdx)
+        if ((x <= viewedBounds.getMinX) || (x >= viewedBounds.getMaxX)) {
+          centerOnXIdx(xIdx)
+        }
+
+        animationHighlighter = Some(JFXStyles.highlightAnimation(nodes, animationHighlighter))
+
+      case None ⇒
+        meta.marks.get(date).foreach { mark ⇒
+          val bounds = getChartBackgroundBounds
+          val xIdx = xAxisWrapper.dateToNumber(mark.date)
+          val (x, y) = getXY(bounds, xIdx)
+          val pixelCenterX = Nodes.pixelCenter(x)
+
+          val marker = new Marker(date)
+          val vertical = marker.verticalLine
+          vertical.setStartX(pixelCenterX)
+          vertical.setEndX(pixelCenterX)
+
+          val icon = marker.icon
+          marker.region.setTranslateX(Nodes.pixelCenter(x - icon.bounds.getWidth / 2))
+
+          refreshMarker(bounds, marker, y, force = true)
+          val viewedBounds = getChartBackgroundViewedBounds()
+          val nodes = List(marker.verticalLine, marker.region)
+
+          anchorPane.getChildren.addAll(nodes:_*)
+          // Make sure the marker is visible (and scroll to center on it if not).
+          if ((x <= viewedBounds.getMinX) || (x >= viewedBounds.getMaxX)) {
+            centerOnXIdx(xIdx)
+          }
+
+          animationHighlighter = Some(JFXStyles.highlightAnimation(nodes, animationHighlighter, {
+            anchorPane.getChildren.removeAll(nodes:_*)
+            ()
+          }))
+        }
+    }
+  }
+
+  private def refreshMarker(bounds: Bounds, marker: Marker, y: Double, force: Boolean) {
+    // Check marker and zoom bounds to prevent collision
+    val markBounds = marker.region.getBoundsInParent
+    val zoomBounds = zoomNode.getBoundsInParent
+    val markerZoomCollision = ((markBounds.getMinX >= zoomBounds.getMinX) && (markBounds.getMinX <= zoomBounds.getMaxX)) ||
+      ((markBounds.getMaxX >= zoomBounds.getMinX) && (markBounds.getMaxX <= zoomBounds.getMaxX))
+    val translateY = marker.region.getTranslateY
+    if (markerZoomCollision) {
+      // The marker and zoom bounds are colliding horizontally
+      if (force || (translateY < bounds.getMinY)) {
+        // Move to bottom (and invert).
+        marker.region.setTranslateY(Nodes.pixelCenter(bounds.getMaxY))
+        marker.region.setScaleY(-1)
+        marker.verticalLine.setStartY(Nodes.pixelCenter(bounds.getMaxY))
+        marker.verticalLine.setEndY(Nodes.pixelCenter(y))
       }
-
-      animationHighlighter = Some(JFXStyles.highlightAnimation(nodes, animationHighlighter))
+    } else {
+      // The marker and zoom bounds don't collide horizontally
+      if (force || (translateY == 0) || (translateY > bounds.getMinY)) {
+        // Move to top (and restore nominal scale).
+        marker.region.setTranslateY(bounds.getMinY - 16)
+        marker.region.setScaleY(1)
+        marker.verticalLine.setStartY(Nodes.pixelCenter(bounds.getMinY))
+        marker.verticalLine.setEndY(Nodes.pixelCenter(y))
+      }
     }
   }
 
@@ -499,121 +560,129 @@ class ChartHandler[A <: ChartMark](
     // less time to move already existing children than to remove and recreate
     // them all. It also prevents many visual glitches, and most of the time
     // we can re-use the marker which is already at the target position.
+    //
+    // Important: we may be called while layout is being performed, and
+    // particularly when the pane children are iterated over. This means we
+    // must not remove children right now otherwise we could trigger an error,
+    // but instead delay it (runLater).
 
     val markersOld = collection.mutable.Map.empty[LocalDate, Marker] ++ markers
     val markersNew = collection.mutable.Set.empty[Marker]
     markers = Map.empty
     def cleanupOldMarkers(): Unit = {
-      anchorPane.getChildren.removeAll {
-        markersOld.values.flatMap { marker ⇒
-          // It is necessary to remove listener once marker is removed, otherwise
-          // it keeps getting triggered because the zoom node is still there.
-          marker.reset()
-          List(marker.verticalLine, marker.region)
-        }.toList.asJava
+      // We can still reset/hide the marker before removing them
+      markersOld.values.foreach { marker ⇒
+        marker.region.setVisible(false)
+        marker.verticalLine.setVisible(false)
+        // It is necessary to remove listener otherwise it keeps getting
+        // triggered because the zoom node is still there.
+        marker.reset()
       }
-      markersOld.clear()
+      if (markersOld.nonEmpty) JFXSystem.runLater {
+        anchorPane.getChildren.removeAll {
+          markersOld.values.flatMap { marker ⇒
+            List(marker.verticalLine, marker.region)
+          }.toList.asJava
+        }
+        markersOld.clear()
+      }
     }
     def newMarker(date: LocalDate): Marker = {
       markersOld.remove(date).map { marker ⇒
         // Cancel any listener on the marker before reusing it
         marker.reset()
+        marker.date = date
         marker
       }.getOrElse {
-        val marker = new Marker
+        val marker = new Marker(date)
         markersNew.add(marker)
         marker
       }
     }
 
     val bounds = getChartBackgroundBounds
-    markers = meta.marks.map { case (date, mark) =>
+    case class MarkersBuilding(markers: Map[LocalDate, Marker] = Map.empty, previous: Option[Marker] = None) {
+      def add(marker: Marker): MarkersBuilding = copy(
+        markers = markers + (marker.date → marker),
+        previous = Some(marker)
+      )
+    }
+    markers = meta.marks.values.toList.sortBy(_.date).foldLeft(MarkersBuilding()) { case (building, mark) =>
       val xIdx = xAxisWrapper.dateToNumber(mark.date)
       val (x, y) = getXY(bounds, xIdx)
+      val pixelCenterX = Nodes.pixelCenter(x)
 
-      val marker = newMarker(date)
-
-      // Note: when using non-plain (e.g. dashed) line style, it is visually
-      // nicer to draw from chart border (top) to line point (bottom).
-      val vertical = marker.verticalLine
-      vertical.setStartX(Nodes.pixelCenter(x))
-      vertical.setEndX(Nodes.pixelCenter(x))
-
-      val icon = marker.icon
-      val markRegion = marker.region
-      val markGroup = icon.group
-      // Note: move icon by half its width and center on pixel.
-      markRegion.setTranslateX(Nodes.pixelCenter(x - icon.bounds.getWidth / 2))
-
-      def markZoomCollision: Boolean = {
-        val markBounds = markRegion.getBoundsInParent
-        val zoomBounds = zoomNode.getBoundsInParent
-        ((markBounds.getMinX >= zoomBounds.getMinX) && (markBounds.getMinX <= zoomBounds.getMaxX)) ||
-          ((markBounds.getMaxX >= zoomBounds.getMinX) && (markBounds.getMaxX <= zoomBounds.getMaxX))
+      val markComment = mark.comment.map { comment ⇒
+        s"${dateFormatter.format(mark.date)}\n${comment.trim}"
       }
-
-      def refreshMarker(force: Boolean) {
-        // Check marker and zoom bounds to prevent collision
-        val translateY = markRegion.getTranslateY
-        if (markZoomCollision) {
-          // The marker and zoom bounds are colliding horizontally
-          if (force || (translateY < bounds.getMinY)) {
-            // Move to bottom (and invert).
-            markRegion.setTranslateY(Nodes.pixelCenter(bounds.getMaxY))
-            markRegion.setScaleY(-1)
-            vertical.setStartY(Nodes.pixelCenter(bounds.getMaxY))
-            vertical.setEndY(Nodes.pixelCenter(y))
-          }
-        } else {
-          // The marker and zoom bounds don't collide horizontally
-          if (force || (translateY == 0) || (translateY > bounds.getMinY)) {
-            // Move to top (and restore nominal scale).
-            markRegion.setTranslateY(bounds.getMinY - 16)
-            markRegion.setScaleY(1)
-            vertical.setStartY(Nodes.pixelCenter(bounds.getMinY))
-            vertical.setEndY(Nodes.pixelCenter(y))
-          }
+      building.previous.filter { previous ⇒
+        pixelCenterX <= previous.verticalLine.getStartX + 2 * previous.icon.groupBoundsInParent.getWidth / 3
+      }.map { previous ⇒
+        // New marker would overlap previous one: re-use previous marker and
+        // update its tooltip when applicable.
+        previous.setupTooltip {
+          val comments = previous.tooltip.map(_.getText).toList ::: markComment.toList
+          if (comments.nonEmpty) Some(comments.mkString("\n\n"))
+          else None
         }
-      }
-      refreshMarker(force = true)
 
-      // Remove any installed tooltip before installing a new one.
-      // This is necessary when re-using an existing marker.
-      Tooltip.uninstall(markGroup, null)
-      mark.comment.foreach { comment =>
-        Tooltip.install(markGroup, new Tooltip(s"${dateFormatter.format(date)}\n$comment"))
-      }
+        building
+      }.getOrElse {
+        // No overlapping
+        val marker = newMarker(mark.date)
 
-      markGroup.setOnMouseEntered { _ =>
-        meta.marksHandler(ChartMarkEvent.Entered, mark)
-      }
-      markGroup.setOnMouseExited { _ =>
-        meta.marksHandler(ChartMarkEvent.Exited, mark)
-      }
+        // Note: when using non-plain (e.g. dashed) line style, it is visually
+        // nicer to draw from chart border (top) to line point (bottom).
+        val vertical = marker.verticalLine
+        vertical.setStartX(pixelCenterX)
+        vertical.setEndX(pixelCenterX)
 
-      val cancellable = RichObservableValue.listen(
-        markRegion.boundsInParentProperty, zoomNode.boundsInParentProperty
-      ) {
-        refreshMarker(force = false)
+        val icon = marker.icon
+        val markGroup = icon.group
+        // Note: move icon by half its width and center on pixel.
+        marker.region.setTranslateX(Nodes.pixelCenter(x - icon.bounds.getWidth / 2))
+
+        refreshMarker(bounds, marker, y, force = true)
+
+        marker.setupTooltip(markComment)
+
+        markGroup.setOnMouseEntered { _ =>
+          meta.marksHandler(ChartMarkEvent.Entered, mark)
+        }
+        markGroup.setOnMouseExited { _ =>
+          meta.marksHandler(ChartMarkEvent.Exited, mark)
+        }
+
+        val cancellable = RichObservableValue.listen(
+          marker.region.boundsInParentProperty, zoomNode.boundsInParentProperty
+        ) {
+          refreshMarker(bounds, marker, y, force = false)
+        }
+        marker.setup(cancellable)
+
+        building.add(marker)
       }
-      marker.setup(cancellable)
+    }.markers
 
-      date -> marker
-    }
-
-    // Finally remove remaining old markers, and add new ones
+    // Finally remove remaining old markers, and add new ones.
     cleanupOldMarkers()
-    anchorPane.getChildren.addAll {
-      markersNew.toList.flatMap { marker =>
-        List(marker.verticalLine, marker.region)
-      }.asJava
+    if (markersNew.nonEmpty) {
+      anchorPane.getChildren.addAll {
+        markersNew.toList.flatMap { marker =>
+          List(marker.verticalLine, marker.region)
+        }.asJava
+      }
+
+      // At some point in the past, we also had to request layout (later, since
+      // we may be doing it right now) otherwise sometimes the marker were not
+      // drawn immediately (only the next time something happens in the pane).
+      // This does not seem necessary anymore.
+      //JFXSystem.runLater {
+      //  anchorPane.requestLayout()
+      //}
     }
 
-    // Requesting layout (in 'runLater') triggers marker drawing (which
-    // otherwise sometimes is done next time something happens in pane).
-    JFXSystem.runLater {
-      anchorPane.requestLayout()
-    }
+    ()
   }
 
   def updateSeries(seriesValues: Seq[ChartSeriesData], replace: Boolean = false, keepCenter: Boolean = true): Unit = {
@@ -1149,7 +1218,7 @@ class ChartHandler[A <: ChartMark](
 
 object ChartHandler {
 
-  class Marker {
+  class Marker(var date: LocalDate) {
     val icon: Graphics.SVGGroup = Icons.mapPin()
     val region: Region = icon.pane
     region.setFocusTraversable(false)
@@ -1160,16 +1229,43 @@ object ChartHandler {
     verticalLine.setVisible(true)
     verticalLine.setDisable(true)
 
+    var tooltip = Option.empty[Tooltip]
+
+    def setupTooltip(text: Option[String]): Unit = {
+      // Remove any installed tooltip before installing a new one.
+      // This is necessary when re-using an existing marker.
+      resetTooltip()
+      text match {
+        case Some(s) ⇒
+          val tt = new Tooltip(s)
+          tooltip = Some(tt)
+          Tooltip.install(icon.group, tt)
+
+        case None ⇒
+          // No tooltip to install
+      }
+    }
+
+    private def resetTooltip(): Unit = {
+      tooltip.foreach(Tooltip.uninstall(icon.group, _))
+      tooltip = None
+    }
+
     private var cancellable = Option.empty[Cancellable]
 
     def setup(cancellable: Cancellable): Unit = {
-      reset()
+      resetCancellable()
       this.cancellable = Some(cancellable)
     }
 
-    def reset(): Unit = {
+    private def resetCancellable(): Unit = {
       cancellable.foreach(_.cancel)
       cancellable = None
+    }
+
+    def reset(): Unit = {
+      resetCancellable()
+      resetTooltip()
     }
 
   }
