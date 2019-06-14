@@ -87,6 +87,8 @@ class AccountHistoryController extends StageLocationPersistentView(AccountHistor
 
   protected var stage: Stage = _
 
+  private var chartMarks: Map[LocalDate, HistoryMark] = Map.empty
+
   private var chartHandler: Option[ChartHandler[HistoryMark]] = None
 
   // Full history events
@@ -483,11 +485,11 @@ class AccountHistoryController extends StageLocationPersistentView(AccountHistor
       ChartSeriesData(data.date, data.grossAmount)
     }
     // Converts useful history events (root items with date) into marks.
-    val marks = historyTable.getRoot.getChildren.asScala.toList.map(_.getValue).filter(_.date.isDefined).groupBy(_.date.get).map {
+    chartMarks = historyTable.getRoot.getChildren.asScala.toList.map(_.getValue).filter(_.date.isDefined).groupBy(_.date.get).map {
       case (date, items) => date -> HistoryMark(date, items)
     }
     val meta = ChartMeta(
-      marks = marks,
+      marks = chartMarks.filter(_._2.items.exists(!_.event.isInstanceOf[Savings.MakeTransfer])),
       marksHandler = onMarkEvent,
       mouseHandler = onMouseEvent
     )
@@ -524,11 +526,11 @@ class AccountHistoryController extends StageLocationPersistentView(AccountHistor
     case e: Savings.MakePayment =>
       List(
         // $1=amount $2=fund $3=scheme
-        AssetEventItem(index, e.date, Strings.assetEventPaymentMain.format(
+        AssetEventItem(event, index, e.date, Strings.assetEventPaymentMain.format(
           formatNumber(e.part.amount(e.part.value), currency),
           savings.getFund(e.part.fundId).name, savings.getScheme(e.part.schemeId).name), e.comment),
         // $1=units $2=NAV $3=availability
-        AssetEventItem(index, Strings.assetEventPaymentDetails1.format(
+        AssetEventItem(event, index, Strings.assetEventPaymentDetails1.format(
           formatNumber(e.part.units), formatNumber(e.part.value, currency),
           Form.formatAvailability(e.part.availability, Some(e.date))))
       )
@@ -536,16 +538,16 @@ class AccountHistoryController extends StageLocationPersistentView(AccountHistor
     case e: Savings.MakeTransfer =>
       List(
         // $1=src amount $2=src fund $3=src scheme $4=dst fund $5=dst scheme
-        AssetEventItem(index, e.date, Strings.assetEventTransferMain.format(
+        AssetEventItem(event, index, e.date, Strings.assetEventTransferMain.format(
           formatNumber(e.partSrc.amount(e.partSrc.value), currency),
           savings.getFund(e.partSrc.fundId).name, savings.getScheme(e.partSrc.schemeId).name,
           savings.getFund(e.partDst.fundId).name, savings.getScheme(e.partDst.schemeId).name), e.comment),
         // $1=src units $2=src NAV $3=src availability
-        AssetEventItem(index, Strings.assetEventTransferDetails1.format(
+        AssetEventItem(event, index, Strings.assetEventTransferDetails1.format(
           formatNumber(e.partSrc.units), formatNumber(e.partSrc.value, currency),
           Form.formatAvailability(e.partSrc.availability, Some(e.date)))),
         // $1=dst units $2=dst NAV $3=dst amount $4=dst availability
-        AssetEventItem(index, Strings.assetEventTransferDetails2.format(
+        AssetEventItem(event, index, Strings.assetEventTransferDetails2.format(
           formatNumber(e.partDst.units), formatNumber(e.partDst.value, currency),
           formatNumber(e.partDst.amount(e.partDst.value), currency),
           Form.formatAvailability(e.partDst.availability, Some(e.date))))
@@ -566,14 +568,14 @@ class AccountHistoryController extends StageLocationPersistentView(AccountHistor
         logger.info(s"action=<refund> date=<${e.date}> id=<${part.id}> nav=<${part.value}> totalUnits=<$totalUnits> units=<${part.units}> investedAmount=<$investedAmount> grossAmount=<$grossAmount> grossGain=<$grossGain> refundLevies=<$refundLevies> leviesAmount=<${refundLevies.amount}> leviesPct=<$leviesPct>")
       List(
         // $1=amount $2=fund $3=scheme
-        AssetEventItem(index, e.date, Strings.assetEventRefundMain.format(
+        AssetEventItem(event, index, e.date, Strings.assetEventRefundMain.format(
           formatNumber(part.amount(part.value), currency),
           savings.getFund(part.fundId).name, savings.getScheme(part.schemeId).name), e.comment),
         // $1=units $2=NAV
-        AssetEventItem(index, Strings.assetEventRefundDetails1.format(
+        AssetEventItem(event, index, Strings.assetEventRefundDetails1.format(
           formatNumber(part.units), formatNumber(part.value, currency))),
         // $1 = gross gain $2 = levies amount $3 = levies global rate
-        AssetEventItem(index, Strings.leviesEstimation.format(
+        AssetEventItem(event, index, Strings.leviesEstimation.format(
           formatNumber(grossGain, currency),
           formatNumber(leviesAmount, currency),
           formatNumber(leviesPct, "%")
@@ -585,7 +587,7 @@ class AccountHistoryController extends StageLocationPersistentView(AccountHistor
       val newName = e.name
       if (newName != oldName) {
         // $1=old name $2=new name
-        List(AssetEventItem(index, Strings.assetEventSchemeRenamed.format(oldName, newName)))
+        List(AssetEventItem(event, index, Strings.assetEventSchemeRenamed.format(oldName, newName)))
       } else Nil
 
     case e: Savings.UpdateFund =>
@@ -593,7 +595,7 @@ class AccountHistoryController extends StageLocationPersistentView(AccountHistor
       val newName = e.name
       if (newName != oldName) {
         // $1=old name $2=new name
-        List(AssetEventItem(index, Strings.assetEventFundRenamed.format(oldName, newName)))
+        List(AssetEventItem(event, index, Strings.assetEventFundRenamed.format(oldName, newName)))
       } else Nil
 
     case _ =>
@@ -604,9 +606,10 @@ class AccountHistoryController extends StageLocationPersistentView(AccountHistor
     for {
       item <- itemOpt
       date <- item.getValue.date
-      chartHandler <- this.chartHandler
+      chartHandler <- chartHandler
+      mark <- chartMarks.get(date)
     } {
-      chartHandler.highlightMark(date)
+      chartHandler.highlightMark(mark)
       showAccountDetails(date)
     }
   }
@@ -694,7 +697,7 @@ object AccountHistoryController {
 
   def title: String = Strings.accountHistory
 
-  case class AssetEventItem(index: Int, date: Option[LocalDate], desc: String, comment: Option[String]) extends Ordered[AssetEventItem] {
+  case class AssetEventItem(event: Savings.Event, index: Int, date: Option[LocalDate], desc: String, comment: Option[String]) extends Ordered[AssetEventItem] {
     var row: Option[TreeTableRow[AssetEventItem]] = None
 
     // Define order for items: by index then date
@@ -705,11 +708,11 @@ object AccountHistoryController {
 
   object AssetEventItem {
 
-    def apply(index: Int, date: LocalDate, desc: String, comment: Option[String]): AssetEventItem =
-      AssetEventItem(index, Some(date), desc, comment)
+    def apply(event: Savings.Event, index: Int, date: LocalDate, desc: String, comment: Option[String]): AssetEventItem =
+      AssetEventItem(event, index, Some(date), desc, comment)
 
-    def apply(index: Int, desc: String): AssetEventItem =
-      AssetEventItem(index, None, desc, None)
+    def apply(event: Savings.Event, index: Int, desc: String): AssetEventItem =
+      AssetEventItem(event, index, None, desc, None)
 
   }
 

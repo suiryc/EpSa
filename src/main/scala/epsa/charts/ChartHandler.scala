@@ -475,22 +475,37 @@ class ChartHandler[A <: ChartMark](
 
   /** Highlights requested mark. */
   def highlightMark(date: LocalDate): Unit = {
+    markers.get(date).foreach(highlightMark(_))
+  }
+
+  def highlightMark(mark: A): Unit = {
+    markers.get(mark.date) match {
+      case Some(marker) ⇒ highlightMark(marker)
+      case None         ⇒ highlightMark(mark.date, Some(mark))
+    }
+  }
+
+  private def highlightMark(marker: Marker, onDone: ⇒ Unit = {}): Unit = {
+    val viewedBounds = getChartBackgroundViewedBounds()
+    val nodes = List(marker.verticalLine, marker.region)
+
+    // Make sure the marker is visible (and scroll to center on it if not).
+    val xIdx = xAxisWrapper.dateToNumber(marker.date)
+    val x = getX(getChartBackgroundBounds, xIdx)
+    if ((x <= viewedBounds.getMinX) || (x >= viewedBounds.getMaxX)) {
+      centerOnXIdx(xIdx)
+    }
+
+    animationHighlighter = Some(JFXStyles.highlightAnimation(nodes, animationHighlighter, onDone))
+  }
+
+  private def highlightMark(date: LocalDate, mark: Option[A]): Unit = {
     markers.get(date) match {
       case Some(marker) ⇒
-        val viewedBounds = getChartBackgroundViewedBounds()
-        val nodes = List(marker.verticalLine, marker.region)
-
-        // Make sure the marker is visible (and scroll to center on it if not).
-        val xIdx = xAxisWrapper.dateToNumber(date)
-        val x = getX(getChartBackgroundBounds, xIdx)
-        if ((x <= viewedBounds.getMinX) || (x >= viewedBounds.getMaxX)) {
-          centerOnXIdx(xIdx)
-        }
-
-        animationHighlighter = Some(JFXStyles.highlightAnimation(nodes, animationHighlighter))
+        highlightMark(marker)
 
       case None ⇒
-        meta.marks.get(date).foreach { mark ⇒
+        mark.foreach { mark ⇒
           val bounds = getChartBackgroundBounds
           val xIdx = xAxisWrapper.dateToNumber(mark.date)
           val (x, y) = getXY(bounds, xIdx)
@@ -505,19 +520,13 @@ class ChartHandler[A <: ChartMark](
           marker.region.setTranslateX(Nodes.pixelCenter(x - icon.bounds.getWidth / 2))
 
           refreshMarker(bounds, marker, y, force = true)
-          val viewedBounds = getChartBackgroundViewedBounds()
+
           val nodes = List(marker.verticalLine, marker.region)
-
           anchorPane.getChildren.addAll(nodes:_*)
-          // Make sure the marker is visible (and scroll to center on it if not).
-          if ((x <= viewedBounds.getMinX) || (x >= viewedBounds.getMaxX)) {
-            centerOnXIdx(xIdx)
-          }
-
-          animationHighlighter = Some(JFXStyles.highlightAnimation(nodes, animationHighlighter, {
+          highlightMark(marker, {
             anchorPane.getChildren.removeAll(nodes:_*)
             ()
-          }))
+          })
         }
     }
   }
