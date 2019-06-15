@@ -2,7 +2,6 @@ package epsa.charts
 
 import epsa.Main
 import epsa.Settings.formatNumber
-import epsa.controllers.Images
 import epsa.util.{Icons, JFXStyles}
 import epsa.util.JFXStyles.AnimationHighlighter
 import java.time.LocalDate
@@ -11,7 +10,6 @@ import javafx.beans.property.{ObjectProperty, SimpleObjectProperty}
 import javafx.geometry.Bounds
 import javafx.scene.chart.{LineChart, NumberAxis, XYChart}
 import javafx.scene.control._
-import javafx.scene.image.ImageView
 import javafx.scene.input.{MouseButton, MouseEvent, ScrollEvent}
 import javafx.scene.layout.{AnchorPane, Region}
 import javafx.scene.shape.{Line, Rectangle}
@@ -224,7 +222,7 @@ class ChartHandler[A <: ChartMark](
   // of values.
   private val zoomNode = new Hyperlink()
   zoomNode.getStyleClass.add("chart-zoom-level")
-  zoomNode.setGraphic(new ImageView(Images.iconMagnifierZoom))
+  zoomNode.setGraphic(Icons.searchPlus().pane)
   // Don't allow focus
   zoomNode.setFocusTraversable(false)
   xZoomProperty.listen { v =>
