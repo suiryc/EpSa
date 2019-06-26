@@ -2,18 +2,18 @@ import sbt._
 import Keys._
 
 lazy val versions = Map[String, String](
-  "akka"          -> "2.5.21",
+  "akka"          -> "2.5.23",
   "epsa"          -> "1.1-SNAPSHOT",
   "h2"            -> "1.4.199",
   "html-cleaner"  -> "2.22",
-  "httpclient"    -> "4.5.7",
+  "httpclient"    -> "4.5.9",
   "javafx"        -> "12.0.1",
   "logback"       -> "1.2.3",
-  "monix"         -> "3.0.0-RC2",
-  "poi"           -> "4.0.1",
+  "monix"         -> "3.0.0-RC3",
+  "poi"           -> "4.1.0",
   "scala"         -> "2.12.8",
   "scala-logging" -> "3.9.2",
-  "scalatest"     -> "3.0.5",
+  "scalatest"     -> "3.0.8",
   "scopt"         -> "3.7.1",
   "slf4j"         -> "1.7.26",
   "slick"         -> "3.3.0",
