@@ -3,6 +3,7 @@ import Keys._
 
 lazy val versions = Map[String, String](
   "akka"          -> "2.5.23",
+  "config"        -> "1.3.4",
   "epsa"          -> "1.1-SNAPSHOT",
   "h2"            -> "1.4.199",
   "html-cleaner"  -> "2.22",
@@ -74,6 +75,7 @@ lazy val epsa = project.in(file(".")).
       "ch.qos.logback"              %  "logback-classic"                   % versions("logback"),
       "com.github.scopt"            %% "scopt"                             % versions("scopt"),
       "com.h2database"              %  "h2"                                % versions("h2"),
+      "com.typesafe"                %  "config"                            % versions("config"),
       "com.typesafe.akka"           %% "akka-actor"                        % versions("akka"),
       "com.typesafe.akka"           %% "akka-slf4j"                        % versions("akka"),
       "com.typesafe.akka"           %% "akka-stream"                       % versions("akka"),
