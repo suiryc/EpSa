@@ -11,11 +11,11 @@ import javafx.scene.image.ImageView
 import suiryc.scala.javafx.scene.control.{CellWithSeparator, ListCellEx, TableCellEx}
 
 class SchemeCell extends ListCell[Option[Savings.Scheme]] with CellWithSeparator[Savings.Scheme] {
-  override protected def itemText(item: Savings.Scheme) = item.name
+  override protected def itemText(item: Savings.Scheme): String = item.name
 }
 
 class FundCell extends ListCell[Option[Savings.Fund]] with CellWithSeparator[Savings.Fund] {
-  override protected def itemText(item: Savings.Fund) = item.name
+  override protected def itemText(item: Savings.Fund): String = item.name
 }
 
 class SchemeAndFundCell extends ListCell[Option[SchemeAndFund]] with CellWithSeparator[SchemeAndFund] {
@@ -23,15 +23,15 @@ class SchemeAndFundCell extends ListCell[Option[SchemeAndFund]] with CellWithSep
 }
 
 class AvailabilityListCell(baseOpt: Option[LocalDate]) extends ListCellEx[Option[LocalDate]] {
-  override protected def itemText(item: Option[LocalDate]) = Form.formatAvailability(item, baseOpt)
+  override protected def itemText(item: Option[LocalDate]): String = Form.formatAvailability(item, baseOpt)
 }
 
 class UnavailabilityPeriodCell extends ListCellEx[Savings.UnavailabilityPeriod] {
-  override protected def itemText(item: Savings.UnavailabilityPeriod) = item.id
+  override protected def itemText(item: Savings.UnavailabilityPeriod): String = item.id
 }
 
 class MonthListCell extends ListCellEx[Option[Month]] {
-  override protected def itemText(item: Option[Month]) =
+  override protected def itemText(item: Option[Month]): String =
     item.map { month =>
       val name = month.getDisplayName(TextStyle.FULL, Locale.getDefault)
       "%02d - %s".format(month.getValue, name.capitalize)
@@ -39,12 +39,12 @@ class MonthListCell extends ListCellEx[Option[Month]] {
 }
 
 class FormatCell[A, B](format: B => String) extends TableCellEx[A, B] {
-  override protected def itemText(item: B) = format(item)
+  override protected def itemText(item: B): String = format(item)
 }
 
 trait ColoredCell[A] extends Cell[A] {
   def value(a: A): Option[BigDecimal]
-  override protected def updateItem(item: A, empty: Boolean) {
+  override protected def updateItem(item: A, empty: Boolean): Unit = {
     super.updateItem(item, empty)
     (if (empty) None else Some(item)).flatMap(value).find(_ != 0) match {
       case Some(v) =>
@@ -62,7 +62,7 @@ trait WarningCell[A] extends Cell[A] {
   setContentDisplay(ContentDisplay.RIGHT)
 
   def warning(a: A): Option[String]
-  override protected def updateItem(item: A, empty: Boolean) {
+  override protected def updateItem(item: A, empty: Boolean): Unit = {
     super.updateItem(item, empty)
     (if (empty) None else Some(item)).flatMap(warning) match {
       case Some(v) =>

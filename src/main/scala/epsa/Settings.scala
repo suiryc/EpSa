@@ -1,6 +1,6 @@
 package epsa
 
-import java.math.{BigDecimal ⇒ jBigDecimal}
+import java.math.{BigDecimal => jBigDecimal}
 import java.nio.file.Path
 import java.text.{DecimalFormat, NumberFormat, ParsePosition}
 import java.util.Locale

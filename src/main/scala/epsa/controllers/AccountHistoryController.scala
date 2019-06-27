@@ -283,7 +283,7 @@ class AccountHistoryController extends StageLocationPersistentView(AccountHistor
       val rows = items.flatMap(_.getValue.row)
 
       // Make sure the table entry is visible.
-      items.map(historyTable.getRow).filter(_ >= 0).sorted.headOption.foreach { index ⇒
+      items.map(historyTable.getRow).filter(_ >= 0).sorted.headOption.foreach { index =>
         TableViews.scrollTo(historyTable, index, top = true, padding = 1)
       }
 
@@ -516,7 +516,7 @@ class AccountHistoryController extends StageLocationPersistentView(AccountHistor
       AnchorPane.setBottomAnchor(pane, 0.0)
       AnchorPane.setLeftAnchor(pane, 0.0)
       this.chartHandler = Some(chartHandler)
-      grossHistory.lastOption.foreach { last ⇒
+      grossHistory.lastOption.foreach { last =>
         chartHandler.centerOnDate(last.date, track = true)
       }
     }

@@ -657,7 +657,7 @@ case class Savings(
     }
 
   def processEvents(events: Savings.Event*)(implicit d: DummyImplicit): Savings =
-    processEvents(events)
+    processEvents(events.toSeq)
 
   def processEvent(event: Event): Savings = event match {
     case CreateScheme(id, name, comment)                => createScheme(id, name, comment)

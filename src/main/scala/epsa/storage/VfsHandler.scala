@@ -45,7 +45,7 @@ object VfsHandler extends StrictLogging {
    */
   def sync(path: Path): Unit = {
     FileUtils.createDirectories(path.toString)
-    pathVirtual.newDirectoryStream.asScala.foreach { filepath ⇒
+    pathVirtual.newDirectoryStream.asScala.foreach { filepath =>
       if (filepath.isDirectory) {
         logger.warn(s"Found directory path=<$filepath> inside virtual space")
       } else {
@@ -56,7 +56,7 @@ object VfsHandler extends StrictLogging {
 
   /** Copies file content. */
   def transfer(src: FilePath, dst: FilePath): Unit = {
-    Using.Manager { use ⇒
+    Using.Manager { use =>
       val bb = ByteBuffer.allocate(512 * 1024)
       val in = use(src.open("r"))
       val out = use(dst.open("rw"))

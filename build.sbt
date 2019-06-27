@@ -17,7 +17,7 @@ lazy val versions = Map[String, String](
   "scalatest"     -> "3.0.8",
   "scopt"         -> "3.7.1",
   "slf4j"         -> "1.7.26",
-  "slick"         -> "3.3.0",
+  "slick"         -> "3.3.2",
   "simple-odf"    -> "0.8.2-incubating",
   "spray-json"    -> "1.3.5",
   "suiryc-scala"  -> "0.0.4-SNAPSHOT"
@@ -121,23 +121,23 @@ def remap(mappings: Seq[(File, String)]): Seq[(File, String)] = {
   val matchPath = "package"
   // Get all files to package, and determine the actual destination path
   val toPackage = mappings.filter {
-    case (_, dst) ⇒ (dst != matchPath) && Path(dst).asPath.startsWith(matchPath)
+    case (_, dst) => (dst != matchPath) && Path(dst).asPath.startsWith(matchPath)
   }.map {
-    case (src, dst) ⇒
+    case (src, dst) =>
       val dstPath = Path(dst).asPath
-      src → dstPath.getParent.resolveSibling(dstPath.getFileName).toString
+      src -> dstPath.getParent.resolveSibling(dstPath.getFileName).toString
   }
   val toPackageSrc = toPackage.map(_._1).toSet
   val toPackageDst = toPackage.map(_._2).toSet
   // Replace mappings that we are explicitly packaging
   mappings.filter {
-    case (src, dst) ⇒ !toPackageSrc.contains(src) && !toPackageDst.contains(dst) && !exclude.contains(dst)
+    case (src, dst) => !toPackageSrc.contains(src) && !toPackageDst.contains(dst) && !exclude.contains(dst)
   } ++ toPackage
 }
 
 // Replace mappings for fat jar generation
 assembledMappings in assembly ~= { mappings =>
-  mappings.map { m ⇒
+  mappings.map { m =>
     if (m.sourcePackage.isEmpty) m.copy(mappings = remap(m.mappings).toVector)
     else m
   }
@@ -145,7 +145,7 @@ assembledMappings in assembly ~= { mappings =>
 
 assemblyMergeStrategy in assembly := {
   case "module-info.class" => MergeStrategy.discard
-  case x if x.startsWith("application.conf") ⇒ MergeStrategy.discard
+  case x if x.startsWith("application.conf") => MergeStrategy.discard
   case x if x.startsWith("library.properties") => MergeStrategy.discard
   case PathList("javax", "xml", _ @ _*) => MergeStrategy.first
   case x => (assemblyMergeStrategy in assembly).value.apply(x)
@@ -170,7 +170,7 @@ install := {
     Path("C:\\") / "Progs" / "EpSa"
   }
   sLog.value.info(s"Copying files to: $targetFolder")
-  List(jar).foreach { src ⇒
+  List(jar).foreach { src =>
     val targetPath = targetFolder / src.getName
     IO.copyFile(src, targetPath.asFile)
   }

@@ -266,7 +266,7 @@ object DataStore {
       case Some(dbInfo) =>
         getDBTemp.flatMap { tmp =>
           copyDB(tmp.db, dbInfo.db)
-        }.map { _ ⇒
+        }.map { _ =>
           sync(dbInfo)
         }.andThen {
           case _ => closeTempDB()
@@ -566,12 +566,12 @@ object DataStore {
     )
 
     // Note: there are 2 ways to associate a case class to a table:
-    // http://slick.typesafe.com/doc/3.1.0/schemas.html#mapped-tables
-    // http://slick.typesafe.com/doc/3.1.0/userdefined.html#monomorphic-case-classes
+    // http://slick.typesafe.com/doc/3.3.2/schemas.html#mapped-tables
+    // http://slick.typesafe.com/doc/3.3.2/userdefined.html#monomorphic-case-classes
     // The monomorphic variant compiles but IntelliJ complains for the '*'
     // function type.
     // In our case, we mix column and case class:
-    // http://slick.typesafe.com/doc/3.1.0/userdefined.html#combining-mapped-types
+    // http://slick.typesafe.com/doc/3.3.2/userdefined.html#combining-mapped-types
 
     protected case class Entry(fundId: UUID, assetValue: Savings.AssetValue)
 
@@ -638,7 +638,7 @@ object DataStore {
     }
 
     def writeValues(fundId: UUID, values: Savings.AssetValue*)(implicit d: DummyImplicit): Future[Unit] =
-      writeValues(fundId, values)
+      writeValues(fundId, values.toSeq)
 
     def deleteValues(fundId: UUID): Future[Int] = {
       def delete(db: DatabaseDef): Future[Int] =

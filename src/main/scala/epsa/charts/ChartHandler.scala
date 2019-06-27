@@ -206,7 +206,7 @@ class ChartHandler[A <: ChartMark](
   /** Chart background. */
   private val chartBg = chart.lookup(".chart-plot-background").asInstanceOf[Region]
   /** Gets, and caches, chart background bounds. */
-  private val chartBgBounds = Cached { () ⇒ BoundsEx.getBounds(chartBg, anchorPane) }
+  private val chartBgBounds = Cached { () => BoundsEx.getBounds(chartBg, anchorPane) }
   // Listen to chart background changes to invalidate cached bounds value.
   chartBg.boundsInParentProperty.listen {
     chartBgBounds.invalidate()
@@ -350,7 +350,7 @@ class ChartHandler[A <: ChartMark](
   }
 
   /** Gets, and caches, chart background viewed bounds. */
-  private val chartBgViewedBounds = Cached { () ⇒ BoundsEx.getViewedBounds(chartPane) }
+  private val chartBgViewedBounds = Cached { () => BoundsEx.getViewedBounds(chartPane) }
   // Listen to chart background changes to invalidate cached bounds value.
   chartPane.viewportBoundsProperty.listen {
     chartBgViewedBounds.invalidate()
@@ -461,12 +461,12 @@ class ChartHandler[A <: ChartMark](
 
   def highlightMark(mark: A): Unit = {
     markers.get(mark.date) match {
-      case Some(marker) ⇒ highlightMark(marker)
-      case None         ⇒ highlightMark(mark.date, Some(mark))
+      case Some(marker) => highlightMark(marker)
+      case None         => highlightMark(mark.date, Some(mark))
     }
   }
 
-  private def highlightMark(marker: Marker, onDone: ⇒ Unit = {}): Unit = {
+  private def highlightMark(marker: Marker, onDone: => Unit = {}): Unit = {
     val viewedBounds = chartBgViewedBounds.value
     val nodes = List(marker.verticalLine, marker.region)
 
@@ -482,11 +482,11 @@ class ChartHandler[A <: ChartMark](
 
   private def highlightMark(date: LocalDate, mark: Option[A]): Unit = {
     markers.get(date) match {
-      case Some(marker) ⇒
+      case Some(marker) =>
         highlightMark(marker)
 
-      case None ⇒
-        mark.foreach { mark ⇒
+      case None =>
+        mark.foreach { mark =>
           val bounds = chartBgBounds.value
           val xIdx = xAxisWrapper.dateToNumber(mark.date)
           val (x, y) = getXY(bounds, xIdx)
@@ -512,7 +512,7 @@ class ChartHandler[A <: ChartMark](
     }
   }
 
-  private def refreshMarker(bounds: Bounds, marker: Marker, y: Double, force: Boolean) {
+  private def refreshMarker(bounds: Bounds, marker: Marker, y: Double, force: Boolean): Unit = {
     // Check marker and zoom bounds to prevent collision
     val markBounds = marker.region.getBoundsInParent
     val zoomBounds = zoomNode.getBoundsInParent
@@ -564,7 +564,7 @@ class ChartHandler[A <: ChartMark](
     markers = Map.empty
     def cleanupOldMarkers(): Unit = {
       // We can still reset/hide the marker before removing them
-      markersOld.foreach { marker ⇒
+      markersOld.foreach { marker =>
         marker.region.setVisible(false)
         marker.verticalLine.setVisible(false)
         // It is necessary to remove listener otherwise it keeps getting
@@ -573,7 +573,7 @@ class ChartHandler[A <: ChartMark](
       }
       if (markersOld.nonEmpty) JFXSystem.runLater {
         anchorPane.getChildren.removeAll {
-          markersOld.flatMap { marker ⇒
+          markersOld.flatMap { marker =>
             List(marker.verticalLine, marker.region)
           }.asJava
         }
@@ -581,7 +581,7 @@ class ChartHandler[A <: ChartMark](
       }
     }
     def newMarker(date: LocalDate): Marker = {
-      markersOld.headOption.map { marker ⇒
+      markersOld.headOption.map { marker =>
         markersOld = markersOld.tail
         // Cancel any listener on the marker before reusing it
         marker.reset()
@@ -597,7 +597,7 @@ class ChartHandler[A <: ChartMark](
     val bounds = chartBgBounds.value
     case class MarkersBuilding(markers: Map[LocalDate, Marker] = Map.empty, previous: Option[Marker] = None) {
       def add(marker: Marker): MarkersBuilding = copy(
-        markers = markers + (marker.date → marker),
+        markers = markers + (marker.date -> marker),
         previous = Some(marker)
       )
     }
@@ -606,12 +606,12 @@ class ChartHandler[A <: ChartMark](
       val (x, y) = getXY(bounds, xIdx)
       val pixelCenterX = Nodes.pixelCenter(x)
 
-      val markComment = mark.comment.map { comment ⇒
+      val markComment = mark.comment.map { comment =>
         s"${dateFormatter.format(mark.date)}\n${comment.trim}"
       }
-      building.previous.filter { previous ⇒
+      building.previous.filter { previous =>
         pixelCenterX <= previous.verticalLine.getStartX + 2 * previous.icon.groupBoundsInParent.getWidth / 3
-      }.map { previous ⇒
+      }.map { previous =>
         // New marker would overlap previous one: re-use previous marker and
         // update its tooltip when applicable.
         previous.setupTooltip {
@@ -1230,12 +1230,12 @@ object ChartHandler {
       // This is necessary when re-using an existing marker.
       resetTooltip()
       text match {
-        case Some(s) ⇒
+        case Some(s) =>
           val tt = new Tooltip(s)
           tooltip = Some(tt)
           Tooltip.install(icon.group, tt)
 
-        case None ⇒
+        case None =>
           // No tooltip to install
       }
     }

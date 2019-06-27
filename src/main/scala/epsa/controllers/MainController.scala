@@ -1008,7 +1008,7 @@ object MainController {
   )
 
   trait TabWithState {
-    def refresh(data: RefreshData)
+    def refresh(data: RefreshData): Unit
   }
 
   case class Refresh(reload: Boolean)

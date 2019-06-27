@@ -32,7 +32,7 @@ object Main extends JFXLauncher[MainApp] {
       opt[String]("debug").unbounded.foreach { v =>
         Settings.debugParams ++= v.split(',').toList.map(Debug.withName).toSet
       }
-      opt[Boolean]("io-capture").action { (v, c) ⇒
+      opt[Boolean]("io-capture").action { (v, c) =>
         c.copy(ioCapture = Some(v))
       }
       opt[Unit]("version").foreach { _ =>
@@ -46,7 +46,7 @@ object Main extends JFXLauncher[MainApp] {
     }
 
     parser.parse(args, Params()) match {
-      case Some(params) ⇒
+      case Some(params) =>
         // Redirect stdout/stderr to logs.
         // Note: scala 'Console' stores the current 'in/out/err' value. So
         // better not trigger it before redirecting streams. (methods to change
@@ -55,7 +55,7 @@ object Main extends JFXLauncher[MainApp] {
         // 'launch' does not return until application is closed
         super.main(args)
 
-      case None ⇒
+      case None =>
         sys.exit(1)
     }
   }
@@ -82,7 +82,7 @@ object Main extends JFXLauncher[MainApp] {
 
 class MainApp extends JFXApplication {
 
-  override def start(stage: Stage) {
+  override def start(stage: Stage): Unit = {
     I18N.loadLocale()
 
     def startController(): Unit = {

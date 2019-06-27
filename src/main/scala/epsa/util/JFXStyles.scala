@@ -6,7 +6,7 @@ import javafx.event.ActionEvent
 import javafx.scene.{Node, Scene}
 import javafx.scene.control.{Control, Tooltip}
 import javafx.scene.image.ImageView
-import javafx.util.{Duration ⇒ jfxDuration}
+import javafx.util.{Duration => jfxDuration}
 import suiryc.scala.javafx.css.Styleables
 import suiryc.scala.javafx.scene.{Styles, StylesFeat}
 
@@ -88,7 +88,7 @@ object JFXStyles extends StylesFeat {
     }
   }
 
-  def highlightAnimation(nodes: List[Node], animationHighlighter: Option[AnimationHighlighter], onDone: ⇒ Unit = {}): AnimationHighlighter = {
+  def highlightAnimation(nodes: List[Node], animationHighlighter: Option[AnimationHighlighter], onDone: => Unit = {}): AnimationHighlighter = {
     def toggle(active: Boolean): Unit =
       nodes.foreach { node =>
         toggleAnimationHighlight(node, active)
@@ -100,7 +100,7 @@ object JFXStyles extends StylesFeat {
       new KeyFrame(jfxDuration.seconds(1.0), { _: ActionEvent => toggle(active = false) })
     )
     timeline.setCycleCount(3)
-    timeline.setOnFinished { _ ⇒
+    timeline.setOnFinished { _ =>
       onDone
     }
     AnimationHighlighter(nodes, timeline, () => {
