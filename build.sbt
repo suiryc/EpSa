@@ -53,18 +53,11 @@ lazy val epsa = project.in(file(".")).
       "-feature",
       "-unchecked",
       "-Xfatal-warnings",
-      "-Xlint",
-      "-Yno-adapted-args",
+      "-Xlint:_",
+      "-Ywarn-dead-code",
       "-Ywarn-numeric-widen",
-      "-Ywarn-value-discard",
-      "-Ywarn-inaccessible",
-      "-Ywarn-infer-any",
-      // Compiler warns of dead code after FXMLLoader.load ...
-      //"-Ywarn-dead-code",
-      "-Ywarn-nullary-override",
-      "-Ywarn-nullary-unit",
-      "-Ywarn-unused",
-      "-Ywarn-unused-import"
+      "-Ywarn-unused:_",
+      "-Ywarn-value-discard"
     ),
     resolvers += Resolver.mavenLocal,
 

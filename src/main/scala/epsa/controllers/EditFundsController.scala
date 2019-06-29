@@ -560,7 +560,7 @@ object EditFundsController {
     dialog.getDialogPane.getButtonTypes.addAll(ButtonType.OK, ButtonType.CANCEL)
 
     val loader = new FXMLLoader(getClass.getResource("/fxml/edit-funds.fxml"), I18N.getResources)
-    dialog.getDialogPane.setContent(loader.load())
+    dialog.getDialogPane.setContent(loader.load[Node]())
     val controller = loader.getController[EditFundsController]
     controller.initialize(savings, dialog, edit)
 

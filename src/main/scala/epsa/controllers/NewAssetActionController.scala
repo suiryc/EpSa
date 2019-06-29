@@ -899,7 +899,7 @@ object NewAssetActionController {
     dialog.getDialogPane.getButtonTypes.addAll(ButtonType.OK, ButtonType.CANCEL)
 
     val loader = new FXMLLoader(getClass.getResource("/fxml/new-asset-action.fxml"), I18N.getResources)
-    dialog.getDialogPane.setContent(loader.load())
+    dialog.getDialogPane.setContent(loader.load[Node]())
     val controller = loader.getController[NewAssetActionController]
     controller.initialize(mainController, savings, dialog, kind, asset)
 

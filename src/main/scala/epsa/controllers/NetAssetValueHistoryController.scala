@@ -15,7 +15,7 @@ import javafx.beans.property.SimpleObjectProperty
 import javafx.collections.FXCollections
 import javafx.event.{ActionEvent, Event}
 import javafx.fxml.{FXML, FXMLLoader}
-import javafx.scene.{Parent, Scene}
+import javafx.scene.{Node, Parent, Scene}
 import javafx.scene.control._
 import javafx.scene.input.MouseEvent
 import javafx.scene.layout.AnchorPane
@@ -609,7 +609,7 @@ object NetAssetValueHistoryController {
     dialog.getDialogPane.getButtonTypes.addAll(ButtonType.OK, ButtonType.CANCEL)
 
     val loader = new FXMLLoader(getClass.getResource("/fxml/net-asset-value-history.fxml"), I18N.getResources)
-    dialog.getDialogPane.setContent(loader.load())
+    dialog.getDialogPane.setContent(loader.load[Node]())
     stage.getScene.getStylesheets.add(getClass.getResource("/css/main.css").toExternalForm)
     JFXStyles.addStylesheet(stage.getScene)
     val controller = loader.getController[NetAssetValueHistoryController]

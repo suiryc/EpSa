@@ -378,7 +378,7 @@ object EditUnavailabilityPeriodsController {
     dialog.getDialogPane.getButtonTypes.addAll(ButtonType.OK, ButtonType.CANCEL)
 
     val loader = new FXMLLoader(getClass.getResource("/fxml/edit-unavailability-periods.fxml"), I18N.getResources)
-    dialog.getDialogPane.setContent(loader.load())
+    dialog.getDialogPane.setContent(loader.load[Node]())
     val controller = loader.getController[EditUnavailabilityPeriodsController]
     controller.initialize(dialog)
 

@@ -13,7 +13,7 @@ import java.time.LocalDate
 import java.util.UUID
 import javafx.beans.property.SimpleObjectProperty
 import javafx.fxml.{FXML, FXMLLoader}
-import javafx.scene.Scene
+import javafx.scene.{Parent, Scene}
 import javafx.scene.control._
 import javafx.scene.image.ImageView
 import javafx.scene.input.MouseEvent
@@ -737,7 +737,7 @@ object AccountHistoryController {
     stage.setTitle(title)
 
     val loader = new FXMLLoader(getClass.getResource("/fxml/account-history.fxml"), I18N.getResources)
-    stage.setScene(new Scene(loader.load()))
+    stage.setScene(new Scene(loader.load[Parent]()))
     stage.getScene.getStylesheets.add(getClass.getResource("/css/main.css").toExternalForm)
     SplitPaneSkinEx.addStylesheet(stage.getScene)
     val controller = loader.getController[AccountHistoryController]

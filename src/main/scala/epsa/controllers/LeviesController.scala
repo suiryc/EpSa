@@ -190,7 +190,7 @@ object LeviesController {
     dialog.getDialogPane.getButtonTypes.addAll(ButtonType.OK, ButtonType.CANCEL)
 
     val loader = new FXMLLoader(getClass.getResource("/fxml/levies.fxml"), I18N.getResources)
-    dialog.getDialogPane.setContent(loader.load())
+    dialog.getDialogPane.setContent(loader.load[Node]())
     val controller = loader.getController[LeviesController]
     controller.initialize(savings, dialog)
 

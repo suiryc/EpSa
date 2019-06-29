@@ -170,7 +170,7 @@ object OptionsController {
     val snapshot = new SettingsSnapshot()
 
     val loader = new FXMLLoader(getClass.getResource("/fxml/options.fxml"), I18N.getResources)
-    dialog.getDialogPane.setContent(loader.load())
+    dialog.getDialogPane.setContent(loader.load[Node]())
     val controller = loader.getController[OptionsController]
     controller.initialize(dialog, snapshot)
 
