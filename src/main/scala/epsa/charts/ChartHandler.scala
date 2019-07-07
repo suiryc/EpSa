@@ -206,7 +206,7 @@ class ChartHandler[A <: ChartMark](
   /** Chart background. */
   private val chartBg = chart.lookup(".chart-plot-background").asInstanceOf[Region]
   /** Gets, and caches, chart background bounds. */
-  private val chartBgBounds = Cached { () => BoundsEx.getBounds(chartBg, anchorPane) }
+  private val chartBgBounds = Cached { BoundsEx.getBounds(chartBg, anchorPane) }
   // Listen to chart background changes to invalidate cached bounds value.
   chartBg.boundsInParentProperty.listen {
     chartBgBounds.invalidate()
@@ -350,7 +350,7 @@ class ChartHandler[A <: ChartMark](
   }
 
   /** Gets, and caches, chart background viewed bounds. */
-  private val chartBgViewedBounds = Cached { () => BoundsEx.getViewedBounds(chartPane) }
+  private val chartBgViewedBounds = Cached { BoundsEx.getViewedBounds(chartPane) }
   // Listen to chart background changes to invalidate cached bounds value.
   chartPane.viewportBoundsProperty.listen {
     chartBgViewedBounds.invalidate()
