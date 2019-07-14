@@ -473,7 +473,8 @@ class NetAssetValueHistoryController extends StageLocationPersistentView(NetAsse
           settings = ChartSettings.hidden.copy(
             xLabel = Strings.date,
             yLabel = Strings.nav,
-            ySuffix = Main.settings.currency.get
+            ySuffix = Main.settings.currency.get,
+            yPrecision = Main.settings.vwapScale.get
           )
         )
         val chartPane = chartHandler.chartPane

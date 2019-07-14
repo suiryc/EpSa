@@ -152,7 +152,8 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
       settings = ChartSettings.hidden.copy(
         xLabel = Strings.date,
         yLabel = Strings.nav,
-        ySuffix = Main.settings.currency.get
+        ySuffix = Main.settings.currency.get,
+        yPrecision = Main.settings.vwapScale.get
       )
     )
     val chartPane = chartHandler.chartPane
@@ -743,11 +744,12 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
           val values = Awaits.readDataStoreNAVs(state.stage, fund.id).getOrElse(Nil)
           // Only show non-empty series
           if (values.nonEmpty) {
-            if (chartHandler.series.getData.isEmpty) {
-              chartHandler.centerOnDate(values.last.date, track = true)
-            }
+            // For first chart, scroll to latest date.
+            // For next charts, keep viewed date.
+            val scrollLast = !chartHandler.hasValues
             chartHandler.setSeriesName(fund.name)
-            chartHandler.updateSeries(values, replace = true, keepCenter = false)
+            chartHandler.updateSeries(values, replace = true, keepCenter = !scrollLast)
+            if (scrollLast) chartHandler.centerOnDate(values.last.date, track = true)
             navHistoryPane.setVisible(true)
           } else {
             navHistoryPane.setVisible(false)

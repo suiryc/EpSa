@@ -500,7 +500,8 @@ class AccountHistoryController extends StageLocationPersistentView(AccountHistor
       settings = ChartSettings.hidden.copy(
         xLabel = Strings.date,
         yLabel = Strings.grossAmount,
-        ySuffix = Main.settings.currency.get
+        ySuffix = Main.settings.currency.get,
+        yPrecision = Main.settings.amountScale.get
       )
     )
 

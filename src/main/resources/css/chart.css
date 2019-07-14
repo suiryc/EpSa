@@ -100,12 +100,17 @@
   -fx-padding: 10px 5px 0px 0px;
 }
 
-/* Move up zoom node to add some space over chart top. */
-.custom-chart .chart-zoom-level {
-  -fx-translate-y: -1px;
+/* Move up controls node to add some space over chart top. */
+.custom-chart .chart-controls {
+  -fx-translate-y: -2px;
 }
 
 /* Remove underline on zoom level. */
 .custom-chart .chart-zoom-level:hover {
   -fx-underline: false;
+}
+
+/* Visual hint: 'mode' icon can be clicked. */
+.custom-chart .chart-controls .chart-mode {
+  -fx-cursor: hand;
 }
