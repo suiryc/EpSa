@@ -33,7 +33,7 @@ object JFXStyles extends StylesFeat {
   def toggleStyles(node: Control, msgOpt: Option[String], styles: Style*): Unit = {
     // Apply all style changes
     // Group by style and check whether at least one instance is set
-    styles.groupBy(_.pseudoClass).mapValues(_.exists(_.active)).foreach {
+    styles.groupBy(_.pseudoClass).view.mapValues(_.exists(_.active)).foreach {
       case (pseudoClass, set) => togglePseudoClass(node, pseudoClass, set)
     }
     // Get the first enabled style provided message, or the default one.

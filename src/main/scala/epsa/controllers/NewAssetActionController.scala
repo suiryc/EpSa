@@ -18,7 +18,7 @@ import javafx.scene.image.ImageView
 import javafx.scene.layout.HBox
 import javafx.stage.{Modality, Stage, Window}
 import javafx.util.converter.LocalDateStringConverter
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import suiryc.scala.javafx.stage.Stages.StageLocation
 import suiryc.scala.math.Ordered._
 import suiryc.scala.settings.ConfigEntry

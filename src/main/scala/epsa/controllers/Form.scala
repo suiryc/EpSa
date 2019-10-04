@@ -79,9 +79,7 @@ object Form {
 }
 
 object AssetActionKind extends Enumeration {
-  val Payment = Value
-  val Transfer = Value
-  val Refund = Value
+  val Payment, Transfer, Refund = Value
 }
 
 case class SchemeAndFund(scheme: Savings.Scheme, fund: Savings.Fund) extends Ordered[SchemeAndFund] {

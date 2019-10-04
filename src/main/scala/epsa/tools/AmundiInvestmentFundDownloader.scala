@@ -5,8 +5,8 @@ import epsa.util.Http
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import org.htmlcleaner.{HtmlCleaner, TagNode}
-import scala.collection.JavaConverters._
 import scala.concurrent.Future
+import scala.jdk.CollectionConverters._
 
 /**
  * Amundi investment fund file downloader.

@@ -11,8 +11,8 @@ import javafx.scene.chart.{LineChart, NumberAxis, XYChart}
 import javafx.scene.input.{MouseButton, MouseEvent, ScrollEvent}
 import javafx.scene.layout.{AnchorPane, HBox, Pane, Region}
 import javafx.scene.shape.{Line, Rectangle}
-import scala.collection.JavaConverters._
 import scala.concurrent.duration._
+import scala.jdk.CollectionConverters._
 import suiryc.scala.akka.CoreSystem
 import suiryc.scala.concurrent.Cancellable
 import suiryc.scala.javafx.beans.value.RichObservableValue

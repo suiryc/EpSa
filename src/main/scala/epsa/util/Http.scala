@@ -9,7 +9,7 @@ import org.apache.http.client.methods.{CloseableHttpResponse, HttpGet, HttpPost,
 import org.apache.http.impl.client.HttpClients
 import org.apache.http.message.BasicNameValuePair
 import org.apache.http.util.EntityUtils
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 /** HTTP helpers. */
 object Http {

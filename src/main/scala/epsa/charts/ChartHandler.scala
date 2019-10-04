@@ -157,6 +157,7 @@ class ChartHandler[A <: ChartMark](
   }
   setXZoom(BigDecimal(1))
   private val contextMenu = new ContextMenu()
+  @scala.annotation.tailrec
   private def loop(zoom: BigDecimal): Unit =
     if (zoom <= xZoomMax) {
       val menuItem = new MenuItem(formatNumber(scalePercents(zoom * 100), "%"))

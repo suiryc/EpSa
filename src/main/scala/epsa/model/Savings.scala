@@ -311,9 +311,9 @@ object Savings extends StrictLogging {
 
       case e: Savings.MakeRefund =>
         List(e.part.fundId -> Savings.AssetValue(e.date, e.part.value))
-    }.groupBy(_._1).mapValues { v =>
+    }.groupBy(_._1).view.mapValues { v =>
       v.map(_._2).sortBy(_.date)
-    }.view.force
+    }.toMap
   }
 
   /**
@@ -1286,7 +1286,7 @@ case class Savings(
         if (!Settings.debug(Debug.LeviesHistory)) None
         else Some(s"action date=<$date>: computing levies for nav=<$nav> totalUnits=<$totalUnits> and gross amount=<$grossAmount>")
       val computed = LeviesPeriodsData(
-        data = data.mapValues(_._1).view.force,
+        data = data.view.mapValues(_._1).toMap,
         debugInfo = leviesPeriodsData.debugInfo,
         warnings = leviesPeriodsData.warnings
       ).addDebugs(data.values.flatMap(_._2).toList ::: debug.toList)

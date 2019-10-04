@@ -20,9 +20,9 @@ import javafx.scene.control._
 import javafx.scene.input.MouseEvent
 import javafx.scene.layout.AnchorPane
 import javafx.stage._
-import scala.collection.JavaConverters._
 import scala.concurrent.Future
 import scala.concurrent.duration._
+import scala.jdk.CollectionConverters._
 import scala.util.{Failure, Success}
 import suiryc.scala.concurrent.RichFuture._
 import suiryc.scala.math.Ordered._
@@ -174,7 +174,7 @@ class NetAssetValueHistoryController extends StageLocationPersistentView(NetAsse
       val selectedFile = fileChooser.showOpenDialog(stage)
       Option(selectedFile).foreach { file =>
         val path = file.toPath
-        probers.toStream.map { prober =>
+        probers.to(LazyList).map { prober =>
           prober.probe(path)
         }.find(_.isDefined).flatten match {
           case Some(hist) =>
@@ -521,7 +521,7 @@ class NetAssetValueHistoryController extends StageLocationPersistentView(NetAsse
       table.setItems(FXCollections.observableList(entries.asJava))
     }
 
-    val current: Map[LocalDate, Savings.AssetValue] = result.current.groupBy(_.date).mapValues(_.head).view.force
+    val current: Map[LocalDate, Savings.AssetValue] = result.current.groupBy(_.date).view.mapValues(_.head).toMap
     val updatedEntries: Seq[AssetEntry] = result.fundChanges.changed.map { changed =>
       AssetEntry(changed.date, Seq(current(changed.date).value, changed.value))
     }

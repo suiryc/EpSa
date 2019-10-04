@@ -14,9 +14,9 @@ class LeviesSpec extends WordSpec with Matchers {
   import epsa.Main.Akka._
   import Levies.JsonProtocol._
 
-  protected val today = LocalDate.now
+  private val today = LocalDate.now
 
-  lazy protected val leviesComplex = buildLevies(s"""
+  lazy private val leviesComplex = buildLevies(s"""
   "name1": {
     "periods": [{ "rate": 0.5, "start": "2001-02-03" }]
   },
@@ -39,24 +39,24 @@ class LeviesSpec extends WordSpec with Matchers {
   protected val levy1 = "name1"
   protected val levy2 = "name2"
 
-  lazy protected val levies_1_1 = buildLevies(s"""
+  lazy private val levies_1_1 = buildLevies(s"""
   "$levy1": {
     "periods": [{ "rate": 10, "start": "2001-01-01" }]
   }""")
 
-  lazy protected val levies_1_1_end = buildLevies(s"""
+  lazy private val levies_1_1_end = buildLevies(s"""
   "$levy1": {
     "periods": [{ "rate": 10, "start": "2001-01-01", "end": "2009-12-31" }]
   }""")
 
-  lazy protected val levies_1_3 = buildLevies(s"""
+  lazy private val levies_1_3 = buildLevies(s"""
   "$levy1": {
     "periods": [{ "rate": 20, "start": "2001-01-01" },
                 { "rate": 40, "start": "2004-01-01" },
                 { "rate": 60, "start": "2008-01-01" }]
   }""")
 
-  lazy protected val levies_2 = buildLevies(s"""
+  lazy private val levies_2 = buildLevies(s"""
   "$levy1": {
     "periods": [{ "rate": 10, "start": "2001-01-01" }]
   },
@@ -197,7 +197,7 @@ class LeviesSpec extends WordSpec with Matchers {
     val assetId2 = Savings.AssetId(scheme.id, fund2.id)
 
     "handle 1 period without end" in {
-      val savings1 = savings0.copy(levies = levies_1_1_end)
+      val savings1 = savings0.copy(levies = levies_1_1)
       val levyPeriod1 = savings1.levies.levies(levy1).periods.head
       val levyStart = levyPeriod1.start
       val date_b1 = levyStart.minusDays(10)

@@ -12,9 +12,8 @@ import javafx.beans.property.{ObjectProperty, SimpleObjectProperty}
 import javafx.collections.ListChangeListener.Change
 import javafx.collections.{FXCollections, ObservableList}
 import javafx.collections.transformation.{SortedList, TransformationList}
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import suiryc.scala.javafx.collections.RichObservableList._
-import suiryc.scala.math.Ordering.localDateOrdering
 
 /** The kind of asset details. */
 object AssetDetailsKind extends Enumeration {

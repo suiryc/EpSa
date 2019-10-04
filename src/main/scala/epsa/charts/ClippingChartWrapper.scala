@@ -130,6 +130,8 @@ class ClippingChartWrapper[A <: ChartMark](override protected val chartHandler: 
   }
 
   private def setupYAxisWidth(): Unit = {
+    import scala.Ordering.Double.TotalOrdering
+
     val formatter = Option(yAxis.getTickLabelFormatter).getOrElse(new DefaultFormatter(yAxis))
     val font = yAxis.getTickLabelFont
     // Try to determine the maximum Y formatted value width. With the formatter,

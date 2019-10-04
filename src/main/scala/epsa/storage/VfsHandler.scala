@@ -5,7 +5,7 @@ import java.nio.ByteBuffer
 import java.nio.file.Path
 import org.h2.store.fs.FileUtils
 import org.h2.store.fs.FilePath
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import suiryc.scala.util.Using
 
 object VfsHandler extends StrictLogging {

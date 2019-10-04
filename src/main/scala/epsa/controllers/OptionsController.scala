@@ -77,7 +77,7 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
     languageChoice.setButtonCell(new I18NLocaleCell)
     languageChoice.setCellFactory(_ => new I18NLocaleCell)
 
-    import scala.collection.JavaConverters._
+    import scala.jdk.CollectionConverters._
     val locales = I18N.locales.sortBy(_.displayName)
     languageChoice.setItems(FXCollections.observableList(locales.asJava))
     locales.find(_.code == I18N.setting.get).foreach { locale =>

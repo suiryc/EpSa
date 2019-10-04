@@ -60,7 +60,7 @@ object BNPParibasInvestmentFundProber extends InvestmentFundProber {
         val dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
         val name = nameRow.getCell(1).getStringCellValue
         // Table is ended by an empty row (while last row contains a warning comment)
-        val values = (dataRowIdx to sheet.getLastRowNum).toStream.map(sheet.getRow).takeWhile { row =>
+        val values = (dataRowIdx to sheet.getLastRowNum).to(LazyList).map(sheet.getRow).takeWhile { row =>
           // Notes:
           // Cell.getCellType was made deprecated prior to being changed between
           // 3.x and 4.x to return an enum instead of an int. In the meantime

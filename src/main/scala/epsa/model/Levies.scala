@@ -40,7 +40,7 @@ case class Levies(
 
   lazy val normalized: Levies = {
     val startDate = levies.flatMap(_._2.periods.map(_.start)).min
-    val normalizedLevies = levies.mapValues { levy =>
+    val normalizedLevies = levies.view.mapValues { levy =>
       // If a period has no end and is followed by another period, set its
       // end to the start of the next period.
       // If a period has an end and the next one does not start the next day,
@@ -78,7 +78,7 @@ case class Levies(
       }
       val periods = periods1.reverse
       levy.copy(periods = periods)
-    }.view.force
+    }.toMap
     copy(levies = normalizedLevies)
   }
 

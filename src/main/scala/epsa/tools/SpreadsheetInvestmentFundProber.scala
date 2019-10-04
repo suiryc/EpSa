@@ -78,7 +78,7 @@ object SpreadsheetInvestmentFundProber extends InvestmentFundProber {
       // There should ba at least one row, and at least 2 columns
       (table.getRowCount > 0) && (table.getColumnCount >= 2)
     }.map { table =>
-      import scala.collection.JavaConverters._
+      import scala.jdk.CollectionConverters._
       // Cell 0 contains the date and cell 1 the value at the given date
       val dateCellIdx = 0
       val valueCellIdx = 1

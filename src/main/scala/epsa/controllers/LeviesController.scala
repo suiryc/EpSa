@@ -16,8 +16,8 @@ import javafx.fxml.{FXML, FXMLLoader}
 import javafx.scene.Node
 import javafx.scene.control.{ButtonType, ComboBox, Dialog, TextArea}
 import javafx.stage.{FileChooser, Stage, Window, WindowEvent}
-import scala.collection.JavaConverters._
 import scala.io.Source
+import scala.jdk.CollectionConverters._
 import suiryc.scala.javafx.scene.control.{Dialogs, ListCellEx}
 import suiryc.scala.javafx.stage.{PathChoosers, StageLocationPersistentView, Stages}
 import suiryc.scala.javafx.stage.Stages.StageLocation

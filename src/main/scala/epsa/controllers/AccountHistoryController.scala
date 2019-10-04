@@ -20,9 +20,9 @@ import javafx.scene.input.MouseEvent
 import javafx.scene.layout.AnchorPane
 import javafx.stage.Stage
 import monix.execution.Cancelable
-import scala.collection.JavaConverters._
 import scala.concurrent.Future
 import scala.concurrent.duration._
+import scala.jdk.CollectionConverters._
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.javafx.scene.control.skin.SplitPaneSkinEx
@@ -437,7 +437,7 @@ class AccountHistoryController extends StageLocationPersistentView(AccountHistor
     // Updates history for given dates range.
     def atDates(history: History, savings: Savings, since: Option[LocalDate], to: LocalDate): History = {
       val from = since.orElse(firstDate).getOrElse(to)
-      Stream.from(0).map { i =>
+      LazyList.from(0).map { i =>
         from.plusDays(i.toLong)
       }.takeWhile { date =>
         date <= to

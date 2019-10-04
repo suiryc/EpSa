@@ -24,11 +24,11 @@ trait AssetField[A] {
   /** Field name in details pane. */
   val detailsLabel: String
   /** Field comment if any. */
-  val comment: (AssetDetails) => Option[String] = { _ => None }
+  val comment: AssetDetails => Option[String] = { _ => None }
   /** Field warning if any. */
-  val warning: (AssetDetails) => Option[String] = { _ => None }
+  val warning: AssetDetails => Option[String] = { _ => None }
   /** How to format field value. */
-  val format: (AssetDetails) => String
+  val format: AssetDetails => String
 
   /** The details pane label (where value is displayed). */
   // Note: the label is cached so that all tabs (savings on various dates)
@@ -58,7 +58,7 @@ trait AssetField[A] {
     )
   }
 
-  protected def buildGraphicNode(assetDetailsOpt: Option[AssetDetails], get: (AssetDetails) => Option[String], create: => ImageView): Option[ImageView] = {
+  protected def buildGraphicNode(assetDetailsOpt: Option[AssetDetails], get: AssetDetails => Option[String], create: => ImageView): Option[ImageView] = {
     assetDetailsOpt.flatMap(get).map { v =>
       val node = create
       Tooltip.install(node, new Tooltip(v))
@@ -80,8 +80,8 @@ trait AssetField[A] {
 
 /** Asset field with formatted text value to display. */
 case class AssetTextField(key: String, columnIdx: Int, tableLabel: String, detailsLabel: String,
-  format: (AssetDetails) => String,
-  override val comment: (AssetDetails) => Option[String] = { _ => None }
+  format: AssetDetails => String,
+  override val comment: AssetDetails => Option[String] = { _ => None }
 ) extends AssetField[String] {
   val column = new TableColumn[AssetDetails, String](tableLabel)
   column.setCellValueFactory(data => {
@@ -91,8 +91,8 @@ case class AssetTextField(key: String, columnIdx: Int, tableLabel: String, detai
 
 /** Asset field with date to display. */
 case class AssetDateField(key: String, columnIdx: Int, tableLabel: String, detailsLabel: String,
-  format: (AssetDetails) => String,
-  value: (AssetDetails) => Option[LocalDate]
+  format: AssetDetails => String,
+  value: AssetDetails => Option[LocalDate]
 ) extends AssetField[AssetDetails] {
   val column = new TableColumn[AssetDetails, AssetDetails](tableLabel)
   column.setCellValueFactory(data => {
@@ -104,15 +104,15 @@ case class AssetDateField(key: String, columnIdx: Int, tableLabel: String, detai
 
 /** Asset field with number to display. */
 case class AssetNumberField(key: String, columnIdx: Int, tableLabel: String, detailsLabel: String,
-  format: (AssetDetails) => String,
-  value: (AssetDetails) => Option[BigDecimal],
-  override val warning: (AssetDetails) => Option[String] = { _ => None }
+  format: AssetDetails => String,
+  value: AssetDetails => Option[BigDecimal],
+  override val warning: AssetDetails => Option[String] = { _ => None }
 ) extends AssetField[AssetDetails] {
   val column = new TableColumn[AssetDetails, AssetDetails](tableLabel)
   column.setCellValueFactory(data => {
     new SimpleObjectProperty(data.getValue)
   })
-  val warning0: (AssetDetails) => Option[String] = warning
+  val warning0: AssetDetails => Option[String] = warning
   column.setCellFactory(_ => {
     new FormatCell[AssetDetails, AssetDetails](format) with WarningCell[AssetDetails] {
       getStyleClass.add(JFXStyles.CLASS_VALUE_NUMBER)
@@ -124,16 +124,16 @@ case class AssetNumberField(key: String, columnIdx: Int, tableLabel: String, det
 
 /** Asset field with (colored) number to display. */
 case class AssetColoredNumberField(key: String, columnIdx: Int, tableLabel: String, detailsLabel: String,
-  format: (AssetDetails) => String,
-  value: (AssetDetails) => Option[BigDecimal],
-  override val warning: (AssetDetails) => Option[String] = { _ => None }
+  format: AssetDetails => String,
+  value: AssetDetails => Option[BigDecimal],
+  override val warning: AssetDetails => Option[String] = { _ => None }
 ) extends AssetField[AssetDetails] {
   val column = new TableColumn[AssetDetails, AssetDetails](tableLabel)
   column.setCellValueFactory(data => {
     new SimpleObjectProperty(data.getValue)
   })
-  val value0: (AssetDetails) => Option[BigDecimal] = value
-  val warning0: (AssetDetails) => Option[String] = warning
+  val value0: AssetDetails => Option[BigDecimal] = value
+  val warning0: AssetDetails => Option[String] = warning
   column.setCellFactory(_ => {
     new FormatCell[AssetDetails, AssetDetails](format) with ColoredCell[AssetDetails] with WarningCell[AssetDetails] {
       getStyleClass.add(JFXStyles.CLASS_VALUE_NUMBER)

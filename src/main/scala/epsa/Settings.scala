@@ -63,7 +63,7 @@ object Settings {
     df
   }
 
-  val preferredCurrencies = List("€", "$", "£", "￥", "฿")
+  val preferredCurrencies: List[String] = List("€", "$", "£", "￥", "฿")
 
   // Note: not really useful to let user change percents scale/rounding
   val percentsScale = 2

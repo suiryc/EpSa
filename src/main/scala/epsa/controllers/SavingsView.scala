@@ -11,7 +11,7 @@ import javafx.scene.control.{SeparatorMenuItem, _}
 import javafx.scene.image.ImageView
 import javafx.scene.input._
 import javafx.scene.layout.AnchorPane
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.scene.control.TableViews
 import suiryc.scala.math.Ordering.localDateOrdering
@@ -32,7 +32,7 @@ class SavingsView(tab: SavingsViewTab) {
   // standard Map, but we would lose the ordering.
   // But since we want a List in the end, a simple '.toList' will get rid of
   // the map-like behaviour.
-  val assetsColumns: List[(String, TableColumn[AssetDetails, _])] = assetFields.mapValues(_.column).toList
+  val assetsColumns: List[(String, TableColumn[AssetDetails, _])] = assetFields.view.mapValues(_.column).toList
 
   private val columnAmount = new TableColumn[AssetDetails, Nothing](Strings.amount)
 
