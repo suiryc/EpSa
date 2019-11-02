@@ -7,6 +7,7 @@ import epsa.util.Awaits
 import java.nio.file.Path
 import javafx.stage.Stage
 import monix.execution.Scheduler
+import suiryc.scala.Configuration
 import scala.concurrent.ExecutionContextExecutor
 import suiryc.scala.akka.CoreSystem
 import suiryc.scala.javafx.{JFXApplication, JFXLauncher}
@@ -15,6 +16,8 @@ import suiryc.scala.log.Loggers
 import suiryc.scala.misc.Util
 
 object Main extends JFXLauncher[MainApp] {
+
+  Configuration.setDefaultApplication()
 
   import Settings.Debug
 
