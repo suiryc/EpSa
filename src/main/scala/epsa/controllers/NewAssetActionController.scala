@@ -50,6 +50,9 @@ class NewAssetActionController extends StageLocationPersistentView(NewAssetActio
   protected var operationDateField: DatePicker = _
 
   @FXML
+  protected var dstOperationDateField: DatePicker = _
+
+  @FXML
   protected var latestDateButton: Button = _
 
   @FXML
@@ -192,7 +195,9 @@ class NewAssetActionController extends StageLocationPersistentView(NewAssetActio
     toggleButtons.find(getToggleKind(_) == actionKind).foreach(actionKindGroup.selectToggle)
 
     // Listen to operation date changes
-    operationDateField.valueProperty.listen(onOperationDate())
+    List(operationDateField, dstOperationDateField).foreach { field =>
+      field.valueProperty.listen(onOperationDate())
+    }
 
     // Listen to fund changes
     srcFundField.valueProperty.listen(onSrcFund())
@@ -218,7 +223,7 @@ class NewAssetActionController extends StageLocationPersistentView(NewAssetActio
     // Force date format (to match the one of LocalDate in other views) in date picker fields
     val dateFormat = "yyyy-MM-dd"
     val dateConverter = new LocalDateStringConverter(DateTimeFormatter.ofPattern(dateFormat), null)
-    for (field <- List(operationDateField, srcAvailabilityField, dstAvailabilityField)) {
+    for (field <- List(operationDateField, dstOperationDateField, srcAvailabilityField, dstAvailabilityField)) {
       field.setPromptText(dateFormat)
       field.setConverter(dateConverter)
       // Track field editor to apply value when possible
@@ -284,6 +289,7 @@ class NewAssetActionController extends StageLocationPersistentView(NewAssetActio
 
     // Set now as operation date default
     operationDateField.setValue(LocalDate.now)
+    dstOperationDateField.setValue(null)
 
     // Select initial scheme and fund (as source)
     for {
@@ -327,6 +333,7 @@ class NewAssetActionController extends StageLocationPersistentView(NewAssetActio
     }
 
     val disableDst = !isDstEnabled
+    dstOperationDateField.setDisable(disableDst)
     dstFundField.setDisable(disableDst)
     dstAvailabilityField.setDisable(disableDst)
     if (Option(dstUnavailabilityPeriodButton.getOnAction).isDefined) dstUnavailabilityPeriodButton.setDisable(disableDst)
@@ -600,38 +607,38 @@ class NewAssetActionController extends StageLocationPersistentView(NewAssetActio
   }
 
   private def updateNAV(updateSrc: Boolean = true): Unit = {
-    getOperationDate.foreach { operationDate =>
-      def updateField(field: TextFieldWithButton, fund: Savings.Fund): Unit = {
-        val navOpt = Awaits.readDataStoreNAV(Some(stage), fund.id, operationDate).getOrElse(None)
-        navOpt match {
-          case Some(nav) =>
-            val text = formatCompactNumber(nav.value)
-            field.setUserData(nav)
+    def updateField(field: TextFieldWithButton, fund: Savings.Fund, operationDate: LocalDate): Unit = {
+      val navOpt = Awaits.readDataStoreNAV(Some(stage), fund.id, operationDate).getOrElse(None)
+      navOpt match {
+        case Some(nav) =>
+          val text = formatCompactNumber(nav.value)
+          field.setUserData(nav)
+          field.setText(text)
+          field.textField.setTooltip(new Tooltip(s"${Strings.date}: ${nav.date}\n${Strings.nav}: ${formatNumber(nav.value, Main.settings.currency.get)}"))
+          field.setOnButtonAction { _ =>
             field.setText(text)
-            field.textField.setTooltip(new Tooltip(s"${Strings.date}: ${nav.date}\n${Strings.nav}: ${formatNumber(nav.value, Main.settings.currency.get)}"))
-            field.setOnButtonAction { _ =>
-              field.setText(text)
-            }
-            // Bind so that changing value allows to reset it
-            field.buttonDisableProperty.bind(field.textField.textProperty.isEqualTo(text))
-            field.textField.setEditable(nav.date != operationDate)
+          }
+          // Bind so that changing value allows to reset it
+          field.buttonDisableProperty.bind(field.textField.textProperty.isEqualTo(text))
+          field.textField.setEditable(nav.date != operationDate)
 
-          case None =>
-            field.setUserData(null)
-            field.setText(null)
-            field.textField.setTooltip(null)
-            field.buttonDisableProperty.unbind()
-            field.setOnButtonAction(null)
-            field.setButtonDisable(true)
-            field.textField.setEditable(true)
-        }
+        case None =>
+          field.setUserData(null)
+          field.setText(null)
+          field.textField.setTooltip(null)
+          field.buttonDisableProperty.unbind()
+          field.setOnButtonAction(null)
+          field.setButtonDisable(true)
+          field.textField.setEditable(true)
       }
+    }
 
+    getOperationDate.foreach { operationDate =>
       if (updateSrc) getSrcFund.foreach { schemeAndFund =>
-        updateField(srcNAVField, schemeAndFund.fund)
+        updateField(srcNAVField, schemeAndFund.fund, operationDate)
       }
       getDstFund.foreach { schemeAndFund =>
-        updateField(dstNAVField, schemeAndFund.fund)
+        updateField(dstNAVField, schemeAndFund.fund, getDstOperationDate.getOrElse(operationDate))
         // Manually trigger src amount callback in order to recompute dst
         // units if necessary.
         if (updateSrc) onSrcAmount()
@@ -689,15 +696,19 @@ class NewAssetActionController extends StageLocationPersistentView(NewAssetActio
 
   private def checkForm(): Option[Savings.AssetEvent] = {
     val operationDate = operationDateField.getValue
+    val dstOperationDate = dstOperationDateField.getValue
     val opDateSelected = Option(operationDate).isDefined
+    val opDstDateSelected = Option(dstOperationDate).isDefined
     val opDateAnterior = opDateSelected && savings.latestAssetAction.exists(operationDate < _)
+    val opDstDateAnterior = opDateSelected && opDstDateSelected && (dstOperationDate < operationDate)
     // Selecting a date of operation anterior to the latest asset action date is allowed even if discouraged
-    val opDateOk = opDateSelected
+    val opDateOk = opDateSelected && !opDstDateAnterior
     val warningMsgOpt = savings.latestAssetAction.map(Strings.anteriorOpDate.format(_))
     JFXStyles.toggleStyles(operationDateField, None,
       JFXStyles.ErrorStyle(!opDateSelected, Strings.mandatoryField),
       JFXStyles.WarningStyle(opDateAnterior, warningMsgOpt.getOrElse(""))
     )
+    JFXStyles.toggleError(dstOperationDateField, opDstDateAnterior, Strings.anteriorDstOpDate)
 
     val isPayment = actionKind == AssetActionKind.Payment
     val srcFund = getSrcFund.orNull
@@ -787,7 +798,7 @@ class NewAssetActionController extends StageLocationPersistentView(NewAssetActio
       val comment = Option(commentField.getText).map(_.trim).find(_.nonEmpty)
       actionKind match {
         case AssetActionKind.Payment  => Savings.MakePayment(operationDate, srcAsset, comment)
-        case AssetActionKind.Transfer => Savings.MakeTransfer(operationDate, srcAsset, dstAsset, comment)
+        case AssetActionKind.Transfer => Savings.MakeTransfer(operationDate, srcAsset, Option(dstOperationDate), dstAsset, comment)
         case AssetActionKind.Refund   => Savings.MakeRefund(operationDate, srcAsset, comment)
       }
     } else None
@@ -814,6 +825,9 @@ class NewAssetActionController extends StageLocationPersistentView(NewAssetActio
 
   private def getOperationDate: Option[LocalDate] =
     Option(operationDateField.getValue)
+
+  private def getDstOperationDate: Option[LocalDate] =
+    Option(dstOperationDateField.getValue)
 
   private def getSavings(operationDate: LocalDate): Savings = {
     // If operation date predates latest asset action, we need to get
@@ -915,10 +929,14 @@ object NewAssetActionController {
     else {
       val eventOpt = controller.checkForm()
       eventOpt.foreach { event =>
+        val dstDate = event match {
+          case Savings.MakeTransfer(_, _, dstDate, _, _) => dstDate.getOrElse(event.date)
+          case _ => event.date
+        }
         for {
-          (schemeAndFundOpt, field, value) <- List(
-            (controller.getSrcFund, controller.srcNAVField, controller.getSrcNAV),
-            (controller.getDstFund, controller.dstNAVField, controller.getDstNAV)
+          (schemeAndFundOpt, field, date, value) <- List(
+            (controller.getSrcFund, controller.srcNAVField, event.date, controller.getSrcNAV),
+            (controller.getDstFund, controller.dstNAVField, dstDate, controller.getDstNAV)
           )
           schemeAndFund <- schemeAndFundOpt
           // Note: use fake NAV when none was found (either because there is no
@@ -927,8 +945,8 @@ object NewAssetActionController {
             if (field.isDisabled) None
             else Option(field.getUserData.asInstanceOf[Savings.AssetValue]).orElse(Some(Savings.AssetValue(LocalDate.ofEpochDay(0), 0)))
         } {
-          if ((event.date != nav.date) && (value != nav.value)) {
-            Awaits.saveDataStoreNAV(owner, schemeAndFund.fund.id, Savings.AssetValue(event.date, value))
+          if ((date != nav.date) && (value != nav.value)) {
+            Awaits.saveDataStoreNAV(owner, schemeAndFund.fund.id, Savings.AssetValue(date, value))
           }
         }
       }

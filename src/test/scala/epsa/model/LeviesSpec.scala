@@ -690,7 +690,8 @@ class LeviesSpec extends WordSpec with Matchers {
         Savings.MakePayment(date, Savings.AssetPart(scheme.id, fund.id, None, units, valuesMap(date).value), None)
       def transfer(date: LocalDate, units: BigDecimal) =
         Savings.MakeTransfer(date, Savings.AssetPart(scheme.id, fund.id, None, units, valuesMap(date).value)
-          , Savings.AssetPart(scheme.id, fund2.id, None, units * valuesMap(date).value / values2Map(date).value, values2Map(date).value), None)
+          , None, Savings.AssetPart(scheme.id, fund2.id, None, units * valuesMap(date).value / values2Map(date).value, values2Map(date).value)
+          , None)
 
       // Testing transferring 75% of fund.
       usingDataStore {
@@ -775,7 +776,8 @@ class LeviesSpec extends WordSpec with Matchers {
         Savings.MakePayment(date, Savings.AssetPart(scheme.id, fund2.id, None, units, values2Map(date).value), None)
       def transfer(date: LocalDate, units: BigDecimal) =
         Savings.MakeTransfer(date, Savings.AssetPart(scheme.id, fund.id, None, units, valuesMap(date).value)
-          , Savings.AssetPart(scheme.id, fund2.id, None, units * valuesMap(date).value / values2Map(date).value, values2Map(date).value), None)
+          , None, Savings.AssetPart(scheme.id, fund2.id, None, units * valuesMap(date).value / values2Map(date).value, values2Map(date).value)
+          , None)
 
       usingDataStore {
         buildNAVHistory(NAVHistory(fund.id, values), NAVHistory(fund2.id, values2))
@@ -837,7 +839,8 @@ class LeviesSpec extends WordSpec with Matchers {
         Savings.MakePayment(date, Savings.AssetPart(scheme.id, fund.id, None, units, valuesMap(date).value), None)
       def transfer(date: LocalDate, units: BigDecimal) =
         Savings.MakeTransfer(date, Savings.AssetPart(scheme.id, fund.id, None, units, valuesMap(date).value)
-          , Savings.AssetPart(scheme.id, fund2.id, None, units * valuesMap(date).value / values2Map(date).value, values2Map(date).value), None)
+          , None, Savings.AssetPart(scheme.id, fund2.id, None, units * valuesMap(date).value / values2Map(date).value, values2Map(date).value)
+          , None)
 
       usingDataStore {
         buildNAVHistory(NAVHistory(fund.id, values), NAVHistory(fund2.id, values2))
@@ -1159,7 +1162,8 @@ class LeviesSpec extends WordSpec with Matchers {
         Savings.MakePayment(date, Savings.AssetPart(scheme.id, fund2.id, None, units, values2Map(date).value), None)
       def transfer(date: LocalDate, units: BigDecimal) =
         Savings.MakeTransfer(date, Savings.AssetPart(scheme.id, fund.id, None, units, valuesMap(date).value)
-          , Savings.AssetPart(scheme.id, fund2.id, None, units * valuesMap(date).value / values2Map(date).value, values2Map(date).value), None)
+          , None, Savings.AssetPart(scheme.id, fund2.id, None, units * valuesMap(date).value / values2Map(date).value, values2Map(date).value)
+          , None)
 
       usingDataStore {
         buildNAVHistory(NAVHistory(fund.id, values), NAVHistory(fund2.id, values2))

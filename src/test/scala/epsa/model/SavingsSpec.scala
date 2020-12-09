@@ -257,11 +257,11 @@ class SavingsSpec extends WordSpec with Matchers {
         Savings.MakePayment(date.plusDays(1), Savings.AssetPart(scheme.id, fund1.id, None, BigDecimal(10), BigDecimal(10)), None),
         Savings.MakePayment(date.plusDays(2), Savings.AssetPart(scheme.id, fund1.id, Some(date.plusDays(10)), BigDecimal(10), BigDecimal(10)), None),
         Savings.MakeTransfer(date.plusDays(3), Savings.AssetPart(scheme.id, fund1.id, None, BigDecimal(1), BigDecimal(10)),
-          Savings.AssetPart(scheme.id, fund2.id, None, BigDecimal(2), BigDecimal(5)), None),
+          None, Savings.AssetPart(scheme.id, fund2.id, None, BigDecimal(2), BigDecimal(5)), None),
         Savings.MakeTransfer(date.plusDays(4), Savings.AssetPart(scheme.id, fund1.id, None, BigDecimal(2), BigDecimal(10)),
-          Savings.AssetPart(scheme.id, fund2.id, None, BigDecimal(10), BigDecimal(2)), None),
+          None, Savings.AssetPart(scheme.id, fund2.id, None, BigDecimal(10), BigDecimal(2)), None),
         Savings.MakeTransfer(date.plusDays(5), Savings.AssetPart(scheme.id, fund1.id, Some(date.plusDays(10)), BigDecimal(3), BigDecimal(10)),
-          Savings.AssetPart(scheme.id, fund2.id, Some(date.plusDays(10)), BigDecimal(10), BigDecimal(3)), None)
+          None, Savings.AssetPart(scheme.id, fund2.id, Some(date.plusDays(10)), BigDecimal(10), BigDecimal(3)), None)
       )
       savings.latestAssetAction shouldBe Some(date.plusDays(5))
       checkSavings(date, savings,
@@ -291,7 +291,7 @@ class SavingsSpec extends WordSpec with Matchers {
       // Create a 3rd entry by transferring part of an existing one
       val savings2_2 = savings2_1.processEvents(
         Savings.MakeTransfer(date.plusDays(3), Savings.AssetPart(scheme.id, fund1.id, None, BigDecimal(1), BigDecimal(1)),
-          Savings.AssetPart(scheme.id, fund2.id, None, BigDecimal(1), BigDecimal(1)), None)
+          None, Savings.AssetPart(scheme.id, fund2.id, None, BigDecimal(1), BigDecimal(1)), None)
       )
       savings2_2.assets.list.size shouldBe 3
       savings2_2.assets.byId.size shouldBe 2
@@ -300,7 +300,7 @@ class SavingsSpec extends WordSpec with Matchers {
       // Empty one entry by transferring to an existing one, keeping 2 different ids
       val savings2_3 = savings2_2.processEvents(
         Savings.MakeTransfer(date.plusDays(4), Savings.AssetPart(scheme.id, fund1.id, None, BigDecimal(1), BigDecimal(1)),
-          Savings.AssetPart(scheme.id, fund2.id, None, BigDecimal(1), BigDecimal(1)), None)
+          None, Savings.AssetPart(scheme.id, fund2.id, None, BigDecimal(1), BigDecimal(1)), None)
       )
       savings2_3.assets.list.size shouldBe 2
       savings2_3.assets.byId.size shouldBe 2
@@ -539,11 +539,11 @@ class SavingsSpec extends WordSpec with Matchers {
       val fund = savings1.funds.head
       checkEventSerialization(Savings.MakeTransfer(LocalDate.now,
         Savings.AssetPart(scheme.id, fund.id, Some(LocalDate.now), BigDecimal(10), BigDecimal(10)),
-        Savings.AssetPart(fund.id, scheme.id, None, BigDecimal(1), BigDecimal(1)),
+        None, Savings.AssetPart(fund.id, scheme.id, None, BigDecimal(1), BigDecimal(1)),
         None))
       checkEventSerialization(Savings.MakeTransfer(LocalDate.now,
         Savings.AssetPart(scheme.id, fund.id, Some(LocalDate.now), BigDecimal(10), BigDecimal(10)),
-        Savings.AssetPart(fund.id, scheme.id, None, BigDecimal(1), BigDecimal(1)),
+        None, Savings.AssetPart(fund.id, scheme.id, None, BigDecimal(1), BigDecimal(1)),
         Some("comment")))
     }
 
@@ -562,7 +562,7 @@ class SavingsSpec extends WordSpec with Matchers {
         Savings.AssetPart(scheme.id, fund1.id, Some(LocalDate.now.plusDays(10)), BigDecimal(10), BigDecimal(10)), None))
       checkHumanReadable(payment, Savings.MakeTransfer(LocalDate.now,
         Savings.AssetPart(scheme.id, fund1.id, Some(LocalDate.now.plusDays(10)), BigDecimal(10), BigDecimal(10)),
-        Savings.AssetPart(scheme.id, fund2.id, None, BigDecimal(1), BigDecimal(1)),
+        None, Savings.AssetPart(scheme.id, fund2.id, None, BigDecimal(1), BigDecimal(1)),
         None))
     }
   }
@@ -621,7 +621,7 @@ class SavingsSpec extends WordSpec with Matchers {
       // With VWAP = 3 (availability independent); dstVWAP = (2 * 3) / 4 = 1.5
       val savings2_5 = savings2_4.processEvent(
         Savings.MakeTransfer(date.plusDays(1), Savings.AssetPart(scheme.id, fund1.id, None, BigDecimal(2), BigDecimal(2)),
-          Savings.AssetPart(scheme.id, fund2.id, None, BigDecimal(4), BigDecimal(1)), None)
+          None, Savings.AssetPart(scheme.id, fund2.id, None, BigDecimal(4), BigDecimal(1)), None)
       )
       checkSavings(date, savings2_5,
         Map(id1 -> BigDecimal(3), id2 -> BigDecimal("1.5")),
@@ -634,7 +634,7 @@ class SavingsSpec extends WordSpec with Matchers {
       //   dstVWAP = (4 * 1.5 + 2 * 3) / (4 + 8) = 1  (as expected)
       val savings2_6 = savings2_5.processEvent(
         Savings.MakeTransfer(date.plusDays(1), Savings.AssetPart(scheme.id, fund1.id, Some(date.plusDays(10)), BigDecimal(2), BigDecimal(4)),
-          Savings.AssetPart(scheme.id, fund2.id, None, BigDecimal(8), BigDecimal(1)), None)
+          None, Savings.AssetPart(scheme.id, fund2.id, None, BigDecimal(8), BigDecimal(1)), None)
       )
       checkSavings(date, savings2_6,
         Map(id2 -> BigDecimal(1)),

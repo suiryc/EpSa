@@ -546,13 +546,25 @@ class AccountHistoryController extends StageLocationPersistentView(AccountHistor
         // $1=src units $2=src NAV $3=src availability
         AssetEventItem(event, index, Strings.assetEventTransferDetails1.format(
           formatNumber(e.partSrc.units), formatNumber(e.partSrc.value, currency),
-          Form.formatAvailability(e.partSrc.availability, Some(e.date)))),
-        // $1=dst units $2=dst NAV $3=dst amount $4=dst availability
-        AssetEventItem(event, index, Strings.assetEventTransferDetails2.format(
-          formatNumber(e.partDst.units), formatNumber(e.partDst.value, currency),
-          formatNumber(e.partDst.amount(e.partDst.value), currency),
-          Form.formatAvailability(e.partDst.availability, Some(e.date))))
-      )
+          Form.formatAvailability(e.partSrc.availability, Some(e.date))))
+      ) :+ {
+        e.dstDate match {
+          case Some(date) =>
+            // $1=dst units $2=dst NAV $3=dst amount $4=dst availability $5=date
+            AssetEventItem(event, index, Strings.assetEventTransferDetails2Date.format(
+              formatNumber(e.partDst.units), formatNumber(e.partDst.value, currency),
+              formatNumber(e.partDst.amount(e.partDst.value), currency),
+              Form.formatAvailability(e.partDst.availability, Some(e.date)),
+              date))
+
+          case None =>
+            // $1=dst units $2=dst NAV $3=dst amount $4=dst availability
+            AssetEventItem(event, index, Strings.assetEventTransferDetails2.format(
+              formatNumber(e.partDst.units), formatNumber(e.partDst.value, currency),
+              formatNumber(e.partDst.amount(e.partDst.value), currency),
+              Form.formatAvailability(e.partDst.availability, Some(e.date))))
+        }
+      }
 
     case e: Savings.MakeRefund =>
       val part = e.part

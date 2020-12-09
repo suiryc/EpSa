@@ -21,7 +21,7 @@
 <?import javafx.scene.layout.VBox?>
 <?import suiryc.scala.javafx.scene.control.TextFieldWithButton?>
 
-<VBox maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" xmlns="http://javafx.com/javafx/10.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="epsa.controllers.NewAssetActionController">
+<VBox maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" xmlns="http://javafx.com/javafx/11.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="epsa.controllers.NewAssetActionController">
    <children>
       <GridPane hgap="10.0" vgap="10.0">
          <columnConstraints>
@@ -184,6 +184,7 @@
                   <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
                </GridPane.margin>
             </Label>
+            <DatePicker fx:id="dstOperationDateField" minWidth="110.0" GridPane.columnIndex="2" GridPane.rowIndex="1" />
             <ComboBox fx:id="dstFundField" maxWidth="1.7976931348623157E308" GridPane.columnIndex="2" GridPane.rowIndex="2" />
             <HBox spacing="5.0" GridPane.columnIndex="2" GridPane.rowIndex="3">
                <children>
