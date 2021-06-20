@@ -146,7 +146,7 @@ assembly / assembledMappings ~= { mappings =>
 }
 
 ThisBuild / assemblyMergeStrategy := {
-  case "module-info.class" => MergeStrategy.discard
+  case PathList(x @ _*) if x.last == "module-info.class" => MergeStrategy.discard
   case x if x.startsWith("application.conf") => MergeStrategy.discard
   case x if x.startsWith("library.properties") => MergeStrategy.discard
   case PathList("javax", "xml", _ @ _*) => MergeStrategy.first
