@@ -9,8 +9,6 @@ import epsa.controllers.MainController.State
 import epsa.model.Savings
 import epsa.util.{Awaits, JFXStyles}
 import epsa.util.JFXStyles.AnimationHighlighter
-import java.time.LocalDate
-import java.util.UUID
 import javafx.beans.property.SimpleObjectProperty
 import javafx.fxml.{FXML, FXMLLoader}
 import javafx.scene.{Parent, Scene}
@@ -20,9 +18,6 @@ import javafx.scene.input.MouseEvent
 import javafx.scene.layout.AnchorPane
 import javafx.stage.Stage
 import monix.execution.Cancelable
-import scala.concurrent.Future
-import scala.concurrent.duration._
-import scala.jdk.CollectionConverters._
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.javafx.scene.control.skin.SplitPaneSkinEx
@@ -32,6 +27,13 @@ import suiryc.scala.javafx.stage.Stages.StageLocation
 import suiryc.scala.math.Ordered._
 import suiryc.scala.math.Ordering._
 import suiryc.scala.settings.ConfigEntry
+
+import java.time.LocalDate
+import java.util.UUID
+import scala.annotation.nowarn
+import scala.concurrent.Future
+import scala.concurrent.duration._
+import scala.jdk.CollectionConverters._
 
 class AccountHistoryController extends StageLocationPersistentView(AccountHistoryController.stageLocation) with StrictLogging {
 
@@ -202,7 +204,7 @@ class AccountHistoryController extends StageLocationPersistentView(AccountHistor
         contentText = Some(Strings.unexpectedIssue),
         ex = Some(ex)
       )
-    }
+    }: @nowarn
   }
 
   /** Restores (persisted) view. */

@@ -1,15 +1,17 @@
 package epsa.model
 
 import epsa.storage.DataStore
-import java.time.LocalDate
-import java.util.UUID
-import org.scalatest.{Matchers, WordSpec}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.wordspec.AnyWordSpec
 import spray.json._
 import suiryc.scala.concurrent.RichFuture._
+
+import java.time.LocalDate
+import java.util.UUID
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration
 
-class LeviesSpec extends WordSpec with Matchers {
+class LeviesSpec extends AnyWordSpec with Matchers {
 
   import epsa.Main.Akka._
   import Levies.JsonProtocol._

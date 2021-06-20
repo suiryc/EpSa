@@ -4,17 +4,19 @@ import epsa.I18N.Strings
 import epsa.controllers.MainController._
 import epsa.model.{StandardAssetDetails, _}
 import epsa.util.{Awaits, JFXStyles}
-import java.time.LocalDate
 import javafx.collections.FXCollections
 import javafx.collections.transformation.SortedList
 import javafx.scene.control.{SeparatorMenuItem, _}
 import javafx.scene.image.ImageView
 import javafx.scene.input._
 import javafx.scene.layout.AnchorPane
-import scala.jdk.CollectionConverters._
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.scene.control.TableViews
 import suiryc.scala.math.Ordering.localDateOrdering
+
+import java.time.LocalDate
+import scala.annotation.nowarn
+import scala.jdk.CollectionConverters._
 
 class SavingsView(tab: SavingsViewTab) {
 
@@ -155,7 +157,8 @@ class SavingsView(tab: SavingsViewTab) {
     row.itemProperty.listen { v =>
       Option(v) match {
         case Some(item) =>
-          val (total, partialTotal, first) = item.kind match {
+          // @nowarn workarounds scala 2.13.x false-positive
+          val (total, partialTotal, first) = (item.kind: @nowarn) match {
             case AssetDetailsKind.Standard             => (false, false, item.first)
             case AssetDetailsKind.TotalPartial         => (false, true, item.first)
             case AssetDetailsKind.TotalPerFund         => (false, true, item.first)

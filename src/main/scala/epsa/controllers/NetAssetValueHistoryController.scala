@@ -8,9 +8,6 @@ import epsa.model.Savings
 import epsa.storage.DataStore
 import epsa.tools.{AmundiInvestmentFundDownloader, BNPParibasInvestmentFundProber, EsaliaInvestmentFundProber, SpreadsheetInvestmentFundProber}
 import epsa.util.{Awaits, JFXStyles}
-import java.nio.file.Path
-import java.time.LocalDate
-import java.util.UUID
 import javafx.beans.property.SimpleObjectProperty
 import javafx.collections.FXCollections
 import javafx.event.{ActionEvent, Event}
@@ -20,10 +17,6 @@ import javafx.scene.control._
 import javafx.scene.input.MouseEvent
 import javafx.scene.layout.AnchorPane
 import javafx.stage._
-import scala.concurrent.Future
-import scala.concurrent.duration._
-import scala.jdk.CollectionConverters._
-import scala.util.{Failure, Success}
 import suiryc.scala.concurrent.RichFuture._
 import suiryc.scala.math.Ordered._
 import suiryc.scala.math.Ordering._
@@ -33,6 +26,15 @@ import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.javafx.scene.control.{Dialogs, TextFieldWithButton}
 import suiryc.scala.javafx.stage.Stages.StageLocation
 import suiryc.scala.javafx.stage.{PathChoosers, StageLocationPersistentView, Stages}
+
+import java.nio.file.Path
+import java.time.LocalDate
+import java.util.UUID
+import scala.annotation.unused
+import scala.concurrent.Future
+import scala.concurrent.duration._
+import scala.jdk.CollectionConverters._
+import scala.util.{Failure, Success}
 
 class NetAssetValueHistoryController extends StageLocationPersistentView(NetAssetValueHistoryController.stageLocation) {
 
@@ -129,7 +131,7 @@ class NetAssetValueHistoryController extends StageLocationPersistentView(NetAsse
     if (canClose) dialog.close()
   }
 
-  def onDownloadNAVHistories(@deprecated("unused","") event: ActionEvent): Unit = {
+  def onDownloadNAVHistories(@unused event: ActionEvent): Unit = {
     // Remember currently selected fund
     val currentFund = getFund
     // Hide chart and selection
@@ -150,18 +152,18 @@ class NetAssetValueHistoryController extends StageLocationPersistentView(NetAsse
     }(JFXSystem.executor)
   }
 
-  def onFund(@deprecated("unused","") event: ActionEvent): Unit = {
+  def onFund(@unused event: ActionEvent): Unit = {
     getFund.foreach { fund =>
       downloadButton.setDisable(fund.amfId.isEmpty)
       loadHistory(fund)
     }
   }
 
-  def onDownload(@deprecated("unused","") event: ActionEvent): Unit = {
+  def onDownload(@unused event: ActionEvent): Unit = {
     getFund.filter(_.amfId.isDefined).foreach(downloadHistory(_))
   }
 
-  def onImport(@deprecated("unused","") event: ActionEvent): Unit = {
+  def onImport(@unused event: ActionEvent): Unit = {
     getFund.foreach { fund =>
       val fileChooser = new FileChooser()
       fileChooser.setTitle(Strings.importNAVHistory)
@@ -196,7 +198,7 @@ class NetAssetValueHistoryController extends StageLocationPersistentView(NetAsse
     }
   }
 
-  def onPurge(@deprecated("unused","") event: ActionEvent): Unit = {
+  def onPurge(@unused event: ActionEvent): Unit = {
     getFund.foreach { fund =>
       val resp = Dialogs.confirmation(
         owner = Some(stage),

@@ -358,7 +358,7 @@ object ChartHandler {
     }
 
     private def resetCancellable(): Unit = {
-      cancellable.foreach(_.cancel)
+      cancellable.foreach(_.cancel())
       cancellable = None
     }
 

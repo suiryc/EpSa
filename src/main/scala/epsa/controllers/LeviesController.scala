@@ -6,23 +6,25 @@ import epsa.I18N.Strings
 import epsa.model.{Levies, Savings}
 import epsa.storage.DataStore._
 import epsa.util.Awaits
-import java.io.File
-import java.net.URL
-import java.nio.file.Path
-import java.util.jar.JarFile
 import javafx.collections.FXCollections
 import javafx.event.ActionEvent
 import javafx.fxml.{FXML, FXMLLoader}
 import javafx.scene.Node
 import javafx.scene.control.{ButtonType, ComboBox, Dialog, TextArea}
 import javafx.stage.{FileChooser, Stage, Window, WindowEvent}
-import scala.io.Source
-import scala.jdk.CollectionConverters._
 import suiryc.scala.javafx.scene.control.{Dialogs, ListCellEx}
 import suiryc.scala.javafx.stage.{PathChoosers, StageLocationPersistentView, Stages}
 import suiryc.scala.javafx.stage.Stages.StageLocation
 import suiryc.scala.settings.ConfigEntry
 import suiryc.scala.util.Using
+
+import java.io.File
+import java.net.URL
+import java.nio.file.Path
+import java.util.jar.JarFile
+import scala.annotation.unused
+import scala.io.Source
+import scala.jdk.CollectionConverters._
 
 class LeviesController extends StageLocationPersistentView(LeviesController.stageLocation) with StrictLogging {
 
@@ -107,7 +109,7 @@ class LeviesController extends StageLocationPersistentView(LeviesController.stag
     if (canClose) dialog.close()
   }
 
-  def onLevies(@deprecated("unused","") event: ActionEvent): Unit = {
+  def onLevies(@unused event: ActionEvent): Unit = {
     getLevies match {
       case Some(levies) => leviesDescField.setText(levies.json)
       case None         => leviesDescField.setText("")
@@ -115,7 +117,7 @@ class LeviesController extends StageLocationPersistentView(LeviesController.stag
     checkForm()
   }
 
-  def onImport(@deprecated("unused","") event: ActionEvent): Unit = {
+  def onImport(@unused event: ActionEvent): Unit = {
     val fileChooser = new FileChooser()
     fileChooser.setTitle(Strings.importLevies)
     fileChooser.getExtensionFilters.addAll(

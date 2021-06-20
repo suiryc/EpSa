@@ -32,7 +32,7 @@ object Main extends JFXLauncher[MainApp] {
     val parser = new scopt.OptionParser[Params](getClass.getCanonicalName) {
       head(versionedName)
       help("help")
-      opt[String]("debug").unbounded.foreach { v =>
+      opt[String]("debug").unbounded().foreach { v =>
         Settings.debugParams ++= v.split(',').toList.map(Debug.withName).toSet
       }
       opt[Boolean]("io-capture").action { (v, c) =>

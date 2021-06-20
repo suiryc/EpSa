@@ -2,17 +2,19 @@ package epsa.storage
 
 import epsa.model.Savings
 import epsa.storage.DataStore.DBAction
-import java.nio.file.Paths
-import java.time.Month
-import org.scalatest.{Matchers, WordSpec}
-import scala.concurrent.duration.Duration
-import scala.concurrent.{Await, Future}
-import scala.util.Success
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.wordspec.AnyWordSpec
 import slick.jdbc.H2Profile.backend.DatabaseDef
 import suiryc.scala.concurrent.RichFuture
 import suiryc.scala.concurrent.RichFuture.Action
 
-class DataStoreSpec extends WordSpec with Matchers {
+import java.nio.file.Paths
+import java.time.Month
+import scala.concurrent.duration.Duration
+import scala.concurrent.{Await, Future}
+import scala.util.Success
+
+class DataStoreSpec extends AnyWordSpec with Matchers {
 
   private val store = DataStore.UnavailabilityPeriods
 

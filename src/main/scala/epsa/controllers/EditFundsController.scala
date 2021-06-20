@@ -13,7 +13,6 @@ import javafx.scene.control._
 import javafx.scene.image.ImageView
 import javafx.scene.input.{KeyCode, KeyEvent, MouseEvent}
 import javafx.stage.{Stage, Window}
-import scala.jdk.CollectionConverters._
 import suiryc.scala.RichOption._
 import suiryc.scala.javafx.beans.value.RichObservableValue
 import suiryc.scala.javafx.beans.value.RichObservableValue._
@@ -23,6 +22,9 @@ import suiryc.scala.javafx.scene.control.{CheckBoxListCellWithInfo, CheckBoxList
 import suiryc.scala.javafx.stage.{StageLocationPersistentView, Stages}
 import suiryc.scala.javafx.stage.Stages.StageLocation
 import suiryc.scala.settings.ConfigEntry
+
+import scala.annotation.unused
+import scala.jdk.CollectionConverters._
 
 class EditFundsController extends StageLocationPersistentView(EditFundsController.stageLocation) {
 
@@ -171,7 +173,7 @@ class EditFundsController extends StageLocationPersistentView(EditFundsControlle
    * An event filter is added on the generated cell to allow de-selecting a
    * Fund in the list view by clicking on it a second time.
    */
-  private def newFundCell(@deprecated("unused","") lv: ListView[Option[Savings.Fund]]): ListCell[Option[Savings.Fund]] = {
+  private def newFundCell(@unused lv: ListView[Option[Savings.Fund]]): ListCell[Option[Savings.Fund]] = {
     // See: http://stackoverflow.com/questions/23622703/deselect-an-item-on-an-javafx-listview-on-click
     val cell = new FundCell
 

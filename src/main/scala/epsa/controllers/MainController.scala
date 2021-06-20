@@ -8,10 +8,6 @@ import epsa.charts.{ChartHandler, ChartMark, ChartMeta, ChartSettings}
 import epsa.model._
 import epsa.storage.DataStore
 import epsa.util.Awaits
-import java.io.PrintWriter
-import java.nio.file.Path
-import java.time.LocalDate
-import java.util.UUID
 import javafx.event.{ActionEvent, EventTarget}
 import javafx.fxml.{FXML, FXMLLoader}
 import javafx.scene.{Node, Parent, Scene}
@@ -20,8 +16,6 @@ import javafx.scene.control._
 import javafx.scene.image.ImageView
 import javafx.scene.input.{KeyCode, KeyEvent, MouseEvent}
 import javafx.stage._
-import scala.jdk.CollectionConverters._
-import scala.util.Success
 import suiryc.scala.RichOption._
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.concurrent.JFXSystem
@@ -32,6 +26,14 @@ import suiryc.scala.javafx.stage.{PathChoosers, StageLocationPersistentView, Sta
 import suiryc.scala.math.Ordered._
 import suiryc.scala.settings.ConfigEntry
 import suiryc.scala.util.Using
+
+import java.io.PrintWriter
+import java.nio.file.Path
+import java.time.LocalDate
+import java.util.UUID
+import scala.annotation.unused
+import scala.jdk.CollectionConverters._
+import scala.util.Success
 
 // TODO: smart deletion of funds ?
 //         - keep the necessary data (NAV on some dates) used to compute levies
@@ -257,71 +259,71 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
     event.consume()
   }
 
-  def onFileNew(@deprecated("unused","") event: ActionEvent): Unit = {
+  def onFileNew(@unused event: ActionEvent): Unit = {
     actor ! OnFileNew
   }
 
-  def onFileOpen(@deprecated("unused","") event: ActionEvent): Unit = {
+  def onFileOpen(@unused event: ActionEvent): Unit = {
     actor ! OnFileOpen
   }
 
-  def onFileClose(@deprecated("unused","") event: ActionEvent): Unit = {
+  def onFileClose(@unused event: ActionEvent): Unit = {
     actor ! OnFileClose
   }
 
-  def onFileSave(@deprecated("unused","") event: ActionEvent): Unit = {
+  def onFileSave(@unused event: ActionEvent): Unit = {
     actor ! OnFileSave(saveAs = false)
   }
 
-  def onFileSaveAs(@deprecated("unused","") event: ActionEvent): Unit = {
+  def onFileSaveAs(@unused event: ActionEvent): Unit = {
     actor ! OnFileSave(saveAs = true)
   }
 
-  def onExit(@deprecated("unused","") event: ActionEvent): Unit = {
+  def onExit(@unused event: ActionEvent): Unit = {
     actor ! OnExit
   }
 
-  def onEditUndo(@deprecated("unused","") event: ActionEvent): Unit = {
+  def onEditUndo(@unused event: ActionEvent): Unit = {
     actor ! OnEditUndo
   }
 
-  def onEditSchemes(@deprecated("unused","") event: ActionEvent): Unit = {
+  def onEditSchemes(@unused event: ActionEvent): Unit = {
     actor ! OnEditSchemes(getSelectedAsset.map(_.schemeId))
   }
 
-  def onEditFunds(@deprecated("unused","") event: ActionEvent): Unit = {
+  def onEditFunds(@unused event: ActionEvent): Unit = {
     actor ! OnEditFunds(getSelectedAsset.map(_.fundId))
   }
 
-  def onEditUnavailabilityPeriods(@deprecated("unused","") event: ActionEvent): Unit = {
+  def onEditUnavailabilityPeriods(@unused event: ActionEvent): Unit = {
     actor ! OnEditUnavailabilityPeriods
   }
 
-  def onNewPayment(@deprecated("unused","") event: ActionEvent): Unit = {
+  def onNewPayment(@unused event: ActionEvent): Unit = {
     actor ! OnNewAssetAction(AssetActionKind.Payment, getSelectedAsset)
   }
 
-  def onNewTransfer(@deprecated("unused","") event: ActionEvent): Unit = {
+  def onNewTransfer(@unused event: ActionEvent): Unit = {
     actor ! OnNewAssetAction(AssetActionKind.Transfer, getSelectedAsset)
   }
 
-  def onNewRefund(@deprecated("unused","") event: ActionEvent): Unit = {
+  def onNewRefund(@unused event: ActionEvent): Unit = {
     actor ! OnNewAssetAction(AssetActionKind.Refund, getSelectedAsset)
   }
 
-  def onOptions(@deprecated("unused","") event: ActionEvent): Unit = {
+  def onOptions(@unused event: ActionEvent): Unit = {
     actor ! OnOptions
   }
 
-  def onSavingsOnDate(@deprecated("unused","") event: ActionEvent): Unit = {
+  def onSavingsOnDate(@unused event: ActionEvent): Unit = {
     actor ! OnSavingsOnDate(None)
   }
 
-  def onAccountHistory(@deprecated("unused","") event: ActionEvent): Unit = {
+  def onAccountHistory(@unused event: ActionEvent): Unit = {
     actor ! OnAccountHistory
   }
 
-  def onNetAssetValueHistory(@deprecated("unused","") event: ActionEvent): Unit = {
+  def onNetAssetValueHistory(@unused event: ActionEvent): Unit = {
     actor ! OnNetAssetValueHistory(getSelectedAsset.map(_.fundId))
   }
 
@@ -330,7 +332,7 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
     actor ! OnShowNAVHistory
   }
 
-  def onLevies(@deprecated("unused","") event: ActionEvent): Unit = {
+  def onLevies(@unused event: ActionEvent): Unit = {
     actor ! OnLevies
   }
 
@@ -342,15 +344,15 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
     stage.toFront()
   }
 
-  def onExportRawAccountHistory(@deprecated("unused","") event: ActionEvent = null): Unit = {
+  def onExportRawAccountHistory(@unused event: ActionEvent = null): Unit = {
     actor ! OnExportRawAccountHistory
   }
 
-  def onImportRawAccountHistory(@deprecated("unused","") event: ActionEvent = null): Unit = {
+  def onImportRawAccountHistory(@unused event: ActionEvent = null): Unit = {
     actor ! OnImportRawAccountHistory
   }
 
-  def onCleanupDataStore(@deprecated("unused","") event: ActionEvent): Unit = {
+  def onCleanupDataStore(@unused event: ActionEvent): Unit = {
     actor ! OnCleanupDataStore(normalize = false)
   }
 
@@ -369,7 +371,7 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
     }
 
   object ControllerActor {
-    def props(state: State) = Props(new ControllerActor(state))
+    def props(state: State): Props = Props(new ControllerActor(state))
   }
 
   class ControllerActor(state0: State) extends Actor {

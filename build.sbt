@@ -2,24 +2,32 @@ import sbt._
 import Keys._
 
 lazy val versions = Map[String, String](
-  "akka"          -> "2.5.25",
-  "config"        -> "1.3.4",
+  "akka"          -> "2.6.15",
+  "config"        -> "1.4.1",
   "epsa"          -> "1.1-SNAPSHOT",
-  "h2"            -> "1.4.199",
-  "html-cleaner"  -> "2.23",
-  "httpclient"    -> "4.5.10",
+  "h2"            -> "1.4.200",
+  "html-cleaner"  -> "2.24",
+  "httpclient"    -> "4.5.13",
   "javafx"        -> "12.0.1",
   "logback"       -> "1.2.3",
-  "monix"         -> "3.0.0",
-  "poi"           -> "4.1.0",
-  "scala"         -> "2.13.1",
-  "scala-logging" -> "3.9.2",
-  "scalatest"     -> "3.0.8",
-  "scopt"         -> "3.7.1",
-  "slf4j"         -> "1.7.28",
-  "slick"         -> "3.3.2",
+  "monix"         -> "3.4.0",
+  "poi"           -> "5.0.0",
+  "scala"         -> "2.13.6",
+  "scala-logging" -> "3.9.3",
+  "scalatest"     -> "3.2.9",
+  "scopt"         -> "4.0.1",
+  "slf4j"         -> "1.7.31",
+  "slick"         -> "3.3.3",
+  // Notes:
+  // simple-odf was part of odftoolkit when handled in apache incubator. Latest
+  // official release is 0.6.2-incubating, while maven has a 0.8.2-incubating.
+  // Deprecated maven: https://search.maven.org/artifact/org.apache.odftoolkit/simple-odf
+  // Once moved out of apache, 'simple' subproject disappeared in refactoring:
+  //  - merge: https://github.com/tdf/odftoolkit/commit/2a6d4fc2b45eed57f83604c5de92941629508ece
+  //  - commit: https://github.com/svanteschubert/apache-odftoolkit/commit/3fee8cf400f006952319449be8794a7104515abd
+  // Latest maven (after move): https://search.maven.org/artifact/org.odftoolkit/simple-odf
   "simple-odf"    -> "0.8.2-incubating",
-  "spray-json"    -> "1.3.5",
+  "spray-json"    -> "1.3.6",
   "suiryc-scala"  -> "0.0.4-SNAPSHOT"
 )
 
@@ -48,20 +56,22 @@ lazy val epsa = project.in(file(".")).
     buildInfoUsePackageAsPath := true,
 
     scalacOptions ++= Seq(
-      "-encoding", "UTF-8",
+      "-explaintypes",
       "-feature",
       "-unchecked",
       "-Werror",
-      "-Xlint:_",
-      "-Ywarn-dead-code",
-      "-Ywarn-numeric-widen",
-      "-Ywarn-unused:_",
-      "-Ywarn-value-discard"
+      "-Wdead-code",
+      "-Wextra-implicit",
+      "-Wnumeric-widen",
+      "-Wunused",
+      "-Wvalue-discard",
+      "-Xcheckinit",
+      "-Xlint"
     ),
     resolvers += Resolver.mavenLocal,
 
-    parallelExecution in Test := false,
-    mainClass in assembly := Some("epsa.Main"),
+    Test / parallelExecution := false,
+    assembly / mainClass := Some("epsa.Main"),
 
     libraryDependencies ++= Seq(
       "ch.qos.logback"              %  "logback-classic"                   % versions("logback"),
@@ -98,7 +108,7 @@ lazy val epsa = project.in(file(".")).
     ),
 
     // Replace mappings for jar generation
-    mappings in (Compile, packageBin) ~= remap,
+    Compile / packageBin / mappings ~= remap,
 
     publishMavenStyle := true,
     publishTo := Some(Resolver.mavenLocal)
@@ -128,19 +138,19 @@ def remap(mappings: Seq[(File, String)]): Seq[(File, String)] = {
 }
 
 // Replace mappings for fat jar generation
-assembledMappings in assembly ~= { mappings =>
+assembly / assembledMappings ~= { mappings =>
   mappings.map { m =>
     if (m.sourcePackage.isEmpty) m.copy(mappings = remap(m.mappings).toVector)
     else m
   }
 }
 
-assemblyMergeStrategy in assembly := {
+ThisBuild / assemblyMergeStrategy := {
   case "module-info.class" => MergeStrategy.discard
   case x if x.startsWith("application.conf") => MergeStrategy.discard
   case x if x.startsWith("library.properties") => MergeStrategy.discard
   case PathList("javax", "xml", _ @ _*) => MergeStrategy.first
-  case x => (assemblyMergeStrategy in assembly).value.apply(x)
+  case x => (ThisBuild / assemblyMergeStrategy).value.apply(x)
 }
 
 lazy val jfxPlatform = {

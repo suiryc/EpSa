@@ -1,9 +1,11 @@
 package epsa.model
 
-import java.time.LocalDate
-import org.scalatest.{Matchers, WordSpec}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.wordspec.AnyWordSpec
 
-class SavingsSpec extends WordSpec with Matchers {
+import java.time.LocalDate
+
+class SavingsSpec extends AnyWordSpec with Matchers {
 
   private val savings0 = Savings()
 

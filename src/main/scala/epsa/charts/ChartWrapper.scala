@@ -325,7 +325,7 @@ trait ChartWrapper[A <: ChartMark] {
       // function) alone appears to do the trick.
       // Since there may be more than one change, keep listening for a limited
       // amount of time (and cancel previous listening if any).
-      changingViewCancellable.foreach(_.cancel)
+      changingViewCancellable.foreach(_.cancel())
       val cancellable = xAxis.scaleProperty.listen(body)
       changingViewCancellable = Some(cancellable)
       CoreSystem.scheduler.scheduleOnce(500.milliseconds) {

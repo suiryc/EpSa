@@ -5,7 +5,6 @@ import epsa.I18N.Strings
 import epsa.storage.DataStore
 import epsa.model.Savings
 import epsa.util.{Awaits, JFXStyles}
-import java.time.Month
 import javafx.collections.FXCollections
 import javafx.event.{ActionEvent, Event}
 import javafx.fxml.{FXML, FXMLLoader}
@@ -14,7 +13,6 @@ import javafx.scene.control._
 import javafx.scene.image.ImageView
 import javafx.scene.input.{KeyCode, KeyEvent, MouseEvent}
 import javafx.stage.{Stage, Window}
-import scala.jdk.CollectionConverters._
 import suiryc.scala.concurrent.RichFuture.Action
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.event.Events
@@ -22,6 +20,10 @@ import suiryc.scala.javafx.scene.control.Dialogs
 import suiryc.scala.javafx.stage.{StageLocationPersistentView, Stages}
 import suiryc.scala.javafx.stage.Stages.StageLocation
 import suiryc.scala.settings.ConfigEntry
+
+import java.time.Month
+import scala.annotation.unused
+import scala.jdk.CollectionConverters._
 
 // TODO: handle user-defined displaying order ?
 
@@ -262,7 +264,7 @@ class EditUnavailabilityPeriodsController extends StageLocationPersistentView(Ed
    * An event filter is added on the generated cell to allow de-selecting an
    * entry in the list view by clicking on it a second time.
    */
-  private def newPeriodCell(@deprecated("unused","") lv: ListView[Savings.UnavailabilityPeriod]): ListCell[Savings.UnavailabilityPeriod] = {
+  private def newPeriodCell(@unused lv: ListView[Savings.UnavailabilityPeriod]): ListCell[Savings.UnavailabilityPeriod] = {
     // See: http://stackoverflow.com/questions/23622703/deselect-an-item-on-an-javafx-listview-on-click
     val cell = new UnavailabilityPeriodCell
 

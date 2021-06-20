@@ -6,8 +6,6 @@ import epsa.I18N.Strings
 import epsa.Settings._
 import epsa.model.Savings
 import epsa.util.{Awaits, JFXStyles}
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 import javafx.event.ActionEvent
 import javafx.collections.FXCollections
 import javafx.fxml.{FXML, FXMLLoader}
@@ -18,13 +16,17 @@ import javafx.scene.image.ImageView
 import javafx.scene.layout.HBox
 import javafx.stage.{Modality, Stage, Window}
 import javafx.util.converter.LocalDateStringConverter
-import scala.jdk.CollectionConverters._
 import suiryc.scala.javafx.stage.Stages.StageLocation
 import suiryc.scala.math.Ordered._
 import suiryc.scala.settings.ConfigEntry
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.scene.control.{DatePickers, Dialogs, TextFieldWithButton}
 import suiryc.scala.javafx.stage.{StageLocationPersistentView, Stages}
+
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import scala.annotation.{nowarn, unused}
+import scala.jdk.CollectionConverters._
 
 class NewAssetActionController extends StageLocationPersistentView(NewAssetActionController.stageLocation) with StrictLogging {
 
@@ -318,7 +320,8 @@ class NewAssetActionController extends StageLocationPersistentView(NewAssetActio
   private def onToggleKind(): Unit = {
     actionKind = getToggleKind(actionKindGroup.getSelectedToggle)
 
-    val (icon, title) = actionKind match {
+    // @nowarn workarounds scala 2.13.x false-positive
+    val (icon, title) = (actionKind: @nowarn) match {
       case AssetActionKind.Payment  => (Images.iconTableImport, Strings.payment)
       case AssetActionKind.Transfer => (Images.iconTablesRelation, Strings.transfer)
       case AssetActionKind.Refund   => (Images.iconTableExport, Strings.refund)
@@ -370,7 +373,7 @@ class NewAssetActionController extends StageLocationPersistentView(NewAssetActio
     ()
   }
 
-  def onLatestDate(@deprecated("unused","") event: ActionEvent): Unit = {
+  def onLatestDate(@unused event: ActionEvent): Unit = {
     savings.latestAssetAction.foreach { date =>
       operationDateField.setValue(date)
     }
@@ -420,7 +423,7 @@ class NewAssetActionController extends StageLocationPersistentView(NewAssetActio
     ()
   }
 
-  def onSrcEmpty(@deprecated("unused","") event: ActionEvent): Unit = {
+  def onSrcEmpty(@unused event: ActionEvent): Unit = {
     for {
       operationDate <- getOperationDate
       schemeAndFund <- getSrcFund
@@ -796,7 +799,8 @@ class NewAssetActionController extends StageLocationPersistentView(NewAssetActio
 
     val event = if (opDateOk && srcOk && dstOk) Some {
       val comment = Option(commentField.getText).map(_.trim).find(_.nonEmpty)
-      actionKind match {
+      // @nowarn workarounds scala 2.13.x false-positive
+      (actionKind: @nowarn) match {
         case AssetActionKind.Payment  => Savings.MakePayment(operationDate, srcAsset, comment)
         case AssetActionKind.Transfer => Savings.MakeTransfer(operationDate, srcAsset, Option(dstOperationDate), dstAsset, comment)
         case AssetActionKind.Refund   => Savings.MakeRefund(operationDate, srcAsset, comment)

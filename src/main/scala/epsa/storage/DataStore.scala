@@ -696,7 +696,7 @@ object DataStore {
       def id: Rep[String] = column[String]("id", O.PrimaryKey)
       def years: Rep[Int] = column[Int]("years")
       def month: Rep[Option[Month]] = column[Option[Month]]("month")
-      def * : ProvenShape[UnavailabilityPeriod] = (id, years, month) <> (Savings.UnavailabilityPeriod.tupled, Savings.UnavailabilityPeriod.unapply)
+      def * : ProvenShape[UnavailabilityPeriod] = (id, years, month).<>(Savings.UnavailabilityPeriod.tupled, Savings.UnavailabilityPeriod.unapply)
     }
 
     override protected val entries = TableQuery[Entries]
