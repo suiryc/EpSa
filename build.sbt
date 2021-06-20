@@ -93,7 +93,10 @@ lazy val epsa = project.in(file(".")).
         exclude("log4j", "log4j")
         exclude("org.slf4j", "slf4j-log4j12"),
       "org.apache.poi"              %  "poi"                               % versions("poi"),
-      "org.apache.poi"              %  "poi-ooxml"                         % versions("poi"),
+      // poi v5.0.0 comes with batik-all which depends on all batik-xxx submodules
+      // while also providing the same .class files but with different content ...
+      "org.apache.poi"              %  "poi-ooxml"                         % versions("poi")
+        exclude("org.apache.xmlgraphics", "batik-all"),
       "org.openjfx"                 %  "javafx-base"                       % versions("javafx") classifier jfxPlatform,
       "org.openjfx"                 %  "javafx-controls"                   % versions("javafx") classifier jfxPlatform,
       "org.openjfx"                 %  "javafx-fxml"                       % versions("javafx") classifier jfxPlatform,
@@ -149,7 +152,11 @@ ThisBuild / assemblyMergeStrategy := {
   case PathList(x @ _*) if x.last == "module-info.class" => MergeStrategy.discard
   case x if x.startsWith("application.conf") => MergeStrategy.discard
   case x if x.startsWith("library.properties") => MergeStrategy.discard
-  case PathList("javax", "xml", _ @ _*) => MergeStrategy.first
+  // Note: monix 3.4.0 (monix-internal-jctools) embeds a few package classes
+  // that comes from scala-collection-compat.
+  case PathList("scala", "collection", "compat", "immutable", "package$.class") => MergeStrategy.first
+  case PathList("scala", "collection", "compat", "immutable", "package.class") => MergeStrategy.first
+  case "scala-collection-compat.properties" => MergeStrategy.first
   case x => (ThisBuild / assemblyMergeStrategy).value.apply(x)
 }
 
