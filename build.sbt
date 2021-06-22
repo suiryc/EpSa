@@ -1,5 +1,6 @@
 import sbt._
 import Keys._
+import suiryc.scala.sbt.AssemblyEx
 
 lazy val versions = Map[String, String](
   "akka"          -> "2.6.15",
@@ -32,9 +33,9 @@ lazy val versions = Map[String, String](
 )
 
 
-lazy val epsa = project.in(file(".")).
-  enablePlugins(BuildInfoPlugin, GitVersioning).
-  settings(
+lazy val epsa = project.in(file("."))
+  .enablePlugins(BuildInfoPlugin, GitVersioning)
+  .settings(
     organization := "suiryc",
     name := "EpSa",
     // Note: if we want to let sbt-git generate the version, we need to comment
@@ -150,8 +151,8 @@ assembly / assembledMappings ~= { mappings =>
 
 ThisBuild / assemblyMergeStrategy := {
   case PathList(x @ _*) if x.last == "module-info.class" => MergeStrategy.discard
-  case x if x.startsWith("application.conf") => MergeStrategy.discard
   case x if x.startsWith("library.properties") => MergeStrategy.discard
+  case "application.conf" => AssemblyEx.concatJarThenDir
   // Note: monix 3.4.0 (monix-internal-jctools) embeds a few package classes
   // that comes from scala-collection-compat.
   case PathList("scala", "collection", "compat", "immutable", "package$.class") => MergeStrategy.first
