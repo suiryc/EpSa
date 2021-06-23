@@ -1,19 +1,17 @@
 package epsa
 
-import akka.actor.ActorSystem
 import epsa.controllers.MainController
 import epsa.model.Savings
 import epsa.util.Awaits
 import javafx.stage.Stage
 import monix.execution.Scheduler
-import suiryc.scala.akka.CoreSystem
+import suiryc.scala.akka.{AkkaResources, CoreSystem}
 import suiryc.scala.javafx.{JFXApplication, JFXLauncher}
 import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.log.Loggers
 import suiryc.scala.misc.Util
 
 import java.nio.file.Path
-import scala.concurrent.ExecutionContextExecutor
 
 object Main extends JFXLauncher[MainApp] {
 
@@ -61,14 +59,9 @@ object Main extends JFXLauncher[MainApp] {
     }
   }
 
-  object Akka {
+  val Akka: AkkaResources = CoreSystem.NonBlocking
 
-    implicit val system: ActorSystem = CoreSystem.system
-    implicit val dispatcher: ExecutionContextExecutor = system.dispatcher
-
-  }
-
-  val scheduler: Scheduler = CoreSystem.scheduler
+  val scheduler: Scheduler = Akka.scheduler
 
   override def shutdown(): Unit = {
     JFXSystem.terminate()

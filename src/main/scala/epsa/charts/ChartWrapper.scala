@@ -1,19 +1,16 @@
 package epsa.charts
 
+import epsa.Main.Akka
 import epsa.Settings.formatNumber
 import epsa.charts.LocalDateAxisWrapper.{dateToNumber, numberToDate}
 import epsa.util.JFXStyles
 import epsa.util.JFXStyles.AnimationHighlighter
-import java.time.LocalDate
 import javafx.geometry.Bounds
 import javafx.scene.Parent
 import javafx.scene.chart.{LineChart, NumberAxis, XYChart}
 import javafx.scene.input.{MouseButton, MouseEvent, ScrollEvent}
 import javafx.scene.layout.{AnchorPane, HBox, Pane, Region}
 import javafx.scene.shape.{Line, Rectangle}
-import scala.concurrent.duration._
-import scala.jdk.CollectionConverters._
-import suiryc.scala.akka.CoreSystem
 import suiryc.scala.concurrent.Cancellable
 import suiryc.scala.javafx.beans.value.RichObservableValue
 import suiryc.scala.javafx.beans.value.RichObservableValue._
@@ -24,6 +21,10 @@ import suiryc.scala.javafx.scene.chart.Axises
 import suiryc.scala.math.BigDecimals
 import suiryc.scala.math.Ordering._
 import suiryc.scala.util.Cached
+
+import java.time.LocalDate
+import scala.concurrent.duration._
+import scala.jdk.CollectionConverters._
 
 trait ChartWrapper[A <: ChartMark] {
 
@@ -328,7 +329,7 @@ trait ChartWrapper[A <: ChartMark] {
       changingViewCancellable.foreach(_.cancel())
       val cancellable = xAxis.scaleProperty.listen(body)
       changingViewCancellable = Some(cancellable)
-      CoreSystem.scheduler.scheduleOnce(500.milliseconds) {
+      Akka.scheduler.scheduleOnce(500.milliseconds) {
         cancellable.cancel()
       }
       ()
