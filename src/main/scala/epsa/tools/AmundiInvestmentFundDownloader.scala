@@ -23,7 +23,7 @@ object AmundiInvestmentFundDownloader {
     val end = dateEnd.getOrElse(LocalDate.now)
     val uri = getUri(amfId, start, end)
     Future {
-      val body = Http.executeBinaryRequest(Http.buildHttpGet(uri.toString))
+      val body = Http.executeBinaryRequest(Http.buildHttpGet(uri))
       EsaliaInvestmentFundProber.probe(body).getOrElse {
         throw new Exception("Downloaded data could not be probed")
       }

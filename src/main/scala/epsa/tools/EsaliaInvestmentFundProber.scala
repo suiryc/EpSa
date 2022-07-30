@@ -34,13 +34,21 @@ object EsaliaInvestmentFundProber extends InvestmentFundProber {
   }
 
   private def probeExcel(book: Workbook): Option[Savings.AssetValueHistory] = {
-    // Rows 0 to 4 contain nothing
-    // Rows 5 to 13 contain information on fund and extraction request
-    // Row 7 contains the investment fund name
-    // Row 15 indicates which data are listed: cell 1 shall contain the date
-    // and cell 2 the value at the given date
-    // Rows 16 and beyond contain dated values
-    // Cell 0 is empty
+    // Notes:
+    // There should be at least one sheet.
+    // The first one is named "Historique des VL". Usually there is a second
+    // empty sheet.
+    //
+    // In all rows, cell 0 is empty.
+    // Rows 0 to 4 contain nothing.
+    // Rows 5 to 13 contain information on fund and extraction request:
+    //  - row 7 is for the investment fund name: cell 1 contains "Nom du fonds"
+    //    while cell 2 contains the fund name
+    // Row 14 is empty.
+    // Row 15 indicates which data are listed in rows 16 and beyond.
+    // In row 15, cell 1 contains "Dates". Initially cell 2 contained "VL(C)",
+    // and lately "VL(data.result_assignment.capitalisation)".
+    // Dated values are listed in reverse history: latest/earliest date first.
     val firstRowIdx = 5
     val firstCellIdx = 1
     val nameRowIdx = 7
@@ -64,7 +72,7 @@ object EsaliaInvestmentFundProber extends InvestmentFundProber {
         (nameRow.getCell(firstCellIdx).getStringCellValue == "Nom du fonds") &&
         (labelsRow.getFirstCellNum == firstCellIdx) && (labelsRow.getLastCellNum >= math.max(dateCellIdx, valueCellIdx)) &&
         (labelsRow.getCell(dateCellIdx).getStringCellValue == "Dates") &&
-        (labelsRow.getCell(valueCellIdx).getStringCellValue == "VL(C)"))
+        labelsRow.getCell(valueCellIdx).getStringCellValue.startsWith("VL"))
       {
         val dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
         val name = nameRow.getCell(firstCellIdx + 1).getStringCellValue
