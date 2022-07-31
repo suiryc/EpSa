@@ -610,12 +610,20 @@ class NewAssetActionController extends StageLocationPersistentView(NewAssetActio
   }
 
   private def updateNAV(updateSrc: Boolean = true): Unit = {
-    def updateField(field: TextFieldWithButton, fund: Savings.Fund, operationDate: LocalDate): Unit = {
-      val navOpt = Awaits.readDataStoreNAV(Some(stage), fund.id, operationDate).getOrElse(None)
-      navOpt match {
+    def updateField(field: TextFieldWithButton, fund: Savings.Fund, operationDate: LocalDate, extraDate: LocalDate*): Unit = {
+      // There may be two dates (for destination fund, source and destination date).
+      // We want to remember any NAV for the wanted date(s).
+      val dates = Set(operationDate) ++ extraDate
+      val navs = dates.toList.flatMap { date =>
+        Awaits.readDataStoreNAV(Some(stage), fund.id, date).getOrElse(None).map(date -> _)
+      }.toMap
+      val userData = if (navs.nonEmpty) navs else null
+      // The operationDate dictates what is displayed in the field.
+      // We still remember retrieved NAVs if any.
+      navs.get(operationDate) match {
         case Some(nav) =>
           val text = formatCompactNumber(nav.value)
-          field.setUserData(nav)
+          field.setUserData(userData)
           field.setText(text)
           field.textField.setTooltip(new Tooltip(s"${Strings.date}: ${nav.date}\n${Strings.nav}: ${formatNumber(nav.value, Main.settings.currency.get)}"))
           field.setOnButtonAction { _ =>
@@ -623,10 +631,13 @@ class NewAssetActionController extends StageLocationPersistentView(NewAssetActio
           }
           // Bind so that changing value allows to reset it
           field.buttonDisableProperty.bind(field.textField.textProperty.isEqualTo(text))
+          // Forbid changing NAV value if we found one for this exact date: we
+          // only allow updating NAV history for missing dates. This also
+          // prevents accidentally changing the field value.
           field.textField.setEditable(nav.date != operationDate)
 
         case None =>
-          field.setUserData(null)
+          field.setUserData(userData)
           field.setText(null)
           field.textField.setTooltip(null)
           field.buttonDisableProperty.unbind()
@@ -641,7 +652,7 @@ class NewAssetActionController extends StageLocationPersistentView(NewAssetActio
         updateField(srcNAVField, schemeAndFund.fund, operationDate)
       }
       getDstFund.foreach { schemeAndFund =>
-        updateField(dstNAVField, schemeAndFund.fund, getDstOperationDate.getOrElse(operationDate))
+        updateField(dstNAVField, schemeAndFund.fund, getDstOperationDate.getOrElse(operationDate), operationDate)
         // Manually trigger src amount callback in order to recompute dst
         // units if necessary.
         if (updateSrc) onSrcAmount()
@@ -933,23 +944,57 @@ object NewAssetActionController {
     else {
       val eventOpt = controller.checkForm()
       eventOpt.foreach { event =>
+        // For the validated asset operation, we wish to update fund(s) NAV(s)
+        // when applicable. This is the case if either:
+        //  - there was no known NAV for a given date, either because there is
+        //    no NAV history yet (newly created fund), or operation date
+        //    predates current history
+        //  - a NAV was found but not for the exact operation date: we only
+        //    found a NAV for a date preceding the operation
+        // For non-transfer operations, there is only one fund concerned, and
+        // one operation date.
+        // For transfer operations, there usually is only one date.
+        // But sometimes the operation is actually effective (truly visible) on
+        // a different date.
+        // For the later case, what we expect is that the effective second date
+        // is later compared to the event date.
+        // What may also happen is that the destination fund was newly created
+        // and has no NAV history yet, or at least that this operation predates
+        // (for event and effective date) any known NAV history.
+        // For this particular case, we insert as usual the NAV for the event
+        // date, and for visual reasons (fund NAV graph) we wish to insert
+        // the same value for the effective date too: the only condition is
+        // thus that for this date there was no known NAV yet (even for a
+        // preceding date).
         val dstDate = event match {
           case Savings.MakeTransfer(_, _, dstDate, _, _) => dstDate.getOrElse(event.date)
           case _ => event.date
         }
         for {
-          (schemeAndFundOpt, field, date, value) <- List(
-            (controller.getSrcFund, controller.srcNAVField, event.date, controller.getSrcNAV),
-            (controller.getDstFund, controller.dstNAVField, dstDate, controller.getDstNAV)
-          )
+          (schemeAndFundOpt, field, date, value, insertOnlyMissing) <- List(
+            (controller.getSrcFund, controller.srcNAVField, event.date, controller.getSrcNAV, false),
+            (controller.getDstFund, controller.dstNAVField, event.date, controller.getDstNAV, false)
+          ) ++ {
+            // If asset operation is effective on destination fund on a different
+            // date, take it into account.
+            if (dstDate != event.date) List((controller.getDstFund, controller.dstNAVField, dstDate, controller.getDstNAV, true))
+            else Nil
+          }
           schemeAndFund <- schemeAndFundOpt
-          // Note: use fake NAV when none was found (either because there is no
-          // NAV history yet, or operation date predates current history).
-          nav <-
+          // Only consider NAVs when operation concerns this field.
+          navs <-
             if (field.isDisabled) None
-            else Option(field.getUserData.asInstanceOf[Savings.AssetValue]).orElse(Some(Savings.AssetValue(LocalDate.ofEpochDay(0), 0)))
+            else Option(field.getUserData.asInstanceOf[Map[LocalDate, Savings.AssetValue]]).orElse(Some(Map.empty[LocalDate, Savings.AssetValue]))
+          // See comments above: in nominal case we update/insert if filled form
+          // differs from history NAV; in a specific case we only insert if
+          // there is no NAV history at the wanted date.
+          navOpt = navs.get(date)
+          mayInsert = !insertOnlyMissing || navOpt.isEmpty
+          nav = navOpt.getOrElse(Savings.AssetValue(LocalDate.ofEpochDay(0), 0))
         } {
-          if ((date != nav.date) && (value != nav.value)) {
+          // Belt and suspenders: only insert/update if NAV date is not the
+          // operation date.
+          if (mayInsert && (date != nav.date) && (value != nav.value)) {
             Awaits.saveDataStoreNAV(owner, schemeAndFund.fund.id, Savings.AssetValue(date, value))
           }
         }
