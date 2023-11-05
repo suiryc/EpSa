@@ -1,24 +1,25 @@
-import sbt._
-import Keys._
-import suiryc.scala.sbt.AssemblyEx
+import sbt.*
+import Keys.*
+import suiryc.scala.sbt.{AssemblyEx, Versioning}
 
 lazy val versions = Map[String, String](
-  "akka"          -> "2.6.15",
-  "config"        -> "1.4.1",
-  "epsa"          -> "1.1-SNAPSHOT",
+  "akka"          -> "2.6.21",
+  "config"        -> "1.4.3",
   "h2"            -> "1.4.200",
-  "html-cleaner"  -> "2.24",
-  "httpclient"    -> "4.5.13",
+  "html-cleaner"  -> "2.29",
+  "httpclient"    -> "4.5.14",
   "javafx"        -> "12.0.1",
-  "logback"       -> "1.2.3",
+  // log4j2 extra dependencies for slf4j, if needed
+  "log4j2"        -> "2.20.0",
+  "logback"       -> "1.4.11",
   "monix"         -> "3.4.0",
-  "poi"           -> "5.0.0",
-  "scala"         -> "2.13.6",
-  "scala-logging" -> "3.9.3",
-  "scalatest"     -> "3.2.9",
-  "scopt"         -> "4.0.1",
-  "slf4j"         -> "1.7.31",
-  "slick"         -> "3.3.3",
+  "poi"           -> "5.2.4",
+  "scala"         -> "2.13.12",
+  "scala-logging" -> "3.9.5",
+  "scalatest"     -> "3.2.17",
+  "scopt"         -> "4.1.0",
+  "slf4j"         -> "2.0.9",
+  "slick"         -> "3.4.1",
   // Notes:
   // simple-odf was part of odftoolkit when handled in apache incubator. Latest
   // official release is 0.6.2-incubating, while maven has a 0.8.2-incubating.
@@ -32,25 +33,33 @@ lazy val versions = Map[String, String](
   "suiryc-scala"  -> "0.0.4-SNAPSHOT"
 )
 
+// Determine version (and log it) once before using it.
+lazy val projectVersion = Versioning.version
+Global / onLoad := {
+  val original = (Global / onLoad).value
+  sLog.value.info(s"Project version: $projectVersion")
+  original
+}
 
 lazy val epsa = project.in(file("."))
-  .enablePlugins(BuildInfoPlugin, GitVersioning)
+  .enablePlugins(BuildInfoPlugin)
   .settings(
     organization := "suiryc",
     name := "EpSa",
-    // Note: if we want to let sbt-git generate the version, we need to comment
-    // "version", uncomment "git.baseVersion" and remove "-SNAPSHOT" (sbt-git
-    // will append it if necessary).
-    version := versions("epsa"),
-    //git.baseVersion := versions("epsa"),
+    version := projectVersion,
     scalaVersion := versions("scala"),
 
     buildInfoKeys := Seq[BuildInfoKey](
       name,
       version,
-      git.gitHeadCommit,
+      BuildInfoKey.action("gitHeadCommit") {
+        Versioning.commitId
+      },
       scalaVersion,
-      sbtVersion
+      sbtVersion,
+      BuildInfoKey.action("buildTime") {
+        System.currentTimeMillis
+      }
     ),
     buildInfoPackage := "epsa",
     buildInfoObject := "Info",
@@ -89,6 +98,8 @@ lazy val epsa = project.in(file("."))
       "net.sourceforge.htmlcleaner" %  "htmlcleaner"                       % versions("html-cleaner"),
       "org.apache.httpcomponents"   %  "httpclient"                        % versions("httpclient")
         exclude ("commons-logging", "commons-logging"),
+      "org.apache.logging.log4j"    %  "log4j-api"                         % versions("log4j2"),
+      "org.apache.logging.log4j"    %  "log4j-to-slf4j"                    % versions("log4j2"),
       "org.apache.odftoolkit"       %  "simple-odf"                        % versions("simple-odf")
         exclude("commons-logging", "commons-logging")
         exclude("log4j", "log4j")
@@ -118,11 +129,12 @@ lazy val epsa = project.in(file("."))
     publishTo := Some(Resolver.mavenLocal)
   )
 
+// Files to exclude: are generated inside 'target/classes' if running
+// from IDE. Useful when not cleaning up before packaging ...
+// Note: "application.conf*" is also discarded in assembly merge strategy.
+lazy val excludedFiles = Set("application.conf", "application.conf.bak")
+
 def remap(mappings: Seq[(File, String)]): Seq[(File, String)] = {
-  // Files to exclude: are generated inside 'target/classes' if running
-  // from IDE. Useful when not cleaning up before packaging ...
-  // Note: "application.conf*" is also discarded in assembly merge strategy.
-  val exclude = Set("application.conf", "application.conf.bak")
   // The 'package' path
   val matchPath = "package"
   // Get all files to package, and determine the actual destination path
@@ -137,26 +149,23 @@ def remap(mappings: Seq[(File, String)]): Seq[(File, String)] = {
   val toPackageDst = toPackage.map(_._2).toSet
   // Replace mappings that we are explicitly packaging
   mappings.filter {
-    case (src, dst) => !toPackageSrc.contains(src) && !toPackageDst.contains(dst) && !exclude.contains(dst)
+    case (src, dst) => !toPackageSrc.contains(src) && !toPackageDst.contains(dst) && !excludedFiles.contains(dst)
   } ++ toPackage
 }
 
-// Replace mappings for fat jar generation
-assembly / assembledMappings ~= { mappings =>
-  mappings.map { m =>
-    if (m.sourcePackage.isEmpty) m.copy(mappings = remap(m.mappings).toVector)
-    else m
-  }
-}
+// Since sbt-assembly 1.0.0, running tests must be configured explicitly
+assembly / test := (Test / test).value
 
 ThisBuild / assemblyMergeStrategy := {
   case PathList(x @ _*) if x.last == "module-info.class" => MergeStrategy.discard
   case x if x.startsWith("library.properties") => MergeStrategy.discard
-  case "application.conf" => AssemblyEx.concatJarThenDir
+  case "application.conf" => AssemblyEx.strategies.concatLibsThenProject
+  case x if excludedFiles.contains(x) => AssemblyEx.strategies.libsOnly
   // Note: monix 3.4.0 (monix-internal-jctools) embeds a few package classes
   // that comes from scala-collection-compat.
+  case PathList("scala", "collection", "compat", "package$.class") => MergeStrategy.first
   case PathList("scala", "collection", "compat", "immutable", "package$.class") => MergeStrategy.first
-  case PathList("scala", "collection", "compat", "immutable", "package.class") => MergeStrategy.first
+  case PathList("scala", "util", "control", "compat", "package$.class") => MergeStrategy.first
   case "scala-collection-compat.properties" => MergeStrategy.first
   case x => (ThisBuild / assemblyMergeStrategy).value.apply(x)
 }

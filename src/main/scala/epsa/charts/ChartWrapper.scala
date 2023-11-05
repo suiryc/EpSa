@@ -367,7 +367,7 @@ trait ChartWrapper[A <: ChartMark] {
     val icon = marker.icon
     val vertical = marker.verticalLine
     val nodes = List(marker.verticalLine, marker.region)
-    val cancellable = RichObservableValue.listen2(marker.region.parentProperty,
+    val cancellable = RichObservableValue.listen2[Any](marker.region.parentProperty,
       xAxis.lowerBoundProperty, xAxis.scaleProperty, yAxis.lowerBoundProperty, yAxis.scaleProperty)
     { cancellable =>
       if ((marker.region.getParent == null) || !isInXAxis(xIdx)) {
