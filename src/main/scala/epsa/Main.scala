@@ -22,7 +22,7 @@ object Main extends JFXLauncher[MainApp] {
   lazy val settings = new Settings(appPath.resolve("application.conf"))
 
   val versionedName: String = s"${epsa.Info.name} ${epsa.Info.version}" +
-    epsa.Info.gitHeadCommit.map(v => s" ($v)").getOrElse("")
+    epsa.Info.commitId.map(v => s" ($v)").getOrElse("")
 
   override def main(args: Array[String]): Unit = {
     val parser = new scopt.OptionParser[Params](getClass.getCanonicalName) {

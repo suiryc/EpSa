@@ -52,7 +52,7 @@ lazy val epsa = project.in(file("."))
     buildInfoKeys := Seq[BuildInfoKey](
       name,
       version,
-      BuildInfoKey.action("gitHeadCommit") {
+      BuildInfoKey.action("commitId") {
         Versioning.commitId
       },
       scalaVersion,
